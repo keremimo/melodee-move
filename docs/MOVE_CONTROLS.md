@@ -78,6 +78,10 @@ after Schwung) differ for some buttons:
 | Shift + Steps 4, 12, 13 | No Move job (no icon): **4 the Mixer** (16 tracks, their effects), **12 the Looper**, **13 Song**. |
 | Shift held | **Nothing on the screen**, as on the stock Move: the steps with a Shift job light, Melodee's 4, 12 and 13 too (Kerem dropped the on-screen Shift card from the mockups). |
 | Undo, quit | **Undo held 0.4 s opens the undo list** (as Melodee's Shift + − hold on the MPC). **Shift + Back goes back to Ableton's Move app**, as today, and Setup (Shift + Step 2) lists it too. |
+| Pad pages (kit depth) | **Nine pad pages on Shift + turn**, after the Play screen's own eight knobs (`docs/ui/kit.png`): TRIM, LAYERS (ZONES on an instrument's pad), TUNE (with Warp, Follow and the kit's warp mode), AMP ENV, PLAY, CLOUD, MIX (with kit volume and COLOUR), FILTER (with its envelope), KIT FILT; Back returns to Play. |
+| 16 Pitches (kit depth) | **In key**: the right 16 play the last pad up the project's key and scale from its root (Melodee's 16 Levels Scale, the Move's In-Key), the sample counting as its own note; Plus and Minus its octave. |
+| Delete + pad (kit depth) | **At once, nothing asked**, as Melodee and the Move do: the pad's notes in the pattern go first; a pad with none is emptied; an empty pad closes the gap, the pads after it moving down one with their notes. Copy onto a pad that holds a sample asks first, as Copy a track does. |
+| Kit pad lights (kit depth) | **Dim, with a flare**: a pad with a sample dim in its colour, bright while it sounds; the last pad white; a muted pad dark grey (the Move's dim white); an empty pad off. |
 
 Followed from the rule without a choice: Left and Right become the
 pattern's bars, so pages move to Shift + turn; in Typing, Back deletes a

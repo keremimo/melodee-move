@@ -13,6 +13,7 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -39,7 +40,7 @@
 //   handed back to be freed off the audio thread.
 namespace app {
 
-constexpr unsigned pad_count = 32; // the Move's pads: kit pads 1-32 (A01-B16), notes 36-67
+constexpr unsigned pad_count = 32; // the Move's pads: on a kit, two of its eight banks (Studio::pad_bank())
 
 // What a track is, as the Move shows it: Melodee's engines, a PLUGIN track
 // split by what it plays (one of Schwung's modules, or another plug-in).
@@ -151,18 +152,58 @@ public:
     void set_octave(unsigned track, int octave);
     int note_for(unsigned pad, int octave) const; // rows of fourths, C2 at the bottom left at octave 0
 
-    // A kit track's pads.
-    unsigned pad() const { return song->tracks[selected].last_pad % pad_count; }
-    void select_pad(unsigned pad);
+    // A kit track's pads: 128 in eight banks of 16 (A-H, melodee::sampler_pads),
+    // the Move's 32 two of them, Track::bank the lower (Plus and Minus move it
+    // 16 pads, docs/MOVE_CONTROLS.md). With 16 Pitches on (Melodee's 16 Levels,
+    // Track::levels) the left 16 are bank Track::bank laid out as the MPC's
+    // (bottom left first, rows of four) and the right 16 the last pad up the
+    // project's key. pad() is the kit pad edited (0-127).
+    unsigned pad() const { return song->tracks[selected].last_pad % melodee::sampler_pads; }
+    void select_pad(unsigned pad); // a kit pad, 0-127
+    int kit_pad_at(unsigned move_pad) const;   // the kit pad under Move pad 0-31; -1 a pitch of 16 Pitches
+    int move_pad_of(unsigned kit_pad) const;   // the Move pad showing a kit pad; -1 out of view
+    unsigned pad_bank() const { return song->tracks[selected].bank; }
+    void set_pad_bank(int bank);               // the lower bank in view, 0..6 (0..7 with 16 Pitches)
+    bool pitches() const;                      // 16 Pitches on the selected kit
+    void set_pitches(bool on);
+    void set_pitches_octave(int octave);       // melodee's kit Levels octave, kit_level_octave as it is
+    int pitch_semitones(unsigned pitch) const; // pitch 0-15 (bottom left first): its semitones from the pad's own
+    void refresh_pads();                       // the audio thread's copy of the above, after anything moved them
+    // Copy the sound of one pad onto another (its sample and values, chain,
+    // mute, zone trims). Clear: the pad's notes in the selected pattern, or
+    // with none its sound, or an empty pad's gap closed (the pads after it
+    // down one, notes too: melodee's shell/pad_gap.h).
+    bool copy_pad(unsigned track, unsigned from, unsigned to);
+    enum class Cleared { Nothing, Notes, Emptied, GapClosed };
+    Cleared clear_pad(unsigned track, unsigned pad);
+    bool delete_pad_notes(unsigned track, unsigned pad); // in the playing pattern; false: none there
+    // Which kit pads sound now, from the engine's taps of the selected track
+    // (the newest voices); for the pads' flare.
+    std::array<bool, melodee::sampler_pads> sounding() const;
     const Sample* sample_of(unsigned track, unsigned pad) const;
     const Sample* sample_of_pad() const { return sample_of(selected, pad()); }
     void set_pad(unsigned track, unsigned pad, const melodee::PadSound& sound); // the project's and the engine's
     void sound_pad(unsigned track, unsigned pad, const melodee::PadSound& sound); // the engine's only (Chop's slices)
     void sound_pads(unsigned track);                                             // the engine's back to the project's
     melodee::SampleChop* chop_of(unsigned slot);
-    std::string install(std::unique_ptr<Sample> sample, unsigned track, unsigned pad); // empty on success
-    struct Job { std::string path; unsigned track, pad; };
+    const Sample* sample_in(unsigned slot) const { return slot < samples.size() ? samples[slot].get() : nullptr; }
+    void set_kit_param(unsigned track, int param, int value); // a kit-wide value (melodee::sampler::Param)
+    // The layer the next sample loaded onto a pad goes on (LAYERS, kit_pages.cpp): 0 the pad's own.
+    struct LayerTarget { int track = -1, pad = -1, layer = 0; };
+    LayerTarget layer_target;
+    // `keep`: the pad keeps its values, only its sample and region new (Trim Sample).
+    std::string install(std::unique_ptr<Sample> sample, unsigned track, unsigned pad, bool keep = false); // empty on success
+    struct Job { std::string path; unsigned track, pad; bool keep = false; };
     std::vector<Job> jobs; // files to load (the service thread's)
+    // A pad's region (or a layer's) written as a WAV, on the service thread
+    // (Sample Options): Trim Sample (Samples/Edits/<NAME>-Trimmed.wav, then the
+    // pad onto all of it) and Save Sample (Samples/<name>.wav, the pad as it was).
+    struct FileJob { bool trim = false; unsigned track = 0, pad = 0; int layer = 0; std::string path; };
+    std::vector<FileJob> file_jobs;
+    std::string samples_folder() const; // Melodee's Samples, under its home
+    // Typing for Melodee's own use (Save Sample's name): `done` with the text unless cancelled.
+    void ask_text(std::string title, std::string initial, std::function<void(const std::string&)> done);
+    std::function<void(const std::string&)> typing_done;
     bool loading = false;
 
     // Transport and tempo.
@@ -239,6 +280,7 @@ private:
     ModuleTrack& make_module_track(unsigned track);
     void drop_module_track(unsigned track);
     void take_back();                      // what the audio thread handed back, freed
+    void run_file_jobs();                  // Trim Sample, Save Sample: regions written as WAVs
     void take_answers();
     void destroy_retired();
     std::string write(std::vector<uint8_t> bytes, std::string settings_text);
@@ -263,6 +305,10 @@ private:
     // pad's press went (its track and key), so its release and pressure
     // go there too.
     std::atomic<int> audio_track {0}, audio_kind {0}, audio_octave {0};
+    // A kit's: the lower bank in view, 16 Pitches on, its pad and each pitch's semitones.
+    std::atomic<int> audio_bank {0}, audio_levels_pad {0};
+    std::atomic<bool> audio_pitches {false};
+    std::array<std::atomic<int>, 16> audio_semitones {};
     std::atomic<bool> pads_typing {false};
     // The MIDI thread's word to the audio thread: a pad pressed now has
     // another job than its sound (Shift, Copy, Delete, Mute or a step held;

@@ -2,7 +2,10 @@
 #include "app/studio.h"
 #include "app/screen.h"
 #include "melodee/engine/engine_info.h"
+#include "melodee/model/scales.h"
+#include "melodee/shell/pad_gap.h"
 #include "melodee/shell/sample_decode.h"
+#include "melodee/shell/sample_memory.h"
 #include <juce_core/juce_core.h>
 #include <algorithm>
 #include <cctype>
@@ -224,12 +227,32 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
             if (pads_quiet.load(std::memory_order_relaxed)) return;  // another job (docs/MOVE_CONTROLS.md)
             int track = audio_track.load(std::memory_order_relaxed);
             auto kind = TrackKind(audio_kind.load(std::memory_order_relaxed));
-            int key = kind == TrackKind::Kit ? int(melodee::sampler_first_note + input.index)
-                    : kind == TrackKind::Synth || kind == TrackKind::Keys || kind == TrackKind::Midi || kind == TrackKind::Plugin
-                        ? note_for(input.index, audio_octave.load(std::memory_order_relaxed)) : -1;
+            int16_t velocity = int16_t(std::max<int>(1, input.value));
+            int key = -1;
+            if (kind == TrackKind::Kit) {
+                // The kit's pads: two banks of 16 from the lower in view; with
+                // 16 Pitches, the left 16 one bank as the MPC lays it and the
+                // right 16 the last pad at its pitches (Melodee's 16 Levels).
+                unsigned bank = unsigned(audio_bank.load(std::memory_order_relaxed)) * 16;
+                unsigned row = move::pad_row(input.index), column = move::pad_column(input.index);
+                if (audio_pitches.load(std::memory_order_relaxed)) {
+                    if (column >= 4) {
+                        int semitones = audio_semitones[row * 4 + column - 4].load(std::memory_order_relaxed);
+                        int pad = audio_levels_pad.load(std::memory_order_relaxed);
+                        went = {track, melodee::pad_note(int(melodee::sampler_first_note) + pad, semitones)};
+                        engine->send({Type::PadNote, uint8_t(track), uint8_t(semitones + 64), uint16_t(pad), velocity});
+                        return;
+                    }
+                    key = int(melodee::sampler_first_note + (bank + row * 4 + column) % melodee::sampler_pads);
+                } else {
+                    key = int(melodee::sampler_first_note + (bank + input.index) % melodee::sampler_pads);
+                }
+            } else if (kind == TrackKind::Synth || kind == TrackKind::Keys || kind == TrackKind::Midi || kind == TrackKind::Plugin) {
+                key = note_for(input.index, audio_octave.load(std::memory_order_relaxed));
+            }
             if (key < 0) return;
             went = {track, key};
-            engine->send({Type::NoteOn, uint8_t(track), 0, uint16_t(key), int16_t(std::max<int>(1, input.value))});
+            engine->send({Type::NoteOn, uint8_t(track), 0, uint16_t(key), velocity});
         } else if (went.track >= 0) {
             engine->send({Type::NoteOff, uint8_t(went.track), 0, uint16_t(went.key), 0});
             went = {};
@@ -294,6 +317,8 @@ void Studio::select(unsigned t) {
     audio_track.store(int(t), std::memory_order_relaxed);
     audio_kind.store(int(kind(t)), std::memory_order_relaxed);
     audio_octave.store(octave(t), std::memory_order_relaxed);
+    refresh_pads();
+    engine->watch_taps(kind(t) == TrackKind::Kit ? int(t) : -1); // the pads' flare
     home();
 }
 
@@ -382,12 +407,141 @@ ModuleTrack* Studio::module_track(unsigned t) { return modules[t % melodee::trac
 
 void Studio::select_pad(unsigned at) {
     auto& track = current();
-    if (at < pad_count && at != track.last_pad) { track.last_pad = uint8_t(at); changed(); }
+    if (at >= melodee::sampler_pads) return;
+    if (at != track.last_pad) { track.last_pad = uint8_t(at); changed(); }
+    if (track.levels && track.levels_pad != at) { // 16 Pitches play the pad picked
+        track.levels_pad = uint8_t(at);
+        refresh_pads();
+    }
+}
+
+int Studio::kit_pad_at(unsigned move_pad) const {
+    const auto& track = current();
+    unsigned bank = track.bank * 16u, row = move::pad_row(move_pad), column = move::pad_column(move_pad);
+    if (track.levels) return column >= 4 ? -1 : int((bank + row * 4 + column) % melodee::sampler_pads);
+    return int((bank + move_pad) % melodee::sampler_pads);
+}
+
+int Studio::move_pad_of(unsigned kit_pad) const {
+    for (unsigned at = 0; at < pad_count; ++at)
+        if (kit_pad_at(at) == int(kit_pad)) return int(at);
+    return -1;
+}
+
+void Studio::set_pad_bank(int bank) {
+    auto& track = current();
+    int highest = int(melodee::sampler_banks) - (track.levels ? 1 : 2); // two banks in view, one with 16 Pitches
+    bank = std::clamp(bank, 0, highest);
+    if (track.bank == bank) return;
+    track.bank = uint8_t(bank);
+    refresh_pads();
+    changed();
+}
+
+bool Studio::pitches() const { return kind() == TrackKind::Kit && current().levels; }
+
+void Studio::set_pitches(bool on) {
+    if (kind() != TrackKind::Kit) return;
+    auto& track = current();
+    track.levels = on;
+    if (on) {
+        track.levels_pad = track.last_pad;
+        track.levels_kind = uint8_t(melodee::LevelsKind::Scale); // in key (Kerem, 2026-11-20)
+        track.bank = uint8_t(track.last_pad / 16); // the left 16: the last pad's bank
+    } else {
+        track.bank = uint8_t(std::min<unsigned>(track.bank, melodee::sampler_banks - 2));
+    }
+    refresh_pads();
+    changed();
+}
+
+void Studio::set_pitches_octave(int value) {
+    auto& track = current();
+    track.octave = int8_t(std::clamp(value, melodee::kit_lowest_octave, melodee::kit_highest_octave));
+    refresh_pads();
+    changed();
+}
+
+int Studio::pitch_semitones(unsigned pitch) const {
+    return melodee::levels_of(*song, current(), pitch % 16).semitones;
+}
+
+void Studio::refresh_pads() {
+    const auto& track = current();
+    bool kit = kind() == TrackKind::Kit;
+    audio_bank.store(track.bank, std::memory_order_relaxed);
+    audio_levels_pad.store(track.levels_pad % melodee::sampler_pads, std::memory_order_relaxed);
+    if (kit && track.levels)
+        for (unsigned n = 0; n < 16; ++n) audio_semitones[n].store(std::clamp(pitch_semitones(n), -63, 63), std::memory_order_relaxed);
+    audio_pitches.store(kit && track.levels, std::memory_order_relaxed);
+}
+
+bool Studio::copy_pad(unsigned t, unsigned from, unsigned to) {
+    t %= melodee::track_count;
+    auto& track = song->tracks[t];
+    if (track.engine != EngineKind::Sampler || from >= melodee::sampler_pads || to >= melodee::sampler_pads || from == to) return false;
+    if (!track.pads[from].used()) return false;
+    track.pads[to] = track.pads[from];
+    track.pad_fx.at[to] = track.pad_fx.at[from];
+    track.set_pad_muted(to, track.pad_muted(from));
+    melodee::clear_trims(track.zone_trims, to);
+    for (const auto trim : track.zone_trims)
+        if (trim.used() && trim.pad == from) melodee::set_trim(track.zone_trims, to, trim.zone, trim.slot, trim.tune, trim.level);
+    apply_track(t);
+    changed();
+    return true;
+}
+
+bool Studio::delete_pad_notes(unsigned t, unsigned at) {
+    t %= melodee::track_count;
+    auto& pattern = bank->at[t][song->tracks[t].pattern % melodee::pattern_count];
+    unsigned key = melodee::sampler_first_note + at;
+    auto before = pattern.events.size();
+    pattern.events.erase(std::remove_if(pattern.events.begin(), pattern.events.end(), [key](const melodee::Event& e) { return e.key == key; }),
+                         pattern.events.end());
+    if (pattern.events.size() == before) return false;
+    apply_track(t);
+    changed();
+    return true;
+}
+
+Studio::Cleared Studio::clear_pad(unsigned t, unsigned at) {
+    t %= melodee::track_count;
+    auto& track = song->tracks[t];
+    if (track.engine != EngineKind::Sampler || at >= melodee::sampler_pads) return Cleared::Nothing;
+    if (delete_pad_notes(t, at)) return Cleared::Notes;
+    if (track.pads[at].used()) {
+        track.pads[at] = melodee::PadSound {};
+        track.pad_fx.at[at] = melodee::Chain {{}, melodee::pad_slots};
+        track.set_pad_muted(at, false);
+        melodee::clear_trims(track.zone_trims, at);
+        apply_track(t);
+        changed();
+        return Cleared::Emptied;
+    }
+    if (!melodee::gap_closes(track, at)) return Cleared::Nothing;
+    melodee::close_pad_gap(track, bank->at[t], at);
+    melodee::close_pad_gap_names(*song, t, at);
+    apply_track(t);
+    if (t == selected) refresh_pads();
+    changed();
+    return Cleared::GapClosed;
+}
+
+std::array<bool, melodee::sampler_pads> Studio::sounding() const {
+    std::array<bool, melodee::sampler_pads> out {};
+    melodee::TrackTaps taps;
+    if (!engine->taps(taps) || taps.track != selected) return out;
+    for (unsigned n = 0; n < taps.count && n < melodee::TrackTaps::voices; ++n) {
+        const auto& voice = taps.voice[n];
+        if (voice.pad >= 0 && voice.pad < int(melodee::sampler_pads) && voice.level > 0.05f && !(voice.flags & melodee::tap::Choked)) out[size_t(voice.pad)] = true;
+    }
+    return out;
 }
 
 const Sample* Studio::sample_of(unsigned t, unsigned at) const {
     const auto& track = song->tracks[t % melodee::track_count];
-    if (at >= pad_count || !track.pads[at].used() || track.pads[at].sample >= samples.size()) return nullptr;
+    if (at >= melodee::sampler_pads || !track.pads[at].used() || track.pads[at].sample >= samples.size()) return nullptr;
     const auto& sample = samples[track.pads[at].sample];
     return sample && sample->data ? sample.get() : nullptr; // a file that was missing at load plays nothing
 }
@@ -405,14 +559,22 @@ void Studio::sound_pad(unsigned t, unsigned at, const melodee::PadSound& sound) 
 }
 
 void Studio::sound_pads(unsigned t) {
-    for (unsigned at = 0; at < pad_count; ++at) sound_pad(t, at, song->tracks[t].pads[at]);
+    for (unsigned at = 0; at < melodee::sampler_pads; ++at) sound_pad(t, at, song->tracks[t].pads[at]);
+}
+
+void Studio::set_kit_param(unsigned t, int param, int value) {
+    t %= melodee::track_count;
+    if (param < 0 || param >= int(melodee::max_params)) return;
+    song->tracks[t].params[size_t(param)] = int16_t(value);
+    send({Type::Param, uint8_t(t), 0, uint16_t(param), int16_t(value)});
+    changed();
 }
 
 melodee::SampleChop* Studio::chop_of(unsigned slot) {
     return slot < melodee::sample_slots ? &song->chops.edit(slot) : nullptr;
 }
 
-std::string Studio::install(std::unique_ptr<Sample> sample, unsigned t, unsigned at) {
+std::string Studio::install(std::unique_ptr<Sample> sample, unsigned t, unsigned at, bool keep) {
     if (song->tracks[t].engine != EngineKind::Sampler) return "NOT A KIT";
     // The first slot no file of the project names.
     unsigned slot = 0;
@@ -425,7 +587,25 @@ std::string Studio::install(std::unique_ptr<Sample> sample, unsigned t, unsigned
     ref.frames = sample->data->model_frames();
     if (slot >= samples.size()) samples.resize(slot + 1);
     samples[slot] = std::move(sample);
+    if (layer_target.layer > 0 && layer_target.track == int(t) && layer_target.pad == int(at) && song->tracks[t].pads[at].used()) {
+        // Onto a layer of the pad (LAYERS): it keeps its tune, level and velocities.
+        melodee::PadSound sound = song->tracks[t].pads[at];
+        auto& layer = sound.layers[size_t(layer_target.layer - 1) % (melodee::pad_layers - 1)];
+        layer.sample = uint16_t(slot);
+        layer.start = layer.end = 0;
+        set_pad(t, at, sound);
+        char text[32];
+        std::snprintf(text, sizeof text, "ON %c%02u LAYER %d", 'A' + int(at / 16 % 8), at % 16 + 1, layer_target.layer % 4 + 1);
+        say(text);
+        return {};
+    }
     melodee::PadSound sound;
+    if (keep && at < melodee::sampler_pads) { // the pad's values on all of its new sample
+        sound = song->tracks[t].pads[at];
+        sound.start = sound.end = 0;
+        sound.loop_lock = true;
+        sound.loop_start = 0;
+    }
     sound.sample = uint16_t(slot);
     set_pad(t, at, sound);
     char text[24];
@@ -540,9 +720,25 @@ CanvasPage::Host Studio::canvas_host(unsigned t) {
     return host;
 }
 
+void Studio::ask_text(std::string title, std::string initial, std::function<void(const std::string&)> done) {
+    typing = true;
+    typed = std::move(initial);
+    typing_title = std::move(title);
+    typing_track = typing_canvas = -1;
+    typing_done = std::move(done);
+    pads_typing.store(true);
+}
+
+std::string Studio::samples_folder() const { return (fs::path(home_path) / "Samples").string(); }
+
 void Studio::finish_typing(bool cancelled) {
     typing = false;
     pads_typing.store(false);
+    if (auto done = std::move(typing_done); done) { // Melodee's own (Save Sample's name)
+        typing_done = nullptr;
+        if (!cancelled) done(typed);
+        return;
+    }
     auto* module = typing_track >= 0 ? module_track(unsigned(typing_track)) : nullptr;
     int index = typing_canvas;
     typing_canvas = typing_track = -1;
@@ -812,8 +1008,9 @@ void Studio::service() {
         auto sample = read_sample(job.path, error);
         std::lock_guard<std::mutex> guard(lock);
         if (!sample) { say(upper(error).substr(0, 16)); continue; }
-        if (auto failed = install(std::move(sample), job.track, job.pad); !failed.empty()) say(failed);
+        if (auto failed = install(std::move(sample), job.track, job.pad, job.keep); !failed.empty()) say(failed);
     }
+    run_file_jobs();
     std::unique_lock<std::mutex> guard(lock);
     loading = false;
     // Autosave: three seconds after the last change, as on the MPC.
@@ -827,6 +1024,79 @@ void Studio::service() {
         guard.lock();
         if (error.empty()) ++saves;
         else { dirty = true; retry_at = now + autosave_retry; say("NOT SAVED"); }
+    }
+}
+
+namespace {
+
+// Frames [start, end) of a sample (the project's 44.1 kHz frames) as a WAV at
+// the sample's own rate, 24-bit, undithered: from memory, or a piece at a time
+// from its file when it is read from storage as it plays. Service thread.
+std::string write_region(const Sample& sample, uint32_t start, uint32_t end, const std::string& path) {
+    const auto& data = *sample.data;
+    uint32_t from = data.own(start), to = data.own(end ? end : data.model_frames());
+    if (to <= from) return "nothing to write";
+    std::error_code error;
+    fs::create_directories(fs::path(path).parent_path(), error);
+    melodee::WavStream out;
+    out.set_dither(false);
+    if (!out.open(path, data.rate, 24)) return "cannot write";
+    constexpr uint32_t piece = 16384;
+    std::vector<float> left(piece), right(piece), frames(piece * 2);
+    melodee::WavReader file;
+    bool from_file = data.left.empty();
+    if (from_file && (!file.open(sample.path, melodee::stream_most_seconds).empty() || !file.seek(from))) return "unreadable";
+    for (uint32_t at = from; at < to;) {
+        uint32_t n = std::min(piece, to - at);
+        if (from_file) {
+            n = file.read(left.data(), right.data(), n);
+            if (!n) break;
+        } else {
+            for (uint32_t k = 0; k < n; ++k) {
+                left[k] = data.left[at + k];
+                right[k] = data.right.empty() ? data.left[at + k] : data.right[at + k];
+            }
+        }
+        for (uint32_t k = 0; k < n; ++k) { frames[2 * k] = left[k]; frames[2 * k + 1] = right[k]; }
+        if (!out.add(frames.data(), n)) return "cannot write";
+        at += n;
+    }
+    return out.close() ? std::string() : "cannot write";
+}
+
+} // namespace
+
+void Studio::run_file_jobs() {
+    std::vector<FileJob> todo;
+    {
+        std::lock_guard<std::mutex> guard(lock);
+        todo.swap(file_jobs);
+    }
+    for (auto& job : todo) {
+        const Sample* sample = nullptr;
+        uint32_t start = 0, end = 0;
+        {
+            std::lock_guard<std::mutex> guard(lock);
+            const auto& sound = song->tracks[job.track % melodee::track_count].pads[job.pad % melodee::sampler_pads];
+            const auto layer = sound.layer(unsigned(job.layer));
+            if (layer.used() && layer.sample < samples.size()) sample = samples[layer.sample].get(); // kept for the run
+            start = layer.start;
+            end = layer.end;
+        }
+        if (!sample || !sample->data) { std::lock_guard<std::mutex> guard(lock); say("NOTHING TO WRITE"); continue; }
+        auto failed = write_region(*sample, start, end, job.path);
+        if (!failed.empty()) { std::lock_guard<std::mutex> guard(lock); say(upper(failed).substr(0, 16)); continue; }
+        if (!job.trim) {
+            std::lock_guard<std::mutex> guard(lock);
+            say(("SAVED " + upper(fs::path(job.path).stem().string())).substr(0, 16));
+            continue;
+        }
+        std::string error;
+        auto trimmed = read_sample(job.path, error);
+        std::lock_guard<std::mutex> guard(lock);
+        if (!trimmed) { say(upper(error).substr(0, 16)); continue; }
+        if (auto failed_install = install(std::move(trimmed), job.track, job.pad, true); !failed_install.empty()) say(failed_install);
+        else say("TRIMMED");
     }
 }
 

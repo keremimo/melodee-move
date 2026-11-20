@@ -68,7 +68,7 @@ bindings::Where MelodeeApp::where() const {
     if (studio.typing) at.screen = Screen::Typing;
     else if (auto* top = studio.top()) at.screen = top->screen_kind();
     switch (studio.kind()) {
-    case TrackKind::Kit: at.track = Track::Kit; break;
+    case TrackKind::Kit: at.track = studio.pitches() ? Track::Pitches : Track::Kit; break;
     case TrackKind::Synth: case TrackKind::Keys: case TrackKind::Midi: case TrackKind::Plugin: at.track = Track::Synth; break;
     case TrackKind::Audio: at.track = Track::Audio; break;
     default: at.track = Track::Any; break;
@@ -175,6 +175,7 @@ void MelodeeApp::settle() {
     auto& studio = *own;
     studio.shift = (gestures.held() & bindings::held::shift) != 0;
     studio.quiet_pads(!bindings::pad_sounds(where(), gestures.held(bindings::Control::Pad), 0));
+    if (studio.pitches()) studio.refresh_pads(); // 16 Pitches follow the project's key, wherever it was set
 }
 
 void MelodeeApp::surface(const move::SurfaceEvent& event) {

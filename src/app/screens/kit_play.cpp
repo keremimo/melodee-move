@@ -2,12 +2,17 @@
 // A kit track's Play screen (docs/UI.md, docs/MOVE_CONTROLS.md): the Move's
 // Device View. Along the top the kit's items, KIT, the last pad, FX1, FX2;
 // the wheel walks them, its push opens the one it is on (the pad: Load
-// samples), Shift + push Sample Options (Chop). Under them the last pad's
-// waveform with start and end; knobs 1-8 tune, level, pan, start, end,
-// attack, decay, cutoff (Shift: finer); the pads play the kit and pick the
-// pad edited (Shift + a pad picks it quietly); a pad held + the Volume knob
-// its level.
-#include "app/screens/common.h"
+// samples), Shift + push Sample Options (Chop), Shift + turn the pad pages
+// (kit_pages.cpp). Under them the last pad's waveform with start and end;
+// knobs 1-8 tune, level, pan, start, end, attack, decay, cutoff (Shift:
+// finer; Shift + a touch, its fine view). The pads play the kit and pick the
+// pad edited (Shift + a pad picks it quietly), two of its eight banks, Plus
+// and Minus moving them 16 pads; Shift + Step 8 turns the right 16 into the
+// last pad's 16 Pitches, Plus and Minus then their octave. Copy held, a pad
+// then another copies the first onto the second (asking when it holds a
+// sample); Delete held, a pad loses its notes, its sound, or its gap.
+#include "app/screens/kit_common.h"
+#include "melodee/shell/pad_gap.h"
 
 namespace app::screens {
 namespace {
@@ -18,12 +23,28 @@ class KitPlay final : public Screen {
 public:
     using Screen::Screen;
 
+    void enter() override { fine = -1; }
+    void leave() override { fine = -1; }
+
+    void input(const move::Input& input) override {
+        using Kind = move::Input::Kind;
+        if (input.kind == Kind::Button && move::Button(input.index) == move::Button::Copy) {
+            copy_down = input.pressed;
+            if (!input.pressed) copy_from = -1;
+        }
+        if (input.kind == Kind::Touch && !input.pressed && int(input.index) == fine) fine = -1;
+    }
+
     bool job(bindings::Job job, const bindings::Use& use) override {
         using bindings::Job;
         switch (job) {
-        case Job::PlayPad: case Job::SelectPadQuietly: studio.select_pad(unsigned(use.index)); return true;
+        case Job::PlayPad: case Job::SelectPadQuietly:
+            if (int kit = studio.kit_pad_at(unsigned(use.index)); kit >= 0) studio.select_pad(unsigned(kit));
+            return true;
+        case Job::PlayPitch: return true; // the audio thread plays it
         case Job::TurnKnob: turn(unsigned(use.index), use.delta, false); return true;
         case Job::TurnKnobFine: turn(unsigned(use.index), use.delta, true); return true;
+        case Job::SecondParameter: fine = use.index; return true;
         case Job::PadLevel: turn(1, use.delta, false); return true;
         case Job::Focus: focus = std::clamp(focus + (use.delta > 0 ? 1 : -1), 0, 3); return true;
         case Job::ShowFocus: studio.say(item(focus)); return true;
@@ -35,30 +56,57 @@ public:
             if (studio.sample_of_pad()) studio.open("sample-options");
             else studio.say("EMPTY PAD");
             return true;
+        case Job::Page:
+            studio.open("kit-pages");
+            if (auto* pages = studio.top(); pages && pages->id() == "kit-pages") pages->job(job, use);
+            return true;
+        case Job::PadBank:
+            studio.set_pad_bank(int(studio.pad_bank()) + (use.control == bindings::Control::Plus ? 1 : -1));
+            studio.say("PADS " + banks_in_view(studio));
+            return true;
+        case Job::PitchesOctave: {
+            int octave = studio.current().octave + (use.control == bindings::Control::Plus ? 1 : -1);
+            studio.set_pitches_octave(octave);
+            studio.say("OCTAVE " + signed_octave());
+            return true;
+        }
+        case Job::SixteenPitches:
+            studio.set_pitches(!studio.pitches());
+            studio.say(studio.pitches() ? "16 PITCHES ON" : "16 PITCHES OFF");
+            return true;
+        case Job::CopyPad: copy(use); return true;
+        case Job::ClearPad: clear(use); return true;
         default: return false;
         }
     }
 
     void lights(move::Lights& lights) override {
         using namespace move;
-        const auto& track = studio.current();
-        auto colour = ui::track_colour(studio.track()).bright;
-        for (unsigned at = 0; at < pad_count; ++at)
-            lights.pad(at, track.pads[at].used() ? (at == studio.pad() ? colour::white : colour) : at == studio.pad() ? colour::dark_grey : colour::off);
+        kit_pads(studio, lights, copy_from);
         steps_playhead(studio, lights);
-        // Left / Right (bars), Plus / Minus (pad banks), Loop (Loop Mode) and
-        // Note/Session (Patterns) wait for wave 2.
-        for (auto button : {Button::Left, Button::Right, Button::Up, Button::Down, Button::Loop, Button::Menu, Button::Back})
-            lights.button(button, 0);
+        // Plus and Minus where they move the banks (or 16 Pitches' octave).
+        bool pitches = studio.pitches();
+        int octave = studio.current().octave, bank = int(studio.pad_bank());
+        int top = int(melodee::sampler_banks) - (pitches ? 1 : 2);
+        lights.button(Button::Up, (pitches ? octave < melodee::kit_highest_octave : bank < top) ? white_dim : 0);
+        lights.button(Button::Down, (pitches ? octave > melodee::kit_lowest_octave : bank > 0) ? white_dim : 0);
+        lights.button(Button::Copy, copy_down ? white_bright : white_dim);
+        lights.button(Button::Delete, white_dim);
+        // Left / Right (bars), Loop (Loop Mode) and Note/Session (Patterns) wait for wave 2.
+        for (auto button : {Button::Left, Button::Right, Button::Loop, Button::Menu, Button::Back}) lights.button(button, 0);
     }
 
     void draw(juce::Graphics& g) override {
-        ui::rail(g, "KIT", track_number(studio), pad_label(studio.pad()));
+        if (fine >= 0 && draw_fine(g)) return;
+        bool pitches = studio.pitches();
+        if (copy_down) { draw_copy(g); return; }
+        ui::rail(g, pitches ? "PTCH" : "KIT", track_number(studio), pad_label(studio.pad()));
         items(g, {item(0), item(1), item(2), item(3)}, focus);
         const Sample* sample = studio.sample_of_pad();
+        std::string where = bar_beat(studio);
         if (!sample) {
             move::draw_text_centred(g, ui::content_x, 22, ui::content_width, "EMPTY", 2);
-            ui::detail(g, focus == 1 ? "PUSH: LOAD" : "", bar_beat(studio));
+            ui::detail(g, pitches ? key_name() : focus == 1 ? "PUSH: LOAD" : "", pitches ? "OCT " + signed_octave() : where);
             return;
         }
         auto area = ui::content(ui::header_height + 1, ui::subject_height - ui::header_height - 1);
@@ -68,9 +116,9 @@ public:
         int start = int(int64_t(sound.start) * area.getWidth() / frames), end = int(int64_t(sound.end ? sound.end : frames) * area.getWidth() / frames);
         g.fillRect(area.getX() + std::min(start, area.getWidth() - 1), area.getY(), 1, area.getHeight());
         g.fillRect(area.getX() + std::min(end, area.getWidth() - 1), area.getY(), 1, area.getHeight());
+        if (pitches) { ui::detail(g, key_name(), "OCT " + signed_octave()); return; }
         auto name = upper(sample->name.substr(0, sample->name.rfind('.'))).substr(0, 10);
-        auto where = bar_beat(studio);
-        ui::detail(g, name, where.empty() ? seconds(frames).substr(0, 5) : where);
+        ui::detail(g, name, where.empty() ? length_of(frames) : where);
     }
 
     Knob knob(unsigned which) const override {
@@ -100,9 +148,16 @@ public:
         }
     }
     std::string knob_owner() const override { return pad_label(studio.pad()); }
+    std::string status() const override {
+        return " bank=" + std::to_string(studio.pad_bank()) + " pitches=" + std::to_string(int(studio.pitches())) +
+               " copy_from=" + std::to_string(copy_from);
+    }
 
 private:
     int focus = 1; // the Device View's item the wheel is on: 0 the kit, 1 the pad, 2-3 the effects
+    int fine = -1; // a knob Shift + touched: its fine view
+    bool copy_down = false;
+    int copy_from = -1; // Copy held: the kit pad picked to copy
     std::string item(int which) const {
         switch (which) {
         case 0: return "KIT";
@@ -110,11 +165,120 @@ private:
         default: return "FX" + std::to_string(which - 1);
         }
     }
-    void turn(unsigned which, int delta, bool fine) {
+    std::string signed_octave() const {
+        int octave = studio.current().octave - melodee::kit_level_octave;
+        return (octave > 0 ? "+" : "") + std::to_string(octave);
+    }
+    std::string key_name() const {
+        const auto& project = studio.project();
+        return upper(std::string(melodee::note_letter(project.root)) + " " + melodee::scales()[project.scale % melodee::scales().size()].name).substr(0, 10);
+    }
+    static std::string length_of(uint32_t frames) { // seconds, or minutes for a long sample
+        if (frames < 60u * 44100u) return seconds(frames).substr(0, 5);
+        unsigned total = frames / 44100u;
+        char text[16];
+        std::snprintf(text, sizeof text, "%u:%02u", total / 60, total % 60);
+        return text;
+    }
+
+    void copy(const bindings::Use& use) {
+        int kit = studio.kit_pad_at(unsigned(use.index));
+        if (kit < 0) return;
+        if (copy_from < 0) {
+            if (studio.current().pads[unsigned(kit)].used()) copy_from = kit;
+            else studio.say("EMPTY PAD");
+            return;
+        }
+        if (kit == copy_from) return;
+        pending_from = unsigned(copy_from);
+        pending_to = unsigned(kit);
+        if (studio.current().pads[unsigned(kit)].used()) studio.push("copy-pad"); // asks first: it holds a sample
+        else copy_now();
+    }
+    void clear(const bindings::Use& use) {
+        int kit = studio.kit_pad_at(unsigned(use.index));
+        if (kit < 0) return;
+        std::string label = pad_label(unsigned(kit));
+        switch (studio.clear_pad(studio.track(), unsigned(kit))) {
+        case Studio::Cleared::Notes: studio.say(label + " NOTES GONE"); break;
+        case Studio::Cleared::Emptied: studio.say(label + " EMPTIED"); break;
+        case Studio::Cleared::GapClosed:
+            studio.say(pad_label(unsigned(kit) + 1) + "-" + pad_label(melodee::gap_end(unsigned(kit)) - 1) + " DOWN ONE");
+            break;
+        case Studio::Cleared::Nothing: studio.say(label + " EMPTY"); break;
+        }
+    }
+
+public:
+    unsigned pending_from = 0, pending_to = 0;
+    void copy_now() {
+        if (studio.copy_pad(studio.track(), pending_from, pending_to)) {
+            studio.say(pad_label(pending_from) + " TO " + pad_label(pending_to));
+            studio.select_pad(pending_to);
+        }
+    }
+
+private:
+    void draw_copy(juce::Graphics& g) {
+        ui::rail(g, "COPY", copy_from < 0 ? "" : pad_label(unsigned(copy_from)), "PAD");
+        if (copy_from < 0) {
+            move::draw_text_centred(g, ui::content_x, 14, ui::content_width, "PRESS THE PAD");
+            move::draw_text_centred(g, ui::content_x, 26, ui::content_width, "TO COPY");
+            return;
+        }
+        move::draw_text_centred(g, ui::content_x, 6, ui::content_width, pad_label(unsigned(copy_from)), 2);
+        move::draw_text_centred(g, ui::content_x, 26, ui::content_width, "ONTO A PAD");
+        if (const Sample* sample = studio.sample_of(studio.track(), unsigned(copy_from)))
+            ui::detail(g, upper(sample->name.substr(0, sample->name.rfind('.'))).substr(0, 16));
+    }
+
+    // Shift + a knob touched: START and END close up at their place (the
+    // Move's Sample Start zoom), TUNE in cents; the rest as touched.
+    bool draw_fine(juce::Graphics& g) {
+        const Sample* sample = studio.sample_of_pad();
+        const PadSound& sound = studio.current().pads[studio.pad()];
+        if (fine == 0) {
+            char text[16];
+            std::snprintf(text, sizeof text, "%+d CT", sound.fine);
+            ui::rail(g, "KNOB", "1", "FINE");
+            ui::big_parameter(g, ui::content(4, 44), "FINE TUNE", text, (sound.fine + 50) / 100.0f);
+            return true;
+        }
+        if ((fine != 3 && fine != 4) || !sample || sample->data->left.empty()) return false; // a long sample: no frames in memory to draw
+        uint32_t frames = std::max<uint32_t>(1, sample->data->model_frames());
+        uint32_t at = fine == 3 ? sound.start : sound.end ? sound.end : frames;
+        ui::rail(g, "KNOB", std::to_string(fine + 1), fine == 3 ? "STRT" : "END");
+        draw_close_up(g, *sample, at);
+        ui::detail(g, seconds(at), "X32");
+        return true;
+    }
+    // The frames round `at`, 32 times closer than the whole sample, the place a line.
+    void draw_close_up(juce::Graphics& g, const Sample& sample, uint32_t at) {
+        auto area = ui::content(0, ui::subject_height);
+        const auto& data = *sample.data;
+        uint32_t frames = std::max<uint32_t>(1, data.model_frames());
+        uint32_t span = std::max<uint32_t>(uint32_t(area.getWidth()), frames / 32);
+        int64_t from = int64_t(at) - span / 2;
+        std::vector<float> peaks(size_t(area.getWidth()), 0.0f);
+        for (int column = 0; column < area.getWidth(); ++column) {
+            int64_t a = from + int64_t(span) * column / area.getWidth(), b = from + int64_t(span) * (column + 1) / area.getWidth();
+            float peak = 0;
+            for (int64_t f = std::max<int64_t>(a, 0); f < b && f < int64_t(frames); f += std::max<int64_t>(1, (b - a) / 16)) {
+                size_t own = data.own(uint32_t(f));
+                if (own < data.left.size()) peak = std::max(peak, std::abs(data.left[own]));
+                if (own < data.right.size()) peak = std::max(peak, std::abs(data.right[own]));
+            }
+            peaks[size_t(column)] = peak;
+        }
+        ui::waveform(g, area, peaks);
+        g.fillRect(area.getX() + area.getWidth() / 2, area.getY(), 1, area.getHeight());
+    }
+
+    void turn(unsigned which, int delta, bool fine_turn) {
         const Sample* sample = studio.sample_of_pad();
         if (!sample) return;
         uint32_t frames = sample->data->model_frames();
-        uint32_t step = std::max<uint32_t>(1, frames / (fine ? 8192 : 256));
+        uint32_t step = std::max<uint32_t>(1, frames / (fine_turn ? 8192 : 256));
         auto move_by = [&](uint32_t value, uint32_t low, uint32_t high) {
             int64_t moved = int64_t(value) + int64_t(delta) * int64_t(step);
             return uint32_t(std::clamp<int64_t>(moved, low, std::max(low, high)));
@@ -122,7 +286,7 @@ private:
         PadSound sound = studio.current().pads[studio.pad()];
         switch (which) {
         case 0:
-            if (fine) sound.fine = int8_t(std::clamp(sound.fine + delta * 5, -50, 50));
+            if (fine_turn) sound.fine = int8_t(std::clamp(sound.fine + delta * 5, -50, 50));
             else sound.pitch = int8_t(std::clamp(sound.pitch + delta, -36, 36));
             break;
         case 1: sound.level = uint8_t(std::clamp(int(sound.level) + delta, 0, 127)); break;
@@ -137,7 +301,7 @@ private:
         case 6: sound.decay = uint8_t(std::clamp(int(sound.decay) + delta, 0, 100)); break;
         case 7:
             sound.cutoff = uint8_t(std::clamp(int(sound.cutoff) + delta, 0, 100));
-            sound.filter = sound.cutoff < 100 ? melodee::PadFilter::Lpf4 : melodee::PadFilter::Off;
+            sound.filter = sound.cutoff < 100 ? (sound.filter == melodee::PadFilter::Off ? melodee::PadFilter::Lpf4 : sound.filter) : melodee::PadFilter::Off;
             break;
         default: return;
         }
@@ -146,6 +310,43 @@ private:
 };
 
 RegisterScreen registered("kit-play", make<KitPlay>, {}, kind_bit(TrackKind::Kit));
+
+// The question before copying onto a pad that holds a sample: push yes, Back no.
+class CopyPad final : public Screen {
+public:
+    using Screen::Screen;
+    bindings::Screen screen_kind() const override { return bindings::Screen::List; }
+    bool job(bindings::Job job, const bindings::Use&) override {
+        using bindings::Job;
+        switch (job) {
+        case Job::ListPush: studio.close(); play().copy_now(); return true;
+        case Job::Back: studio.close(); return true;
+        case Job::ListTurn: case Job::ListTurnFine: case Job::TurnKnob: case Job::TurnKnobFine: case Job::CopyPad: return true;
+        default: return false;
+        }
+    }
+    void lights(move::Lights& lights) override {
+        using namespace move;
+        kit_pads(studio, lights, int(play().pending_from));
+        steps_playhead(studio, lights);
+        for (auto button : {Button::Left, Button::Right, Button::Up, Button::Down, Button::Loop, Button::Menu}) lights.button(button, 0);
+        lights.button(Button::Back, white_dim);
+    }
+    void draw(juce::Graphics& g) override {
+        auto& kit = play();
+        std::string to = pad_label(kit.pending_to), what;
+        if (const Sample* sample = studio.sample_of(studio.track(), kit.pending_to)) what = upper(sample->name.substr(0, sample->name.rfind('.')));
+        ui::rail(g, "COPY", pad_label(kit.pending_from), to);
+        move::draw_text_centred(g, ui::content_x, 6, ui::content_width, "REPLACE", 2);
+        move::draw_text_centred(g, ui::content_x, 26, ui::content_width, (to + " " + what).substr(0, 15) + "?");
+        ui::detail(g, "PUSH YES", "BACK NO");
+    }
+
+private:
+    KitPlay& play() { return static_cast<KitPlay&>(*studio.screen("kit-play")); }
+};
+
+RegisterScreen copy_pad("copy-pad", make<CopyPad>);
 
 } // namespace
 } // namespace app::screens
