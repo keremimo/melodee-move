@@ -186,6 +186,85 @@ Chop), Kerem decides with that map. `docs/ui/tracks.png` is the sheet
 | Metronome (Shift + Step 6) | `MET` | `ON` or `OFF` large, its level | `PUSH: OK` |
 | Groove (Shift + Step 7) | `GRV` | the groove in % large | `PUSH: OK` |
 
+## Instruments
+
+Melodee's instruments on the note tracks (wave 2, `docs/PARITY.md`,
+instruments): keygroup tracks, the Move's Keys & Scale with Melodee's own
+layouts, the ARP and CHORD pages, a module track's macros, and the auto
+sampler. `docs/ui/instruments.png` is the sheet
+(`src/ui/mockups_instruments.cpp`); the screens are built to it once Kerem
+has approved it. The Move's keys keep Ableton's meaning: Shift + Step 9 is
+Keys & Scale, Shift + Step 10 Full Velocity, Shift + Step 11 Repeat and
+Arp, Plus and Minus the octave, Shift + Plus / Minus a scale degree
+(Control Live's job, free on the Move).
+
+![The instruments screens](ui/instruments.png)
+
+- **A keygroup track** plays one instrument across the pads: an SFZ, an
+  MPC keygroup program (`.xpm`, MPC 3's `.xty`), an EXS24 instrument, a
+  SoundFont preset, a DecentSampler preset, or one sample, played from the
+  note found in it. Its Play screen is the Device View: the wheel walks the
+  track, its instrument and its effects; the push on the instrument opens
+  the instrument browser (instruments and samples; a SoundFont opens as a
+  folder of its presets). Its zones stream from storage and play as their
+  files land (`LOADING` and a bar on ZONES).
+- **Its pages**, Shift + turn, knobs 1-8: **ZONES** (an instrument: knob 1
+  picks a zone, 2 its tune, 3 its level; the zones drawn over the keys) or
+  **TRIM** (one sample: start, end, loop, loop point, crossfade, reverse,
+  the waveform), **PLAY** (tune, fine, level, pan, velocity, mono, play
+  mode, glide), **AMP ENV** (attack, decay, sustain, release; the shape
+  drawn), **FILTER** (type, cutoff, resonance, envelope amount, and the
+  filter envelope's four stages), then **ARP** and **CHORD**. Melodee's
+  TUNE and FILT ENV pages fold into PLAY and FILTER: the Move has eight
+  knobs where the MPC has three.
+- **ARP** (every note track's page): on, mode (Up, Down, Up-down, Random,
+  Order), rate (1/4 to 1/64T), octaves, gate, hold. Shift + Step 11 opens
+  the Move's Repeat and Arp, whose Arp styles turn the same arpeggiator on.
+- **CHORD** (every note track's page): on, type (Triad, Dia 7, Sus2, Sus4,
+  Power, Dia 9), voicing (Close, Open, Drop 2, Spread), inversion, hold;
+  the last chord drawn on two octaves of keys.
+- **Keys & Scale** (Shift + Step 9), the Move's list: MODE (the Move's
+  In-Key and Chromatic, then Melodee's Prog and Drums), ROWS (Octaves or
+  4ths), KEY, SCALE (Melodee's thirteen, which the project file keeps), and
+  TRANSPOSE (-12 to +12). The key and scale are the project's, set from any
+  track; the mode, rows and transpose are each track's. Push a row to change
+  it, the wheel turns it, push again is done.
+- **Prog**: each pad a chord of an MPC 3 `.progression`; the PROG row's push
+  lists the progressions (loaded as the wheel turns), VOICING (File, Close,
+  Open, Spread) and KEY SHIFT move them. The rail names the chord played.
+- **The chord builder**: STORE CHORD with pads held takes their notes; the
+  mode turns to Prog, the empty pads pulse, and the pad pressed next takes
+  the chord, saved as `Mine N` in `Melodee/Progressions`.
+- **Drums**: the pads play notes 36 up as a kit's do (pad 1 is 36), Plus and
+  Minus move 16; the screen names the voice hit (a MIDI drum map's or
+  General MIDI's name).
+- **Full Velocity** (Shift + Step 10): every pad at 127, as on the Move; its
+  step lights bright while Shift is held.
+- **Macros on a module track**: the first of its pages is **MACRO**:
+  FILTER (low pass left, high pass right, off in the middle), ECHO and SPACE
+  (Melodee's three knobs on every plug-in, saved with the track), MOD (the
+  mod wheel) and BEND (pitch bend, back to the middle when the knob is let
+  go).
+- **Auto sample**: a module track (or a MIDI track's instrument, heard at
+  the line in) played a key at a time into an MPC keygroup program on a new
+  keygroup track. The check runs first (CHECKING, then what it found);
+  knobs 1-8 are LOW, HIGH, STEP, LAYERS, HOLD, TAIL, TAP, LOOP, Shift + turn
+  the second page (LEVEL; on a MIDI track the INPUT and its meter); push
+  starts, the steps fill as the keys are done, Back stops and deletes what
+  was made.
+
+| Screen | Rail | Subject | Detail |
+| --- | --- | --- | --- |
+| Keygroup, a page | `KEYS` / track / page | the items, the page's title, its knobs or picture | the zone or sample, the note |
+| Instrument browser | `LOAD` / track / `INS` or `SF2` | instruments and samples, a SoundFont's presets | `PUSH: LOAD` |
+| ARP, CHORD | the track's / track / page | six or five knobs; CHORD's keys | mode and rate; type and voicing |
+| Keys & Scale | `SCAL` / key / scale | MODE, ROWS, KEY, SCALE, TRANSPOSE (Prog: PROG, VOICING, KEY SHIFT, STORE CHORD) | `PUSH: CHANGE` |
+| Progressions | `LOAD` / track / `PROG` | the progressions | `PUSH: OK` |
+| Store a chord | `PROG` / / `STOR` | the chord's name large | `BACK: NO` |
+| Drums | the track's / track / `DRUM` | the note and its voice | `36-67` |
+| Macro | the module / track / page | FILTER, ECHO, SPACE, MOD, BEND | the preset |
+| Auto sample | `AUTO` / track / page or progress | the keys to sample, eight knobs, the note recorded | samples, time, room |
+
 ## Screens in code
 
 Each screen is a file of its own in `src/app/screens/`, a `Screen`
