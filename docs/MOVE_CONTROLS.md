@@ -77,6 +77,7 @@ after Schwung) differ for some buttons:
 | Kit pads | **32 kit pads** (two banks of 16) as today; **Plus and Minus move 16 pads** through the kit's 8 banks (as Control Live's Drum mode). **Shift + Step 8** turns the right 16 into **16 Pitches** of the last pad (Melodee's 16 Levels, Tune), the left 16 staying the kit; Plus and Minus are then the pitches' octave. |
 | Shift + Steps 4, 12, 13 | No Move job (no icon): **4 the Mixer** (16 tracks, their effects), **12 the Looper**, **13 Song**. |
 | Shift held | **Nothing on the screen**, as on the stock Move: the steps with a Shift job light, Melodee's 4, 12 and 13 too (Kerem dropped the on-screen Shift card from the mockups). |
+| Looper (Shift + Step 12) | **A pad row a loop** (layout A of `docs/ui/looper.png`): L1 the top row beside Track 1; its four left pads record / overdub, play / stop on the boundary (Shift: at once), undo / redo, held to clear; **the right 16 keep playing the selected track**. On the Looper **the track buttons are L1-L4** (select, Mute and Shift + Mute with one, held with the Volume knob its level, as the Move's tracks). **Rec records the selected loop** (Ableton: Rec records the selected track); the wheel picks the loop, **its push opens the loop's sheet** (MORE), Shift + the wheel turns to MIX. The screens as drawn (Kerem, 2026-11-20). |
 | Undo, quit | **Undo held 0.4 s opens the undo list** (as Melodee's Shift + − hold on the MPC). **Shift + Back goes back to Ableton's Move app**, as today, and Setup (Shift + Step 2) lists it too. |
 
 Followed from the rule without a choice: Left and Right become the
@@ -163,7 +164,7 @@ while Shift is held.
 | Shift + Step 9 | Keys & Scales: In-Key or Chromatic, octaves or 4ths, key, scale | The project's key and scale, a synth's layout | wave 2: instruments |
 | Shift + Step 10 | Full Velocity on or off | Full Level | wave 2: instruments |
 | Shift + Step 11 | Repeat and the Arpeggiator (rate; Repeat, Up, Down, Random) | Note Repeat and Arp | wave 2: sequencer |
-| Shift + Step 12 | No job | The Looper | wave 2: looper |
+| Shift + Step 12 | No job | The Looper; on it, back to Play | done |
 | Shift + Step 13 | No job | Song | wave 2: song & export |
 | Shift + Step 14 | A new clip for the selected track, selected | The track's next empty pattern | wave 2: sequencer |
 | Shift + Step 15 | Doubles the loop with its notes and automation | Double Seq | wave 2: sequencer |
@@ -310,6 +311,32 @@ while Shift is held.
 | Power button | On; off after a push of the wheel; held 10 s, off at once | The Move's own: it never reaches the app | none |
 | Control Live (Setup) | Makes the Move a control surface for Live | Melodee plays itself; Ableton's app does this | none |
 
+### The Looper
+
+Shift + Step 12 (docs/UI.md, "Looper"; `docs/ui/looper.png`). The Move has
+no looper: its controls keep their meaning for the four loop tracks L1-L4
+(a track button selects one, Mute mutes one, Rec records into the
+selected one), and a pad row is a loop, L1 the top row beside Track 1.
+What has no row here holds as on Play (Play, Shift + Play, the knobs and
+their touch, Plus and Minus, Back, a track button held and a step).
+
+| Control | On the Move | In Melodee | Status |
+| --- | --- | --- | --- |
+| Pad, left 16 (Looper) | (No Looper on the Move) | A loop's row, L1 on top: record, close, overdub and play again (as Rec); play or stop on the boundary, again cancels; undo then redo the last overdub; held 0.6 s, clear | done |
+| Shift + Pad, left 16 (Looper) | (As above) | The play / stop pad at once; the rest as without Shift | done |
+| Pad, right 16 (Looper, kit) | (As above) | The selected kit's bank of 16 (the last pad's), A01 bottom left; the pad played is the last pad | done |
+| Pad, right 16 (Looper, synth) | (As above) | 16 notes up from C at the track's octave | done |
+| Track button (Looper) | Selects the track | Selects the loop track, L1 the top button | done |
+| Track button held + Volume knob (Looper) | The track's volume, in dB | The loop track's level, in dB | done |
+| Mute (Looper) | Mutes the selected track | Mutes the selected loop | done |
+| Mute held + Track button (Looper) | Mutes that track | Mutes that loop | done |
+| Shift + Mute held + Track button (Looper) | Solos that track | Solos that loop | done |
+| Rec (Looper) | Records into the selected track | Records the selected loop: record, close, overdub and play again; one at another tempo is fitted first; stopped, Play starts it | done |
+| Wheel turn (Looper) | (Moves through a list) | Picks the loop; on the loop's sheet, its item | done |
+| Wheel push (Looper) | (Opens, confirms) | The loop's sheet (MORE); on it, its item; the Looper off, turns it on | done |
+| Shift + Wheel turn (Looper) | The parameter banks | LOOPS and MIX | done |
+| Step (Looper) | (Step Edit) | Nothing: the steps show the selected loop's place | free |
+
 ## Lights
 
 Not checked by the tests: they follow from the screens.
@@ -333,6 +360,10 @@ Not checked by the tests: they follow from the screens.
 | Rec | Dim when it can record, flashing in the count-in, solid red recording, dark when it cannot | The same | core |
 | Sampling | Pulses red in Sampling Mode | The same | wave 2: sampling |
 | Capture | Lit while there is something to keep, dark once cleared | The same | wave 2: sequencer |
+| Looper, pads | (No Looper on the Move) | A loop's row: record red (blinking armed), orange overdubbing, its colour dim otherwise; play / stop its colour, white on the bar, dim stopped, blinking with a change waiting; undo white, redo grey; clear dim red, red while held | done |
+| Looper, track buttons | (Tracks) | L1-L4 in their colours (mint, yellow, purple, sky), the selected one bright, an empty one dark; muted grey, soloed blue | done |
+| Looper, steps | (The playhead) | The selected loop across its length, its place white; a take running, the bar's sixteenths red | done |
+| Looper, Rec | (Recording) | Red while a loop records or overdubs, blinking while one is armed | done |
 | Knob LEDs | Red with automation; with Mute held, red active, white off, dark none; green for a macro; all pulse while browsing effects | Lit for the knobs the screen uses; motion's colours with the sequencer | done |
 | White buttons | Lit where they do something | The same | done |
 

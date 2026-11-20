@@ -41,6 +41,7 @@ enum class Screen : uint8_t {
     Typing,
     Canvas,     // a module's own page, entered
     Tracks,     // the sixteen tracks, latched (Shift + Note/Session)
+    Looper,     // the Looper (Shift + Step 12) and its sheets: four loops, L1-L4
     Count
 };
 
@@ -98,6 +99,7 @@ constexpr uint16_t none = 0, shift = 1 << 0, track = 1 << 1, step = 1 << 2, pad 
     X(LoopMode) X(MuteSelected) X(Undo) X(Redo) X(UndoList) X(DuplicatePattern) X(DeleteCurrentPattern) X(TypeBackspace) \
     X(ToggleSession) X(PeekSession) X(TracksOverview) X(Back) X(BackToPlay) X(LeaveChop) X(CanvasBack) X(TypeCancel) \
     X(Quit) X(ShiftSteps) X(ShiftLock) X(Uppercase) \
+    X(LoopPad) X(LoopPadNow) X(SelectLoop) X(LoopLevel) X(MuteLoop) X(SoloLoop) X(LoopRecord) X(PickLoop) X(LoopSheet) \
     X(Octave) X(PadBank) X(PitchesOctave) X(ScaleStep) X(TrackBank) X(SlicePage) X(Bar) X(Bar16) X(PatternPage) X(SliceStep)
 
 enum class Job : uint8_t {

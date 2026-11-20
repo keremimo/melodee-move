@@ -112,6 +112,15 @@ bool MelodeeApp::global(bindings::Job job, const bindings::Use& use) {
         unsigned t = held_track();
         studio.set_level(t, int(studio.project().tracks[t].mix.level) + use.delta);
         volume_track = t;
+        volume_loop = -1;
+        volume_until = Clock::now() + volume_linger;
+        return true;
+    }
+    case Job::LoopLevel: { // the Looper: a track button is a loop, L1 on top
+        unsigned loop = 0;
+        while (loop + 1 < 4 && !rows_down.test(loop)) ++loop;
+        studio.loops().set_level(loop, int(studio.loops().mix(loop).level) + use.delta);
+        volume_loop = int(loop);
         volume_until = Clock::now() + volume_linger;
         return true;
     }
@@ -174,7 +183,13 @@ void MelodeeApp::act(const bindings::Use& use) {
 void MelodeeApp::settle() {
     auto& studio = *own;
     studio.shift = (gestures.held() & bindings::held::shift) != 0;
-    studio.quiet_pads(!bindings::pad_sounds(where(), gestures.held(bindings::Control::Pad), 0));
+    auto at = where();
+    // On the Looper the left 16 pads are the loops' rows (the audio thread's,
+    // through loop_pads()); whether the rest sound is a right-16 pad's row.
+    bool looping = at.screen == bindings::Screen::Looper;
+    uint16_t held = gestures.held(bindings::Control::Pad);
+    studio.loop_pads(looping, (held & ~(bindings::held::shift | bindings::held::pad)) == 0);
+    studio.quiet_pads(!bindings::pad_sounds(at, held, looping ? 4 : 0));
 }
 
 void MelodeeApp::surface(const move::SurfaceEvent& event) {
@@ -211,6 +226,7 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point now) {
     auto& studio = *own;
     // Holds that came due (a track button, Undo, Back held).
     for (const auto& use : gestures.tick(now)) act(use);
+    studio.loops().tick(now); // a clear pad held long enough, the Looper's refusals, its loops kept
     settle();
     // The track buttons: the selected track's bank, each its colour, the selected one bright.
     // Soloed blue, as on the Move; muted grey.
@@ -283,6 +299,13 @@ void MelodeeApp::draw_touched(juce::Graphics& g) {
 
 void MelodeeApp::draw_volume(juce::Graphics& g) {
     auto& studio = *own;
+    if (volume_loop >= 0) {
+        int level = studio.loops().mix(unsigned(volume_loop)).level;
+        std::string tag = "L" + std::to_string(volume_loop + 1);
+        ui::rail(g, "VOL", tag, "LOOP");
+        ui::big_parameter(g, ui::content(4, 44), tag + " VOLUME", melodee::decibels(level) + " DB", level / 127.0f);
+        return;
+    }
     int level = studio.project().tracks[volume_track].mix.level;
     ui::rail(g, "VOL", std::to_string(volume_track + 1), "TRK");
     ui::big_parameter(g, ui::content(4, 44), "TRACK " + std::to_string(volume_track + 1) + " VOLUME", melodee::decibels(level) + " DB", level / 127.0f);
@@ -302,6 +325,7 @@ void MelodeeApp::draw_typing(juce::Graphics& g) {
 // ---------------------------------------------------------------- service thread, and the rest
 
 void MelodeeApp::service() { own->service(); }
+void MelodeeApp::stopping() { own->stopping(); }
 
 std::string MelodeeApp::status() const {
     std::lock_guard<std::mutex> guard(own->lock);
