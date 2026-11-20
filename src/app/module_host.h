@@ -157,6 +157,9 @@ public:
     // A call into the module that took the audio thread `slow_us` or more:
     // what it was and how long, for the log.
     static constexpr uint32_t slow_us = 1000;
+    // On a source's own thread, rendering ahead, only a stall that eats into
+    // its 23 ms lead is worth telling.
+    static constexpr uint32_t source_slow_us = 10000;
     struct Slow { char what[96] {}; uint32_t us = 0; };
     bool slow(Slow& out);
 

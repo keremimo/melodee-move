@@ -667,8 +667,12 @@ void test_schwung_modules() {
         CHECK(streaming.stream_late() > 0); // and the stream ran dry for a moment instead
         app::SynthPlayer::Slow stalled;
         bool reported = false;
-        while (streaming.slow(stalled)) reported |= std::string(stalled.what) == "set stall=40";
-        CHECK(reported);
+        bool small_reported = false;
+        while (streaming.slow(stalled)) {
+            reported |= std::string(stalled.what) == "set stall=40";
+            small_reported |= stalled.us < app::SynthPlayer::source_slow_us;
+        }
+        CHECK(reported && !small_reported); // ahead of time, only a stall that eats into the lead
         // Let go: its thread hands the commands back, and the module.
         CHECK(streaming.set_module(nullptr));
         app::LoadedModule* back = nullptr;

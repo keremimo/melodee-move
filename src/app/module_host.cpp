@@ -505,7 +505,8 @@ bool SynthPlayer::slow(Slow& out) { return slows.pop(out); }
 
 void SynthPlayer::timed(Clock::time_point begun, const char* kind, const char* key, const char* value) {
     auto took = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - begun).count();
-    if (took < long(slow_us)) return;
+    bool ahead_of_time = player.load(std::memory_order_relaxed) == source_thread_plays; // the source's thread, rendering ahead
+    if (took < long(ahead_of_time ? source_slow_us : slow_us)) return;
     Slow slow;
     slow.us = uint32_t(std::min<long long>(took, UINT32_MAX));
     std::snprintf(slow.what, sizeof slow.what, "%s%s%s%s%s", kind, key ? " " : "", key ? key : "", value ? "=" : "", value ? value : "");
