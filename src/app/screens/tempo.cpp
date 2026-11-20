@@ -62,6 +62,14 @@ public:
         auto signature = studio.project().time_signature();
         ui::rail(g, "TMPO", "", std::to_string(signature.beats) + "/" + std::to_string(signature.unit));
         char bpm[16];
+        if (unsigned heard = studio.midi.following() && !studio.midi.following_mtc() ? studio.midi.tempo_in() : 0) {
+            // MIDI clock in leads (src/app/midi.h): the tempo heard; the wheel waits.
+            std::snprintf(bpm, sizeof bpm, "%u.%u", heard / 10, heard % 10);
+            move::draw_text_centred(g, ui::content_x, 10, ui::content_width, bpm, 3);
+            move::draw_text_centred(g, ui::content_x, 38, ui::content_width, "MIDI CLOCK IN");
+            ui::detail(g, "EXT", bar_beat(studio));
+            return;
+        }
         std::snprintf(bpm, sizeof bpm, "%u.%u", studio.tempo() / 10, studio.tempo() % 10);
         big(g, bpm, "BPM");
         move::draw_text(g, ui::content_x + 4, 40, "SHIFT: FINER");
@@ -76,7 +84,10 @@ public:
     std::string knob_owner() const override { return "TMPO"; }
 
 private:
-    void turn(int delta) override { studio.set_tempo(unsigned(std::clamp(int(studio.tempo()) + delta * (studio.shift ? 1 : 10), 300, 3000))); }
+    void turn(int delta) override {
+        if (studio.midi.following() && !studio.midi.following_mtc()) return; // the clock in sets it
+        studio.set_tempo(unsigned(std::clamp(int(studio.tempo()) + delta * (studio.shift ? 1 : 10), 300, 3000)));
+    }
 };
 
 class Metronome final : public Setting {

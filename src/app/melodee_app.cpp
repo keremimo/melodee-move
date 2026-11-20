@@ -127,6 +127,7 @@ bool MelodeeApp::global(bindings::Job job, const bindings::Use& use) {
         return true;
     }
     case Job::TracksOverview: studio.open("tracks"); return true;
+    case Job::TrackOptions: studio.select(bank + unsigned(use.index)); return false; // and its options open (track_options.cpp)
     // Transport and volume.
     case Job::PlayStop:
         if (studio.playing()) studio.stop();
@@ -288,6 +289,7 @@ void MelodeeApp::draw_touched(juce::Graphics& g) {
     auto shown = top->knob(unsigned(touched));
     ui::rail(g, "KNOB", std::to_string(touched + 1), top->knob_owner());
     ui::big_parameter(g, ui::content(4, 44), shown.name, shown.value, shown.fraction);
+    if (auto detail = top->knob_detail(unsigned(touched)); !detail.empty()) ui::detail(g, detail.substr(0, 16));
 }
 
 void MelodeeApp::draw_volume(juce::Graphics& g) {

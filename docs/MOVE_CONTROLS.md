@@ -180,7 +180,7 @@ while Shift is held.
 | Track button | Selects the track (and Note Mode, from the Overview or Session) | Selects that track of the bank in view, as it is let go (today on the press) | done |
 | Track button held | Shows that track while held, without selecting it | The sixteen tracks on the screen, the steps picking (core's design A; it selects the track on the press today) | done |
 | Track button held + Volume knob | The track's volume, in dB on the screen | The track's level | done |
-| Shift + Track button | The track's options: colour, MIDI In and Out channel | The same | wave 2: MIDI/sync/undo/projects |
+| Shift + Track button | The track's options: colour, MIDI In and Out channel | Selects it and shows its options: its colour, MIDI IN and MIDI OUT (docs/UI.md, MIDI and sync) | done |
 | Mute held + Track button | Mutes or unmutes the track (its LED dims) | The same | done |
 | Shift + Mute held + Track button | Solos or unsolos the track (its LED blue) | The same | done |
 | Track button held + Copy held + Step | No job (Control Live: Copy + a track button duplicates the track) | Copies that track onto the next step's, asking before replacing | done |

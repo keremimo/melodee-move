@@ -106,7 +106,7 @@ std::vector<Binding> make_table() {
         {"Track button", S::Any, T::Any, H::none, C::TrackButton, G::Tap, J::SelectTrack, St::Done},
         {"Track button held", S::Any, T::Any, H::none, C::TrackButton, G::Hold, J::PeekTrack, St::Done},
         {"Track button held + Volume knob", S::Any, T::Any, H::track, C::Volume, G::Turn, J::TrackLevel, St::Done},
-        {"Shift + Track button", S::Any, T::Any, H::shift, C::TrackButton, G::Press, J::TrackOptions, St::Wave2, projects},
+        {"Shift + Track button", S::Any, T::Any, H::shift, C::TrackButton, G::Press, J::TrackOptions, St::Done},
         {"Mute held + Track button", S::Any, T::Any, H::mute, C::TrackButton, G::Press, J::MuteTrack, St::Done},
         {"Shift + Mute held + Track button", S::Any, T::Any, H::shift | H::mute, C::TrackButton, G::Press, J::SoloTrack, St::Done},
         {"Track button held + Copy held + Step", S::Any, T::Any, H::track | H::copy, C::Step, G::Press, J::CopyTrack, St::Done},

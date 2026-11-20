@@ -51,6 +51,8 @@ public:
     virtual Knob knob(unsigned) const { return {}; }
     // What the touched knob's rail says under its number.
     virtual std::string knob_owner() const { return {}; }
+    // The detail line under knob n shown large; empty: none.
+    virtual std::string knob_detail(unsigned) const { return {}; }
     // Fields for the status line (" key=value ..."), whether shown or not.
     virtual std::string status() const { return {}; }
 

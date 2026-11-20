@@ -1,0 +1,23 @@
+#!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-only
+# melodee-midi HEX... | panic
+# On the Move, while melodee-move runs: one message into Melodee's MIDI input,
+# as if it came in on the USB port ("melodee-midi 90 3c 64": note C3 on
+# channel 1), or MIDI Config's Panic ("melodee-midi panic"). Over SSH:
+#   ssh root@move.local /data/UserData/melodee-move/melodee-midi panic
+set -eu
+FIFO=${MELODEE_MIDI_FIFO:-/tmp/melodee-move-midi}
+if [ $# -eq 0 ]; then
+    echo "usage: melodee-midi HEX... | panic" >&2
+    exit 2
+fi
+if [ ! -p "$FIFO" ]; then
+    echo "melodee-midi: melodee-move is not running ($FIFO missing)" >&2
+    exit 1
+fi
+# A reader holds the FIFO open while melodee-move runs; a stale one left by a
+# crash would block the write, so it gets two seconds.
+timeout 2 sh -c 'printf "%s\n" "$1" > "$2"' sh "$*" "$FIFO" || {
+    echo "melodee-midi: melodee-move did not take it" >&2
+    exit 1
+}

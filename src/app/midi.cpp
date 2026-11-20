@@ -10,7 +10,11 @@
 #include "melodee/model/sampler.h"
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
+#include <fcntl.h>
 #include <filesystem>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <fstream>
 #include <sstream>
 
@@ -61,6 +65,8 @@ Midi::Midi() {
 }
 
 Midi::~Midi() {
+    if (remote_in >= 0) { close(remote_in); unlink(remote_path().c_str()); }
+    if (remote_keep >= 0) close(remote_keep);
     SysexJob job;
     while (sysex_jobs.pop(job)) delete job.bytes;
     while (sysex_done.pop(job)) delete job.bytes;
@@ -447,7 +453,6 @@ void Midi::panic(Studio& studio) {
     release_all(studio);
     studio.send({Type::AllNotesOff, 255}); // the engines, and the notes the engine host owes an off
     panics_asked.fetch_add(1, std::memory_order_release);
-    studio.say("MIDI PANIC");
 }
 
 void Midi::configure(Studio& studio, bool force) {
@@ -531,7 +536,49 @@ void Midi::send_sysex(Studio& studio, unsigned track) {
 
 int Midi::sysex_percent(unsigned track) const { return sysex_progress[track % track_count].load(std::memory_order_relaxed) - 1; }
 
+std::string Midi::remote_path() {
+    const char* path = std::getenv("MELODEE_MIDI_FIFO");
+    return path && *path ? path : "/tmp/melodee-move-midi";
+}
+
+void Midi::remote(Studio& studio) {
+    if (!remote_tried) {
+        remote_tried = true;
+        auto path = remote_path();
+        struct stat info {};
+        if (stat(path.c_str(), &info) == 0 && !S_ISFIFO(info.st_mode)) return; // something else there: no remote
+        if (stat(path.c_str(), &info) != 0 && mkfifo(path.c_str(), 0666) != 0) return;
+        chmod(path.c_str(), 0666);
+        remote_in = open(path.c_str(), O_RDONLY | O_NONBLOCK);
+        if (remote_in >= 0) remote_keep = open(path.c_str(), O_WRONLY | O_NONBLOCK);
+    }
+    if (remote_in < 0) return;
+    char bytes[256];
+    for (ssize_t got; (got = read(remote_in, bytes, sizeof bytes)) > 0;) remote_line.append(bytes, size_t(got));
+    for (size_t end; (end = remote_line.find('\n')) != std::string::npos;) {
+        std::string line = remote_line.substr(0, end);
+        remote_line.erase(0, end + 1);
+        std::lock_guard<std::mutex> hold(studio.lock);
+        if (line.rfind("panic", 0) == 0) { panic(studio); studio.say("MIDI PANIC"); continue; }
+        // Hex bytes: a message, or a SysEx, in pieces of up to three as the port brings them.
+        std::istringstream in(line);
+        std::vector<uint8_t> message;
+        for (std::string word; in >> word && message.size() < 512;) message.push_back(uint8_t(std::strtoul(word.c_str(), nullptr, 16)));
+        for (size_t at = 0; at < message.size();) {
+            move::ExternalMidi m;
+            m.timestamp_ns = uint64_t(now_ns());
+            bool piece = message[0] == 0xf0;
+            size_t take = piece ? std::min<size_t>(3, message.size() - at) : message.size() - at;
+            for (size_t k = 0; k < take && k < 3; ++k) m.bytes[m.size++] = message[at + k];
+            at += piece ? take : message.size();
+            receive(studio, m);
+        }
+    }
+    if (remote_line.size() > 4096) remote_line.clear();
+}
+
 void Midi::service(Studio& studio) {
+    remote(studio);
     SysexJob done;
     while (sysex_done.pop(done)) { delete done.bytes; sysex_sent.fetch_add(1, std::memory_order_relaxed); }
     std::vector<std::pair<unsigned, std::string>> asked;

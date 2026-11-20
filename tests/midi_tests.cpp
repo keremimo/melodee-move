@@ -7,11 +7,15 @@
 // project's MVMO section. A test binary of its own, beside move-tests.
 #include "app/melodee_app.h"
 #include "app/midi.h"
+#include "app/screen.h"
 #include "app/studio.h"
+#include "ui/mockups.h"
 #include "melodee/engine/midi_engine.h"
+#include "melodee/model/scales.h"
 #include "move/host.h"
 #include "move/spi_device.h"
 #include "move/spi_protocol.h"
+#include "move/display.h"
 #include "move/tools.h"
 #include <chrono>
 #include <cstring>
@@ -264,6 +268,17 @@ void test_in() {
     CHECK(count_of(rig.blocks(2), 0x92, 48) == 1);
     rig.in_message({0x88, 48, 0});
     CHECK(count_of(rig.blocks(2), 0x82, 48) == 1);
+    // melodee-midi: a line into the FIFO, read by the service thread, as if from the port.
+    rig.melodee->service();
+    CHECK(std::filesystem::is_fifo(app::Midi::remote_path()));
+    {
+        std::ofstream fifo(app::Midi::remote_path());
+        fifo << "98 30 46\n" << "panic\n";
+    }
+    rig.melodee->service();
+    auto remote = rig.blocks(6);
+    CHECK(count_of(remote, 0x92, 48) == 1);
+    CHECK(rig.melodee->status().find("midi_panics=1") != std::string::npos);
 }
 
 uint64_t now_ns() { return uint64_t(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count()); }
@@ -377,10 +392,179 @@ void test_saved() {
     CHECK(midi.config.port == melodee::MidiPort::Usb && !midi.config.cv_out);
 }
 
+// ---------------------------------------------------------------- the screens, by hand
+
+// The Move's controls as a hand uses them, through the app and its bindings table.
+struct Hand {
+    app::MelodeeApp& m;
+    void cc(uint8_t number, uint8_t value) { m.surface(make_event(0xb0, number, value)); }
+    void press(Button b) { cc(button_cc(b), 127); cc(button_cc(b), 0); }
+    void down(Button b) { cc(button_cc(b), 127); }
+    void up(Button b) { cc(button_cc(b), 0); }
+    void wheel(int steps) { cc(main_knob_cc, uint8_t(steps & 0x7f)); }
+    void knob(unsigned n, int steps) { cc(uint8_t(knob_first_cc + n), uint8_t(steps & 0x7f)); }
+    void touch(unsigned n, bool on) { m.surface(make_event(on ? 0x90 : 0x80, uint8_t(n), on ? 127 : 0)); }
+    void step(unsigned n) { m.surface(make_event(0x90, step_note(n), 127)); m.surface(make_event(0x80, step_note(n), 0)); }
+    // Shift twice within 0.3 s locks it (as on the Move): a hand's presses come further apart.
+    template <class Do> void shift(Do&& what) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(320));
+        down(Button::Shift); what(); up(Button::Shift);
+    }
+};
+
+// The screen as drawn, four times size, for a look beside docs/ui/midi.png.
+void snap(app::MelodeeApp& m, const std::string& name) {
+    juce::Image image(juce::Image::ARGB, screen_width, screen_height, true);
+    {
+        juce::Graphics g(image);
+        g.fillAll(juce::Colours::black);
+        g.setColour(juce::Colours::white);
+        m.draw(g);
+    }
+    auto folder = juce::File::getCurrentWorkingDirectory().getChildFile("build/midi-previews");
+    folder.createDirectory();
+    ui::mockup::write_png(frame_image(pack(image), 4), folder.getChildFile(juce::String(name) + ".png"));
+}
+
+bool has(app::MelodeeApp& m, const std::string& text) { return m.status().find(text) != std::string::npos; }
+
+void test_screens() {
+    Rig rig("screens");
+    Hand hand {*rig.melodee};
+    auto& studio = rig.studio();
+    rig.midi_track(2);
+    rig.pump();
+    CHECK(has(*rig.melodee, "page=midi-play") && has(*rig.melodee, "midi_page=1"));
+    snap(*rig.melodee, "device");
+    // Knob 1 on DEVICE: the channel.
+    hand.knob(0, -1);
+    { std::lock_guard<std::mutex> hold(studio.lock); CHECK(studio.current().params[mt::Channel] == 2); }
+    // Shift + the wheel: the next page, PROGRAM; knob 3 the program.
+    hand.shift([&] { hand.wheel(1); });
+    CHECK(has(*rig.melodee, "midi_page=2"));
+    hand.knob(2, 12);
+    { std::lock_guard<std::mutex> hold(studio.lock); CHECK(studio.current().params[mt::Program] == 12); }
+    std::this_thread::sleep_for(std::chrono::milliseconds(1700)); // the turned knob's moment passes
+    snap(*rig.melodee, "program");
+    // CC 1-8: knob 1 its value; Shift + knob 1 what it sends.
+    hand.shift([&] { hand.wheel(1); });
+    CHECK(has(*rig.melodee, "midi_page=3"));
+    hand.knob(0, -10);
+    hand.shift([&] { hand.knob(0, 1); });
+    {
+        std::lock_guard<std::mutex> hold(studio.lock);
+        CHECK(studio.current().params[mt::slot_value(0)] == 54 && studio.current().params[mt::slot_address(0)] == 75);
+    }
+    hand.shift([&] { hand.touch(0, true); snap(*rig.melodee, "slot-address"); hand.touch(0, false); });
+    std::this_thread::sleep_for(std::chrono::milliseconds(1700));
+    snap(*rig.melodee, "cc");
+    // Every page round: PADS to Drums, AUDIO's input, SYSEX.
+    for (int n = 0; n < 4; ++n) hand.shift([&] { hand.wheel(1); });
+    CHECK(has(*rig.melodee, "midi_page=7"));
+    hand.knob(0, 1); // Drums
+    {
+        std::lock_guard<std::mutex> hold(studio.lock);
+        CHECK(studio.current().layout == melodee::PadLayout::Drums);
+        studio.current().last_pad = 1;
+    }
+    hand.knob(1, 2); // A02: 37 + 2
+    {
+        std::lock_guard<std::mutex> hold(studio.lock);
+        CHECK(studio.current().midi.drum_note[1] == 39 && melodee::drum_key(studio.current(), 1) == 39); // what the pads play (Melodee's drum_key)
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(1700));
+    snap(*rig.melodee, "pads");
+    hand.shift([&] { hand.wheel(1); });
+    for (int n = 0; n < 3; ++n) hand.knob(0, 1); // a choice a turn: NONE, L, R, L+R
+    { std::lock_guard<std::mutex> hold(studio.lock); CHECK(studio.current().params[mt::AudioIn] == mt::AudioRear); }
+    rig.pump();
+    hand.shift([&] { hand.wheel(1); });
+    CHECK(has(*rig.melodee, "midi_page=9"));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1700));
+    snap(*rig.melodee, "sysex");
+    // The wheel to the sound, push: Sounds; the wheel loads as it turns; Shift held: options.
+    hand.wheel(1);
+    hand.press(Button::MainPush);
+    CHECK(has(*rig.melodee, "page=midi-sounds") && has(*rig.melodee, "sounds=1"));
+    snap(*rig.melodee, "sounds");
+    std::this_thread::sleep_for(std::chrono::milliseconds(320));
+    hand.down(Button::Shift);
+    std::this_thread::sleep_for(std::chrono::milliseconds(450));
+    rig.pump();
+    hand.up(Button::Shift);
+    CHECK(has(*rig.melodee, "sounds_options=1"));
+    snap(*rig.melodee, "sound-options");
+    hand.press(Button::MainPush); // SAVE SOUND
+    CHECK(has(*rig.melodee, "sounds=2") && has(*rig.melodee, "sounds_options=0"));
+    CHECK(std::filesystem::exists(rig.home + "/Sounds/MIDI 3 1.mlds"));
+    hand.wheel(-1); // MIDI OUT, loaded: the program back to none
+    { std::lock_guard<std::mutex> hold(studio.lock); CHECK(studio.current().params[mt::Program] == 0); }
+    hand.wheel(1);  // MIDI 3 1, as saved
+    { std::lock_guard<std::mutex> hold(studio.lock); CHECK(studio.current().params[mt::Program] == 12); }
+    hand.press(Button::Back);
+    CHECK(has(*rig.melodee, "page=midi-play"));
+    // Shift + track button 1 (track 1 of the bank): selected, its options; MIDI IN 5.
+    hand.shift([&] { hand.press(Button::Row1); });
+    CHECK(has(*rig.melodee, "page=track-options") && has(*rig.melodee, "track=1 "));
+    hand.press(Button::MainPush);
+    hand.wheel(5);
+    snap(*rig.melodee, "track-options");
+    hand.press(Button::MainPush);
+    hand.wheel(1); // MIDI OUT
+    hand.press(Button::MainPush);
+    hand.wheel(9);
+    hand.press(Button::MainPush);
+    {
+        std::lock_guard<std::mutex> hold(studio.lock);
+        CHECK(studio.project().tracks[0].midi_channel == 5 && studio.midi.track_out[0] == 9 && studio.midi.out_channel(studio, 0) == 9);
+    }
+    hand.press(Button::Back);
+    CHECK(has(*rig.melodee, "page=kit-play"));
+    // Shift + Step 2: MIDI Config (Setup's MIDI row, once Setup is merged); SYNC IN to CLOCK; PANIC.
+    hand.shift([&] { hand.step(1); });
+    CHECK(has(*rig.melodee, "page=midi-config"));
+    snap(*rig.melodee, "config");
+    hand.wheel(4);
+    hand.press(Button::MainPush);
+    hand.wheel(1);
+    snap(*rig.melodee, "config-edit");
+    hand.press(Button::MainPush);
+    { std::lock_guard<std::mutex> hold(studio.lock); CHECK(studio.midi.config.sync_in == melodee::MidiSync::Clock); }
+    hand.wheel(20); // to the end: PANIC
+    hand.press(Button::MainPush);
+    rig.blocks(4);
+    CHECK(has(*rig.melodee, "midi_panics=1") && has(*rig.melodee, "midi_panicked=1"));
+    snap(*rig.melodee, "config-panic");
+    hand.press(Button::Back); // the list again
+    CHECK(has(*rig.melodee, "page=midi-config") && has(*rig.melodee, "midi_panicked=0"));
+    hand.press(Button::Back);
+    CHECK(has(*rig.melodee, "page=kit-play"));
+    // Tempo while MIDI clock leads: the tempo heard.
+    uint64_t at = now_ns();
+    rig.in_message({0xfa}, at);
+    for (int pulse = 0; pulse < 30; ++pulse) { rig.in_message({0xf8}, at + uint64_t(pulse) * 20833333u); rig.blocks(1); }
+    hand.shift([&] { hand.step(4); });
+    CHECK(has(*rig.melodee, "page=tempo"));
+    snap(*rig.melodee, "tempo-ext");
+}
+
+// Setup (Shift + Step 2) is move-projects': once its screen is here, MIDI
+// Config gives up its stand-in Trigger (src/app/screens/midi_config.cpp).
+void test_setup_trigger() {
+    bool setup = false, stand_in = false;
+    for (const auto& entry : app::registered_screens()) {
+        if (entry.id == "setup") setup = true;
+        if (entry.id == "midi-config")
+            for (const auto& when : entry.triggers) stand_in |= when.job == app::bindings::Job::Setup;
+    }
+    CHECK(!(setup && stand_in));
+}
+
 } // namespace
 
 int main() {
     std::filesystem::create_directories("build/test-midi");
+    setenv("MELODEE_MIDI_FIFO", "build/test-midi/fifo", 1); // not the Move's own
     std::filesystem::create_directories("build/test-samples");
     std::filesystem::create_directories("build/test-no-modules");
     test_packets();
@@ -390,6 +574,8 @@ int main() {
     test_sync_in();
     test_sysex();
     test_saved();
+    test_screens();
+    test_setup_trigger();
     std::cout << "midi-tests: " << checks - failures << '/' << checks << " checks passed\n";
     return failures ? 1 : 0;
 }

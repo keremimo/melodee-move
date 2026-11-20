@@ -21,7 +21,8 @@ ldd build/melodee-move | awk '$3 ~ /^\// { print $3 }' \
 printf '<?xml version="1.0"?>\n<fontconfig></fontconfig>\n' > "$OUT/lib/fonts.conf"
 cp tools/launcher.sh "$OUT/melodee-move"
 cp tools/run-stock.sh "$OUT/run-stock.sh"
+cp tools/melodee-midi "$OUT/melodee-midi" # MIDI into the running app, or Panic, over SSH
 cp -R "$OUT/bin" "$OUT/lib" "$TOOL/"
 cp module/module.json module/standalone "$TOOL/"
-chmod 755 "$OUT/melodee-move" "$OUT/run-stock.sh" "$TOOL/standalone" "$OUT/bin/melodee-move" "$TOOL/bin/melodee-move"
+chmod 755 "$OUT/melodee-move" "$OUT/run-stock.sh" "$OUT/melodee-midi" "$TOOL/standalone" "$OUT/bin/melodee-move" "$TOOL/bin/melodee-move"
 echo "bundle: $OUT ($(ls "$OUT/lib" | wc -l) libraries), $TOOL"
