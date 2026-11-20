@@ -627,31 +627,59 @@ void SynthPlayer::note_on(int note, int velocity) { midi(0x90, uint8_t(std::clam
 void SynthPlayer::note_off(int note) { midi(0x80, uint8_t(std::clamp(note, 0, 127)), 0); }
 void SynthPlayer::pressure(int note, int value) { midi(0xa0, uint8_t(std::clamp(note, 0, 127)), uint8_t(std::clamp(value, 0, 127))); }
 
-void SynthPlayer::render(const move::AudioBlock& input, move::AudioBlock& output, float gain) {
-    rendered_at.store(std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now().time_since_epoch()).count(), std::memory_order_relaxed);
-    // The input, where a module reading the device page looks for it.
+void module_input(const move::AudioBlock& input) {
     for (unsigned n = 0; n < input.size(); ++n) {
         auto sample = uint16_t(int16_t(input[n] >> 16));
         mapped_page[audio_in_offset + 2 * n] = uint8_t(sample);
         mapped_page[audio_in_offset + 2 * n + 1] = uint8_t(sample >> 8);
     }
+}
+
+bool SynthPlayer::next_block() {
+    rendered_at.store(std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now().time_since_epoch()).count(), std::memory_order_relaxed);
     if (player.load(std::memory_order_acquire) == source_thread_plays || !apply()) {
         // A source: the next block its thread made, if it is there.
-        if (source_blocks.pop(block)) taken.fetch_add(1, std::memory_order_release);
-        else {
-            if (primed.load(std::memory_order_relaxed)) late.fetch_add(1, std::memory_order_relaxed);
-            return;
+        if (source_blocks.pop(block)) {
+            taken.fetch_add(1, std::memory_order_release);
+            return true;
         }
-    } else {
-        if (!current) return;
-        block.fill(0);
-        auto begun = Clock::now();
-        current->api->render_block(current->instance, block.data(), int(move::audio_frames));
-        timed(begun, "render", nullptr, nullptr);
+        if (primed.load(std::memory_order_relaxed)) late.fetch_add(1, std::memory_order_relaxed);
+        return false;
     }
+    if (!current) return false;
+    block.fill(0);
+    auto begun = Clock::now();
+    current->api->render_block(current->instance, block.data(), int(move::audio_frames));
+    timed(begun, "render", nullptr, nullptr);
+    return true;
+}
+
+void SynthPlayer::render(const move::AudioBlock& input, move::AudioBlock& output, float gain) {
+    module_input(input);
+    if (!next_block()) return;
     for (unsigned n = 0; n < block.size(); ++n) {
         int64_t mixed = int64_t(output[n]) + int64_t(float(block[n]) * gain * 65536.0f);
         output[n] = int32_t(std::clamp<int64_t>(mixed, INT32_MIN + 1, INT32_MAX));
+    }
+}
+
+void SynthPlayer::render_add(float* left, float* right, unsigned frames) {
+    constexpr float scale = 1.0f / 32768.0f;
+    while (frames) {
+        if (block_used >= move::audio_frames) {
+            if (!next_block()) block.fill(0);
+            block_used = 0;
+        }
+        unsigned n = std::min(frames, move::audio_frames - block_used);
+        const int16_t* from = block.data() + 2 * block_used;
+        for (unsigned f = 0; f < n; ++f) {
+            left[f] += float(from[2 * f]) * scale;
+            right[f] += float(from[2 * f + 1]) * scale;
+        }
+        left += n;
+        right += n;
+        frames -= n;
+        block_used += n;
     }
 }
 
