@@ -75,6 +75,9 @@ Three parts so far:
   is done, Back cancels. A file the page hands over (Webstream's download)
   goes onto the first empty kit pad, to play and chop. An action such as
   play/pause or stop is a button: push its menu row, or turn its knob up.
+  What a page keeps for itself (Webstream's provider, where its menus are)
+  is saved with the module and comes back on the next start; using a page
+  counts as a change, saved three seconds on.
 - The master knob is the volume; Shift + Back goes back to Move.
 - **Saving**: the whole project is one Melodee project file,
   `/data/UserData/Melodee/Projects/Move.mldp` (`--home` moves the folder),
