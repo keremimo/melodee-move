@@ -27,6 +27,10 @@ namespace fs = std::filesystem;
 alignas(64) uint8_t mapped_page[4096] {};
 constexpr int audio_out_offset = 256, audio_in_offset = 2048 + 256;
 std::atomic<float> tempo {120.0f};
+// Melodee's transport as the modules read it (set_module_transport()): playing, where, the time signature.
+std::atomic<bool> transport_playing {false};
+std::atomic<double> transport_beats {0.0};
+std::atomic<uint8_t> transport_upper {4}, transport_lower {4};
 thread_local bool on_audio_thread = false;
 
 void host_log(const char* message) {
@@ -34,9 +38,9 @@ void host_log(const char* message) {
     if (!on_audio_thread && message) std::fprintf(stderr, "schwung module: %s\n", message);
 }
 int refuse_midi(const uint8_t*, int) { return 0; }       // no Move tracks, no external send yet
-int clock_status() { return schwung::clock_stopped; }    // no transport yet
+int clock_status() { return transport_playing.load(std::memory_order_relaxed) ? schwung::clock_running : schwung::clock_stopped; }
 float bpm() { return tempo.load(std::memory_order_relaxed); }
-double beat_position() { return 0.0; }
+double beat_position() { return transport_beats.load(std::memory_order_relaxed); } // quarters since Play
 int emit_value(void*, const char*, const char*, const char*, float, float, float, int, int) { return 0; }
 void clear_source(void*, const char*) {}
 
@@ -113,6 +117,13 @@ bool param_from(const juce::var& entry, ModuleParam& out) {
 } // namespace
 
 void set_module_tempo(float bpm_value) { tempo.store(bpm_value, std::memory_order_relaxed); }
+
+void set_module_transport(bool playing, double beats, unsigned upper, unsigned lower) {
+    transport_playing.store(playing, std::memory_order_relaxed);
+    transport_beats.store(beats, std::memory_order_relaxed);
+    transport_upper.store(uint8_t(upper), std::memory_order_relaxed);
+    transport_lower.store(uint8_t(lower), std::memory_order_relaxed);
+}
 
 // ---------------------------------------------------------------- the catalog
 
@@ -718,15 +729,15 @@ extern "C" __attribute__((visibility("default"))) int schwung_move_info(void* ou
     info.size = sizeof info;
     info.version = 1;
     info.valid = 1;
-    info.playing = 0;
+    info.playing = app::transport_playing.load(std::memory_order_relaxed);
     info.metronome_on = info.midi_clock_sync = info.input_monitoring = 255;
     info.root_note = info.selected_track = info.global_quant = -1;
-    info.ts_upper = 4;
-    info.ts_lower = 4;
+    info.ts_upper = app::transport_upper.load(std::memory_order_relaxed);
+    info.ts_lower = app::transport_lower.load(std::memory_order_relaxed);
     info.tempo = app::tempo.load(std::memory_order_relaxed);
     info.groove = -1;
     info.master_db = -1000;
-    info.song_beats = -1;
+    info.song_beats = app::transport_playing.load(std::memory_order_relaxed) ? app::transport_beats.load(std::memory_order_relaxed) : -1;
     for (auto& track : info.track) { track.color_id = -1; track.type = -1; track.muted = track.soloed = track.selected = 255; track.volume_db = -1000; }
     std::memcpy(out, &info, std::min(capacity, sizeof info));
     return 1;

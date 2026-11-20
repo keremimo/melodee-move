@@ -40,6 +40,8 @@ enum class Cell : uint8_t { Empty, Notes, Playing, Queued, Stopping };
 struct GridRow {
     std::string tag;               // the track's, as the rail names it ("KIT", "OBXD"); empty: no track
     std::array<Cell, 8> cells {};
+    uint8_t follows = 0;           // a bit a cell: a follow action comes after it (an arrow)
+    uint8_t progress = 0;          // how far the playing cell has played, 0..10 (a bar under it)
 };
 void pattern_grid(juce::Graphics& g, juce::Rectangle<int> area, const std::array<GridRow, 4>& rows, unsigned first_pattern,
                   int selected_row, int selected_column);

@@ -51,6 +51,11 @@ public:
     virtual Knob knob(unsigned) const { return {}; }
     // What the touched knob's rail says under its number.
     virtual std::string knob_owner() const { return {}; }
+    // Knob n as a Motion lane (melodee-sample's model/limits.h motion_*
+    // numbers; a kit pad's own value on `pad`), for a held step's locks and
+    // the knob moves Seq Record writes (sequencer.h). False: none. A kit's
+    // page that names its knobs as kit-play does (TUNE, LEVEL ...) needs none.
+    virtual bool knob_lane(unsigned, unsigned& /*param*/, unsigned& /*pad*/) const { return false; }
     // Fields for the status line (" key=value ..."), whether shown or not.
     virtual std::string status() const { return {}; }
 

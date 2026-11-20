@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "app/melodee_app.h"
 #include "app/screen.h"
+#include "app/sequencer.h"
 #include "move/display.h"
 #include "move/font.h"
 #include "ui/track_style.h"
@@ -163,12 +164,15 @@ void MelodeeApp::act(const bindings::Use& use) {
     const bindings::Binding* row = bindings::find(where(), use);
     if (!row || row->job == bindings::Job::Nothing) return;
     last_job = row->job;
-    if (global(row->job, use)) return;
+    bool done = global(row->job, use);
     Screen* top = studio.top();
-    if (top && top->job(row->job, use)) return;
+    if (!done) done = top && top->job(row->job, use);
     // The track's Play screen under the one on top keeps what that one leaves.
-    if (auto* play = studio.screen(home_screen(studio.kind())); play && play != top && play->job(row->job, use)) return;
-    trigger(row->job);
+    if (auto* play = studio.screen(home_screen(studio.kind())); !done && play && play != top) done = play->job(row->job, use);
+    // Then the sequencer (sequencer.h): the steps, bars and patterns, Rec, Capture.
+    if (!done) done = studio.sequencer().job(row->job, use);
+    if (!done) trigger(row->job);
+    studio.sequencer().after(row->job, use); // a knob moved while recording, written
 }
 
 void MelodeeApp::settle() {
@@ -199,6 +203,7 @@ void MelodeeApp::surface(const move::SurfaceEvent& event) {
     for (auto* shown : std::vector<Screen*>(studio.stack)) shown->input(input);
     if (holding())
         if (auto* sixteen = tracks()) sixteen->input(input);
+    if (!studio.typing) studio.sequencer().input(event); // pads into Seq Record and Capture, steps held
     // Then the jobs.
     studio.shift = (gestures.held() & bindings::held::shift) != 0;
     for (const auto& use : gestures.feed(input, now)) act(use);
@@ -212,6 +217,7 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point now) {
     // Holds that came due (a track button, Undo, Back held).
     for (const auto& use : gestures.tick(now)) act(use);
     settle();
+    studio.sequencer().tick(now);
     // The track buttons: the selected track's bank, each its colour, the selected one bright.
     // Soloed blue, as on the Move; muted grey.
     unsigned first = ui::bank_of(studio.track()) * ui::tracks_a_bank;
@@ -239,7 +245,10 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point now) {
         lights.button(Button::Back, white_dim);
         return;
     }
-    if (auto* top = studio.top()) top->lights(lights);
+    if (auto* top = studio.top()) {
+        top->lights(lights);
+        if (!holding() && top->screen_kind() == bindings::Screen::Play) studio.sequencer().lights(lights, now); // the steps, Rec, Capture
+    }
     if (holding()) {
         if (auto* sixteen = tracks()) sixteen->lights(lights); // the steps as the tracks, over the screen's
     } else if (studio.shift) { // the steps with a Shift job that works (docs/MOVE_CONTROLS.md); the metronome bright when on
@@ -250,6 +259,7 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point now) {
             use.index = int(step);
             use.held = bindings::held::shift;
             const auto* row = bindings::find(at, use);
+            if (!row) { use.gesture = bindings::Gesture::Tap; row = bindings::find(at, use); } // a tap's job (Shift + Step 16)
             bool works = row && row->status == bindings::Status::Done;
             lights.step(step, !works ? colour::off : row->job == bindings::Job::Metronome && studio.click() ? colour::white : colour::light_grey);
         }
@@ -266,6 +276,7 @@ void MelodeeApp::draw(juce::Graphics& g) {
     if (studio.typing) draw_typing(g);
     else if (holding() && now < volume_until) draw_volume(g);
     else if (holding() && now - held_at >= hold_shown && tracks()) tracks()->draw(g);
+    else if (top && top->screen_kind() == bindings::Screen::Play && studio.sequencer().draw(g)) {} // a step held: its card, TRIG, a lock
     else if (top && touched >= 0 && now < touched_until && !top->knob(unsigned(touched)).name.empty()) draw_touched(g);
     else if (top) top->draw(g);
     if (now < studio.message_until) {

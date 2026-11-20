@@ -93,7 +93,15 @@ void pattern_grid(juce::Graphics& g, juce::Rectangle<int> area, const std::array
                 break;
             }
             g.setColour(on);
-            if (r == selected_row && c == selected_column) g.fillRect(x - 1, y + cell_w, cell_w + 1, 2);
+            if (row.follows >> c & 1) { // a follow action: an arrow at its right edge
+                g.setColour(row.cells[size_t(c)] == Cell::Playing ? off : on);
+                g.fillRect(x + cell_w - 3, y + 4, 1, 3);
+                g.fillRect(x + cell_w - 4, y + 3, 1, 1);
+                g.fillRect(x + cell_w - 4, y + 7, 1, 1);
+                g.setColour(on);
+            }
+            if (row.cells[size_t(c)] == Cell::Playing && row.progress) g.fillRect(x, y + cell_w + 1, std::min<int>(row.progress, cell_w - 1), 1);
+            if (r == selected_row && c == selected_column) g.fillRect(x - 1, y + cell_w + 2, cell_w + 1, 1);
         }
     }
 }
