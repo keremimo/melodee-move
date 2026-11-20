@@ -34,4 +34,8 @@ if [ -n "$PREVIEWS" ]; then
 fi
 # exec: run-stock.sh becomes the SSH session's leader, the process a dropped
 # connection signals, so it can stop melodee-move and bring Move back.
-ssh -t "root@$HOST" "exec sh $REMOTE/run-stock.sh $ARGUMENTS"
+# -tt: a terminal on the Move even when this one has none (run from a
+# script or a background task). Without it, a dropped connection sends the
+# Move side no hang-up: the run's traps never fire, the program keeps
+# running, and nothing would start Ableton's app again.
+ssh -tt "root@$HOST" "exec sh $REMOTE/run-stock.sh $ARGUMENTS"

@@ -194,6 +194,10 @@ terminal: Ableton's app is stopped as the Move's own shutdown stops it, the
 spike runs with realtime priority, and Ableton's app comes back however it
 ends (Shift + Back, Ctrl-C, the connection dropping, a crash; a reboot
 always comes back to stock). As with any quit of Move, save your Set first.
+`tools/stop-stock.sh move.local` ends a run from another terminal, as Shift
++ Back would. The SSH session always has a terminal on the Move (`ssh -tt`),
+so a run started from a script or a background task ends when that is
+stopped, too: without one the Move gets no hang-up and the run carries on.
 Run this way, Melodee is root, and so are the Schwung modules it plays: what
 they write in `/data/UserData/schwung` during the run (logs, caches) is given
 back to the Move's user on the way out, so Schwung can write it again.
