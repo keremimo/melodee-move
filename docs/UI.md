@@ -186,6 +186,66 @@ Chop), Kerem decides with that map. `docs/ui/tracks.png` is the sheet
 | Metronome (Shift + Step 6) | `MET` | `ON` or `OFF` large, its level | `PUSH: OK` |
 | Groove (Shift + Step 7) | `GRV` | the groove in % large | `PUSH: OK` |
 
+## MIDI and sync
+
+The Move gives Melodee **one MIDI port**: USB-MIDI cable 2 of its device
+page, where a class-compliant device on USB-A and a computer on USB-C (the
+"Ableton Move Standalone Port") both arrive, in and out (docs/MIDI.md). So
+nothing here picks a port; the rest is Melodee's MIDI as melodee-sample has
+it. `docs/ui/midi.png` is the sheet (`src/ui/mockups_midi.cpp`).
+
+![MIDI and sync](ui/midi.png)
+
+- **A MIDI track's Play screen** (`MIDI` / track / page): the Device View's
+  items along the top (the track, its sound, FX1, FX2), the page's title,
+  its knobs as names and values (a channel, `POLY`, `-12`: values a bar
+  cannot say), the detail line the last message out and the bar and beat.
+  Shift + the wheel walks its nine pages, as a module's: **DEVICE**
+  (channel, delay in ms), **PROGRAM** (bank MSB and LSB, program, this
+  pattern's own), **CC 1-8**, **CC 9-16**, **CC 17-24** (24 slots, recorded
+  as motion), **EXPRESS** (bend, how pad pressure goes out), **PADS** (Keys
+  or Drums, the last pad's note with its General MIDI name), **AUDIO** (the
+  Move's input as the track's sound: L, R or both, monitor, level),
+  **SYSEX** (a `.syx` from `Melodee/SysEx`, sent as the project loads; knob
+  3 turned up sends it, the detail line counting).
+- **What a slot sends**: Shift + a knob on a CC page (the Move's second
+  parameter): touched, the knob large says what it sends (`CC 74`, `NRPN
+  300`, `BEND`), and turned, changes it (Kerem, 2026-11-20). A touched knob
+  without Shift shows its value, under its full name.
+- **Sounds** (the wheel's push on the track's sound): the MIDI engine's own
+  and the ones saved (`Melodee/Sounds`, `.mlds`), starred ones marked `*`;
+  each loads as the wheel turns, push or Back done. Shift held: SAVE SOUND,
+  STAR or UNSTAR, SHOW (all, starred, recent).
+- **MIDI Config** (Setup, Shift + Step 2: its MIDI and MIDI SYNC rows): in
+  and out channels, pad MIDI in and out, sync in and out (MIDI clock or
+  MTC), Thru, program change, the Remote channel and CCs, PANIC. The wheel
+  picks a row, push edits it (`[MTC]`), the wheel sets it, push again done;
+  push on PANIC sends it. The rail's bottom says `IN` and `OUT` as MIDI
+  passes; the detail line `EXT CLOCK` and the tempo heard, or `EXT MTC`,
+  while following.
+- **Track options** (Shift + a track button, as on the Move): its colour,
+  **MIDI IN** (AUTO, or a channel 1-16 that plays this track whichever is
+  selected; AUTO: the selected track hears MIDI Config's in channel) and
+  **MIDI OUT** (AUTO, or the channel its notes go out on; a MIDI track's is
+  its DEVICE channel). The wheel, push, as in MIDI Config.
+- **Tempo, following MIDI clock**: the BPM heard, `MIDI CLOCK IN`, and `EXT`
+  on the detail line; the wheel does nothing then.
+
+| Screen | Rail | Subject | Detail |
+| --- | --- | --- | --- |
+| MIDI track, a page | `MIDI` / track / page `n/9` | items, the page's title, 8 knob names and values | last message out; bar and beat |
+| A slot's address (Shift + knob) | `KNOB` / knob / `ADR` | `KNOB n SENDS`, the address large, a bar | its General MIDI name |
+| Sounds | `LOAD` / track / `SND` | the sounds, starred `*` | the filter, `SHIFT: OPT` |
+| Sound options (Shift held) | `OPT` / track / `SND` | SAVE SOUND, STAR, SHOW | |
+| MIDI Config | `MIDI` / / `IN`, `OUT` | its rows, the one edited `[ ]` | `EXT CLOCK` tempo, `EXT MTC` |
+| Panic pushed | `MIDI` / / `OUT` | `PANIC`, what went | `BACK: MIDI` |
+| Track options | `TRK` / track / `OPT` | colour, MIDI IN, MIDI OUT | what the row means |
+
+Lights: a MIDI track's pads as a synth's on Keys (every C in the track's
+colour, a held pad white), as a kit's on Drums (32 pads, Plus and Minus the
+next 16, the last pad white); MIDI Config and the track options keep the
+pads playing the track and light Back.
+
 ## Screens in code
 
 Each screen is a file of its own in `src/app/screens/`, a `Screen`

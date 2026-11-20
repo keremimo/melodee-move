@@ -61,4 +61,9 @@ void sheet(juce::Graphics& g, juce::Rectangle<int> area);
 void knob_cells(juce::Graphics& g, juce::Rectangle<int> area, const std::array<std::string, 8>& names,
                 const std::array<float, 8>& values, int touched = -1);
 
+// Eight cells, two rows of four, each a name and its value as text (a MIDI
+// track's page: a channel, POLY, -12): for values a bar cannot say.
+void knob_values(juce::Graphics& g, juce::Rectangle<int> area, const std::array<std::string, 8>& names,
+                 const std::array<std::string, 8>& values, int touched = -1);
+
 } // namespace ui
