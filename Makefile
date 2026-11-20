@@ -9,7 +9,8 @@ JUCE := build/deps/JUCE/modules
 PACKAGES := freetype2 fontconfig
 CPPFLAGS := -Isrc -I$(JUCE) $(shell pkg-config --cflags $(PACKAGES) jack) \
     -DJUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1 -DJUCE_STANDALONE_APPLICATION=1 \
-    -DJUCE_USE_CURL=0 -DJUCE_WEB_BROWSER=0 -DNDEBUG
+    -DJUCE_USE_CURL=0 -DJUCE_WEB_BROWSER=0 -DNDEBUG \
+    -DJUCE_USE_MP3AUDIOFORMAT=1 -DJUCE_USE_WINDOWS_MEDIA_FORMAT=0 -DJUCE_USE_OPUS=0
 # The Move's CM4 is a Cortex-A72, ARMv8.0-A. Never tune for the MPC Sample's
 # Cortex-A55 (ARMv8.2-A): its atomics and dot-product instructions do not
 # exist on the A72 and stop the program with SIGILL.
@@ -29,13 +30,18 @@ LDLIBS := $(shell pkg-config --libs $(PACKAGES)) -ldl -pthread -lrt
 # in melodee-sample, never here.
 MELODEE ?= ../melodee-sample
 MELODEE_INCLUDES := -I$(MELODEE)/src -I$(MELODEE)/base/src
-MELODEE_SOURCES := $(wildcard $(MELODEE)/src/melodee/engine/*.cpp $(MELODEE)/src/melodee/model/*.cpp)
+# shell/sample_decode.cpp: Melodee's own reader for WAV, and AIFF, FLAC, Ogg
+# and MP3 through JUCE, as on the MPC.
+MELODEE_SOURCES := $(wildcard $(MELODEE)/src/melodee/engine/*.cpp $(MELODEE)/src/melodee/model/*.cpp) \
+    $(MELODEE)/src/melodee/shell/sample_decode.cpp
 MELODEE_OBJECTS := $(patsubst $(MELODEE)/src/%.cpp,build/obj/melodee-sample/%.o,$(MELODEE_SOURCES))
 MELODEE_LIBRARY := build/melodee.a
 CPPFLAGS += $(MELODEE_INCLUDES)
 
-MODULE_CPP := $(wildcard $(JUCE)/juce_core/*.cpp $(JUCE)/juce_events/*.cpp $(JUCE)/juce_graphics/*.cpp)
-MODULE_C := $(wildcard $(JUCE)/juce_core/*.c $(JUCE)/juce_graphics/*.c)
+MODULE_CPP := $(wildcard $(JUCE)/juce_core/*.cpp $(JUCE)/juce_events/*.cpp $(JUCE)/juce_graphics/*.cpp \
+    $(JUCE)/juce_audio_basics/*.cpp) $(JUCE)/juce_audio_formats/juce_audio_formats.cpp
+MODULE_C := $(wildcard $(JUCE)/juce_core/*.c $(JUCE)/juce_graphics/*.c) \
+    $(addprefix $(JUCE)/juce_audio_formats/juce_audio_formats_,flac_1.c flac_2.c ogg.c)
 JUCE_OBJECTS := $(addprefix build/obj/juce/,$(notdir $(MODULE_CPP:.cpp=.o) $(MODULE_C:.c=.o)))
 SHARED_OBJECTS := $(patsubst src/%.cpp,build/obj/%.o,$(wildcard src/move/*.cpp src/ui/*.cpp src/spike/*.cpp src/app/*.cpp))
 
@@ -48,7 +54,7 @@ $(MELODEE_LIBRARY): $(MELODEE_OBJECTS)
 	rm -f $@ && $(AR) rcs $@ $^
 build/obj/melodee-sample/%.o: $(MELODEE)/src/%.cpp
 	@mkdir -p $(@D)
-	$(CXX) $(MELODEE_INCLUDES) -DNDEBUG $(CXXFLAGS) -w -c $< -o $@
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -w -c $< -o $@
 build/obj/tests/%.o: tests/%.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(WARNINGS) -c $< -o $@

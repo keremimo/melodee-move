@@ -18,6 +18,7 @@
 #include <filesystem>
 #include <cmath>
 #include <cstring>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <random>
@@ -431,6 +432,28 @@ void test_melodee_app() {
     CHECK(melodee.status().find("page=play") != std::string::npos);
     melodee.surface(make_event(0xb0, button_cc(Button::Back), 127));
     CHECK(melodee.load_now(folder + "/missing.wav", 3) != "");
+
+    // An AIFF (much of the Move's Core Library), written by hand: a 220 Hz
+    // tone, 16-bit stereo at 44.1 kHz, read by Melodee's read_audio().
+    std::string aiff = folder + "/tone.aif";
+    {
+        constexpr uint32_t frames = 22050;
+        std::ofstream file(aiff, std::ios::binary);
+        auto be32 = [&](uint32_t v) { for (int s = 24; s >= 0; s -= 8) file.put(char((v >> s) & 0xff)); };
+        auto be16 = [&](uint16_t v) { file.put(char(v >> 8)); file.put(char(v & 0xff)); };
+        file.write("FORM", 4); be32(4 + 26 + 16 + frames * 4); file.write("AIFF", 4);
+        file.write("COMM", 4); be32(18); be16(2); be32(frames); be16(16);
+        const unsigned char rate[10] {0x40, 0x0e, 0xac, 0x44, 0, 0, 0, 0, 0, 0}; // 44100 as an 80-bit float
+        file.write(reinterpret_cast<const char*>(rate), 10);
+        file.write("SSND", 4); be32(8 + frames * 4); be32(0); be32(0);
+        for (uint32_t n = 0; n < frames; ++n) {
+            auto sample = uint16_t(int16_t(std::sin(6.2831853 * 220.0 * n / 44100.0) * 20000));
+            be16(sample); be16(sample);
+        }
+    }
+    CHECK(melodee.load_now(aiff, 3).empty());
+    CHECK(quiet());
+    CHECK(play(3, 20) > to_s32(0.15f)); // 0.61 x velocity x centre pan's -3 dB x volume: about 0.3
 }
 
 bool has(const std::string& text, const std::string& part) { return text.find(part) != std::string::npos; }

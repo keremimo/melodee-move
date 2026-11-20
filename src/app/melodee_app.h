@@ -21,7 +21,9 @@
 //
 //   Play  the last pad's sample; knobs 1-8: tune, level, pan, start, end,
 //         attack, decay, cutoff. Touch a knob to see it large.
-//   Load  (Menu) WAV files from the Move's sample library onto the last pad.
+//   Load  (Menu) sound files (WAV, AIFF, FLAC, Ogg, MP3) onto the last pad,
+//         from the Move's own storage: your samples, your recordings,
+//         Ableton's Core Library, or anywhere in /data/UserData.
 //   Chop  (Loop) the last pad's sample: Auto, Beats, Regions or Threshold;
 //         the pads play the slices; the jogwheel or Left/Right picks one;
 //         knobs: its start, its end, the type, the amount. Push the
@@ -90,7 +92,7 @@ private:
     const Sample* sample_of(unsigned pad) const;
     void say(std::string text);
     std::string install(std::unique_ptr<Sample> sample, unsigned pad);
-    void place(std::unique_ptr<Sample> sample, uint16_t slot, const melodee::SampleChop& chop);
+    void put_sample(std::unique_ptr<Sample> sample, uint16_t slot, const melodee::SampleChop& chop);
     void changed();
     void remember_chop();
     KitFile snapshot() const;               // the kit as it stands, to save outside the lock
@@ -110,10 +112,15 @@ private:
     unsigned pad = 0;
     Page page = Page::Play;
     bool shift = false;
-    // Load
+    // Load: the places it opens on (the Move's own sample folders and the
+    // Core Library, or the one --samples names), then folders within one.
+    struct Place { std::string name, path, tag; };
+    std::vector<Place> places;
+    int place = -1;            // -1: the list of places
     std::string library, folder;
     std::vector<Entry> entries;
     int cursor = 0;
+    void open_place(int index);
     struct Job { std::string path; unsigned pad; };
     std::vector<Job> jobs;
     bool loading = false;

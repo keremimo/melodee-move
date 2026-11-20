@@ -20,7 +20,7 @@ Three parts so far:
 
 - **Play**: the last pad's sample. Knobs 1-8: tune, level, pan, start, end,
   attack, decay, cutoff (Shift: finer). Touch a knob to see it large.
-- **Load** (Menu): WAV files from the Move's sample library
+- **Load** (Menu): WAV, AIFF, FLAC, Ogg and MP3 files, from a list of places: My Samples, Recordings, Ableton's Core Library (`/data/CoreLibrary/Samples`) and all of `/data/UserData`
   (`/data/UserData/UserLibrary/Samples`, or `--samples DIR`) onto the last
   pad. The jogwheel picks, its push opens a folder or loads, Back goes up.
 - **Chop** (Loop): the last pad's sample, cut by Melodee's Auto, Beats,

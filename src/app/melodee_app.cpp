@@ -4,6 +4,7 @@
 #include "move/font.h"
 #include "ui/widgets.h"
 #include "melodee/shell/chop.h"
+#include "melodee/shell/sample_decode.h"
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -17,8 +18,15 @@ using melodee::ChopMode;
 using melodee::PadSound;
 namespace fs = std::filesystem;
 
-constexpr const char* move_library = "/data/UserData/UserLibrary/Samples";
 constexpr const char* move_user_data = "/data/UserData";
+// Where the Move keeps sound files, as Load lists them (the ones that exist).
+struct MovePlace { const char* name; const char* path; const char* tag; };
+constexpr MovePlace move_places[] {
+    {"MY SAMPLES", "/data/UserData/UserLibrary/Samples", "SMP"},
+    {"RECORDINGS", "/data/UserData/UserLibrary/Recordings", "REC"},
+    {"CORE LIBRARY", "/data/CoreLibrary/Samples", "CORE"},
+    {"ALL USER DATA", "/data/UserData", "ALL"},
+};
 constexpr const char* move_home = "/data/UserData/Melodee";
 constexpr auto autosave_idle = std::chrono::milliseconds(3000); // as Melodee's autosave on the MPC (shell/autosave.h)
 constexpr auto autosave_retry = std::chrono::seconds(10);
@@ -53,9 +61,11 @@ std::vector<float> peaks_of(const melodee::Overview& overview) {
     for (size_t n = 0; n < overview.size(); ++n) peaks[n] = overview[n] / 255.0f;
     return peaks;
 }
-bool is_wav(const fs::path& path) {
+// The kinds Melodee's read_audio() reads (shell/sample_decode.h).
+bool is_sound_file(const fs::path& path) {
     auto extension = upper(path.extension().string());
-    return extension == ".WAV";
+    return extension == ".WAV" || extension == ".AIF" || extension == ".AIFF" || extension == ".FLAC" || extension == ".OGG"
+        || extension == ".MP3";
 }
 
 } // namespace
@@ -63,7 +73,13 @@ bool is_wav(const fs::path& path) {
 MelodeeApp::MelodeeApp(std::string library_folder, std::string home_folder)
     : library(std::move(library_folder)), home(std::move(home_folder)) {
     std::error_code error;
-    if (library.empty()) library = fs::is_directory(move_library, error) ? move_library : fs::current_path(error).string();
+    if (!library.empty()) places.push_back({"SAMPLES", library, "SMP"});
+    else
+        for (const auto& candidate : move_places)
+            if (fs::is_directory(candidate.path, error)) places.push_back({candidate.name, candidate.path, candidate.tag});
+    if (places.empty()) places.push_back({"HERE", fs::current_path(error).string(), "HERE"});
+    if (places.size() == 1) place = 0; // one place: straight into it
+    library = places[size_t(std::max(place, 0))].path;
     if (home.empty()) home = fs::is_directory(move_user_data, error) ? move_home : (fs::current_path(error) / "Melodee").string();
     folder = library;
     project = (fs::path(home) / "Projects" / "Move.mldp").string();
@@ -137,14 +153,27 @@ void MelodeeApp::remember_chop() {
     changed();
 }
 
+void MelodeeApp::open_place(int index) {
+    if (index < 0 || index >= int(places.size())) return;
+    place = index;
+    library = folder = places[size_t(index)].path;
+    cursor = 0;
+    list_folder();
+}
+
 void MelodeeApp::list_folder() {
     entries.clear();
+    if (place < 0) { // the places themselves
+        for (const auto& where : places) entries.push_back({where.name, true});
+        cursor = std::clamp(cursor, 0, std::max(0, int(entries.size()) - 1));
+        return;
+    }
     std::error_code error;
     for (const auto& item : fs::directory_iterator(folder, fs::directory_options::skip_permission_denied, error)) {
         auto name = item.path().filename().string();
         if (name.empty() || name[0] == '.') continue;
         if (item.is_directory(error)) entries.push_back({name, true});
-        else if (is_wav(item.path())) entries.push_back({name, false});
+        else if (is_sound_file(item.path())) entries.push_back({name, false});
     }
     std::sort(entries.begin(), entries.end(), [](const Entry& a, const Entry& b) {
         if (a.folder != b.folder) return a.folder;
@@ -371,12 +400,15 @@ void MelodeeApp::surface(const move::SurfaceEvent& event) {
             else enter_chop();
         } else if (button == Button::Back) {
             if (page == Page::Load) {
-                if (fs::path(folder) != fs::path(library)) { folder = fs::path(folder).parent_path().string(); cursor = 0; list_folder(); }
+                if (place >= 0 && fs::path(folder) != fs::path(library)) { folder = fs::path(folder).parent_path().string(); cursor = 0; list_folder(); }
+                else if (place >= 0 && places.size() > 1) { place = -1; cursor = 0; list_folder(); } // back to the places
                 else page = Page::Play;
             } else if (page == Page::Chop) leave_chop();
             else if (page == Page::ToPads) page = Page::Chop;
         } else if (button == Button::MainPush) {
-            if (page == Page::Load && cursor < int(entries.size())) {
+            if (page == Page::Load && place < 0) {
+                open_place(cursor);
+            } else if (page == Page::Load && cursor < int(entries.size())) {
                 const auto& entry = entries[size_t(cursor)];
                 auto path = (fs::path(folder) / entry.name).string();
                 if (entry.folder) { folder = path; cursor = 0; list_folder(); }
@@ -483,9 +515,9 @@ void MelodeeApp::draw_play(juce::Graphics& g) {
 }
 
 void MelodeeApp::draw_load(juce::Graphics& g) {
-    ui::rail(g, "LOAD", pad_label(pad), jobs.empty() ? "SMP" : "...");
+    ui::rail(g, "LOAD", pad_label(pad), !jobs.empty() ? "..." : place < 0 ? "FROM" : places[size_t(place)].tag);
     if (entries.empty()) {
-        move::draw_text_centred(g, ui::content_x, 22, ui::content_width, "NO WAV FILES");
+        move::draw_text_centred(g, ui::content_x, 22, ui::content_width, "NO SOUND FILES");
         ui::detail(g, upper(fs::path(folder).filename().string()).substr(0, 16));
         return;
     }
@@ -540,7 +572,7 @@ template <class Sample> std::unique_ptr<Sample> read_sample(const std::string& p
     sample->name = fs::path(path).filename().string();
     sample->path = path;
     sample->data = std::make_unique<melodee::SampleData>();
-    error = melodee::read_wav(path, *sample->data, 60);
+    error = melodee::read_audio(path, *sample->data, 60, nullptr); // WAV, AIFF, FLAC, Ogg, MP3, as Melodee reads them
     if (!error.empty()) return nullptr;
     melodee::make_overview(*sample->data, sample->overview);
     auto mono = melodee::model_mono(*sample->data);
@@ -563,7 +595,7 @@ std::string MelodeeApp::install(std::unique_ptr<Sample> sample, unsigned at) {
     return {};
 }
 
-void MelodeeApp::place(std::unique_ptr<Sample> sample, uint16_t slot, const melodee::SampleChop& chop) {
+void MelodeeApp::put_sample(std::unique_ptr<Sample> sample, uint16_t slot, const melodee::SampleChop& chop) {
     if (slot >= melodee::sample_slots) return;
     if (slot >= samples.size()) { samples.resize(size_t(slot) + 1); chops.resize(samples.size()); }
     if (sample->data && !player.set_sample(slot, sample->data.get())) sample->data.reset(); // the queue was full: as missing
@@ -640,7 +672,7 @@ std::string MelodeeApp::restore_now() {
         read.push_back(std::move(sample));
     }
     std::lock_guard<std::mutex> guard(lock);
-    for (size_t n = 0; n < kit.samples.size(); ++n) place(std::move(read[n]), kit.samples[n].slot, kit.samples[n].chop);
+    for (size_t n = 0; n < kit.samples.size(); ++n) put_sample(std::move(read[n]), kit.samples[n].slot, kit.samples[n].chop);
     pads = kit.pads;
     pad = kit.last_pad;
     for (unsigned at = 0; at < pad_count; ++at) player.set_pad(at, pads[at]);
