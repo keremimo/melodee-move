@@ -67,7 +67,7 @@ public:
 
     void lights(move::Lights& lights) override {
         using namespace move;
-        for (unsigned at = 0; at < pad_count; ++at) lights.pad(at, at == studio.pad() ? colour::white : studio.current().pads[at].used() ? ui::track_colour(studio.track()).dim : colour::off);
+        for (unsigned at = 0; at < pad_count; ++at) light_pad(lights, at, at == studio.pad() ? colour::white : studio.current().pads[at].used() ? ui::track_colour(studio.track()).dim : colour::off);
         steps_playhead(studio, lights);
         for (auto button : {Button::Left, Button::Right, Button::Up, Button::Down, Button::Loop}) lights.button(button, 0);
         lights.button(Button::Menu, 0);

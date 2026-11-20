@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #pragma once
+#include "app/pad_layout.h"
 #include "app/screen.h"
 #include "move/display.h"
 #include "move/font.h"
@@ -13,6 +14,11 @@
 
 // What the screens share: names, numbers and the playhead as they show them.
 namespace app::screens {
+
+// A pad's number in the layout the user chose (pad_layout.h), from the
+// physical pad a job carries; and a light set by that number.
+inline unsigned pad_number(int physical) { return logical_pad(uint8_t(physical), pad_layout()); }
+inline void light_pad(move::Lights& lights, unsigned number, uint8_t colour) { lights.pad(physical_pad(uint8_t(number), pad_layout()), colour); }
 
 inline std::string upper(std::string text) {
     for (auto& c : text) c = char(std::toupper(static_cast<unsigned char>(c)));

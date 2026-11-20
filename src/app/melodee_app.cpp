@@ -19,11 +19,11 @@ constexpr auto volume_linger = std::chrono::milliseconds(1200);
 
 constexpr auto turn_linger = std::chrono::milliseconds(1200);
 
-// Typing, for a module's page: the pads a keyboard, top row first ('\b'
-// backspace), the steps digits and marks.
-constexpr const char* keyboard_rows[4] {"abcdefgh", "ijklmnop", "qrstuvwx", "yz -.'&\b"};
+// Typing, for a module's page: the pads a keyboard in the pad layout
+// (pad_layout.h: reading order, Delete bottom right), the steps digits and
+// marks.
 constexpr const char* step_keys = "1234567890()/:,!";
-char key_for_pad(unsigned pad) { return keyboard_rows[3 - pad / 8][pad % 8]; }
+char key_for_pad(unsigned pad) { return typing_key(uint8_t(pad), pad_layout()); }
 
 std::string upper(std::string text) {
     for (auto& c : text) c = char(std::toupper(static_cast<unsigned char>(c)));
