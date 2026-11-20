@@ -7,14 +7,18 @@
 // the typing keyboard and the lights. The screens are the setting at the
 // real 128 x 64; the panels are the pads lit, each pad labelled with what it
 // plays, the Rows layout on the left and Banks on the right. Two readings of
-// scales in Banks are drawn for Kerem to pick: (a) the 32 pads up the scale
-// in pad order, (b) rows of fourths inside each bank.
+// scales in Banks were drawn for Kerem to pick: (a) the 32 pads up the scale
+// in pad order, (b) rows of fourths inside each bank. He chose (a), a global
+// setting in Setup with no shortcut, and typing that follows the banks
+// (2026-11-20); (b) stays on the sheet as the reading not taken.
 #include "ui/mockups.h"
 #include "app/pad_layout.h"
+#include "app/pad_setting.h"
 #include "move/controls.h"
 #include "move/display.h"
 #include "move/font.h"
 #include "move/lights.h"
+#include "ui/pad_numbering.h"
 #include "ui/track_style.h"
 #include "ui/widgets.h"
 #include <cctype>
@@ -101,21 +105,25 @@ bool in_c_major(int note) {
 }
 int c_major(int index) { return base_note + 12 * (index / 7) + major[index % 7]; } // the index-th note of C major from C2
 
-// A note's light, as the Move lights its notes: roots in the track's
-// colour, the key's other notes light grey, the rest dark.
-uint8_t note_light(int note) { return note % 12 == 0 ? synth_colour : in_c_major(note) ? move::colour::light_grey : move::colour::off; }
+// A note's light: roots in the track's colour; In-Key (as the Move lights
+// its notes) the key's other notes light grey; Chromatic (as a synth track
+// lights them today) the other naturals dark grey; the rest dark.
+uint8_t note_light(int note, bool in_key) {
+    if (note % 12 == 0) return synth_colour;
+    if (!in_c_major(note)) return move::colour::off;
+    return in_key ? move::colour::light_grey : move::colour::dark_grey;
+}
 
 // The notes of a reading: each pad's note from where it sits.
 enum class Reading { RowsChromatic, RowsInKey, RunChromatic, RunInKey, BankChromatic, BankInKey };
 int note_of(Reading reading, unsigned physical) {
-    int column = int(move::pad_column(physical)), row = int(move::pad_row(physical));
     int logical = app::logical_pad(uint8_t(physical), PadLayout::Banks);
     int in_bank = logical % 16, bank = logical / 16, bank_column = in_bank % 4, bank_row = in_bank / 4;
     switch (reading) {
-    case Reading::RowsChromatic: return base_note + column + 5 * row;      // today: right a semitone, up a fourth
-    case Reading::RowsInKey: return c_major(column + 3 * row);             // In-Key in 4ths: up a row, 3 notes of C major
-    case Reading::RunChromatic: return base_note + logical;               // (a) 1-32 up the semitones
-    case Reading::RunInKey: return c_major(logical);                      // (a) 1-32 up the key
+    case Reading::RowsChromatic: return base_note + app::pad_steps(uint8_t(physical), PadLayout::Rows, 5); // right a semitone, up a fourth
+    case Reading::RowsInKey: return c_major(app::pad_steps(uint8_t(physical), PadLayout::Rows, 3));         // In-Key in 4ths: 3 notes a row
+    case Reading::RunChromatic: return base_note + app::pad_steps(uint8_t(physical), PadLayout::Banks, 5); // (a) 1-32 up the semitones
+    case Reading::RunInKey: return c_major(app::pad_steps(uint8_t(physical), PadLayout::Banks, 3));         // (a) 1-32 up the key
     case Reading::BankChromatic: return base_note + 12 * bank + bank_column + 5 * bank_row; // (b) a fourth a row, the right bank an octave up
     case Reading::BankInKey: return c_major(7 * bank + bank_column + 3 * bank_row);
     }
@@ -126,7 +134,8 @@ PadPanel notes_panel(Reading reading, bool banks) {
     p.banks = banks;
     for (unsigned pad = 0; pad < move::pad_count; ++pad) {
         int note = note_of(reading, pad);
-        p.pads[pad] = note_light(note);
+        bool in_key = reading == Reading::RowsInKey || reading == Reading::RunInKey || reading == Reading::BankInKey;
+        p.pads[pad] = note_light(note, in_key);
         p.labels[pad] = note_name(note);
     }
     return p;
@@ -167,14 +176,9 @@ PadPanel pitches_panel(bool banks) {
     return p;
 }
 
-// Typing: the keys in reading order, top left first: across the eight
+// Typing: the keys in reading order (app::typing_key): across the eight
 // columns in Rows, through the left bank then the right one in Banks.
-constexpr const char* keys = "abcdefghijklmnopqrstuvwxyz -.'&\b";
-char key_at(unsigned physical, PadLayout layout) {
-    if (layout == PadLayout::Rows) return keys[(3 - move::pad_row(physical)) * 8 + move::pad_column(physical)];
-    unsigned logical = app::logical_pad(uint8_t(physical), layout), bank = logical / 16, in_bank = logical % 16;
-    return keys[bank * 16 + (3 - in_bank / 4) * 4 + in_bank % 4];
-}
+char key_at(unsigned physical, PadLayout layout) { return app::typing_key(uint8_t(physical), layout); }
 PadPanel typing_panel(PadLayout layout) {
     PadPanel p;
     p.banks = layout == PadLayout::Banks;
@@ -192,9 +196,7 @@ PadPanel setting_panel(PadLayout layout) {
     PadPanel p;
     p.banks = layout == PadLayout::Banks;
     for (unsigned n = 0; n < 32; ++n) {
-        uint8_t colour = layout == PadLayout::Banks ? (n < 16 ? move::colour::azure : move::colour::violet)
-                                                    : (n / 8) % 2 ? move::colour::violet : move::colour::azure;
-        put(p, layout, n, n == 0 || (layout == PadLayout::Banks && n == 16) ? move::colour::white : colour, std::to_string(n + 1));
+        put(p, layout, n, numbering_colour(n, layout), std::to_string(n + 1));
     }
     return p;
 }
@@ -210,38 +212,17 @@ std::vector<Panel> pads_panels() {
         {"pitches-rows", "ROWS: 16 PITCHES, AS APPROVED", pitches_panel(false)},
         {"pitches-banks", "BANKS: 16 PITCHES, THE TWO BANKS", pitches_panel(true)},
         {"notes-rows-key", "ROWS: C MAJOR IN 4THS, C2 BOTTOM LEFT", notes_panel(Reading::RowsInKey, false)},
-        {"notes-a-key", "BANKS (A): C MAJOR, 1-32 UP THE KEY", notes_panel(Reading::RunInKey, true)},
+        {"notes-a-key", "BANKS (A), CHOSEN: C MAJOR, 1-32 UP", notes_panel(Reading::RunInKey, true)},
         {"notes-rows-chromatic", "ROWS: CHROMATIC IN 4THS (TODAY)", notes_panel(Reading::RowsChromatic, false)},
-        {"notes-a-chromatic", "BANKS (A): CHROMATIC, 1-32 UP", notes_panel(Reading::RunChromatic, true)},
-        {"notes-b-key", "BANKS (B): C MAJOR, 4THS IN EACH BANK", notes_panel(Reading::BankInKey, true)},
-        {"notes-b-chromatic", "BANKS (B): CHROMATIC, E, A, D SKIPPED", notes_panel(Reading::BankChromatic, true)},
+        {"notes-a-chromatic", "BANKS (A), CHOSEN: CHROMATIC, 1-32 UP", notes_panel(Reading::RunChromatic, true)},
+        {"notes-b-key", "NOT TAKEN (B): C MAJOR, 4THS A BANK", notes_panel(Reading::BankInKey, true)},
+        {"notes-b-chromatic", "NOT TAKEN (B): CHROMATIC, E A D GONE", notes_panel(Reading::BankChromatic, true)},
         {"typing-rows", "ROWS: TYPING, A-H ACROSS THE TOP", typing_panel(PadLayout::Rows)},
         {"typing-banks", "BANKS: TYPING, A-P LEFT, Q-DEL RIGHT", typing_panel(PadLayout::Banks)},
     };
 }
 
 // ---------------------------------------------------------------- the setting, on the screen
-
-// The numbering in `layout` on the subject, as the pads lie: where each run
-// of pads starts, its number inverted (1, 9, 17, 25 in Rows; 1, 5, 9, 13 and
-// 17, 21, 25, 29 in Banks), the other pads small squares, the banks apart.
-void numbering(juce::Graphics& g, PadLayout layout) {
-    const int cell = 12, gap = layout == PadLayout::Banks ? 6 : 0;
-    const int left = content_x + (content_width - 8 * cell - gap) / 2;
-    for (unsigned pad = 0; pad < move::pad_count; ++pad) {
-        int column = int(move::pad_column(pad)), row = int(move::pad_row(pad));
-        int x = left + column * cell + (column >= 4 ? gap : 0), y = 2 + (3 - row) * cell;
-        unsigned number = app::logical_pad(uint8_t(pad), layout) + 1u;
-        bool starts = layout == PadLayout::Banks ? column % 4 == 0 : column == 0;
-        g.setColour(on);
-        if (!starts) { g.drawRect(x + 3, y + 3, cell - 6, cell - 6); continue; }
-        g.fillRect(x - 1, y, cell + 1, cell - 1);
-        g.setColour(off);
-        auto text = std::to_string(number);
-        move::draw_text(g, x + (cell - move::text_width(text)) / 2, y + 2, text);
-        g.setColour(on);
-    }
-}
 
 std::string row(const std::string& name, const std::string& value) { // name left, value flush right, 16 characters
     return name + std::string(name.size() + value.size() < 16 ? 16 - name.size() - value.size() : 1, ' ') + value;
@@ -258,31 +239,25 @@ std::vector<float> loop_peaks() {
 
 std::vector<Screen> pads_screens() {
     return {
-        {"setup-pads", "SETUP > PADS: LAYOUT, PUSH TO EDIT", [](juce::Graphics& g) {
+        {"setup-pads", "SETUP > PADS: PUSH EDITS LAYOUT", [](juce::Graphics& g) {
             rail(g, "PADS", "", "SETP");
-            list(g, content(0, height), {row("LAYOUT", "[BANKS]"), row("RESPONSE", "MED"), row("PRESSURE", "ON")}, 0, 1);
+            list(g, content(0, height), {row("LAYOUT", "ROWS"), row("RESPONSE", "MED"), row("PRESSURE", "ON")}, 0, 1);
         }},
-        {"setup-message", "PUSHED: SET, SAID, THE PADS CHANGE AT ONCE", [](juce::Graphics& g) {
+        {"setup-message", "PUSHED AGAIN: SET, THE PADS CHANGE AT ONCE", [](juce::Graphics& g) {
             rail(g, "PADS", "", "SETP");
             list(g, content(0, height), {row("LAYOUT", "BANKS"), row("RESPONSE", "MED"), row("PRESSURE", "ON")}, 0, 1);
             sheet(g, {content_x, detail_y - 2, content_width, 10});
             move::draw_text_centred(g, content_x, detail_y, content_width, "PADS: MPC BANKS");
         }},
-        {"layout-rows", "EDITING LAYOUT: MOVE ROWS, THE NUMBERS", [](juce::Graphics& g) {
+        {"layout-rows", "PUSHED: THE WHEEL TURNS IT, ROWS", [](juce::Graphics& g) {
             rail(g, "PADS", "", "SETP");
-            numbering(g, PadLayout::Rows);
-            detail(g, "MOVE ROWS", "8 A ROW");
+            pad_numbering(g, PadLayout::Rows);
+            detail(g, app::pad_setting::detail_left(PadLayout::Rows), app::pad_setting::detail_right(PadLayout::Rows));
         }},
-        {"layout-banks", "EDITING LAYOUT: MPC BANKS, THE NUMBERS", [](juce::Graphics& g) {
+        {"layout-banks", "TURNED TO BANKS; PUSH SETS IT", [](juce::Graphics& g) {
             rail(g, "PADS", "", "SETP");
-            numbering(g, PadLayout::Banks);
-            detail(g, "MPC BANKS", "2 X 4X4");
-        }},
-        {"shortcut", "IF A SHORTCUT: SHIFT + LOOP FLIPS IT", [](juce::Graphics& g) {
-            rail(g, "KIT", "1", "A05");
-            waveform(g, content(header_height + 1, subject_height - header_height - 1), loop_peaks());
-            sheet(g, {content_x, detail_y - 2, content_width, 10});
-            move::draw_text_centred(g, content_x, detail_y, content_width, "PADS: MPC BANKS");
+            pad_numbering(g, PadLayout::Banks);
+            detail(g, app::pad_setting::detail_left(PadLayout::Banks), app::pad_setting::detail_right(PadLayout::Banks));
         }},
         {"chop-banks", "CHOP IN BANKS: THE SCREEN AS BEFORE", [](juce::Graphics& g) {
             rail(g, "SLC", "07", "/20");
@@ -311,7 +286,7 @@ juce::Image pads_sheet(const std::vector<Screen>& screens, const std::vector<Pan
     move::draw_text(g, gap, 20, "MELODEE ON MOVE: PADS", 4);
     g.setColour(juce::Colour(0xff8a96a3));
     move::draw_text(g, gap, 60, "MOVE ROWS OR TWO MPC BANKS; EVERY PAD JOB FOLLOWS. DOCS/UI.MD", 2);
-    move::draw_text(g, gap, 84, "LEFT: ROWS. RIGHT: BANKS. SCALES IN BANKS: (A) RECOMMENDED, OR (B)", 2);
+    move::draw_text(g, gap, 84, "LEFT: ROWS. RIGHT: BANKS. SCALES IN BANKS: (A), KEREM'S PICK; (B) NOT TAKEN", 2);
     auto place = [&](size_t n, int from) { return juce::Point<int>(gap + int(n % 2) * (screen_w + gap), from + int(n / 2) * (screen_h + caption + gap)); };
     for (size_t n = 0; n < screens.size(); ++n) {
         auto at = place(n, top);

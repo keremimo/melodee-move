@@ -8,6 +8,8 @@ TESTS := build/move-tests
 CONTROLS_TESTS := build/controls-tests
 # The pad layouts (src/app/pad_layout.*), alone.
 PAD_TESTS := build/pad-layout-tests
+# The pad layouts through the Move app: every pad job in both layouts.
+PADS_APP_TESTS := build/pads-app-tests
 JUCE := build/deps/JUCE/modules
 # libjack is loaded at run time by the JACK host (src/move/jack_host.cpp), so
 # only its headers are needed here and the binary runs where there is no JACK.
@@ -67,7 +69,7 @@ SHARED_OBJECTS := $(patsubst src/%.cpp,build/obj/%.o,$(wildcard src/move/*.cpp s
 
 # A stand-in Schwung module for the tests, where Schwung keeps its synths.
 FAKE_MODULE := build/test-modules/sound_generators/fake
-all: $(TARGET) $(TESTS) $(CONTROLS_TESTS) $(PAD_TESTS) $(FAKE_MODULE)/dsp.so $(FAKE_MODULE)/module.json $(FAKE_MODULE)/page.js
+all: $(TARGET) $(TESTS) $(CONTROLS_TESTS) $(PAD_TESTS) $(PADS_APP_TESTS) $(FAKE_MODULE)/dsp.so $(FAKE_MODULE)/module.json $(FAKE_MODULE)/page.js
 $(FAKE_MODULE)/dsp.so: tests/fake_module/dsp.c
 	@mkdir -p $(@D)
 	$(CC) -O2 -fPIC -shared -Wall -Wextra -Werror $< -o $@
@@ -85,6 +87,8 @@ $(CONTROLS_TESTS): build/obj/tests/controls_tests.o build/obj/app/bindings.o
 	$(CXX) -static-libstdc++ -static-libgcc $^ -pthread -o $@
 $(PAD_TESTS): build/obj/tests/pad_layout_tests.o build/obj/app/pad_layout.o
 	$(CXX) -static-libstdc++ -static-libgcc $^ -pthread -o $@
+$(PADS_APP_TESTS): build/obj/tests/pads_app_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS) $(MELODEE_LIBRARY)
+	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 $(MELODEE_LIBRARY): $(MELODEE_OBJECTS)
 	rm -f $@ && $(AR) rcs $@ $^
 build/obj/melodee-sample/%.o: $(MELODEE)/src/%.cpp
@@ -112,5 +116,5 @@ $(foreach m,$(MODULE_C),$(eval $(call c_module_rule,$(m))))
 juce: $(JUCE_OBJECTS)
 .PHONY: all clean juce
 clean:
-	rm -rf build/obj $(TARGET) $(TESTS) $(CONTROLS_TESTS) $(PAD_TESTS)
+	rm -rf build/obj $(TARGET) $(TESTS) $(CONTROLS_TESTS) $(PAD_TESTS) $(PADS_APP_TESTS)
 -include $(shell find build/obj -name '*.d' 2>/dev/null)
