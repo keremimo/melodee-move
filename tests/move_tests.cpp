@@ -1010,6 +1010,14 @@ void test_tracks() {
     CHECK(loudest(melodee, 40) > to_s32(0.05f)); // the pattern plays A01
     melodee.service();
     CHECK(has(melodee.status(), "playing=1") && !has(melodee.status(), "tick=0 "));
+    uint32_t before = 0;
+    {   // Restarted (the Move's Shift + Play): from the top again.
+        std::lock_guard<std::mutex> guard(melodee.studio().lock);
+        before = melodee.studio().host().ticks();
+        melodee.studio().restart();
+    }
+    loudest(melodee, 1);
+    CHECK(before > 10 && melodee.studio().host().ticks() < 3 && has(melodee.status(), "playing=1"));
     press(melodee, Button::Play);
     loudest(melodee, 2);
     CHECK(has(melodee.status(), "playing=0"));
