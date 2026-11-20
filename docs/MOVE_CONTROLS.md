@@ -78,6 +78,10 @@ after Schwung) differ for some buttons:
 | Shift + Steps 4, 12, 13 | No Move job (no icon): **4 the Mixer** (16 tracks, their effects), **12 the Looper**, **13 Song**. |
 | Shift held | **Nothing on the screen**, as on the stock Move: the steps with a Shift job light, Melodee's 4, 12 and 13 too (Kerem dropped the on-screen Shift card from the mockups). |
 | Undo, quit | **Undo held 0.4 s opens the undo list** (as Melodee's Shift + − hold on the MPC). **Shift + Back goes back to Ableton's Move app**, as today, and Setup (Shift + Step 2) lists it too. |
+| Track options: MIDI | **Shift + a track button shows MIDI IN and MIDI OUT**, as the Move (1.5) does: MIDI IN is AUTO or a channel 1-16 that plays the track whichever is selected (Melodee's track channel); MIDI OUT is AUTO or the channel its notes go out on, kept in a section of the Move's own in the project (the MPC keeps one channel); a MIDI track's MIDI OUT is its DEVICE channel. |
+| MIDI Panic | **No Move key**: MIDI Config's PANIC row (push) and `melodee-midi panic`, as Melodee's P4 kept it. Stopping already ends the notes sent. |
+| A MIDI track's slots | **Shift + a knob on a CC page is what that slot sends** (the Move's second parameter): touched, the address shows large; turned, it changes (CC, 14-bit CC, NRPN, bend, pressure). |
+| Schwung modules' MIDI out | **A module's `midi_send_external` goes out on the Move's MIDI port** with Melodee's own MIDI. |
 
 Followed from the rule without a choice: Left and Right become the
 pattern's bars, so pages move to Shift + turn; in Typing, Back deletes a
