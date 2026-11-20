@@ -346,9 +346,13 @@ to be designed again for this screen.
 
 ## Next
 
-- The engine host's cost on a Move (66-69 µs a block where the first scope
-  took 9-10): skip the empty tracks' per-block work in melodee-sample, or
-  share the tracks out to render workers, if it is ever needed.
+- The engine host made lighter, on melodee-sample's branch
+  `engine-skip-empty-tracks` (until it is merged, build with
+  `MELODEE_SAMPLE` set to a checkout of it): an empty track's buffers are no
+  longer cleared every block, and a silent Pad FX punch records its history
+  a block at a time. In the simulated Move the cycle's work went from 87-114
+  µs to 16-19 µs with the first alone and 14-19 µs with both (three runs
+  each); not measured on a Move yet.
 - The latency meter on a Move (LATENCY page, jogwheel push), against
   Ableton's firmware and Schwung.
 - Wave 2, from docs/PARITY.md: sequencer, sampling, kit depth, instruments,
