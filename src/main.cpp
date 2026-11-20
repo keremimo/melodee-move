@@ -8,9 +8,11 @@
 #include "move/tools.h"
 #include "spike/spike_app.h"
 #include "ui/mockups.h"
+#include "web/web_layer.h"
 #include <csignal>
 #include <cstring>
 #include <exception>
+#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -21,13 +23,14 @@ namespace {
 void usage() {
     std::cerr <<
         "usage: melodee-move [--app melodee|spike] [--samples DIR] [--home DIR] [--modules DIR] [--previews DIR]\n"
-        "                    [--backend auto|spi|jack|simulated] [--seconds S] [--name CLIENT]\n"
+        "                    [--web-port PORT | --no-web] [--backend auto|spi|jack|simulated] [--seconds S] [--name CLIENT]\n"
         "                    [--loopback FRAMES] [--script 'TRANSFER:STATUS,DATA1,DATA2;...']\n"
         "         run on the Move: Melodee (its sample library in --samples, by default the Move's own; its\n"
         "         projects in --home/Projects, by default /data/UserData/Melodee; its synths Schwung's\n"
         "         modules in --modules, by default /data/UserData/schwung/modules), or the\n"
         "         spike (--previews: Melodee's pages crushed). spi is the Move's own device on Ableton's firmware,\n"
-        "         jack is jackd -d move on Armbian, simulated a stand-in for the device (--loopback, --script)\n"
+        "         jack is jackd -d move on Armbian, simulated a stand-in for the device (--loopback, --script).\n"
+        "         Melodee's web page: http://move.local:8080 (--web-port: the first port to try), off with --no-web\n"
         "       melodee-move --self-test FILE.wav       render offline, fail if silent\n"
         "       melodee-move --preview DIR              the screen as PNGs\n"
         "       melodee-move --melodee-previews DIR [--modules DIR]  Melodee's screens as PNGs\n"
@@ -53,6 +56,7 @@ int main(int argc, char** argv) {
     std::signal(SIGPIPE, SIG_IGN);
     try {
         std::string previews, samples, home, modules, melodee_previews, which = "melodee";
+        int web_port = web::default_port; // -1: no web page
         move::RunOptions options;
         for (int n = 1; n < argc; ++n) {
             std::string argument = argv[n];
@@ -70,6 +74,8 @@ int main(int argc, char** argv) {
             else if (argument == "--home" && has_value) home = argv[++n];
             else if (argument == "--modules" && has_value) modules = argv[++n];
             else if (argument == "--app" && has_value) which = argv[++n];
+            else if (argument == "--web-port" && has_value) web_port = std::stoi(argv[++n]);
+            else if (argument == "--no-web") web_port = -1;
             else if (argument == "--seconds" && has_value) options.seconds = std::stod(argv[++n]);
             else if (argument == "--name" && has_value) options.client_name = argv[++n];
             else if (argument == "--backend" && has_value) options.backend = backend_named(argv[++n]);
@@ -84,7 +90,10 @@ int main(int argc, char** argv) {
         }
         if (which != "melodee") { usage(); return 2; }
         auto app = std::make_unique<app::MelodeeApp>(samples, home, modules);
-        return move::run_app(*app, options);
+        if (web_port < 0) return move::run_app(*app, options);
+        // The web page around it (src/web/web_layer.h), on Melodee's folder: the one its projects are in.
+        web::WebLayer layer(*app, {std::filesystem::path(app->project_path()).parent_path().parent_path().string(), uint16_t(web_port)});
+        return move::run_app(layer, options);
     } catch (const std::exception& error) {
         std::cerr << "melodee-move: " << error.what() << '\n';
         return 1;

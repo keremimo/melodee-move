@@ -2,6 +2,7 @@
 # melodee-move: the Move runtime (src/move/), the spike app (src/spike/) and
 # their tests, built for linux/arm64 in tools/Dockerfile (./build.sh).
 TARGET := build/melodee-move
+.DEFAULT_GOAL := all
 TESTS := build/move-tests
 JUCE := build/deps/JUCE/modules
 # libjack is loaded at run time by the JACK host (src/move/jack_host.cpp), so
@@ -37,6 +38,10 @@ MELODEE_INCLUDES := -I$(MELODEE)/src -I$(MELODEE)/base/src
 # and MP3 through JUCE, as on the MPC.
 MELODEE_SOURCES := $(wildcard $(MELODEE)/src/melodee/engine/*.cpp $(MELODEE)/src/melodee/model/*.cpp) \
     $(MELODEE)/src/melodee/shell/sample_decode.cpp
+# web/web_server.cpp and web/card_files.cpp: the helpers of Melodee's page on
+# the MPC (JSON text, safe names, paths kept in a folder, file types), plain
+# C++, for the page on the Move (src/web/).
+MELODEE_SOURCES += $(MELODEE)/src/melodee/web/web_server.cpp $(MELODEE)/src/melodee/web/card_files.cpp
 MELODEE_OBJECTS := $(patsubst $(MELODEE)/src/%.cpp,build/obj/melodee-sample/%.o,$(MELODEE_SOURCES))
 MELODEE_LIBRARY := build/melodee.a
 CPPFLAGS += $(MELODEE_INCLUDES)
@@ -60,9 +65,23 @@ build/obj/quickjs/%.o: $(QUICKJS)/%.c
 	$(CC) $(QUICKJS_CFLAGS) -c $< -o $@
 SHARED_OBJECTS := $(patsubst src/%.cpp,build/obj/%.o,$(wildcard src/move/*.cpp src/ui/*.cpp src/spike/*.cpp src/app/*.cpp src/web/*.cpp))
 
+# Melodee's web page (src/web/): its files, with the guide and Rubik, in one
+# bundle the binary carries (tools/web_bundle.py, .incbin in web_bundle.cpp),
+# and the version it shows, module/module.json's.
+WEB_BUNDLE := build/gen/web_bundle.bin
+VERSION := $(shell sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' module/module.json)
+$(WEB_BUNDLE): tools/web_bundle.py $(wildcard src/web/static/*) docs/GUIDE.md
+	@mkdir -p $(@D)
+	MELODEE=$(MELODEE) python3 tools/web_bundle.py $@
+build/obj/web/web_bundle.o: $(WEB_BUNDLE)
+build/obj/web/web_page.o: CPPFLAGS += -DMELODEE_MOVE_VERSION=\"v$(VERSION)\"
+WEB_TESTS := build/web-tests
+$(WEB_TESTS): build/obj/tests/web_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS) $(MELODEE_LIBRARY)
+	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
+
 # A stand-in Schwung module for the tests, where Schwung keeps its synths.
 FAKE_MODULE := build/test-modules/sound_generators/fake
-all: $(TARGET) $(TESTS) $(FAKE_MODULE)/dsp.so $(FAKE_MODULE)/module.json $(FAKE_MODULE)/page.js
+all: $(TARGET) $(TESTS) $(WEB_TESTS) $(FAKE_MODULE)/dsp.so $(FAKE_MODULE)/module.json $(FAKE_MODULE)/page.js
 $(FAKE_MODULE)/dsp.so: tests/fake_module/dsp.c
 	@mkdir -p $(@D)
 	$(CC) -O2 -fPIC -shared -Wall -Wextra -Werror $< -o $@

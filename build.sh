@@ -4,7 +4,8 @@
 # the unit tests, the sound self-test, the screen previews, a run of the
 # whole runtime against a simulated Move (a pad, the jogwheel to LATENCY,
 # the meter timing clicks through a 300-frame cable, Shift + Back to quit),
-# and the packages in dist/. When Melodee's own page previews are at hand
+# Melodee's runs (load, chop, saving, the synth track, the web page), and
+# the packages in dist/. When Melodee's own page previews are at hand
 # (MELODEE_PREVIEWS, by default ../melodee-sample/build/melodee-preview),
 # also crush them to the Move's 128 x 64 screen in build/crushed.
 set -eu
@@ -49,11 +50,17 @@ RESTORE_EXPECTED='page=play pad=A02 samples=1 slices=0 pads=17 .* saves=1 unsave
 SYNTH_SCRIPT='50:0xb0,42,127;60:0xb0,50,127;80:0xb0,3,127;400:0x90,68,110;430:0x80,68,0;500:0xb0,71,3;520:0xb0,55,127'
 SYNTH_EXPECTED='track=synth synth=fake octave=1'
 SYNTH_FLAGS='--backend simulated --samples build/simulated-samples --home build/simulated-synth --modules build/test-modules'
+# The web page (src/web/): Melodee runs while tests/web_check.py opens its
+# page as a browser on the Move itself (let in, as one on the USB cable) and
+# as one at the machine's own address (as on Wi-Fi: refused until it types
+# the code it reads off the Move's mirrored screen).
+WEB_FLAGS='--backend simulated --samples build/simulated-samples --home build/simulated-web --web-port 8080 --seconds 12'
 # shellcheck disable=SC2086
 docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE" && pwd):/melodee:ro" -e MELODEE=/melodee \
     $MOUNT melodee-move-builder sh -c "
     make -j4 &&
     build/move-tests &&
+    build/web-tests &&
     build/melodee-move --self-test build/self-test.wav &&
     build/melodee-move --preview build/preview &&
     { build/melodee-move --app spike --backend simulated --loopback 300 --seconds 8 --script '$SCRIPT' 2> build/simulated.log || true; } &&
@@ -78,6 +85,10 @@ docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE
     { build/melodee-move $SYNTH_FLAGS --seconds 3 2> build/simulated-synth-restore.log || true; } &&
     tail -n 1 build/simulated-synth-restore.log &&
     grep -q '$SYNTH_EXPECTED' build/simulated-synth-restore.log &&
+    rm -rf build/simulated-web &&
+    { build/melodee-move $WEB_FLAGS 2> build/simulated-web.log & } &&
+    python3 -I tests/web_check.py 8080 src/move/font.cpp &&
+    wait &&
     build/melodee-move --melodee-previews build/melodee-previews --modules build/test-modules > /dev/null &&
     build/melodee-move --probe-modules build/test-modules &&
     tools/bundle.sh &&

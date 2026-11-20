@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#17141F">
+<title>Melodee · Move</title>
+<link rel="stylesheet" href="/app.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%2317141F'/%3E%3Crect x='3' y='3' width='4.5' height='4.5' rx='1' fill='%23FF7A5C'/%3E%3Crect x='8.5' y='3' width='4.5' height='4.5' rx='1' fill='%23FFC145'/%3E%3Crect x='3' y='8.5' width='4.5' height='4.5' rx='1' fill='%2346D9B0'/%3E%3Crect x='8.5' y='8.5' width='4.5' height='4.5' rx='1' fill='%239D8CFF'/%3E%3C/svg%3E">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/" data-view="screen"><img src="/logo.png" width="149" height="34" alt="Melodee"><span class="device">Move</span></a>
+  <nav class="tabs" id="tabs" aria-label="Pages">
+    <a href="/" data-view="screen">Screen</a>
+    <a href="/files" data-view="files">Files</a>
+    <a href="/guide" data-view="guide">Guide</a>
+  </nav>
+  <div class="link" id="link" data-state="wait" title="Connection to the Move">
+    <span class="led"></span><span class="word" id="link-word">Move</span>
+  </div>
+</header>
+<main>
+
+<section class="view pair" id="view-pair" hidden>
+  <div class="pair-card">
+    <p class="kicker">Wi-Fi</p>
+    <h1>Pair this browser</h1>
+    <p class="lead">This browser reaches the Move over Wi-Fi, where anyone nearby could. To open Melodee's page
+      here, ask the Move for a code and type the six digits its screen shows. By USB cable no code is needed.</p>
+    <button type="button" id="pair-ask">Show a code on the Move</button>
+    <form class="code" id="pair-form" hidden autocomplete="off">
+      <div class="digits" id="digits">
+        <input inputmode="numeric" aria-label="Digit 1"><input inputmode="numeric" aria-label="Digit 2"><input inputmode="numeric" aria-label="Digit 3">
+        <span class="gap"></span>
+        <input inputmode="numeric" aria-label="Digit 4"><input inputmode="numeric" aria-label="Digit 5"><input inputmode="numeric" aria-label="Digit 6">
+      </div>
+      <button type="submit" id="pair-send" disabled>Pair</button>
+    </form>
+    <p class="say" id="pair-say"></p>
+  </div>
+</section>
+
+<section class="view" id="view-screen" hidden>
+  <div class="mirror">
+    <div class="bezel">
+      <canvas id="mirror" width="128" height="64" aria-label="The Move's screen"></canvas>
+      <div class="veil" id="mirror-veil"><span>Waiting for the Move</span></div>
+    </div>
+    <div class="mirror-bar">
+      <span class="live" id="live" data-state="off"><i></i><span id="live-word">Off</span></span>
+      <span class="aside" id="rate"></span>
+      <button type="button" class="quiet" id="snap">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6.5h3l1.5-2h5L14 6.5h3v9H3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="10" cy="11" r="2.6" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+        Save PNG
+      </button>
+    </div>
+  </div>
+  <section class="cards" aria-label="This Move">
+    <div class="card" style="--tone:var(--coral)">
+      <span class="label">Melodee</span>
+      <span class="value" id="v-version">–</span>
+      <span class="sub" id="v-app">by Kerem Kiliç (Ellic Studio)</span>
+    </div>
+    <div class="card" style="--tone:var(--amber)">
+      <span class="label">Storage</span>
+      <span class="value" id="v-free">–</span>
+      <span class="gauge"><i id="g-free"></i></span>
+    </div>
+    <div class="card" style="--tone:var(--mint)">
+      <span class="label">Connection</span>
+      <span class="value" id="v-via">–</span>
+      <span class="sub" id="v-where"></span>
+    </div>
+  </section>
+</section>
+
+<section class="view files" id="view-files" hidden>
+  <div class="files-bar">
+    <nav class="crumbs" id="crumbs" aria-label="Folder"></nav>
+    <div class="files-tools">
+      <button type="button" class="quiet" id="new-folder">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2.5 5.5h5l1.5 2h8.5v8h-15z M10 10v4 M8 12h4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>
+        Folder
+      </button>
+      <label class="button">
+        <input type="file" id="upload-input" multiple hidden>
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 14V4 M6 8l4-4 4 4 M4 16h12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Upload
+      </label>
+    </div>
+  </div>
+  <div class="queue" id="queue" hidden>
+    <span class="queue-words" id="queue-words"></span>
+    <span class="gauge wide"><i id="queue-bar"></i></span>
+  </div>
+  <div class="file-list" id="file-list">
+    <div class="drop-veil"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 22V8 M10 14l6-6 6 6 M7 26h18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Drop to upload here</span></div>
+    <ul class="lanes" id="entries" aria-label="Files"></ul>
+  </div>
+  <p class="files-foot" id="files-foot"></p>
+  <audio id="player" preload="none"></audio>
+</section>
+
+<section class="view" id="view-guide" hidden>
+  <div class="doc-layout">
+    <aside>{{guide_toc}}</aside>
+    <article class="doc" id="guide">{{guide}}</article>
+  </div>
+</section>
+
+</main>
+<script src="/app.js" defer></script>
+</body>
+</html>
