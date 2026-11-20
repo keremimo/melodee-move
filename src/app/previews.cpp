@@ -74,6 +74,26 @@ int write_previews(const std::string& directory, const std::string& modules) {
     ok = save(melodee, folder, "chop") && ok;
     press(move::Button::MainPush);
     ok = save(melodee, folder, "to-pads") && ok;
+
+    // The tracks: a track button held (the sixteen), the tempo, an empty
+    // track and its new-track sheet.
+    press(move::Button::Back);
+    press(move::Button::Back);
+    send(0xbf, move::button_cc(move::Button::Row1), 127);
+    std::this_thread::sleep_for(std::chrono::milliseconds(250));
+    ok = save(melodee, folder, "tracks") && ok;
+    send(0xbf, move::button_cc(move::Button::Row1), 0);
+    send(0xbf, move::button_cc(move::Button::Shift), 127);
+    press(move::Button::Play);
+    send(0xbf, move::button_cc(move::Button::Shift), 0);
+    ok = save(melodee, folder, "tempo") && ok;
+    press(move::Button::Back);
+    press(move::Button::Row4);
+    ok = save(melodee, folder, "track-empty") && ok;
+    press(move::Button::MainPush);
+    ok = save(melodee, folder, "new-track") && ok;
+    press(move::Button::Back);
+    press(move::Button::Row1);
     if (modules.empty()) return ok ? 0 : 1;
 
     // The synth track: empty, its modules, the first one loaded, a knob.

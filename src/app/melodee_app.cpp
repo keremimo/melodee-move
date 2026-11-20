@@ -13,6 +13,7 @@ namespace app {
 namespace {
 
 constexpr auto touch_linger = std::chrono::milliseconds(600);
+constexpr auto hold_shown = std::chrono::milliseconds(200); // a track button held this long shows the sixteen
 constexpr auto turn_linger = std::chrono::milliseconds(1200);
 
 // Typing, for a module's page: the pads a keyboard, top row first ('\b'
@@ -47,6 +48,8 @@ void MelodeeApp::audio_opened(const move::AudioFormat& format) { own->audio_open
 void MelodeeApp::audio_event(const move::SurfaceEvent& event) { own->audio_event(event); }
 
 // ---------------------------------------------------------------- MIDI thread
+
+Screen* MelodeeApp::tracks() const { return own->screen("tracks"); }
 
 bool MelodeeApp::trigger(move::Button button) {
     auto& studio = *own;
@@ -90,7 +93,19 @@ void MelodeeApp::surface(const move::SurfaceEvent& event) {
     case Kind::Button: {
         auto button = Button(input.index);
         if (int row = track_button(button); row >= 0) {
-            if (input.pressed) studio.select(ui::bank_of(studio.track()) * ui::tracks_a_bank + unsigned(row));
+            if (input.pressed) {
+                if (!holding()) {
+                    held_at = Clock::now();
+                    if (auto* sixteen = tracks()) sixteen->enter();
+                }
+                rows_down.set(size_t(row));
+                studio.select(ui::bank_of(studio.track()) * ui::tracks_a_bank + unsigned(row));
+            } else rows_down.reset(size_t(row));
+            return;
+        }
+        // A track button held: Copy and Delete are the sixteen tracks' (with a step).
+        if (holding() && (button == Button::Copy || button == Button::Delete)) {
+            if (auto* sixteen = tracks()) sixteen->surface(input);
             return;
         }
         if (button == Button::Play && input.pressed && !studio.shift) {
@@ -102,6 +117,12 @@ void MelodeeApp::surface(const move::SurfaceEvent& event) {
         if (input.pressed) trigger(button);
         return;
     }
+    case Kind::Step:
+        if (holding()) { // the steps are the sixteen tracks
+            if (auto* sixteen = tracks()) sixteen->surface(input);
+            return;
+        }
+        break;
     case Kind::MasterKnob:
         studio.volume = std::clamp(studio.volume.load() + input.delta * 0.01f, 0.0f, 1.0f);
         return;
@@ -137,6 +158,7 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point) {
     lights.button(Button::Play, studio.playing() ? colour::green : colour::dark_grey);
     lights.button(Button::Shift, session().shift ? white_bright : white_dim);
     lights.button(Button::Delete, studio.typing ? white_dim : 0);
+    lights.button(Button::Copy, 0);
     if (studio.typing) { // the keyboard
         for (unsigned at = 0; at < pad_count; ++at) {
             char c = key_for_pad(at);
@@ -147,6 +169,8 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point) {
         return;
     }
     if (auto* top = studio.top()) top->lights(lights);
+    if (holding())
+        if (auto* sixteen = tracks()) sixteen->lights(lights); // the steps as the tracks, over the screen's
 }
 
 // ---------------------------------------------------------------- screen thread
@@ -157,6 +181,7 @@ void MelodeeApp::draw(juce::Graphics& g) {
     auto now = Clock::now();
     Screen* top = studio.top();
     if (studio.typing) draw_typing(g);
+    else if (holding() && now - held_at >= hold_shown && tracks()) tracks()->draw(g);
     else if (top && touched >= 0 && now < touched_until && !top->knob(unsigned(touched)).name.empty()) draw_touched(g);
     else if (top) top->draw(g);
     if (now < studio.message_until) {

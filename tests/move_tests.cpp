@@ -1031,8 +1031,33 @@ void test_tracks() {
     melodee.audio_event(make_event(0x90, pad_note(0), 110));
     CHECK(loudest(melodee, 10) == 0);
     melodee.audio_event(make_event(0x80, pad_note(0), 0));
+    // A track button held: the steps are the sixteen tracks.
+    auto hold = [&](bool down) { melodee.surface(make_event(0xb0, button_cc(Button::Row1), down ? 127 : 0)); };
+    auto step = [&](unsigned n) { melodee.surface(make_event(0x90, step_note(n), 127)); melodee.surface(make_event(0x80, step_note(n), 0)); };
+    hold(true);
+    step(0);
+    CHECK(has(melodee.status(), "track=1 kind=kit"));
+    melodee.surface(make_event(0xb0, button_cc(Button::Copy), 127)); // Copy held: track 1, then 11 (empty): copied at once
+    step(0);
+    step(10);
+    melodee.surface(make_event(0xb0, button_cc(Button::Copy), 0));
+    CHECK(has(melodee.status(), "tracks=4"));
+    melodee.surface(make_event(0xb0, button_cc(Button::Delete), 127)); // Delete held: track 11, asked first
+    step(10);
+    melodee.surface(make_event(0xb0, button_cc(Button::Delete), 0));
+    hold(false);
+    CHECK(has(melodee.status(), "page=delete-track") && has(melodee.status(), "tracks=4"));
+    press(melodee, Button::MainPush);
+    loudest(melodee, 2);
+    CHECK(has(melodee.status(), "page=kit-play") && has(melodee.status(), "tracks=3"));
+    hold(true); // an empty step: its new-track sheet
+    step(11);
+    hold(false);
+    CHECK(has(melodee.status(), "track=12 kind=empty") && has(melodee.status(), "page=new-track"));
+    press(melodee, Button::Back);
+    CHECK(has(melodee.status(), "page=empty-play"));
     CHECK(melodee.save_now().empty());
-    // Saved whole: the four kits, the pattern, the tempo.
+    // Saved whole: the three kits, the pattern, the tempo.
     auto project = std::make_unique<melodee::Project>();
     auto patterns = std::make_unique<melodee::PatternBank>();
     app::PluginStates states;

@@ -335,7 +335,9 @@ bool Studio::new_track(unsigned t, TrackKind made) {
 void Studio::delete_track(unsigned t) {
     t %= melodee::track_count;
     drop_module_track(t);
+    auto mix = song->tracks[t].mix; // its mix strip stays, as Melodee's Delete leaves it
     song->tracks[t] = melodee::Track {};
+    song->tracks[t].mix = mix;
     for (auto& pattern : bank->at[t]) pattern = melodee::Pattern {};
     apply_track(t);
     if (t == selected) select(t);
@@ -366,6 +368,7 @@ bool Studio::copy_track(unsigned from, unsigned to) {
     } else if (copy.engine == EngineKind::Plugin) {
         return false; // another host's plug-in: its own copy is its host's to make
     }
+    copy.mix = song->tracks[to].mix; // the target keeps its strip, as Melodee's Copy leaves it
     song->tracks[to] = copy;
     bank->at[to] = bank->at[from];
     apply_track(to);
