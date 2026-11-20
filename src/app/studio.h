@@ -13,6 +13,7 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -60,6 +61,8 @@ struct Sample {
 // Reads a sound file and finds its hits, beats and what Auto reads. Slow
 // and allocating: never on the audio thread, never under the lock.
 std::unique_ptr<Sample> read_sample(const std::string& path, std::string& error);
+// The same for frames already in memory (a take, Audio Recall), kept as `path`.
+std::unique_ptr<Sample> make_sample(const std::string& path, std::unique_ptr<melodee::SampleData> data);
 
 // Melodee's PLUGIN track's plug-in, for one of Schwung's modules: the
 // engine host calls it on the audio thread (engine/plugin_engine.h).
@@ -104,6 +107,7 @@ struct ModuleTrack {
 };
 
 class Screen;
+class Sampling;
 
 class Studio {
 public:
@@ -161,6 +165,9 @@ public:
     void sound_pads(unsigned track);                                             // the engine's back to the project's
     melodee::SampleChop* chop_of(unsigned slot);
     std::string install(std::unique_ptr<Sample> sample, unsigned track, unsigned pad); // empty on success
+    // A sample into the project's first free slot, offered to the engine: the slot, or -1 and why.
+    int add_sample(std::unique_ptr<Sample> sample, std::string& error);
+    const melodee::SampleData* sample_of_slot(unsigned slot) const;
     struct Job { std::string path; unsigned track, pad; };
     std::vector<Job> jobs; // files to load (the service thread's)
     bool loading = false;
@@ -228,6 +235,16 @@ public:
     const std::string& home_folder() const { return home_path; }
     std::string library;
     std::string status() const;
+    // Sampling (src/app/sampling.h): Melodee's Sample Record, Input Config and Audio Recall.
+    Sampling& sampling() { return *sampler_shell; }
+    const Sampling& sampling() const { return *sampler_shell; }
+    // MIDI thread: the pads play track `track` (-1: the selected one, as ever), whatever the
+    // screen gives them to do: a take of Melodee's own sound plays the source from the pads.
+    void pads_play(int track);
+    // MIDI thread: the output quiet (the mic heard through the speaker would howl).
+    void quiet_speaker(bool quiet) { speaker_quiet.store(quiet, std::memory_order_relaxed); }
+    // What finishes typing that no module page asked for (a sample's name), else nothing.
+    std::function<void(const std::string& text, bool cancelled)> typing_done;
     // MIDI thread: whether a pad pressed now stays quiet, its job another
     // than its sound (bindings::pad_sounds()); the audio thread reads it.
     void quiet_pads(bool quiet) { pads_quiet.store(quiet, std::memory_order_relaxed); }
@@ -268,6 +285,10 @@ private:
     // another job than its sound (Shift, Copy, Delete, Mute or a step held;
     // bindings::pad_sounds()), so it stays quiet.
     std::atomic<bool> pads_quiet {false};
+    // Sampling's: the pads on a track other than the selected one (-1 none), and the speaker quiet.
+    std::atomic<int> pads_track {-1}, pads_kind {0}, pads_octave {0};
+    std::atomic<bool> speaker_quiet {false};
+    std::unique_ptr<Sampling> sampler_shell;
     struct Went { int track = -1, key = -1; };
     std::array<Went, pad_count> pad_went {};
     // Last, so it goes first: it holds the samples and runners above.

@@ -66,8 +66,9 @@ enum class Control : uint8_t {
 // hold_time with nothing else used meanwhile is also a Tap; held past
 // hold_time unused, a Hold; pressed again within double_time, a Double.
 // A row reacts to one of them, so a control does either its Press job or
-// its Tap job in one place, never both (checked by the tests).
-enum class Gesture : uint8_t { Press, Tap, Hold, Double, Turn, Count };
+// its Tap job in one place, never both (checked by the tests). A pad let go
+// is a Release (Sampling: a pad held records until it is let go).
+enum class Gesture : uint8_t { Press, Tap, Hold, Double, Turn, Release, Count };
 
 // What is held down while the control is used.
 namespace held {
@@ -98,7 +99,8 @@ constexpr uint16_t none = 0, shift = 1 << 0, track = 1 << 1, step = 1 << 2, pad 
     X(LoopMode) X(MuteSelected) X(Undo) X(Redo) X(UndoList) X(DuplicatePattern) X(DeleteCurrentPattern) X(TypeBackspace) \
     X(ToggleSession) X(PeekSession) X(TracksOverview) X(Back) X(BackToPlay) X(LeaveChop) X(CanvasBack) X(TypeCancel) \
     X(Quit) X(ShiftSteps) X(ShiftLock) X(Uppercase) \
-    X(Octave) X(PadBank) X(PitchesOctave) X(ScaleStep) X(TrackBank) X(SlicePage) X(Bar) X(Bar16) X(PatternPage) X(SliceStep)
+    X(Octave) X(PadBank) X(PitchesOctave) X(ScaleStep) X(TrackBank) X(SlicePage) X(Bar) X(Bar16) X(PatternPage) X(SliceStep) \
+    X(RecordPadUp) X(SliceOptions) X(JumpHit) X(DeleteFile) X(StarFile)
 
 enum class Job : uint8_t {
 #define MELODEE_JOB_ENUM(name) name,

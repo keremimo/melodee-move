@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "app/melodee_app.h"
+#include "app/sampling.h"
 #include "app/screen.h"
 #include "move/display.h"
 #include "move/font.h"
@@ -183,6 +184,9 @@ void MelodeeApp::surface(const move::SurfaceEvent& event) {
     std::lock_guard<std::mutex> guard(own->lock);
     auto& studio = *own;
     auto now = Clock::now();
+    // The jack: what the input carries (the mic or the line in) and where the sound goes (src/app/sampling.h).
+    if (input.kind == Kind::AudioInSense) { studio.sampling().sense_input(input.value); return; }
+    if (input.kind == Kind::AudioOutSense) { studio.sampling().sense_output(input.value); return; }
     // What the app and the screens show of controls held.
     if (input.kind == Kind::Button)
         if (int row = track_button(move::Button(input.index)); row >= 0) {
@@ -230,6 +234,9 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point now) {
     lights.button(Button::Shift, studio.shift ? white_bright : white_dim);
     lights.button(Button::Delete, studio.typing ? white_dim : 0);
     lights.button(Button::Copy, 0);
+    // Sampling: Monitor, the speaker, the pads on a source (src/app/sampling.h); its light where it records.
+    studio.sampling().tick(studio.top() && studio.top()->id() == "sampling");
+    lights.button(Button::Sample, studio.kind() == TrackKind::Kit || studio.kind() == TrackKind::Audio ? colour::dark_grey : colour::off);
     if (studio.typing) { // the keyboard
         for (unsigned at = 0; at < pad_count; ++at) {
             char c = key_for_pad(at);

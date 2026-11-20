@@ -1188,6 +1188,139 @@ void test_migration() {
     CHECK(saved.module == "fake" && saved.preset == 1 && std::string(project->plugins[synth.plugin].path).find("fake") != std::string::npos);
 }
 
+void test_sampling() {
+    // Melodee's Sample Record on the Move's Sampling button (docs/UI.md
+    // "Sampling"): the jack picks mic or line, a pad records onto itself,
+    // another pad carries the take on onto it, the pad again ends it, a pad
+    // held ends it as it is let go; Audio Recall onto the next empty pad;
+    // Resample with the pads playing the kit; the input kept in the settings.
+    std::string folder = "build/test-samples", home = "build/test-home-sampling", loop = folder + "/loop.wav";
+    std::filesystem::create_directories(folder);
+    std::filesystem::remove_all(home);
+    CHECK(write_test_loop(loop));
+    std::string recorded = home + "/Samples/Recorded";
+    {
+        app::MelodeeApp melodee(folder, home, "build/test-no-modules");
+        Session session;
+        melodee.attach(session);
+        melodee.audio_opened(AudioFormat {});
+        CHECK(melodee.restore_now().empty());
+        CHECK(melodee.load_now(loop, 0).empty());
+        Lights lights;
+        AudioBlock in {}, out {};
+        // The input: a 330 Hz tone, half scale, or silence.
+        unsigned phase = 0;
+        auto blocks = [&](int count, bool tone) {
+            int32_t peak = 0;
+            for (int block = 0; block < count; ++block) {
+                for (unsigned f = 0; f < audio_frames; ++f, ++phase) {
+                    int32_t v = tone ? to_s32(0.5f * float(std::sin(6.2831853 * 330.0 * phase / 44100.0))) : 0;
+                    in[2 * f] = in[2 * f + 1] = v;
+                }
+                out.fill(0);
+                melodee.render(in, out);
+                peak = std::max(peak, peak_of(out));
+                if (block % 8 == 0) melodee.lights(lights, App::Clock::now());
+            }
+            return peak;
+        };
+        auto settle = [&] { // the service thread's turn: the take written and onto its pads
+            for (int n = 0; n < 200; ++n) {
+                melodee.service();
+                melodee.lights(lights, App::Clock::now());
+                if (has(melodee.status(), "rec=idle")) break;
+                std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            }
+        };
+        // The jack: no cable (the mic), the speaker.
+        melodee.surface(make_event(0xb0, audio_in_sense_cc, 0));
+        melodee.surface(make_event(0xb0, audio_out_sense_cc, 0));
+        CHECK(has(melodee.status(), "source=MIC in=mic out=speaker"));
+        press_button(melodee, Button::Sample);
+        CHECK(has(melodee.status(), "page=sampling "));
+        melodee.lights(lights, App::Clock::now());
+        CHECK(has(melodee.status(), "monitor=0")); // Auto, but the mic through the speaker: off, no howl
+        // A06 records at once; A07 carries it on; A07 again ends it.
+        tap_pad(melodee, 5);
+        blocks(2, true);
+        CHECK(has(melodee.status(), "rec=recording"));
+        blocks(200, true); // 0.58 s
+        tap_pad(melodee, 6);
+        blocks(100, true);
+        tap_pad(melodee, 6);
+        blocks(2, false);
+        settle();
+        CHECK(has(melodee.status(), "rec=idle") && has(melodee.status(), "last_take=TAKE 1"));
+        CHECK(std::filesystem::exists(recorded + "/TAKE 1.wav") && !std::filesystem::exists(recorded + "/TAKE 1.wav.part"));
+        CHECK(has(melodee.status(), "pad=A07 samples=2 pads=3"));
+        press_button(melodee, Button::Back);
+        CHECK(has(melodee.status(), "page=kit-play"));
+        // A06 plays the take's first part (the tone), A07 the rest.
+        auto play = [&](unsigned pad) {
+            melodee.audio_event(make_event(0x90, pad_note(pad), 110));
+            int32_t peak = blocks(20, false);
+            melodee.audio_event(make_event(0x80, pad_note(pad), 0));
+            blocks(400, false);
+            return peak;
+        };
+        CHECK(play(5) > to_s32(0.1f));
+        CHECK(play(6) > to_s32(0.1f));
+        // Held: A08 records while held, ends as it is let go.
+        press_button(melodee, Button::Sample);
+        melodee.surface(make_event(0x90, pad_note(7), 100));
+        blocks(100, true);
+        std::this_thread::sleep_for(std::chrono::milliseconds(450));
+        CHECK(has(melodee.status(), "rec=recording"));
+        melodee.surface(make_event(0x80, pad_note(7), 0));
+        blocks(2, true);
+        settle();
+        CHECK(has(melodee.status(), "last_take=TAKE 2") && has(melodee.status(), "pads=4"));
+        // Tapped: it records on after the tap is let go; Sampling ends it.
+        tap_pad(melodee, 8);
+        blocks(50, true);
+        CHECK(has(melodee.status(), "rec=recording"));
+        press_button(melodee, Button::Sample); // a take: ends; Sampling Mode stays
+        blocks(2, false);
+        settle();
+        CHECK(has(melodee.status(), "last_take=TAKE 3") && has(melodee.status(), "page=sampling "));
+        press_button(melodee, Button::Sample); // again: leaves
+        CHECK(has(melodee.status(), "page=kit-play"));
+        // Audio Recall: the last phrase of the ring onto the next empty pad after the last one (A09: A10).
+        blocks(300, false);
+        blocks(200, true);
+        blocks(400, false);
+        with_shift(melodee, [&] { press_button(melodee, Button::Sample); });
+        settle();
+        for (int n = 0; n < 50 && !std::filesystem::exists(recorded + "/RECALL 1.wav"); ++n) melodee.service();
+        CHECK(std::filesystem::exists(recorded + "/RECALL 1.wav"));
+        CHECK(has(melodee.status(), "pad=A10") && has(melodee.status(), "pads=6"));
+        press_button(melodee, Button::Back);
+        // A cable goes in: the line in.
+        melodee.surface(make_event(0xb0, audio_in_sense_cc, 127));
+        CHECK(has(melodee.status(), "source=LINE in=line"));
+        // RESAMPLE (knob 1: LINE, LINE L, LINE R, RESAMPLE); A12 is the take's, then A01 plays the kit into it.
+        press_button(melodee, Button::Sample);
+        melodee.surface(make_event(0xb0, knob_first_cc, 3));
+        CHECK(has(melodee.status(), "source=RSMP"));
+        tap_pad(melodee, 11);
+        melodee.lights(lights, App::Clock::now());
+        blocks(4, false);
+        CHECK(has(melodee.status(), "rec=recording"));
+        melodee.audio_event(make_event(0x90, pad_note(0), 110)); // the pads play the kit while it records
+        CHECK(blocks(40, false) > to_s32(0.05f));
+        melodee.audio_event(make_event(0x80, pad_note(0), 0));
+        press_button(melodee, Button::MainPush); // the push ends it
+        blocks(2, false);
+        settle();
+        CHECK(has(melodee.status(), "last_take=RESAMPLE 1"));
+        CHECK(std::filesystem::exists(recorded + "/RESAMPLE 1.wav"));
+    }
+    // The input as set is kept with the Move's settings.
+    std::ifstream settings(home + "/Move.settings");
+    std::string text((std::istreambuf_iterator<char>(settings)), std::istreambuf_iterator<char>());
+    CHECK(has(text, "in_source 4") && has(text, "in_threshold 0"));
+}
+
 } // namespace
 
 int main() {
@@ -1207,6 +1340,7 @@ int main() {
     test_synth_track();
     test_tracks();
     test_migration();
+    test_sampling();
     std::cout << "move-tests: " << checks - failures << " of " << checks << " checks passed\n";
     return failures ? 1 : 0;
 }

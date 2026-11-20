@@ -33,7 +33,8 @@ std::vector<Binding> make_table() {
         {"Pad (Browser)", S::Browser, T::Kit, H::none, C::Pad, G::Press, J::PlayPad, St::Done},
         {"Pad (Chop)", S::Chop, T::Any, H::none, C::Pad, G::Press, J::PlaySlice, St::Done},
         {"Pad (Typing)", S::Typing, T::Any, H::none, C::Pad, G::Press, J::TypeKey, St::Done},
-        {"Pad (Sampling)", S::Sampling, T::Any, H::none, C::Pad, G::Press, J::RecordPad, St::Wave2, sampling},
+        {"Pad (Sampling)", S::Sampling, T::Any, H::none, C::Pad, G::Press, J::RecordPad, St::Done},
+        {"Pad let go (Sampling)", S::Sampling, T::Any, H::none, C::Pad, G::Release, J::RecordPadUp, St::Done},
         {"Pad (Session)", S::Session, T::Any, H::none, C::Pad, G::Press, J::LaunchPattern, St::Wave2, sequencer},
         {"Shift + Pad (Session)", S::Session, T::Any, H::shift, C::Pad, G::Press, J::PasteBounced, St::Wave2, song},
         {"Pad (Overview)", S::Overview, T::Any, H::none, C::Pad, G::Press, J::SelectProject, St::Wave2, projects},
@@ -46,7 +47,7 @@ std::vector<Binding> make_table() {
         {"Delete held + Pad (Play, kit)", S::Play, T::Kit, H::del, C::Pad, G::Press, J::ClearPad, St::Wave2, sequencer},
         {"Delete held + Pad (Session)", S::Session, T::Any, H::del, C::Pad, G::Press, J::DeletePattern, St::Wave2, sequencer},
         {"Delete held + Pad (Overview)", S::Overview, T::Any, H::del, C::Pad, G::Press, J::DeleteProject, St::Wave2, projects},
-        {"Delete held + Pad (Chop)", S::Chop, T::Any, H::del, C::Pad, G::Press, J::RemoveCut, St::Wave2, sampling},
+        {"Delete held + Pad (Chop)", S::Chop, T::Any, H::del, C::Pad, G::Press, J::RemoveCut, St::Done},
         {"Mute held + Pad (Play, kit)", S::Play, T::Kit, H::mute, C::Pad, G::Press, J::MutePad, St::Wave2, mixer},
         {"Step held + Pad", S::Play, T::Any, H::step, C::Pad, G::Press, J::NoteOnStep, St::Wave2, sequencer},
         {"Step held + Pad (Loop)", S::Loop, T::Any, H::step, C::Pad, G::Press, J::NoteOnBar, St::Wave2, sequencer},
@@ -138,17 +139,20 @@ std::vector<Binding> make_table() {
         {"Wheel touch (Play)", S::Play, T::Any, H::none, C::WheelTouch, G::Press, J::ShowFocus, St::Done},
         {"Wheel turn (Browser)", S::Browser, T::Any, H::none, C::WheelTurn, G::Turn, J::BrowseTurn, St::Done},
         {"Wheel push (Browser)", S::Browser, T::Any, H::none, C::WheelPush, G::Press, J::BrowsePush, St::Done},
+        {"Shift + Wheel push (Browser)", S::Browser, T::Any, H::shift, C::WheelPush, G::Press, J::StarFile, St::Done},
         {"Shift held (Browser)", S::Browser, T::Any, H::none, C::Shift, G::Hold, J::BrowserOptions, St::Wave2, kit_depth},
         {"Wheel turn (list)", S::List, T::Any, H::none, C::WheelTurn, G::Turn, J::ListTurn, St::Done},
         {"Shift + Wheel turn (list)", S::List, T::Any, H::shift, C::WheelTurn, G::Turn, J::ListTurnFine, St::Done},
         {"Wheel push (list)", S::List, T::Any, H::none, C::WheelPush, G::Press, J::ListPush, St::Done},
         {"Wheel turn (Chop)", S::Chop, T::Any, H::none, C::WheelTurn, G::Turn, J::ChopAmount, St::Done},
         {"Wheel push (Chop)", S::Chop, T::Any, H::none, C::WheelPush, G::Press, J::ToPads, St::Done},
+        {"Shift + Wheel push (Chop)", S::Chop, T::Any, H::shift, C::WheelPush, G::Press, J::SliceOptions, St::Done},
+        {"Shift + Wheel turn (Chop)", S::Chop, T::Any, H::shift, C::WheelTurn, G::Turn, J::JumpHit, St::Done},
         {"Wheel turn (To Pads)", S::ToPads, T::Any, H::none, C::WheelTurn, G::Turn, J::ToPadsChoose, St::Done},
         {"Wheel push (To Pads)", S::ToPads, T::Any, H::none, C::WheelPush, G::Press, J::ToPadsPlace, St::Done},
-        {"Wheel turn (Sampling)", S::Sampling, T::Any, H::none, C::WheelTurn, G::Turn, J::InputTurn, St::Wave2, sampling},
-        {"Wheel push (Sampling)", S::Sampling, T::Any, H::none, C::WheelPush, G::Press, J::InputPush, St::Wave2, sampling},
-        {"Wheel touch (Sampling)", S::Sampling, T::Any, H::none, C::WheelTouch, G::Press, J::ShowSource, St::Wave2, sampling},
+        {"Wheel turn (Sampling)", S::Sampling, T::Any, H::none, C::WheelTurn, G::Turn, J::InputTurn, St::Done},
+        {"Wheel push (Sampling)", S::Sampling, T::Any, H::none, C::WheelPush, G::Press, J::InputPush, St::Done},
+        {"Wheel touch (Sampling)", S::Sampling, T::Any, H::none, C::WheelTouch, G::Press, J::ShowSource, St::Done},
         {"Wheel turn (Canvas)", S::Canvas, T::Any, H::none, C::WheelTurn, G::Turn, J::CanvasTurn, St::Done},
         {"Wheel push (Canvas)", S::Canvas, T::Any, H::none, C::WheelPush, G::Press, J::CanvasPush, St::Done},
         {"Wheel push (Typing)", S::Typing, T::Any, H::none, C::WheelPush, G::Press, J::TypeDone, St::Done},
@@ -165,8 +169,8 @@ std::vector<Binding> make_table() {
         // Capture and Sampling
         {"Capture", S::Any, T::Any, H::none, C::Capture, G::Press, J::Recall, St::Wave2, sequencer},
         {"Shift + Capture", S::Any, T::Any, H::shift, C::Capture, G::Press, J::ClearRecall, St::Wave2, sequencer},
-        {"Sampling", S::Any, T::Any, H::none, C::Sampling, G::Press, J::SamplingMode, St::Wave2, sampling},
-        {"Shift + Sampling", S::Any, T::Any, H::shift, C::Sampling, G::Press, J::AudioRecall, St::Wave2, sampling},
+        {"Sampling", S::Any, T::Any, H::none, C::Sampling, G::Press, J::SamplingMode, St::Done},
+        {"Shift + Sampling", S::Any, T::Any, H::shift, C::Sampling, G::Press, J::AudioRecall, St::Done},
 
         // Loop, Mute, Undo, Copy, Delete
         {"Loop", S::Play, T::Any, H::none, C::Loop, G::Tap, J::LoopMode, St::Wave2, sequencer},
@@ -179,6 +183,7 @@ std::vector<Binding> make_table() {
         {"Shift + Copy", S::Any, T::Any, H::shift, C::Copy, G::Press, J::Nothing, St::Free},
         {"Delete", S::Play, T::Any, H::none, C::Delete, G::Tap, J::DeleteCurrentPattern, St::Wave2, sequencer},
         {"Delete (Typing)", S::Typing, T::Any, H::none, C::Delete, G::Press, J::TypeBackspace, St::Done},
+        {"Delete (Browser)", S::Browser, T::Any, H::none, C::Delete, G::Tap, J::DeleteFile, St::Done},
         {"Shift + Delete", S::Any, T::Any, H::shift, C::Delete, G::Press, J::Nothing, St::Free},
 
         // Note/Session, Back, Shift
@@ -438,7 +443,8 @@ std::vector<Use> Gestures::feed(const move::Input& input, Clock::time_point now)
     Down down = *at;
     downs.erase(at);
     if (mapped.control == Control::Shift) shift_down = false;
-    if (input.kind == Kind::Touch || input.kind == Kind::Pad) return uses; // a touch or a pad has no tap
+    if (input.kind == Kind::Pad) { uses.push_back(use_of(Gesture::Release)); return uses; } // a pad has no tap; let go, a Release
+    if (input.kind == Kind::Touch) return uses; // a touch has no tap
     if (!down.used && !down.held_long && now - down.since < hold_time) {
         Use use = use_of(Gesture::Tap);
         use.held = down.held; // as it was when it went down

@@ -78,6 +78,9 @@ after Schwung) differ for some buttons:
 | Shift + Steps 4, 12, 13 | No Move job (no icon): **4 the Mixer** (16 tracks, their effects), **12 the Looper**, **13 Song**. |
 | Shift held | **Nothing on the screen**, as on the stock Move: the steps with a Shift job light, Melodee's 4, 12 and 13 too (Kerem dropped the on-screen Shift card from the mockups). |
 | Undo, quit | **Undo held 0.4 s opens the undo list** (as Melodee's Shift + − hold on the MPC). **Shift + Back goes back to Ableton's Move app**, as today, and Setup (Shift + Step 2) lists it too. |
+| Sampling's input | **The jack decides.** The Move has one input, the mic with no cable and the line in with one (CC 114): SOURCE offers MIC, or LINE, LINE L, LINE R, then RESAMPLE and TRACK n; a hardware source follows the jack as a cable goes in or out, and the mic picked with the speaker on turns Monitor off (no howl). |
+| Browser: preview, star, delete | **Each file plays as the wheel lands on it**, as the Move's browser auditions (PREVIEW on or off on Sampling's settings page); **Shift + push stars or unstars** it (Melodee's Shift + B3); **Delete asks, then deletes** the file or folder: in Melodee's folder and the Move's User Library (My Samples, Recordings, as Move Manager may), never the Core Library or what the project plays. |
+| Sampling and Chop's free controls | As docs/ui/sampling.png draws them: **Shift + turn in Sampling, its SAMPLING settings** (Melodee's Settings rows); **Shift + push in Chop, slice options** (Extract, Split, Merge, Remove all cuts); **Shift + turn in Chop, the cut from hit to hit**; **Plus and Minus in Chop, slices 33-64**. |
 
 Followed from the rule without a choice: Left and Right become the
 pattern's bars, so pages move to Shift + turn; in Typing, Back deletes a
@@ -98,7 +101,8 @@ the amount, as the Move's wheel sets the number of slices.
 | Pad (Browser) | Picks the drum pad the browser loads onto; the browser stays where it is | Plays the pad and makes it the one a sample loads onto | done |
 | Pad (Chop) | In Slicing Mode, picks the slice the third knob moves | Plays the slice and selects it, 32 at once | done |
 | Pad (Typing) | (Text is typed with the wheel) | A key: letters, space, backspace | done |
-| Pad (Sampling) | Records into that pad (pulsing red); the pad again, any pad or Sampling stops; held, records until let go; another pad while recording carries on onto it from there | Melodee's Record onto the pad; a pad hit while recording starts the next part there | wave 2: sampling |
+| Pad (Sampling) | Records into that pad (pulsing red); the pad again, any pad or Sampling stops; held, records until let go; another pad while recording carries on onto it from there | Melodee's Record onto the pad; a pad hit while recording starts the next part there; with Melodee's own sound as the source the pads play it once the take is armed | done |
+| Pad let go (Sampling) | A pad held while recording: the recording ends as it is let go | The same: held 0.4 s or more, the take ends as the pad is let go; tapped, it records on | done |
 | Pad (Session) | Launches the clip (a row a track, a column a scene); an empty slot is selected for a new clip; sliding down a column plays the scene | Launches the track's pattern; a column is a scene | wave 2: sequencer |
 | Shift + Pad (Session) | With an audio clip copied: pastes it bounced into an audio clip slot | Pastes the copied pattern printed to audio | wave 2: song & export |
 | Pad (Overview) | Selects a Set; Play previews it | Selects a project | wave 2: MIDI/sync/undo/projects |
@@ -111,7 +115,7 @@ the amount, as the Move's wheel sets the number of slices.
 | Delete held + Pad (Play, kit) | Deletes the pad's notes in the clip | Deletes its notes; a pad with none is emptied (as Control Live's Drum mode and the MPC's Erase + pad) | wave 2: sequencer |
 | Delete held + Pad (Session) | Deletes the clip at once | Deletes the pattern | wave 2: sequencer |
 | Delete held + Pad (Overview) | Deletes the Set, the pad again to confirm | Deletes the project, asked first | wave 2: MIDI/sync/undo/projects |
-| Delete held + Pad (Chop) | No job (Control Live's Slicing mode: deletes the slice) | Takes the slice's cut out | wave 2: sampling |
+| Delete held + Pad (Chop) | No job (Control Live's Slicing mode: deletes the slice) | Takes the slice's cut out | done |
 | Mute held + Pad (Play, kit) | Mutes or unmutes the drum pad (dim white) | Mutes or unmutes the kit pad | wave 2: mixer & effects |
 | Step held + Pad | Adds or removes that note on the step | The same on the pattern | wave 2: sequencer |
 | Step held + Pad (Loop) | The note on every step of the bar | The same | wave 2: sequencer |
@@ -217,6 +221,7 @@ while Shift is held.
 | Wheel touch (Play) | Highlights the sample (audio track) | Names the item in focus | done |
 | Wheel turn (Browser) | Moves through the list, loading each preset (Autoload) | Moves through the list; a module's presets load as it turns | done |
 | Wheel push (Browser) | Opens a folder; loads (Autoload off); leaves with the preset chosen | Opens a folder, loads onto the pad or the track | done |
+| Shift + Wheel push (Browser) | No job | Stars or unstars the file under the cursor (Melodee's Shift + B3); STARRED and RECENT lead the places | done |
 | Shift held (Browser) | Options: Save Preset (Shift held) | Options: save the sample or the module's preset | wave 2: kit depth |
 | Wheel turn (list) | Moves through a menu; turns a value | The same | done |
 | Shift + Wheel turn (list) | Fine (tempo, groove) | Fine | done |
@@ -224,11 +229,13 @@ while Shift is held.
 | Wheel long push | Confirms a factory reset | Melodee never resets the Move | none |
 | Wheel turn (Chop) | Slicing Mode: the number of slices | The chop's amount: slices, beat division, threshold | done |
 | Wheel push (Chop) | Confirms the slices onto a new Drum Rack | To Pads: Poly, Mono, Thru, Kit | done |
+| Shift + Wheel push (Chop) | No job | Slice options: Extract, Split, Merge, Remove all cuts | done |
+| Shift + Wheel turn (Chop) | No job | The selected slice's start, from hit to hit (Melodee's Shift + wheel) | done |
 | Wheel turn (To Pads) | (Slicing Mode places at once) | Picks Poly, Mono, Thru or Kit | done |
 | Wheel push (To Pads) | (Slicing Mode places at once) | Places the slices on the first empty pads | done |
-| Wheel turn (Sampling) | Picks gain, monitoring or source | Melodee's input: source, monitoring, threshold | wave 2: sampling |
-| Wheel push (Sampling) | Switches the source (Mic, Line in, Line in mono, Resampling, USB-C) or the setting | The same | wave 2: sampling |
-| Wheel touch (Sampling) | Shows the input source | The same | wave 2: sampling |
+| Wheel turn (Sampling) | Picks gain, monitoring or source | Melodee's input rows: source, gain, monitor, start (threshold), length; Shift + turn its SAMPLING settings | done |
+| Wheel push (Sampling) | Switches the source (Mic, Line in, Line in mono, Resampling, USB-C) or the setting | The row's next value (gain and start: push, then the wheel); while a take runs, ends it | done |
+| Wheel touch (Sampling) | Shows the input source | The same | done |
 | Wheel turn (Canvas) | No job | The module's own page | done |
 | Wheel push (Canvas) | No job | Enters the page, then the page's push | done |
 | Wheel push (Typing) | Types the character, or Enter | Done | done |
@@ -251,8 +258,8 @@ while Shift is held.
 | --- | --- | --- | --- |
 | Capture | Keeps the notes (and knob moves) played without recording, in a clip; stopped, sets the tempo from them (the wheel picks one of three) | Melodee's Recall | wave 2: sequencer |
 | Shift + Capture | Clears what Capture would keep | The same | wave 2: sequencer |
-| Sampling | Sampling Mode: press the pad to record into; again or Back leaves; on an audio track, arms it | Melodee's Record | wave 2: sampling |
-| Shift + Sampling | No job | Audio Recall: the last 25 s of the input onto the next empty pad | wave 2: sampling |
+| Sampling | Sampling Mode: press the pad to record into; again or Back leaves; on an audio track, arms it | Melodee's Record (Sampling again ends a take, then leaves); on an audio track its INPUT | done |
+| Shift + Sampling | No job | Audio Recall: the last 25 s of the input onto the next empty pad | done |
 
 ### Loop, Mute, Undo, Copy, Delete
 
@@ -268,6 +275,7 @@ while Shift is held.
 | Shift + Copy | No job | None given | free |
 | Delete | Deletes the selected track's clip | Deletes the pattern | wave 2: sequencer |
 | Delete (Typing) | (Back deletes on the Move) | A backspace | done |
+| Delete (Browser) | No job (Move Manager deletes samples) | Deletes the file or folder under the cursor, asked first; what the project plays and the Core Library are kept | done |
 | Shift + Delete | No job | None given | free |
 
 ### Note/Session, Back, Shift
@@ -322,7 +330,7 @@ Not checked by the tests: they follow from the screens.
 | Pads, Session | Clips in the track's colour; the selected one pulsing white; one waiting to start pulsing green, one about to stop pulsing in its colour | The same for patterns | wave 2: sequencer |
 | Pads, Overview | Sets in their colours, the selected one pulsing; an empty slot dark, white when selected | The same for projects | wave 2: MIDI/sync/undo/projects |
 | Pads, Browser | All pulse while browsing presets; the target pad pulses while browsing samples | The same | next |
-| Pads, Sampling | The pads that can take a sample pink; the one recording pulsing red | The same | wave 2: sampling |
+| Pads, Sampling | The pads that can take a sample pink; the one recording pulsing red | The empty pads pink, the kit's in its colour (recorded over), the one taking pulsing red, the parts taken red; with Melodee's own sound as the source, the source's pads | done |
 | Steps, Play | White with notes; the track's colour dim where empty; grey dim past the loop; the playhead green; brighter under a long note; red over a step's automation | The same | wave 2: sequencer |
 | Steps, Loop | The selected bar white; bars in the loop the track's colour; the rest dim | The same | wave 2: sequencer |
 | Steps, Shift held | The icons under the steps with a job | Those steps white dim; one that is on (metronome, 16 Pitches, Full Velocity, Repeat) bright | next |
@@ -331,7 +339,7 @@ Not checked by the tests: they follow from the screens.
 | Track buttons | Each track's colour; while playing, its level (white when loud); a solo blue; a mute dim | The same for the bank in view | core |
 | Play | Lit while playing | The same | core |
 | Rec | Dim when it can record, flashing in the count-in, solid red recording, dark when it cannot | The same | core |
-| Sampling | Pulses red in Sampling Mode | The same | wave 2: sampling |
+| Sampling | Pulses red in Sampling Mode | Red in Sampling Mode, pulsing while it records; dim where it can record (a kit or audio track) | done |
 | Capture | Lit while there is something to keep, dark once cleared | The same | wave 2: sequencer |
 | Knob LEDs | Red with automation; with Mute held, red active, white off, dark none; green for a macro; all pulse while browsing effects | Lit for the knobs the screen uses; motion's colours with the sequencer | done |
 | White buttons | Lit where they do something | The same | done |
@@ -381,4 +389,5 @@ long, double, used as a modifier) has tests of its own.
 ## Mockups
 
 `build/melodee-move --ui-mockups DIR` draws the screens this map moves or
-adds (`src/ui/mockups_controls.cpp`): `docs/ui/controls.png`.
+adds (`src/ui/mockups_controls.cpp`): `docs/ui/controls.png`; sampling's
+(`src/ui/mockups_sampling.cpp`): `docs/ui/sampling.png`.
