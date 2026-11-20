@@ -980,16 +980,53 @@ void test_tracks() {
     press(melodee, Button::Play);
     loudest(melodee, 2);
     CHECK(has(melodee.status(), "playing=0"));
-    // Tempo: Shift + Play; the jogwheel two steps up, its push the metronome; Back.
-    session.shift = true;
-    press(melodee, Button::Play);
-    session.shift = false;
+    // The Move's settings: Shift + Step 5 the tempo (the jogwheel two up, push
+    // confirms); Shift + Step 6 the metronome on; Shift + Step 7 the groove.
+    auto shift_step = [&](unsigned n) {
+        session.shift = true;
+        melodee.surface(make_event(0x90, step_note(n), 127));
+        melodee.surface(make_event(0x80, step_note(n), 0));
+        session.shift = false;
+    };
+    shift_step(4);
     CHECK(has(melodee.status(), "page=tempo"));
     melodee.surface(make_event(0xb0, main_knob_cc, 2));
     press(melodee, Button::MainPush);
-    CHECK(has(melodee.status(), "tempo=122.0 click=1"));
+    CHECK(has(melodee.status(), "page=kit-play") && has(melodee.status(), "tempo=122.0 click=0"));
+    shift_step(5);
+    CHECK(has(melodee.status(), "page=metronome") && has(melodee.status(), "click=1"));
     press(melodee, Button::Back);
-    CHECK(has(melodee.status(), "page=kit-play"));
+    shift_step(6);
+    melodee.surface(make_event(0xb0, main_knob_cc, 3));
+    press(melodee, Button::MainPush);
+    CHECK(has(melodee.status(), "page=kit-play") && has(melodee.status(), "swing=53"));
+    // Shift + Play is the Move's (retrigger): it opens nothing.
+    session.shift = true;
+    press(melodee, Button::Play);
+    session.shift = false;
+    CHECK(has(melodee.status(), "page=kit-play") && has(melodee.status(), "playing=0"));
+    // Mute alone: the selected track; Mute + a track button: that one; Shift + Mute + a track button: solo.
+    press(melodee, Button::Mute);
+    CHECK(has(melodee.status(), "mute=1 solo=0"));
+    press(melodee, Button::Mute);
+    CHECK(has(melodee.status(), "mute=0 solo=0"));
+    melodee.surface(make_event(0xb0, button_cc(Button::Mute), 127));
+    session.shift = true;
+    press(melodee, Button::Row1);
+    session.shift = false;
+    melodee.surface(make_event(0xb0, button_cc(Button::Mute), 0));
+    CHECK(has(melodee.status(), "track=1 kind=kit") && has(melodee.status(), "mute=0 solo=1"));
+    melodee.surface(make_event(0xb0, button_cc(Button::Mute), 127));
+    session.shift = true;
+    press(melodee, Button::Row1);
+    session.shift = false;
+    melodee.surface(make_event(0xb0, button_cc(Button::Mute), 0));
+    CHECK(has(melodee.status(), "solo=0"));
+    // A track button held, the Volume knob: that track's volume.
+    melodee.surface(make_event(0xb0, button_cc(Button::Row1), 127));
+    melodee.surface(make_event(0xb0, master_knob_cc, 127)); // one down
+    melodee.surface(make_event(0xb0, button_cc(Button::Row1), 0));
+    CHECK(melodee.studio().project().tracks[0].mix.level == 99);
 
     auto& studio = melodee.studio();
     {   // Track 5 a new kit; track 1 can not be made again.
@@ -1062,7 +1099,8 @@ void test_tracks() {
     auto patterns = std::make_unique<melodee::PatternBank>();
     app::PluginStates states;
     CHECK(app::read_project_file(home + "/Projects/Move.mldp", *project, *patterns, states).empty());
-    CHECK(project->used_tracks() == 3 && project->tracks[4].engine == melodee::EngineKind::Sampler && project->tempo == 1220);
+    CHECK(project->used_tracks() == 3 && project->tracks[4].engine == melodee::EngineKind::Sampler && project->tempo == 1220 && project->swing == 53);
+    CHECK(project->tracks[0].mix.level == 99);
     CHECK(patterns->at[0][0].events.size() == 4);
 }
 

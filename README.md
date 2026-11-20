@@ -29,11 +29,14 @@ Three parts so far:
   an empty step opens the new-track sheet (kit, synth, keygroup, MIDI,
   audio), Copy + a step and another copies a track, Delete + a step deletes
   one. A new project has a kit on track 1 and a synth on track 2.
-- **Transport and tempo**: Play plays and stops the patterns (the steps
-  follow the playhead); Shift + Play is the tempo: the jogwheel or knob 1
-  the BPM (Shift: tenths), knob 2 the swing, knob 3 the metronome's level,
-  push the metronome. Editing patterns comes next (docs/PARITY.md,
-  sequencer); a project from the MPC plays its patterns.
+- **Transport and tempo**, on the Move's own keys (Ableton's manual):
+  Play plays and stops the patterns (the steps follow the playhead); Shift
+  + Step 5 the tempo (the jogwheel, Shift: tenths; push confirms), Shift +
+  Step 6 the metronome on or off (the jogwheel its level), Shift + Step 7
+  the groove. A track button held with the Volume knob sets that track's
+  volume; Mute mutes the selected track, Mute + a track button that one,
+  Shift + Mute + a track button solos it. Editing patterns comes next
+  (docs/PARITY.md, sequencer); a project from the MPC plays its patterns.
 - **Play** (a kit track): the last pad's sample. Knobs 1-8: tune, level, pan, start, end,
   attack, decay, cutoff (Shift: finer). Touch a knob to see it large.
 - **Load** (Menu): WAV, AIFF, FLAC, Ogg and MP3 files onto the last pad,

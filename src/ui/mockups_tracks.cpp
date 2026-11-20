@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // The tracks, transport and tempo screens (docs/UI.md, "Tracks"), as
-// mockups: tracks.png. Three ways to pick among sixteen tracks (A, B, C),
-// the new-track sheet, copy and delete, each track type's Play screen, the
-// tempo screen, and the lights.
+// mockups: tracks.png. The Move's own keys keep Ableton's meaning (its
+// manual): Play plays and stops, Shift + Step 5 / 6 / 7 are tempo,
+// metronome and groove, a track button held with the Volume knob is that
+// track's volume, Mute (+ Shift) + a track button mutes (solos) it. Picking
+// among sixteen tracks: A (built: a track button held, the steps pick) and C
+// (Shift + Menu, free on the Move); the new-track sheet, copy and delete,
+// each track type's Play screen, and the lights.
 #include "ui/mockups.h"
 #include "move/display.h"
 #include "move/font.h"
@@ -112,20 +116,12 @@ std::vector<Screen> tracks_screens() {
     auto peaks = break_peaks();
     return {
         // Picking a track: three ways, one to choose.
-        {"pick-a", "A: HOLD A TRACK BUTTON. STEPS PICK", [](juce::Graphics& g) {
+        {"pick-a", "A (BUILT): A TRACK BUTTON HELD, STEPS PICK", [](juce::Graphics& g) {
             rail(g, "TRKS", "5", "/16");
             track_grid(g, content(0, 52), selected);
             detail(g, "05 KIT BREAKS");
         }},
-        {"pick-b", "B: SHIFT + TRACK BUTTON: BANK 2", [](juce::Graphics& g) {
-            rail(g, "BANK", "2", "5-8");
-            std::vector<std::string> rows;
-            for (unsigned t = 4; t < 8; ++t)
-                rows.push_back(std::to_string(t + 1) + " " + (example[t].tag[0] ? std::string(example[t].tag) + "  " + example[t].name : "-"));
-            list(g, content(0, 52), rows, int(selected - 4), 1);
-            detail(g, "ROW 1-4: TRACK");
-        }},
-        {"pick-c", "C: SHIFT + MENU: TRACK LIST", [](juce::Graphics& g) {
+        {"pick-c", "C: SHIFT + MENU (FREE ON MOVE): A LIST", [](juce::Graphics& g) {
             rail(g, "TRKS", "5", "/16");
             std::vector<std::string> rows;
             for (unsigned t = 0; t < 16; ++t)
@@ -148,7 +144,7 @@ std::vector<Screen> tracks_screens() {
             rail(g, "DEL", "5", "KIT");
             move::draw_text(g, content_x + 2, 4, "DELETE TRACK 5?", 1);
             move::draw_text(g, content_x + 2, 18, "BREAKS, 9 PADS", 1);
-            move::draw_text(g, content_x + 2, 28, "UNDO BRINGS IT", 1);
+            move::draw_text(g, content_x + 2, 28, "IT ALL GOES", 1);
             detail(g, "PUSH YES", "BACK NO");
         }},
         // Each kind of track, playing.
@@ -191,20 +187,31 @@ std::vector<Screen> tracks_screens() {
             move::draw_text_centred(g, content_x, 18, content_width, "EMPTY", 2);
             detail(g, "PUSH: NEW TRACK");
         }},
-        // Transport and tempo.
-        {"tempo", "SHIFT + PLAY: TEMPO", [](juce::Graphics& g) {
+        // Transport and tempo, on the Move's own keys.
+        {"track-volume", "TRACK BUTTON HELD + VOLUME KNOB", [](juce::Graphics& g) {
+            rail(g, "VOL", "5", "TRK");
+            big_parameter(g, content(4, 44), "TRACK 5 VOLUME", "-1.6 DB", 0.75f);
+        }},
+        {"tempo", "SHIFT + STEP 5: TEMPO", [](juce::Graphics& g) {
             rail(g, "TMPO", "", "4/4");
             move::draw_text(g, content_x + 4, 4, "120.0", 3);
             move::draw_text(g, content_x + 4, 28, "BPM");
-            move::draw_text(g, content_x + 4, 40, "SWING 54%");
-            move::draw_text(g, width - move::text_width("CLICK"), 40, "CLICK");
-            g.fillRect(width - move::text_width("CLICK"), 48, move::text_width("CLICK") - 1, 1); // on
-            detail(g, "PUSH: CLICK", "3.2");
+            move::draw_text(g, content_x + 4, 40, "SHIFT: FINER");
+            detail(g, "PUSH: OK", "3.2");
         }},
-        {"tempo-touch", "TEMPO: KNOB 1 TOUCHED", [](juce::Graphics& g) {
-            rail(g, "KNOB", "1", "TMPO");
-            big_parameter(g, content(4, 44), "TEMPO", "120.0", 0.4f);
-            move::draw_text_centred(g, content_x, detail_y, content_width, "BPM, SHIFT: 0.1");
+        {"metronome", "SHIFT + STEP 6: METRONOME ON", [](juce::Graphics& g) {
+            rail(g, "MET", "", "");
+            move::draw_text(g, content_x + 4, 4, "ON", 3);
+            move::draw_text(g, content_x + 4, 28, "METRONOME");
+            move::draw_text(g, content_x + 4, 40, "LEVEL 70");
+            detail(g, "PUSH: OK");
+        }},
+        {"groove", "SHIFT + STEP 7: GROOVE", [](juce::Graphics& g) {
+            rail(g, "GRV", "", "");
+            move::draw_text(g, content_x + 4, 4, "24%", 3);
+            move::draw_text(g, content_x + 4, 28, "GROOVE");
+            move::draw_text(g, content_x + 4, 40, "100%: TRIPLETS");
+            detail(g, "PUSH: OK");
         }},
     };
 }
@@ -233,13 +240,26 @@ std::vector<Panel> tracks_panels() {
         s.note = "A: ROW 1 HELD, STEPS = TRACKS";
         panels.push_back({"lights-pick-a", "LIGHTS A: STEP 8 GREY = EMPTY: NEW", s});
     }
-    {   // B: Shift held: the track buttons are the four banks.
+    {   // Mute and solo, as on the Move: track 6 muted (grey), track 7 soloed (blue).
         Surface s;
-        for (unsigned b = 0; b < 4; ++b) s.tracks[b] = b == bank_of(selected) ? white : b < 3 ? light_grey : dark_grey;
-        s.pads = kit_pads(five.dim, -1);
+        s.tracks = bank_buttons();
+        s.tracks[1] = dark_grey;
+        s.tracks[2] = blue;
+        s.pads = kit_pads(five.bright, -1);
         s.play = green;
-        s.note = "B: SHIFT HELD, ROWS = BANKS";
-        panels.push_back({"lights-pick-b", "LIGHTS B: SHIFT HELD", s});
+        s.note = "MUTE+ROW 2, SHIFT+MUTE+ROW 3";
+        panels.push_back({"lights-mute", "LIGHTS: 6 MUTED, 7 SOLOED (BLUE)", s});
+    }
+    {   // Shift held: the steps that open the Move's settings, the metronome's lit while it is on.
+        Surface s;
+        s.tracks = bank_buttons();
+        s.pads = kit_pads(five.dim, -1);
+        s.steps[4] = light_grey;
+        s.steps[5] = white;
+        s.steps[6] = light_grey;
+        s.play = green;
+        s.note = "SHIFT HELD: STEPS 5, 6, 7";
+        panels.push_back({"lights-shift", "LIGHTS: SHIFT, TEMPO, CLICK (ON), GROOVE", s});
     }
     {   // A synth track: every C in the track's colour, the other naturals dim.
         Surface s;

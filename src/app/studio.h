@@ -172,6 +172,10 @@ public:
     unsigned tempo() const { return song->tempo; } // tenths of a BPM
     void set_tempo(unsigned tenths);
     void set_swing(unsigned percent);
+    // A track's mix strip, as Move's track button combinations set it.
+    void set_level(unsigned track, int level); // 0..127, 100 unity
+    void set_mute(unsigned track, bool on);
+    void set_solo(unsigned track, bool on);
     bool click() const { return click_on; }
     unsigned click_level() const { return click_volume; }
     void set_click(bool on, unsigned level);

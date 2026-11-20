@@ -75,19 +75,29 @@ int write_previews(const std::string& directory, const std::string& modules) {
     press(move::Button::MainPush);
     ok = save(melodee, folder, "to-pads") && ok;
 
-    // The tracks: a track button held (the sixteen), the tempo, an empty
-    // track and its new-track sheet.
+    // The tracks: a track button held (the sixteen; with the Volume knob,
+    // the track's volume), the Move's tempo, metronome and groove (Shift +
+    // Steps 5-7), an empty track and its new-track sheet.
     press(move::Button::Back);
     press(move::Button::Back);
     send(0xbf, move::button_cc(move::Button::Row1), 127);
     std::this_thread::sleep_for(std::chrono::milliseconds(250));
     ok = save(melodee, folder, "tracks") && ok;
+    send(0xbf, move::master_knob_cc, 127);
+    ok = save(melodee, folder, "track-volume") && ok;
     send(0xbf, move::button_cc(move::Button::Row1), 0);
-    send(0xbf, move::button_cc(move::Button::Shift), 127);
-    press(move::Button::Play);
-    send(0xbf, move::button_cc(move::Button::Shift), 0);
-    ok = save(melodee, folder, "tempo") && ok;
-    press(move::Button::Back);
+    auto shift_step = [&](unsigned step, const char* name) {
+        send(0xbf, move::button_cc(move::Button::Shift), 127);
+        send(0x9f, move::step_note(step), 127);
+        send(0x8f, move::step_note(step), 0);
+        send(0xbf, move::button_cc(move::Button::Shift), 0);
+        bool saved = save(melodee, folder, name);
+        press(move::Button::Back);
+        return saved;
+    };
+    ok = shift_step(4, "tempo") && ok;
+    ok = shift_step(5, "metronome") && ok;
+    ok = shift_step(6, "groove") && ok;
     press(move::Button::Row4);
     ok = save(melodee, folder, "track-empty") && ok;
     press(move::Button::MainPush);

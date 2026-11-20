@@ -23,29 +23,30 @@ user guide (`guide/*.md`).
 - A wave-2 area: `sequencer`, `sampling`, `kit depth`, `instruments`,
   `mixer & effects`, `song & export`, `looper`,
   `MIDI & sync & undo & projects`.
-- A wave-1 area running in a parallel session: `stems`, `plug-in host`
-  (CLAP, VST3, LV2 and VST2 builds that run on the Move's 64-bit ARM Linux,
-  beyond Schwung's modules), `web page`.
+- `web page`: the wave-1 session running beside the core.
+- `schwung`: covered by Schwung on the Move, nothing for Melodee to build
+  (Kerem, 2026-11-20): Stems by Schwung's own separator, plug-ins by
+  Schwung's modules, which are the Move's plug-ins (Melodee hosts them on its
+  PLUGIN tracks). Where Melodee still has to wire a Schwung piece in (its
+  audio effects on a chain), the row names that wave-2 area instead.
 - `n/a`: no place on the Move. The Move controls cell says why, and what
   stands in where something does.
 
-**The Move's controls keep Ableton's meaning** (Kerem, 2026-11-20):
-[MOVE_CONTROLS.md](MOVE_CONTROLS.md) maps every Move control and shortcut,
-with his decisions, and `src/app/bindings.*` holds it as a tested table.
-Where a Move controls cell below differs from it (Shift + Step n as the
-MPC's Shift + Pad n, Menu to load, Shift + Play for tempo, Shift + Capture
-for Recall, Left / Right for pages, Shift held for patterns), the map wins.
+**Move controls** are proposals, to settle while building. Every key the
+Move prints keeps the meaning Ableton's manual gives it (Kerem, 2026-11-20;
+"Ableton Move parity", below, and [MOVE_CONTROLS.md](MOVE_CONTROLS.md)):
+Melodee's own jobs go to what the Move leaves free. Where a proposal below
+names a Move job (Shift + Step 1-3, 5-11, 15, 16; Menu, the Note/Session
+toggle; Loop; Shift + Play; Shift + a track button), MOVE_CONTROLS.md's
+bindings map decides, and overrides the cell here.
 
-**Move controls** are proposals, to settle while building, in line with
-[UI.md](UI.md)'s control table and the core session's track design (pending
-Kerem's approval):
-
-- Row1-4 pick among the four tracks of the bank in view. A track button held
-  shows the 16 tracks and turns the steps into them: a step picks that track,
-  Copy + step copies it, Delete + step deletes it, an empty step opens the
-  new-track sheet.
-- Play plays and stops; Shift + Play opens the tempo screen (jogwheel the
-  BPM; knobs BPM, swing, metronome level; push the metronome on or off).
+- Row1-4 pick among the four tracks of the bank in view (the Move's track
+  select). A track button held shows the 16 tracks and turns the steps into
+  them (free on the Move): a step picks that track, Copy + step copies it,
+  Delete + step deletes it, an empty step opens the new-track sheet.
+- Play plays and stops; Shift + Step 5 / 6 / 7 are tempo, metronome and
+  groove, as on the Move; a track button held with the Volume knob is that
+  track's volume; Mute (+ Shift) + a track button mutes (solos) it.
 - Otherwise the steps are the sequencer's 16 steps.
 - **Shift + Step n** carries the job the MPC prints under pad n (Shift +
   Pad n).
@@ -91,7 +92,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Sounds**: a MIDI track's saved sounds (`.mlds`), favourites (MELODEE.md › Playing, Sounds) | MIDI & sync & undo & projects | Menu (load) on a MIDI track | [ ] |
 | **16 Levels**: the last pad or note on every pad as Velocity, Filter, Tune, Scale or Zones; ends, octave; a MIDI keyboard plays the pad on every key (MELODEE.md › Playing, 16 Levels) | kit depth | Places > 16 Levels; the levels over the pads; knobs type and ends | [ ] |
 | **Note Repeat**: 1/4-1/64 and triplets, swung, pressure as velocity, written under Seq Record (MELODEE.md › Playing, Note Repeat) | sequencer | Shift + Step 9 (the MPC's Fader page); the rate to settle | [ ] |
-| **Tempo**: BPM, swing, metronome level, metronome on / off (MELODEE.md › Playing, Tempo) | done | Shift + Play: jogwheel, knobs, push | [ ] |
+| **Tempo**: BPM, swing, metronome level, metronome on / off (MELODEE.md › Playing, Tempo) | done | Shift + Step 5 / 6 / 7: tempo, metronome, groove, as on the Move | [ ] |
 | **Tap tempo, halve, double; metronome Rec** (clicks only while recording) (MELODEE.md › The panel; Playing, Tempo) | sequencer | tempo screen: tap a step; Left / Right halve, double; push cycles Off / On / Rec | [ ] |
 | **Track speed**: ×½, ×¾, ×1, ×1½, ×2 against the tempo (MELODEE.md › Playing, Tracks) | sequencer | a knob on the Mixer or Patterns page | [ ] |
 | **Keygroup track pages**: TRIM / ZONES, TUNE, AMP ENV, FILTER, FILT ENV, PLAY, ARP, CHORD (guide/instrument-and-midi-tracks.md) | instruments | Left / Right pages, knobs 1-8; Menu loads | [ ] |
@@ -123,7 +124,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Patterns as note lists**: tick (96 a quarter), length, key, velocity, chance, accent, slide, tie, ratchet (MELODEE.md › Sequencing) | sequencer | steps; Places > Roll | [ ] |
 | **128 patterns a track** in banks (MELODEE.md › Sequencing) | sequencer | pattern layer: 32 a bank, Up / Down | [ ] |
 | **Pattern length, Q, time signature**: 1-128 bars, Q 1/4-1/64 with triplets, 1/4-15/16 (MELODEE.md › Sequencing, Patterns) | sequencer | Patterns page knobs | [ ] |
-| **Swing** 50-75 % (MELODEE.md › Sequencing) | done | tempo screen knob | [ ] |
+| **Swing** 50-75 % (MELODEE.md › Sequencing) | done | Shift + Step 7: the Move's groove | [ ] |
 | **Free length**: an empty pattern grows a bar at a time as it is recorded (MELODEE.md › Sequencing) | sequencer | Rec | [ ] |
 | **Launch a pattern**: at the next bar, at once when stopped; an empty one as long as the one playing (MELODEE.md › Sequencing, Seq held) | sequencer | pattern layer: a pad | [ ] |
 | **Pattern chains**: up to eight patterns, each played once, round again (CHAN) (MELODEE.md › Sequencing, Seq held) | sequencer | pattern layer: several pads in one hold | [ ] |
@@ -233,7 +234,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Slices 33-64** on a second bank (MELODEE.md › Sampler, Chop) | sampling | Up / Down in Chop | [ ] |
 | **Chop close up**: the view follows the cut; a moved cut plays its slice; Shift + wheel jumps from hit to hit (MELODEE.md › Sampler, Chop) | sampling | jogwheel; Shift + jogwheel | [ ] |
 | **Extract, Split, Merge**; a slice taken out; every cut out (MELODEE.md › Sampler, Chop) | sampling | Copy (Extract); Delete; Delete + Loop | [ ] |
-| **CLEAN**: cut on the sample's drums stem (MELODEE.md › Sampler, Chop) | stems | Chop: HERE > Clean | [ ] |
+| **CLEAN**: cut on the sample's drums stem (MELODEE.md › Sampler, Chop) | schwung | Schwung's separator writes the stems as files: Load the drums stem and Chop it | — |
 | **To Pads**: Poly, Mono, Thru (MELODEE.md › Sampler, Chop) | done | Chop: push; jogwheel | [ ] |
 | **To Pads KIT**: a pad a sound (MELODEE.md › Sampler, Chop) | sampling | To Pads sheet | [ ] |
 | **To Pads PATTERN**: a note for each slice into the pattern (MELODEE.md › Sampler, Chop) | sequencer | To Pads sheet | [ ] |
@@ -248,8 +249,8 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Sampling Melodee's own sound**: a track or Resample as the source, the pads playing it (MELODEE.md › Sampler, Record) | sampling | Input Config source | [ ] |
 | **Audio Recall**: the input's last 25 s onto the next empty pad (MELODEE.md › Sampler) | sampling | Capture | [ ] |
 | **Resample**: the pattern with every track onto a pad; on Song, the whole song (MELODEE.md › Sampler) | sampling | Shift + Step 11, then a pad | [ ] |
-| **Stems**: drums, bass, music and vocals onto four empty pads; BEST (MELODEE.md › Sampler, Stems) | stems | a pad page: HERE > Stems | [ ] |
-| **Stems program**: melodee-stems and its 80 MB model built for the Move's A72; the memory check (MELODEE.md › Sampler, Stems) | stems | automatic | [ ] |
+| **Stems**: drums, bass, music and vocals onto four empty pads; BEST (MELODEE.md › Sampler, Stems) | schwung | Schwung's separator; Load the stems it writes onto pads | — |
+| **Stems program**: melodee-stems and its 80 MB model built for the Move's A72; the memory check (MELODEE.md › Sampler, Stems) | schwung | Schwung's own, already built for the Move | — |
 
 ## Effects
 
@@ -371,34 +372,34 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Render workers**: tracks in parallel on the spare cores (MELODEE.md › Threads and data) | mixer & effects | `EngineHost::set_render_threads()`; measure on the Move first (the audio thread renders alone now) | [ ] |
 | **Overload guard**: the busiest track gives up its oldest voice before a block runs late (MELODEE.md › Threads and data) | done | automatic | [ ] |
 | **Pads at their frame**: a note played by hand sounds where it came in (MELODEE.md › Threads and data) | done | pads sound in the cycle they are read | [ ] |
-| **Melodee Poly, PD and Chip**: Open MPC synths with factory presets and pad pressure (MELODEE.md › Synths) | plug-in host | their aarch64 builds on the plug-in host | [ ] |
-| **Old PROPHET, CZ, SID tracks** open on Poly, PD and Chip (MELODEE.md › Synths) | plug-in host | automatic | [ ] |
+| **Melodee Poly, PD and Chip**: Open MPC synths with factory presets and pad pressure (MELODEE.md › Synths) | schwung | Schwung's synths take their place | — |
+| **Old PROPHET, CZ, SID tracks** open on Poly, PD and Chip (MELODEE.md › Synths) | schwung | open named and silent; pick a Schwung synth for the track | — |
 
 ## Plug-ins
 
 | Feature | Status | Move controls | ✓ |
 | --- | --- | --- | --- |
-| **VST3** bundles with `Contents/aarch64-linux/` (MELODEE.md › Plug-ins) | plug-in host | Menu (load) | [ ] |
-| **LV2** bundles for aarch64, presets as programs (MELODEE.md › Plug-ins, LV2) | plug-in host | Menu (load) | [ ] |
-| **CLAP** for aarch64 on Melodee's own host; presets found by discovery, cached (MELODEE.md › Plug-ins, CLAP) | plug-in host | Menu (load) | [ ] |
-| **VST2** `.so` and Open MPC plug-in folders for aarch64 (MELODEE.md › Plug-ins) | plug-in host | Menu (load) | [ ] |
-| **32-bit ARM plug-ins** through a bridge process (MELODEE.md › Plug-ins) | plug-in host | automatic, if the Move's kernel runs 32-bit code (to check) | [ ] |
-| **Picker**: folders, bundles of several, INSTRUMENT and EFFECT tags, the rest dimmed with the reason (MELODEE.md › Plug-ins) | plug-in host | Menu (load); jogwheel | [ ] |
-| **A plug-in instrument**: its parameters on the knobs, a step at a time, back to default (MELODEE.md › Plug-ins, An instrument) | plug-in host | knobs 1-8; Left / Right; Delete + knob | [ ] |
-| **Presets**: programs with names; CLAP preset files in folders (MELODEE.md › Plug-ins, Presets) | plug-in host | jogwheel; push | [ ] |
-| **Drum machine plug-ins**: voices named, the pads to Drums (MELODEE.md › Plug-ins, Drum machines) | plug-in host | pads from note 36 | [ ] |
-| **Plug-in effects** on track, bus, master and loop chains (MELODEE.md › Plug-ins, An effect) | plug-in host | Places > Effects | [ ] |
-| **Transport to plug-ins**: playing, position, tempo, time signature; TRANSPORT off (MELODEE.md › Plug-ins, Transport) | plug-in host | a setting on the plug-in's page | [ ] |
-| **Plugin Data** as the plug-ins' home folder (MELODEE.md › Plug-ins) | plug-in host | /data/UserData/Melodee/Plugin Data | [ ] |
-| **Neural Amp Modeler and TONE3000**: models and IRs from Plugin Data; capture size kept (MELODEE.md › Plug-ins) | plug-in host | knobs | [ ] |
+| **VST3** bundles with `Contents/aarch64-linux/` (MELODEE.md › Plug-ins) | schwung | covered by Schwung's modules, the Move's plug-ins | — |
+| **LV2** bundles for aarch64, presets as programs (MELODEE.md › Plug-ins, LV2) | schwung | covered by Schwung's modules, the Move's plug-ins | — |
+| **CLAP** for aarch64 on Melodee's own host; presets found by discovery, cached (MELODEE.md › Plug-ins, CLAP) | schwung | covered by Schwung's modules, the Move's plug-ins | — |
+| **VST2** `.so` and Open MPC plug-in folders for aarch64 (MELODEE.md › Plug-ins) | schwung | covered by Schwung's modules, the Move's plug-ins | — |
+| **32-bit ARM plug-ins** through a bridge process (MELODEE.md › Plug-ins) | schwung | covered by Schwung's modules, the Move's plug-ins | — |
+| **Picker**: folders, bundles of several, INSTRUMENT and EFFECT tags, the rest dimmed with the reason (MELODEE.md › Plug-ins) | done | Menu on a synth track: Schwung's modules | [ ] |
+| **A plug-in instrument**: its parameters on the knobs, a step at a time, back to default (MELODEE.md › Plug-ins, An instrument) | done | a Schwung module's pages on knobs 1-8, Left / Right | [ ] |
+| **Presets**: programs with names; CLAP preset files in folders (MELODEE.md › Plug-ins, Presets) | done | a Schwung module's presets on the jogwheel | [ ] |
+| **Drum machine plug-ins**: voices named, the pads to Drums (MELODEE.md › Plug-ins, Drum machines) | done | Schwung's drum modules (9w9) from note 36: Down an octave | [ ] |
+| **Plug-in effects** on track, bus, master and loop chains (MELODEE.md › Plug-ins, An effect) | mixer & effects | Schwung's audio effect modules on track, bus and master chains | [ ] |
+| **Transport to plug-ins**: playing, position, tempo, time signature; TRANSPORT off (MELODEE.md › Plug-ins, Transport) | sequencer | `schwung_move_info()` and `get_bpm()`: the tempo now; playing and the place to come | [ ] |
+| **Plugin Data** as the plug-ins' home folder (MELODEE.md › Plug-ins) | schwung | covered by Schwung's modules, the Move's plug-ins | — |
+| **Neural Amp Modeler and TONE3000**: models and IRs from Plugin Data; capture size kept (MELODEE.md › Plug-ins) | schwung | covered by Schwung's modules, the Move's plug-ins | — |
 | **Open MPC's rate bridge** for 48 and 96 kHz (MELODEE.md › Plug-ins) | n/a | the Move runs at 44.1 kHz, Open MPC's own rate | — |
-| **Delay compensation**: plug-in and Limiter latencies lined up on every path, MIDI out too (MELODEE.md › Plug-ins) | plug-in host | automatic | [ ] |
-| **Notes to plug-ins**: wheel, bend, poly aftertouch, CC 84 and CC 68 for slides and ties (MELODEE.md › Plug-ins, Notes) | plug-in host | automatic | [ ] |
-| **Idle plug-ins sleep** when silent (MELODEE.md › Threads and data) | plug-in host | automatic | [ ] |
-| **Support in the binary**: GUI stubs, libsndfile, libsamplerate, FFTW, the armhf runtime (MELODEE.md › Plug-ins) | plug-in host | automatic | [ ] |
-| **Saved with the project**: each plug-in's path and state (PLUG) (MELODEE.md › Plug-ins, Saving) | plug-in host | automatic | [ ] |
-| **Replace a plug-in**: asks; one undo brings the old one back with its state (MELODEE.md › Plug-ins) | plug-in host | question sheet | [ ] |
-| **Plug-in probe**: a command-line host to try a plug-in first (MELODEE.md › Plug-ins) | plug-in host | command line, as `--probe-modules` for Schwung's | [ ] |
+| **Delay compensation**: plug-in and Limiter latencies lined up on every path, MIDI out too (MELODEE.md › Plug-ins) | schwung | covered by Schwung's modules, the Move's plug-ins | — |
+| **Notes to plug-ins**: wheel, bend, poly aftertouch, CC 84 and CC 68 for slides and ties (MELODEE.md › Plug-ins, Notes) | done | Melodee's PLUGIN engine to a Schwung module: notes, pressure, CC | [ ] |
+| **Idle plug-ins sleep** when silent (MELODEE.md › Threads and data) | schwung | covered by Schwung's modules, the Move's plug-ins | — |
+| **Support in the binary**: GUI stubs, libsndfile, libsamplerate, FFTW, the armhf runtime (MELODEE.md › Plug-ins) | schwung | covered by Schwung's modules, the Move's plug-ins | — |
+| **Saved with the project**: each plug-in's path and state (PLUG) (MELODEE.md › Plug-ins, Saving) | done | a Schwung module's state in its PLUG entry | [ ] |
+| **Replace a plug-in**: asks; one undo brings the old one back with its state (MELODEE.md › Plug-ins) | MIDI & sync & undo & projects | asks; its undo | [ ] |
+| **Plug-in probe**: a command-line host to try a plug-in first (MELODEE.md › Plug-ins) | done | `--probe-modules` | [ ] |
 
 ## Files
 
@@ -412,7 +413,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Cache**: decoded long samples and instrument files, 4 GB, aged out after 30 days (MELODEE.md › Files on the card) | kit depth | /data/UserData/Melodee/Cache | [ ] |
 | **Export folders**: Mixdowns, Stems, MIDI, MPC 3 (MELODEE.md › Files on the card; guide/song.md) | song & export | /data/UserData/Melodee | [ ] |
 | **SysEx folder** (MELODEE.md › Files on the card) | MIDI & sync & undo & projects | /data/UserData/Melodee/SysEx | [ ] |
-| **Plugins folder**, read only (MELODEE.md › Files on the card) | plug-in host | /data/UserData/Melodee/Plugins | [ ] |
+| **Plugins folder**, read only (MELODEE.md › Files on the card) | schwung | covered by Schwung's modules, the Move's plug-ins | — |
 
 ## Remote and previews
 
@@ -488,17 +489,54 @@ sections, each on Shift + Step n.
 
 | Status | Rows |
 | --- | --- |
-| `done` | 48 |
-| `sequencer` | 43 |
+| `done` | 55 |
+| `sequencer` | 44 |
 | `sampling` | 22 |
 | `kit depth` | 27 |
 | `instruments` | 25 |
-| `mixer & effects` | 21 |
+| `mixer & effects` | 22 |
 | `song & export` | 21 |
 | `looper` | 13 |
-| `MIDI & sync & undo & projects` | 53 |
-| `stems` | 3 |
-| `plug-in host` | 23 |
+| `MIDI & sync & undo & projects` | 54 |
 | `web page` | 11 |
+| `schwung` | 16 |
 | `n/a` | 25 |
 | All rows | 335 |
+
+# Ableton Move parity
+
+The second half of parity: every key the Move prints keeps the meaning
+Ableton's manual (https://www.ableton.com/en/move/manual/, its section in
+brackets) gives it, and Melodee's own jobs move to keys the Move leaves
+free, as melodee-sample's MELODEE_PARITY.md does for the MPC. The whole map,
+every control and shortcut with what Melodee does on it, is
+[MOVE_CONTROLS.md](MOVE_CONTROLS.md); its bindings table is the one place
+the keys are handled. Below, the keys the core session (tracks, transport,
+tempo) touches, and where each stands now.
+
+| Move key | Ableton's meaning | Melodee on the Move | Status | ✓ |
+| --- | --- | --- | --- | --- |
+| **Play** | start / stop (20) | plays and stops the patterns | done | [ ] |
+| **Shift + Play** | retrigger the playing clips from their start (17.1.5) | nothing yet: the bindings table | MIDI & sync & undo & projects | [ ] |
+| **Rec** | record into the selected track's clip, after a count-in (14.1) | Seq Record | sequencer | [ ] |
+| **Track button** | select the track (20) | selects one of the bank's four of sixteen | done | [ ] |
+| **Track button held** (an unselected one) | look at that track without selecting it (20) | selects it on the press; held, the sixteen, the steps pick (free on the Move) | MOVE_CONTROLS.md decides | [ ] |
+| **Track button + Volume knob** | that track's volume, in dB (16.2) | the same (`VOL`) | done | [ ] |
+| **Mute** | mute the selected track (16.4) | the same | done | [ ] |
+| **Mute + track button** | mute that track (16.4) | the same; its button grey | done | [ ] |
+| **Shift + Mute + track button** | solo that track, its button blue (16.3) | the same | done | [ ] |
+| **Shift + track button** | the track's options (colour, MIDI channel) | nothing yet | MIDI & sync & undo & projects | [ ] |
+| **Copy / Delete + track button** | Control Live only (18.2) | free; Melodee copies and deletes with a track button held and the steps | done | [ ] |
+| **Shift + Step 5** | Tempo: the wheel, Shift + wheel finer, push confirms (10.1) | the same | done | [ ] |
+| **Shift + Step 6** | Metronome on / off (10.3) | the same; the wheel its level | done | [ ] |
+| **Shift + Step 7** | Groove, 0 % to 100 % triplet sixteenths and past (10.2) | the same, as Melodee's swing 50-75 % | done | [ ] |
+| **Shift + Step 3** | Workflow settings: count-in (13, 14.1.1) | with Rec | sequencer | [ ] |
+| **Shift + Steps 1, 2, 8-11, 15, 16** | Set overview, Setup, 16 Pitches, Keys & Scale, full velocity, Repeat / Arp, double loop, quantize (20) | not yet | MOVE_CONTROLS.md decides | [ ] |
+| **Note / Session toggle** ("Menu", CC 50) | switch Note and Session; held, a peek (5, 17) | Load (samples, modules) | MOVE_CONTROLS.md decides | [ ] |
+| **Loop** | Loop mode: the steps are bars (12.1) | Chop | MOVE_CONTROLS.md decides | [ ] |
+| **Volume knob** | the main volume (16.1) | the same | done | [ ] |
+| **Wheel, its push, Shift + wheel** | choose, confirm, finer (20, 10.1) | the same on every screen | done | [ ] |
+| **Back** | leave a menu or view (20) | the same | done | [ ] |
+| **Undo, Shift + Undo** | undo, redo (20) | not yet | MIDI & sync & undo & projects | [ ] |
+| **Capture** | the last notes played into a clip (14.3) | not yet | sampling | [ ] |
+| **Sample** ("Sampling") | Sampling mode (15.1) | not yet | sampling | [ ] |

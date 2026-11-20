@@ -451,6 +451,25 @@ void Studio::set_swing(unsigned percent) {
     changed();
 }
 
+void Studio::set_level(unsigned t, int level) {
+    auto& mix = song->tracks[t % melodee::track_count].mix;
+    mix.level = uint8_t(std::clamp(level, 0, 127));
+    send({Type::Level, uint8_t(t), 0, 0, int16_t(mix.level)});
+    changed();
+}
+
+void Studio::set_mute(unsigned t, bool on) {
+    song->tracks[t % melodee::track_count].mix.mute = on;
+    send({Type::Mute, uint8_t(t), 0, 0, int16_t(on)});
+    changed();
+}
+
+void Studio::set_solo(unsigned t, bool on) {
+    song->tracks[t % melodee::track_count].mix.solo = on;
+    send({Type::Solo, uint8_t(t), 0, 0, int16_t(on)});
+    changed();
+}
+
 void Studio::set_click(bool on, unsigned level) {
     click_on = on;
     click_volume = std::min(level, 100u);
@@ -917,10 +936,11 @@ std::string Studio::status() const {
     char text[512];
     std::snprintf(text, sizeof text,
                   "page=%s track=%u kind=%s tracks=%u pad=%c%02u samples=%u pads=%u loading=%d saves=%u unsaved=%d synth=%s octave=%d "
-                  "typing=%d playing=%d tick=%u tempo=%.1f click=%d slow_calls=%u slowest_ms=%.1f stream_late=%u dropped=%u",
+                  "typing=%d playing=%d tick=%u tempo=%.1f click=%d swing=%u mute=%d solo=%d slow_calls=%u slowest_ms=%.1f stream_late=%u dropped=%u",
                   top() ? top()->id().c_str() : "-", selected + 1, kind_name(kind()), tracks, 'A' + int(pad() / 16), pad() % 16 + 1, loaded, used,
                   int(loading), saves, int(dirty), module && module->module ? module->module->info().id.c_str() : "-", octave(selected), int(typing),
-                  int(engine->playing()), engine->ticks(), song->tempo / 10.0, int(click_on), slow_calls, slowest_us / 1000.0,
+                  int(engine->playing()), engine->ticks(), song->tempo / 10.0, int(click_on), unsigned(song->swing), int(track.mix.mute),
+                  int(track.mix.solo), slow_calls, slowest_us / 1000.0,
                   module ? module->player.stream_late() : 0u, engine->dropped());
     std::string line = text;
     for (const auto& screen : screens) line += screen->status();

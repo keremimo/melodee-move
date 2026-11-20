@@ -114,15 +114,26 @@ open it; Back goes up, then closes the menu.
 
 ## Tracks
 
-Sixteen tracks, as in Melodee, chosen on 2026-11-20 from three ways of
-picking among them (design **A**). `docs/ui/tracks.png` is the sheet
+Sixteen tracks, as in Melodee, picked as design **A** (chosen on
+2026-11-20). Every Move key keeps the meaning Ableton's manual gives it
+(Kerem, 2026-11-20; the whole map is docs/MOVE_CONTROLS.md): Play, Mute,
+Shift + Step 5 / 6 / 7, a track button with the Volume knob work as on the
+Move, and Melodee's own jobs take keys the Move leaves free (a track button
+held with the steps is one). Where a Move job and a Melodee job want the
+same key (the track buttons and sixteen tracks, Menu and Load, Loop and
+Chop), Kerem decides with that map. `docs/ui/tracks.png` is the sheet
 (`src/ui/mockups_tracks.cpp`); the screens are built to it.
 
 ![The tracks screens](ui/tracks.png)
 
 - **The track buttons** are the four tracks of the selected track's bank
   (1-4, 5-8, 9-12, 13-16), each in its track's colour (`ui/track_style.h`),
-  the selected one bright, an empty one dark. A tap picks one.
+  the selected one bright, an empty one dark, a muted one grey, a soloed one
+  blue (the Move's). A tap picks one. Held with the Volume knob: that
+  track's volume in dB (`VOL` / track), as on the Move.
+- **Mute**, as on the Move: alone, mutes the selected track; with a track
+  button, mutes that track; Shift + Mute + a track button solos it. Its
+  light is bright while the selected track is muted.
 - **A track button held** shows the sixteen as a grid on the screen, a row a
   bank, each cell the track's kind (a synth's module), the selected one
   inverted; the rail says `TRKS` / the track / `/16`. The 16 steps are the
@@ -145,13 +156,22 @@ picking among them (design **A**). `docs/ui/tracks.png` is the sheet
   and play (pads as notes on the note tracks, Up / Down the octave), their
   own pages coming in wave 2 (`docs/PARITY.md`); an empty track (`----`)
   says `PUSH: NEW TRACK`.
-- **Transport**: Play plays and stops the patterns; while it plays the
-  steps show the selected track's playhead (a sixteenth a step) and the
-  detail line the bar and beat (`3.2`).
-- **Tempo** (Shift + Play): the BPM large; the jogwheel or knob 1 the tempo
-  (Shift: tenths), knob 2 the swing, knob 3 the metronome's level; push the
-  metronome on or off (`CLICK` underlined when on). The steps count the
-  bar's beats, the one playing white. Back or Shift + Play leaves.
+- **Transport**: Play plays and stops the patterns, as on the Move; while it
+  plays the steps show the selected track's playhead (a sixteenth a step)
+  and the detail line the bar and beat (`3.2`). Shift + Play is the Move's
+  retrigger, left to the bindings table.
+- **The Move's settings on Shift + a step**: with Shift held, Steps 5, 6
+  and 7 light (6 white while the metronome is on).
+  - **Tempo** (Shift + Step 5): the BPM large; the jogwheel sets it (Shift:
+    tenths), knob 1 too; push confirms.
+  - **Metronome** (Shift + Step 6): turns it on or off and shows it; the
+    jogwheel sets its level (Melodee's: the Move's manual gives none); push
+    confirms.
+  - **Groove** (Shift + Step 7): the Move's groove, 0 % straight to 100 %
+    triplet sixteenths and on to 150 % (Melodee's swing 50 to 75 %); the
+    jogwheel sets it; push confirms.
+  The steps count the bar's beats on these, the one playing white; Back
+  leaves too.
 
 | Screen | Rail | Subject | Detail |
 | --- | --- | --- | --- |
@@ -161,15 +181,21 @@ picking among them (design **A**). `docs/ui/tracks.png` is the sheet
 | Delete | `DEL` / track / kind | the question | `PUSH YES`, `BACK NO` |
 | Empty track | `----` / track | `EMPTY` | `PUSH: NEW TRACK` |
 | Keygroup, MIDI, audio, plug-in | `KEYS`, `MIDI`, `AUD`, `PLUG` / track / lowest note or channel | what it plays | kind; the bar and beat while playing |
-| Tempo | `TMPO` / / signature | BPM large, swing, `CLICK` | push: click on / off; bar and beat |
+| Track volume (track button held, Volume knob) | `VOL` / track / `TRK` | the track's volume in dB, a bar | |
+| Tempo (Shift + Step 5) | `TMPO` / / signature | BPM large | `PUSH: OK`; bar and beat |
+| Metronome (Shift + Step 6) | `MET` | `ON` or `OFF` large, its level | `PUSH: OK` |
+| Groove (Shift + Step 7) | `GRV` | the groove in % large | `PUSH: OK` |
 
 ## Screens in code
 
 Each screen is a file of its own in `src/app/screens/`, a `Screen`
 (`src/app/screen.h`) registered there with a `RegisterScreen`: its id, how
 it is made, the buttons that open it from a track's Play screen (a
-`Trigger`: Menu on a kit opens `load-samples`, Loop `chop`, Shift + Play
-`tempo`), or the track kinds whose Play screen it is. A new screen is a new
+`Trigger`: Menu on a kit opens `load-samples`, Loop `chop`), or the track
+kinds whose Play screen it is. Keys that work everywhere (the track
+buttons, Play, Mute, Shift + Step 5-7, the Volume knob) are the app's, in
+`melodee_app.cpp`, until the central bindings table (docs/MOVE_CONTROLS.md)
+takes them all. A new screen is a new
 file; no other file changes. The app (`melodee_app.cpp`) keeps only what is
 the same everywhere: the track buttons, Play, the master knob, a touched
 knob shown large, typing for a module's page, and the sixteen tracks while
@@ -216,7 +242,12 @@ hold the code to it. In short:
   selected one bright; an empty one dark.
 - **Steps, a track button held**: the sixteen tracks, each its colour, the
   selected one white, an empty one grey; Copy and Delete lit.
-- **Steps, on the tempo screen**: the bar's beats, the one playing white.
+- **Steps, Shift held**: Steps 5, 6, 7 (tempo, metronome, groove), 6 white
+  while the metronome is on.
+- **Steps, on tempo, metronome and groove**: the bar's beats, the one
+  playing white.
+- **Track buttons, muted and soloed**: grey and blue, as on the Move.
+- **Mute**: bright while the selected track is muted.
 - **Play**: green while playing.
 - **Knob lights**: lit for the knobs the screen uses, dark for the rest.
 - **Buttons**: lit where they do something on this screen.

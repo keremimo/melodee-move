@@ -45,10 +45,11 @@ MELODEE_EXPECTED='page=kit-play .*pad=A02 samples=1 pads=17 .*slices=16'
 # follows three seconds after.
 RESTORE_SCRIPT='100:0xb0,71,2'
 RESTORE_EXPECTED='page=kit-play .*pad=A02 samples=1 pads=17 loading=0 saves=1 unsaved=0 .*slices=0'
-# Transport and tempo, on that project: Play at 100; Shift + Play at 300
-# opens the tempo, the jogwheel two steps up (122 BPM), its push the
-# metronome; Back at 360. Still playing at the end.
-TRANSPORT_SCRIPT='100:0xb0,85,127;101:0xb0,85,0;300:0xb0,49,127;301:0xb0,85,127;302:0xb0,85,0;303:0xb0,49,0;320:0xb0,14,2;340:0xb0,3,127;341:0xb0,3,0;360:0xb0,51,127;361:0xb0,51,0'
+# Transport and tempo, on that project, with the Move's own keys: Play at
+# 100; Shift + Step 5 at 300 opens the tempo, the jogwheel two steps up
+# (122 BPM), its push confirms; Shift + Step 6 at 360 the metronome on; Back
+# at 380. Still playing at the end.
+TRANSPORT_SCRIPT='100:0xb0,85,127;101:0xb0,85,0;300:0xb0,49,127;301:0x90,20,127;302:0x80,20,0;303:0xb0,49,0;320:0xb0,14,2;340:0xb0,3,127;341:0xb0,3,0;360:0xb0,49,127;361:0x90,21,127;362:0x80,21,0;363:0xb0,49,0;380:0xb0,51,127;381:0xb0,51,0'
 TRANSPORT_EXPECTED='page=kit-play .*playing=1 tick=[1-9][0-9]* tempo=122.0 click=1'
 # The synth track: Row 2, Menu, the jogwheel's push loads the one module in
 # build/test-modules (the tests' stand-in), a pad plays it, knob 1 turns its
