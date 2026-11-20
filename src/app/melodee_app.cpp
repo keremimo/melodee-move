@@ -14,14 +14,9 @@ namespace app {
 namespace {
 
 constexpr auto touch_linger = std::chrono::milliseconds(600);
-constexpr auto hold_shown = std::chrono::milliseconds(200); // a track button held this long shows the sixteen
+constexpr auto hold_shown = bindings::Gestures::hold_time; // a track button held this long shows the sixteen (the Move's hold)
 constexpr auto volume_linger = std::chrono::milliseconds(1200);
 
-// Shift + a step opens a setting, as on the Move (its manual, "Shift + Step"):
-// the step (0 is Step 1) and the screen. Step 6 also turns the metronome on
-// or off.
-struct ShiftStep { unsigned step; const char* screen; };
-constexpr ShiftStep shift_steps[] {{4, "tempo"}, {5, "metronome"}, {6, "groove"}};
 constexpr auto turn_linger = std::chrono::milliseconds(1200);
 
 // Typing, for a module's page: the pads a keyboard, top row first ('\b'
@@ -59,11 +54,33 @@ void MelodeeApp::audio_event(const move::SurfaceEvent& event) { own->audio_event
 
 Screen* MelodeeApp::tracks() const { return own->screen("tracks"); }
 
-bool MelodeeApp::trigger(move::Button button) {
+unsigned MelodeeApp::held_track() const {
+    for (unsigned row = 0; row < 4; ++row)
+        if (rows_down.test(row)) return ui::bank_of(own->track()) * ui::tracks_a_bank + row;
+    return own->track();
+}
+
+bindings::Where MelodeeApp::where() const {
+    using bindings::Screen;
+    using bindings::Track;
+    const auto& studio = *own;
+    bindings::Where at;
+    if (studio.typing) at.screen = Screen::Typing;
+    else if (auto* top = studio.top()) at.screen = top->screen_kind();
+    switch (studio.kind()) {
+    case TrackKind::Kit: at.track = Track::Kit; break;
+    case TrackKind::Synth: case TrackKind::Keys: case TrackKind::Midi: case TrackKind::Plugin: at.track = Track::Synth; break;
+    case TrackKind::Audio: at.track = Track::Audio; break;
+    default: at.track = Track::Any; break;
+    }
+    return at;
+}
+
+bool MelodeeApp::trigger(bindings::Job job) {
     auto& studio = *own;
     for (const auto& entry : registered_screens())
         for (const auto& when : entry.triggers) {
-            if (when.button != button || when.shift != studio.shift) continue;
+            if (when.job != job) continue;
             if (when.kinds && !(when.kinds & kind_bit(studio.kind()))) continue;
             studio.open(entry.id);
             return true;
@@ -78,116 +95,125 @@ void MelodeeApp::type(char c) {
     studio.typed += studio.shift ? char(std::toupper(static_cast<unsigned char>(c))) : c;
 }
 
+// The jobs that are the same on every screen.
+bool MelodeeApp::global(bindings::Job job, const bindings::Use& use) {
+    using bindings::Job;
+    auto& studio = *own;
+    unsigned bank = ui::bank_of(studio.track()) * ui::tracks_a_bank;
+    switch (job) {
+    // The track buttons: a tap selects, held the sixteen (drawn), a step picks.
+    case Job::SelectTrack: studio.select(bank + unsigned(use.index)); return true;
+    case Job::PeekTrack: return true;
+    case Job::PickTrack: case Job::CopyTrack: case Job::ClearTrack:
+        if (!holding()) return false; // the sixteen latched: the screen's
+        if (auto* sixteen = tracks()) sixteen->job(job, use);
+        return true;
+    case Job::TrackLevel: {
+        unsigned t = held_track();
+        studio.set_level(t, int(studio.project().tracks[t].mix.level) + use.delta);
+        volume_track = t;
+        volume_until = Clock::now() + volume_linger;
+        return true;
+    }
+    case Job::MuteSelected: studio.set_mute(studio.track(), !studio.current().mix.mute); return true;
+    case Job::MuteTrack: {
+        unsigned t = bank + unsigned(use.index);
+        studio.set_mute(t, !studio.project().tracks[t].mix.mute);
+        return true;
+    }
+    case Job::SoloTrack: {
+        unsigned t = bank + unsigned(use.index);
+        studio.set_solo(t, !studio.project().tracks[t].mix.solo);
+        return true;
+    }
+    case Job::TracksOverview: studio.open("tracks"); return true;
+    // Transport and volume.
+    case Job::PlayStop:
+        if (studio.playing()) studio.stop();
+        else studio.play();
+        return true;
+    case Job::Restart: // the Move's retrigger: every playing pattern from its top; stopped, nothing
+        if (studio.playing()) { studio.stop(); studio.play(); }
+        return true;
+    case Job::MainVolume: studio.volume = std::clamp(studio.volume.load() + use.delta * 0.01f, 0.0f, 1.0f); return true;
+    case Job::Metronome: studio.set_click(!studio.click(), studio.click_level()); return false; // and its screen opens
+    // Knobs: a touch or a turn shows the knob large; the turn is the screen's.
+    case Job::ShowKnob: touched = use.index; touched_until = Clock::time_point::max(); return true;
+    case Job::TurnKnob: case Job::TurnKnobFine:
+        if (touched != use.index || touched_until != Clock::time_point::max()) {
+            touched = use.index;
+            touched_until = Clock::now() + turn_linger;
+        }
+        return false;
+    case Job::BackToPlay: studio.home(); return true;
+    case Job::Quit: return true; // the runtime's (Shift + Back never arrives)
+    case Job::ShiftSteps: return true; // lights() shows them
+    case Job::ShiftLock: studio.say(gestures.shift_locked() ? "SHIFT LOCKED" : "SHIFT"); return true;
+    // Typing, for a module's page that asked: the pads and steps a keyboard.
+    case Job::TypeKey: type(key_for_pad(unsigned(use.index))); return true;
+    case Job::TypeDigit: type(step_keys[use.index]); return true;
+    case Job::TypeBackspace: type('\b'); return true;
+    case Job::TypeDone: studio.finish_typing(false); return true;
+    case Job::TypeCancel: studio.finish_typing(true); return true;
+    case Job::Uppercase: return true; // type() reads Shift
+    default: return false;
+    }
+}
+
+void MelodeeApp::act(const bindings::Use& use) {
+    auto& studio = *own;
+    const bindings::Binding* row = bindings::find(where(), use);
+    if (!row || row->job == bindings::Job::Nothing) return;
+    last_job = row->job;
+    if (global(row->job, use)) return;
+    Screen* top = studio.top();
+    if (top && top->job(row->job, use)) return;
+    // The track's Play screen under the one on top keeps what that one leaves.
+    if (auto* play = studio.screen(home_screen(studio.kind())); play && play != top && play->job(row->job, use)) return;
+    trigger(row->job);
+}
+
+void MelodeeApp::settle() {
+    auto& studio = *own;
+    studio.shift = (gestures.held() & bindings::held::shift) != 0;
+    studio.quiet_pads(!bindings::pad_sounds(where(), gestures.held(bindings::Control::Pad), 0));
+}
+
 void MelodeeApp::surface(const move::SurfaceEvent& event) {
     using Kind = move::Input::Kind;
-    using move::Button;
     const auto& input = event.input;
     std::lock_guard<std::mutex> guard(own->lock);
     auto& studio = *own;
-    studio.shift = session().shift.load();
-    if (studio.typing) { // a module's page asked for text: the pads and steps are a keyboard
-        if (input.kind == Kind::Pad && input.pressed && input.index < pad_count) type(key_for_pad(input.index));
-        else if (input.kind == Kind::Step && input.pressed && input.index < 16) type(step_keys[input.index]);
-        else if (input.kind == Kind::Button && input.pressed) {
-            auto button = Button(input.index);
-            if (button == Button::Delete) type('\b');
-            else if (button == Button::MainPush) studio.finish_typing(false);
-            else if (button == Button::Back || button == Button::Menu) studio.finish_typing(true);
-        }
-        return;
-    }
-    Screen* top = studio.top();
-    switch (input.kind) {
-    case Kind::Button: {
-        auto button = Button(input.index);
-        if (button == Button::Mute) { // with a track button: that track; alone: the selected one
-            if (input.pressed) { mute_down = true; mute_used = false; }
-            else {
-                if (mute_down && !mute_used) studio.set_mute(studio.track(), !studio.current().mix.mute);
-                mute_down = false;
-            }
-            return;
-        }
-        if (int row = track_button(button); row >= 0) {
-            unsigned t = ui::bank_of(studio.track()) * ui::tracks_a_bank + unsigned(row);
-            if (mute_down && input.pressed) { // Mute + track: mute it; Shift + Mute + track: solo it
-                mute_used = true;
-                const auto& mix = studio.project().tracks[t].mix;
-                if (studio.shift) studio.set_solo(t, !mix.solo);
-                else studio.set_mute(t, !mix.mute);
-                return;
-            }
+    auto now = Clock::now();
+    // What the app and the screens show of controls held.
+    if (input.kind == Kind::Button)
+        if (int row = track_button(move::Button(input.index)); row >= 0) {
             if (input.pressed) {
                 if (!holding()) {
-                    held_at = Clock::now();
+                    held_at = now;
                     if (auto* sixteen = tracks()) sixteen->enter();
                 }
                 rows_down.set(size_t(row));
-                studio.select(t);
             } else rows_down.reset(size_t(row));
-            return;
         }
-        // A track button held: Copy and Delete are the sixteen tracks' (with a step).
-        if (holding() && (button == Button::Copy || button == Button::Delete)) {
-            if (auto* sixteen = tracks()) sixteen->surface(input);
-            return;
-        }
-        if (button == Button::Play) {
-            // Shift + Play is the Move's retrigger: left for the bindings table (docs/MOVE_CONTROLS.md).
-            if (input.pressed && !studio.shift) {
-                if (studio.playing()) studio.stop();
-                else studio.play();
-            }
-            return;
-        }
-        if (top && top->surface(input)) return;
-        if (input.pressed) trigger(button);
-        return;
-    }
-    case Kind::Step:
-        if (holding()) { // the steps are the sixteen tracks
-            if (auto* sixteen = tracks()) sixteen->surface(input);
-            return;
-        }
-        if (studio.shift) { // the Move's settings
-            if (input.pressed)
-                for (const auto& setting : shift_steps)
-                    if (setting.step == input.index) {
-                        if (setting.step == 5) studio.set_click(!studio.click(), studio.click_level());
-                        studio.open(setting.screen);
-                    }
-            return;
-        }
-        break;
-    case Kind::MasterKnob:
-        if (holding()) { // a track button held: that track's volume, as on the Move
-            studio.set_level(studio.track(), int(studio.current().mix.level) + input.delta);
-            volume_until = Clock::now() + volume_linger;
-            return;
-        }
-        studio.volume = std::clamp(studio.volume.load() + input.delta * 0.01f, 0.0f, 1.0f);
-        return;
-    case Kind::Touch:
-        if (input.index >= move::knob_count) break;
-        if (input.pressed) { touched = input.index; touched_until = Clock::time_point::max(); }
-        else if (touched == int(input.index)) touched_until = Clock::now() + touch_linger;
-        return;
-    case Kind::Knob:
-        if (top) top->surface(input);
-        if (touched != int(input.index) || touched_until != Clock::time_point::max()) {
-            touched = input.index;
-            touched_until = Clock::now() + turn_linger;
-        }
-        return;
-    default: break;
-    }
-    if (top) top->surface(input);
+    if (input.kind == Kind::Touch && !input.pressed && touched == int(input.index) && input.index < move::knob_count)
+        touched_until = now + touch_linger;
+    for (auto* shown : std::vector<Screen*>(studio.stack)) shown->input(input);
+    if (holding())
+        if (auto* sixteen = tracks()) sixteen->input(input);
+    // Then the jobs.
+    studio.shift = (gestures.held() & bindings::held::shift) != 0;
+    for (const auto& use : gestures.feed(input, now)) act(use);
+    settle();
 }
 
-void MelodeeApp::lights(move::Lights& lights, Clock::time_point) {
+void MelodeeApp::lights(move::Lights& lights, Clock::time_point now) {
     using namespace move;
     std::lock_guard<std::mutex> guard(own->lock);
     auto& studio = *own;
+    // Holds that came due (a track button, Undo, Back held).
+    for (const auto& use : gestures.tick(now)) act(use);
+    settle();
     // The track buttons: the selected track's bank, each its colour, the selected one bright.
     // Soloed blue, as on the Move; muted grey.
     unsigned first = ui::bank_of(studio.track()) * ui::tracks_a_bank;
@@ -203,7 +229,7 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point) {
     }
     lights.button(Button::Mute, studio.current().mix.mute ? white_bright : white_dim);
     lights.button(Button::Play, studio.playing() ? colour::green : colour::dark_grey);
-    lights.button(Button::Shift, session().shift ? white_bright : white_dim);
+    lights.button(Button::Shift, studio.shift ? white_bright : white_dim);
     lights.button(Button::Delete, studio.typing ? white_dim : 0);
     lights.button(Button::Copy, 0);
     if (studio.typing) { // the keyboard
@@ -218,10 +244,17 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point) {
     if (auto* top = studio.top()) top->lights(lights);
     if (holding()) {
         if (auto* sixteen = tracks()) sixteen->lights(lights); // the steps as the tracks, over the screen's
-    } else if (session().shift) { // the steps that open a setting
-        for (unsigned step = 0; step < step_count; ++step) lights.step(step, colour::off);
-        for (const auto& setting : shift_steps)
-            lights.step(setting.step, setting.step == 5 && studio.click() ? colour::white : colour::light_grey);
+    } else if (studio.shift) { // the steps with a Shift job that works (docs/MOVE_CONTROLS.md); the metronome bright when on
+        auto at = where();
+        for (unsigned step = 0; step < step_count; ++step) {
+            bindings::Use use;
+            use.control = bindings::Control::Step;
+            use.index = int(step);
+            use.held = bindings::held::shift;
+            const auto* row = bindings::find(at, use);
+            bool works = row && row->status == bindings::Status::Done;
+            lights.step(step, !works ? colour::off : row->job == bindings::Job::Metronome && studio.click() ? colour::white : colour::light_grey);
+        }
     }
 }
 
@@ -252,9 +285,9 @@ void MelodeeApp::draw_touched(juce::Graphics& g) {
 
 void MelodeeApp::draw_volume(juce::Graphics& g) {
     auto& studio = *own;
-    int level = studio.current().mix.level;
-    ui::rail(g, "VOL", std::to_string(studio.track() + 1), "TRK");
-    ui::big_parameter(g, ui::content(4, 44), "TRACK " + std::to_string(studio.track() + 1) + " VOLUME", melodee::decibels(level) + " DB", level / 127.0f);
+    int level = studio.project().tracks[volume_track].mix.level;
+    ui::rail(g, "VOL", std::to_string(volume_track + 1), "TRK");
+    ui::big_parameter(g, ui::content(4, 44), "TRACK " + std::to_string(volume_track + 1) + " VOLUME", melodee::decibels(level) + " DB", level / 127.0f);
 }
 
 void MelodeeApp::draw_typing(juce::Graphics& g) {
@@ -265,7 +298,7 @@ void MelodeeApp::draw_typing(juce::Graphics& g) {
     if (line.size() > 21) line = line.substr(line.size() - 21);
     move::draw_text(g, 1, 24, line);
     move::draw_text(g, 1, 46, "PADS: LETTERS");
-    move::draw_text(g, 1, 56, "PUSH: OK  BACK: CANCEL");
+    move::draw_text(g, 1, 56, "PUSH: OK  BACK: DEL");
 }
 
 // ---------------------------------------------------------------- service thread, and the rest
@@ -274,7 +307,7 @@ void MelodeeApp::service() { own->service(); }
 
 std::string MelodeeApp::status() const {
     std::lock_guard<std::mutex> guard(own->lock);
-    return own->status();
+    return own->status() + " job=" + bindings::job_name(last_job);
 }
 
 unsigned MelodeeApp::slice_count() const {

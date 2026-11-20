@@ -34,10 +34,12 @@ SCRIPT='20:0x90,68,100;60:0x80,68,0;80:0xb0,14,2;90:0xb0,3,127;91:0xb0,3,0;1300:
 # The meter hears its click 300 frames of cable plus one block after it
 # left render(): the block a render waits for the next exchange.
 EXPECTED='loop_frames=428/428'
-# Melodee: Menu at 50, the jogwheel's push at 60 loads the loop onto A01; a
-# hit at 400; Loop at 500 chops it (Auto: 16 slices), slice 2 at 520; two
-# pushes at 600 and 620 put them on pads from A02; Shift + Back at 1300.
-MELODEE_SCRIPT='50:0xb0,50,127;60:0xb0,3,127;400:0x90,68,110;430:0x80,68,0;500:0xb0,58,127;520:0x90,69,100;540:0x80,69,0;600:0xb0,3,127;620:0xb0,3,127;1300:0xb0,49,127;1301:0xb0,51,127'
+# Melodee, with the Move's keys (docs/MOVE_CONTROLS.md): the wheel's push at
+# 50 opens Load for the pad, its push at 60 loads the loop onto A01; a hit at
+# 400; Shift + push at 500 opens Sample Options, its push at 510 Chop (Auto:
+# 16 slices), slice 2 at 520; two pushes at 600 and 620 put them on pads
+# from A02; Shift + Back at 1300.
+MELODEE_SCRIPT='50:0xb0,3,127;51:0xb0,3,0;60:0xb0,3,127;61:0xb0,3,0;400:0x90,68,110;430:0x80,68,0;500:0xb0,49,127;501:0xb0,3,127;502:0xb0,3,0;503:0xb0,49,0;510:0xb0,3,127;511:0xb0,3,0;520:0x90,69,100;540:0x80,69,0;600:0xb0,3,127;601:0xb0,3,0;620:0xb0,3,127;621:0xb0,3,0;1300:0xb0,49,127;1301:0xb0,51,127'
 MELODEE_EXPECTED='page=kit-play .*pad=A02 samples=1 pads=17 .*slices=16'
 # Saving: the run above quits within three seconds of its last change, so
 # it saves on the way out; the next start reads the project back (A01 and
@@ -51,10 +53,11 @@ RESTORE_EXPECTED='page=kit-play .*pad=A02 samples=1 pads=17 loading=0 saves=1 un
 # at 380. Still playing at the end.
 TRANSPORT_SCRIPT='100:0xb0,85,127;101:0xb0,85,0;300:0xb0,49,127;301:0x90,20,127;302:0x80,20,0;303:0xb0,49,0;320:0xb0,14,2;340:0xb0,3,127;341:0xb0,3,0;360:0xb0,49,127;361:0x90,21,127;362:0x80,21,0;363:0xb0,49,0;380:0xb0,51,127;381:0xb0,51,0'
 TRANSPORT_EXPECTED='page=kit-play .*playing=1 tick=[1-9][0-9]* tempo=122.0 click=1'
-# The synth track: Row 2, Menu, the jogwheel's push loads the one module in
+# The synth track: Track 2 tapped at 50, the wheel's push at 60 lists the
+# modules (none loaded yet), its push at 80 loads the one in
 # build/test-modules (the tests' stand-in), a pad plays it, knob 1 turns its
-# level up three, Up an octave. The next start has it back as it was.
-SYNTH_SCRIPT='50:0xb0,42,127;60:0xb0,50,127;80:0xb0,3,127;400:0x90,68,110;430:0x80,68,0;500:0xb0,71,3;520:0xb0,55,127'
+# level up three, Plus an octave. The next start has it back as it was.
+SYNTH_SCRIPT='50:0xb0,42,127;51:0xb0,42,0;60:0xb0,3,127;61:0xb0,3,0;80:0xb0,3,127;81:0xb0,3,0;400:0x90,68,110;430:0x80,68,0;500:0xb0,71,3;520:0xb0,55,127;521:0xb0,55,0'
 SYNTH_EXPECTED='kind=synth .*synth=fake octave=1'
 SYNTH_FLAGS='--backend simulated --samples build/simulated-samples --home build/simulated-synth --modules build/test-modules'
 # shellcheck disable=SC2086

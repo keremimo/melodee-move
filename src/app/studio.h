@@ -227,6 +227,9 @@ public:
     const std::string& home_folder() const { return home_path; }
     std::string library;
     std::string status() const;
+    // MIDI thread: whether a pad pressed now stays quiet, its job another
+    // than its sound (bindings::pad_sounds()); the audio thread reads it.
+    void quiet_pads(bool quiet) { pads_quiet.store(quiet, std::memory_order_relaxed); }
 
 private:
     void forward();                        // audio thread: the ring into the host
@@ -260,6 +263,10 @@ private:
     // go there too.
     std::atomic<int> audio_track {0}, audio_kind {0}, audio_octave {0};
     std::atomic<bool> pads_typing {false};
+    // The MIDI thread's word to the audio thread: a pad pressed now has
+    // another job than its sound (Shift, Copy, Delete, Mute or a step held;
+    // bindings::pad_sounds()), so it stays quiet.
+    std::atomic<bool> pads_quiet {false};
     struct Went { int track = -1, key = -1; };
     std::array<Went, pad_count> pad_went {};
     // Last, so it goes first: it holds the samples and runners above.

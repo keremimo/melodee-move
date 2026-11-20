@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #pragma once
+#include "app/bindings.h"
 #include "app/studio.h"
 #include "move/app.h"
 #include <juce_graphics/juce_graphics.h>
@@ -30,10 +31,20 @@ public:
 
     virtual void enter() {} // shown, over the Play screen or as it
     virtual void leave() {} // gone (closed, or the track changed)
-    // A control the app has not taken (the track buttons, Play, the
-    // master knob, Shift are the app's; a held track button takes the
-    // steps). False: not this screen's, so a Trigger may open another.
-    virtual bool surface(const move::Input& input) = 0;
+    // Where the controls are, as docs/MOVE_CONTROLS.md's map names its
+    // screens: a track's Play screen is Play, a list the wheel walks List,
+    // a browser Browser. It may change with what the screen shows (a
+    // module's menu is a List, its own page a Canvas).
+    virtual bindings::Screen screen_kind() const { return bindings::Screen::Play; }
+    // A job of the bindings table (src/app/bindings.h), the control's use
+    // and where it came from. The app takes the jobs that are the same
+    // everywhere (the track buttons, Play, the volume knob, typing); the
+    // rest come here, then to the track's Play screen under this one.
+    // False: not this screen's, so a Trigger may open another.
+    virtual bool job(bindings::Job job, const bindings::Use& use) = 0;
+    // Every input as it comes, before its jobs: for what a screen shows of
+    // controls held (pads down), never to act on.
+    virtual void input(const move::Input&) {}
     virtual void lights(move::Lights& lights) = 0;
     virtual void draw(juce::Graphics& g) = 0;
     // Knob n (0-7) as a touch shows it large; an empty name: not in use.
@@ -52,12 +63,12 @@ private:
     std::string own_id;
 };
 
-// When a screen opens from a button: the button (with Shift or not), on
-// tracks of `kinds` (a bit a TrackKind; 0: any), wherever the screen on top
-// does not use that button itself. It opens over the track's Play screen.
+// When a screen opens from a job of the bindings table (Shift + Step 5:
+// Job::Tempo), on tracks of `kinds` (a bit a TrackKind; 0: any), wherever
+// the screens do not take that job themselves. It opens over the track's
+// Play screen.
 struct Trigger {
-    move::Button button = move::Button::Count;
-    bool shift = false;
+    bindings::Job job = bindings::Job::Nothing;
     uint32_t kinds = 0;
 };
 constexpr uint32_t kind_bit(TrackKind kind) { return 1u << unsigned(kind); }
@@ -72,7 +83,7 @@ struct ScreenEntry {
 const std::vector<ScreenEntry>& registered_screens();
 
 // In a screen's own file:
-//   static RegisterScreen chop("chop", make<ChopScreen>, {{move::Button::Loop, false, kind_bit(TrackKind::Kit)}});
+//   static RegisterScreen tempo("tempo", make<Tempo>, {{bindings::Job::Tempo}});
 struct RegisterScreen {
     RegisterScreen(std::string id, ScreenFactory make, std::vector<Trigger> triggers = {}, uint32_t home_of = 0);
 };

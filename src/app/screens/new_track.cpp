@@ -26,14 +26,12 @@ public:
         if (studio.kind() != TrackKind::Empty) studio.close(); // only an empty track becomes something
     }
 
-    bool surface(const move::Input& input) override {
-        using Kind = move::Input::Kind;
-        using move::Button;
-        if (input.kind == Kind::MainKnob) { cursor = std::clamp(cursor + input.delta, 0, choice_count - 1); return true; }
-        if (input.kind == Kind::Pad || input.kind == Kind::Knob) return true;
-        if (input.kind != Kind::Button || !input.pressed) return false;
-        switch (Button(input.index)) {
-        case Button::MainPush: {
+    bindings::Screen screen_kind() const override { return bindings::Screen::List; }
+    bool job(bindings::Job job, const bindings::Use& use) override {
+        using bindings::Job;
+        switch (job) {
+        case Job::ListTurn: case Job::ListTurnFine: cursor = std::clamp(cursor + use.delta, 0, choice_count - 1); return true;
+        case Job::ListPush: {
             unsigned track = studio.track();
             auto kind = choices[cursor].kind;
             if (!studio.new_track(track, kind)) return true;
@@ -42,7 +40,8 @@ public:
             else if (kind == TrackKind::Kit) studio.open("load-samples");
             return true;
         }
-        case Button::Back: studio.close(); return true;
+        case Job::Back: studio.close(); return true;
+        case Job::TurnKnob: case Job::TurnKnobFine: case Job::PlayPad: case Job::PlayNote: return true;
         default: return false;
         }
     }

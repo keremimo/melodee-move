@@ -41,23 +41,18 @@ public:
 
     void enter() override { list_folder(); }
 
-    bool surface(const move::Input& input) override {
-        using Kind = move::Input::Kind;
-        using move::Button;
-        if (input.kind == Kind::MainKnob) {
-            cursor = std::clamp(cursor + input.delta, 0, std::max(0, int(entries.size()) - 1));
-            return true;
-        }
-        if (input.kind != Kind::Button) return input.kind == Kind::Knob;
-        if (!input.pressed) return false;
-        switch (Button(input.index)) {
-        case Button::Menu: studio.close(); return true;
-        case Button::Back:
+    bindings::Screen screen_kind() const override { return bindings::Screen::Browser; }
+    bool job(bindings::Job job, const bindings::Use& use) override {
+        using bindings::Job;
+        switch (job) {
+        case Job::BrowseTurn: cursor = std::clamp(cursor + use.delta, 0, std::max(0, int(entries.size()) - 1)); return true;
+        case Job::TurnKnob: case Job::TurnKnobFine: return true;
+        case Job::Back:
             if (place >= 0 && fs::path(folder) != fs::path(root)) { folder = fs::path(folder).parent_path().string(); cursor = 0; list_folder(); }
             else if (place >= 0 && places.size() > 1) { place = -1; cursor = 0; list_folder(); } // back to the places
             else studio.close();
             return true;
-        case Button::MainPush:
+        case Job::BrowsePush:
             if (place < 0) { open_place(cursor); return true; }
             if (cursor < int(entries.size())) {
                 const auto& entry = entries[size_t(cursor)];
@@ -66,7 +61,7 @@ public:
                 else { studio.jobs.push_back({path, studio.track(), studio.pad()}); studio.say("LOADING"); }
             }
             return true;
-        default: return false;
+        default: return false; // a pad: the kit's Play screen picks it, the one a sample loads onto
         }
     }
 
@@ -75,7 +70,7 @@ public:
         for (unsigned at = 0; at < pad_count; ++at) lights.pad(at, at == studio.pad() ? colour::white : studio.current().pads[at].used() ? ui::track_colour(studio.track()).dim : colour::off);
         steps_playhead(studio, lights);
         for (auto button : {Button::Left, Button::Right, Button::Up, Button::Down, Button::Loop}) lights.button(button, 0);
-        lights.button(Button::Menu, white_bright);
+        lights.button(Button::Menu, 0);
         lights.button(Button::Back, white_dim);
     }
 
@@ -131,7 +126,7 @@ private:
     int cursor = 0;
 };
 
-RegisterScreen registered("load-samples", make<LoadSamples>, {{move::Button::Menu, false, kind_bit(TrackKind::Kit)}});
+RegisterScreen registered("load-samples", make<LoadSamples>); // the wheel's push on a kit's pad (the Device View)
 
 } // namespace
 } // namespace app::screens

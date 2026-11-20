@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// A kit track's Play screen (docs/UI.md): the last pad's sample, its
+// A kit track's Play screen (docs/UI.md, docs/MOVE_CONTROLS.md): the Move's
+// Device View. Along the top the kit's items, KIT, the last pad, FX1, FX2;
+// the wheel walks them, its push opens the one it is on (the pad: Load
+// samples), Shift + push Sample Options (Chop). Under them the last pad's
 // waveform with start and end; knobs 1-8 tune, level, pan, start, end,
 // attack, decay, cutoff (Shift: finer); the pads play the kit and pick the
-// pad edited; Left / Right the pad before / after.
+// pad edited (Shift + a pad picks it quietly); a pad held + the Volume knob
+// its level.
 #include "app/screens/common.h"
 
 namespace app::screens {
@@ -14,22 +18,23 @@ class KitPlay final : public Screen {
 public:
     using Screen::Screen;
 
-    bool surface(const move::Input& input) override {
-        using Kind = move::Input::Kind;
-        using move::Button;
-        switch (input.kind) {
-        case Kind::Pad:
-            if (input.pressed) studio.select_pad(input.index);
+    bool job(bindings::Job job, const bindings::Use& use) override {
+        using bindings::Job;
+        switch (job) {
+        case Job::PlayPad: case Job::SelectPadQuietly: studio.select_pad(unsigned(use.index)); return true;
+        case Job::TurnKnob: turn(unsigned(use.index), use.delta, false); return true;
+        case Job::TurnKnobFine: turn(unsigned(use.index), use.delta, true); return true;
+        case Job::PadLevel: turn(1, use.delta, false); return true;
+        case Job::Focus: focus = std::clamp(focus + (use.delta > 0 ? 1 : -1), 0, 3); return true;
+        case Job::ShowFocus: studio.say(item(focus)); return true;
+        case Job::OpenBrowser:
+            if (focus == 1) studio.open("load-samples");
+            else studio.say(focus == 0 ? "KITS: NOT YET" : "EFFECTS: NOT YET");
             return true;
-        case Kind::Knob: turn(input.index, input.delta, studio.shift); return true;
-        case Kind::Button:
-            if (!input.pressed) return false;
-            if (Button(input.index) == Button::Left || Button(input.index) == Button::Right) {
-                int way = Button(input.index) == Button::Left ? -1 : 1;
-                studio.select_pad(unsigned(std::clamp(int(studio.pad()) + way, 0, int(pad_count) - 1)));
-                return true;
-            }
-            return false;
+        case Job::SampleOptions:
+            if (studio.sample_of_pad()) studio.open("sample-options");
+            else studio.say("EMPTY PAD");
+            return true;
         default: return false;
         }
     }
@@ -41,30 +46,28 @@ public:
         for (unsigned at = 0; at < pad_count; ++at)
             lights.pad(at, track.pads[at].used() ? (at == studio.pad() ? colour::white : colour) : at == studio.pad() ? colour::dark_grey : colour::off);
         steps_playhead(studio, lights);
-        lights.button(Button::Left, white_dim);
-        lights.button(Button::Right, white_dim);
-        lights.button(Button::Up, 0);
-        lights.button(Button::Down, 0);
-        lights.button(Button::Loop, studio.sample_of_pad() ? white_dim : 0);
-        lights.button(Button::Menu, white_dim);
-        lights.button(Button::Back, 0);
+        // Left / Right (bars), Plus / Minus (pad banks), Loop (Loop Mode) and
+        // Note/Session (Patterns) wait for wave 2.
+        for (auto button : {Button::Left, Button::Right, Button::Up, Button::Down, Button::Loop, Button::Menu, Button::Back})
+            lights.button(button, 0);
     }
 
     void draw(juce::Graphics& g) override {
         ui::rail(g, "KIT", track_number(studio), pad_label(studio.pad()));
+        items(g, {item(0), item(1), item(2), item(3)}, focus);
         const Sample* sample = studio.sample_of_pad();
         if (!sample) {
-            move::draw_text_centred(g, ui::content_x, 18, ui::content_width, "EMPTY PAD", 2);
-            ui::detail(g, "MENU: LOAD", bar_beat(studio));
+            move::draw_text_centred(g, ui::content_x, 22, ui::content_width, "EMPTY", 2);
+            ui::detail(g, focus == 1 ? "PUSH: LOAD" : "", bar_beat(studio));
             return;
         }
-        auto area = ui::content(0, ui::subject_height);
+        auto area = ui::content(ui::header_height + 1, ui::subject_height - ui::header_height - 1);
         ui::waveform(g, area, peaks_of(sample->overview));
         uint32_t frames = std::max<uint32_t>(1, sample->data->model_frames());
         const auto& sound = studio.current().pads[studio.pad()];
         int start = int(int64_t(sound.start) * area.getWidth() / frames), end = int(int64_t(sound.end ? sound.end : frames) * area.getWidth() / frames);
-        g.fillRect(area.getX() + std::min(start, area.getWidth() - 1), 0, 1, area.getHeight());
-        g.fillRect(area.getX() + std::min(end, area.getWidth() - 1), 0, 1, area.getHeight());
+        g.fillRect(area.getX() + std::min(start, area.getWidth() - 1), area.getY(), 1, area.getHeight());
+        g.fillRect(area.getX() + std::min(end, area.getWidth() - 1), area.getY(), 1, area.getHeight());
         auto name = upper(sample->name.substr(0, sample->name.rfind('.'))).substr(0, 10);
         auto where = bar_beat(studio);
         ui::detail(g, name, where.empty() ? seconds(frames).substr(0, 5) : where);
@@ -99,6 +102,14 @@ public:
     std::string knob_owner() const override { return pad_label(studio.pad()); }
 
 private:
+    int focus = 1; // the Device View's item the wheel is on: 0 the kit, 1 the pad, 2-3 the effects
+    std::string item(int which) const {
+        switch (which) {
+        case 0: return "KIT";
+        case 1: return pad_label(studio.pad());
+        default: return "FX" + std::to_string(which - 1);
+        }
+    }
     void turn(unsigned which, int delta, bool fine) {
         const Sample* sample = studio.sample_of_pad();
         if (!sample) return;

@@ -82,7 +82,7 @@ void test_doc_and_table(const std::string& doc) {
 // Every row answers its own use somewhere it applies, with its job.
 void test_every_row_answers() {
     const Screen real[] {Screen::Play, Screen::Loop, Screen::Session, Screen::Overview, Screen::Browser, Screen::List,
-                         Screen::Chop, Screen::ToPads, Screen::Sampling, Screen::Typing, Screen::Canvas};
+                         Screen::Chop, Screen::ToPads, Screen::Sampling, Screen::Typing, Screen::Canvas, Screen::Tracks};
     for (const auto& row : table()) {
         std::vector<Screen> screens;
         if (row.screen == Screen::Any || row.screen == Screen::Everywhere) {
@@ -230,6 +230,9 @@ void test_pads_sound() {
     CHECK(pad_sounds({Screen::Browser, Track::Kit}, held::none, 5));
     CHECK(pad_sounds({Screen::List, Track::Synth}, held::none, 5));
     CHECK(pad_sounds({Screen::Play, Track::Pitches}, held::none, 7));
+    CHECK(pad_sounds(synth, held::shift, 0));      // no job for Shift + a note: it plays
+    CHECK(pad_sounds(kit, held::track, 0));        // a track button held: the pads still play
+    CHECK(pad_sounds({Screen::Play, Track::Any}, held::none, 0)); // an empty track: nothing stops it
     for (uint16_t bits : {held::shift, held::copy, held::del, held::mute, held::step})
         CHECK_SAID(!pad_sounds(kit, bits, 0), "a pad sounds with " << bits << " held");
     CHECK(!pad_sounds({Screen::Typing, Track::Kit}, held::none, 0));

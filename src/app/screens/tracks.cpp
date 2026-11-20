@@ -18,25 +18,29 @@ public:
 
     void enter() override { copy_down = delete_down = false; copy_from = -1; }
 
-    bool surface(const move::Input& input) override {
-        using Kind = move::Input::Kind;
-        using move::Button;
-        if (input.kind == Kind::Button) {
-            auto button = Button(input.index);
-            if (button == Button::Copy) { copy_down = input.pressed; if (!input.pressed) copy_from = -1; return true; }
-            if (button == Button::Delete) { delete_down = input.pressed; return true; }
-            return false;
-        }
-        if (input.kind != Kind::Step || !input.pressed || input.index >= melodee::track_count) return input.kind == Kind::Step;
-        unsigned t = input.index;
+    // Latched by Shift + Note/Session it is a screen of its own; held under a
+    // track button the app hands it the steps.
+    bindings::Screen screen_kind() const override { return bindings::Screen::Tracks; }
+    void input(const move::Input& input) override {
+        if (input.kind != move::Input::Kind::Button) return;
+        auto button = move::Button(input.index);
+        if (button == move::Button::Copy) { copy_down = input.pressed; if (!input.pressed) copy_from = -1; }
+        if (button == move::Button::Delete) delete_down = input.pressed;
+    }
+    bool job(bindings::Job job, const bindings::Use& use) override {
+        using bindings::Job;
+        if (job == Job::Back) { studio.close(); return true; }
+        if (job != Job::PickTrack && job != Job::CopyTrack && job != Job::ClearTrack) return false;
+        if (use.index < 0 || unsigned(use.index) >= melodee::track_count) return true;
+        unsigned t = unsigned(use.index);
         bool used = studio.kind(t) != TrackKind::Empty;
-        if (delete_down) {
+        if (job == Job::ClearTrack) {
             if (!used) return true;
             pending_from = pending_to = int(t);
             studio.open("delete-track");
             return true;
         }
-        if (copy_down) {
+        if (job == Job::CopyTrack) {
             if (copy_from < 0) { if (used) copy_from = int(t); return true; }
             if (int(t) == copy_from) return true;
             pending_from = copy_from;
@@ -116,20 +120,20 @@ class Confirm : public Screen {
 public:
     Confirm(Studio& studio, bool deleting) : Screen(studio), deleting(deleting) {}
 
-    bool surface(const move::Input& input) override {
-        using Kind = move::Input::Kind;
-        using move::Button;
-        if (input.kind == Kind::Pad || input.kind == Kind::Knob || input.kind == Kind::MainKnob) return true;
-        if (input.kind != Kind::Button || !input.pressed) return false;
-        auto button = Button(input.index);
-        if (button == Button::MainPush) {
+    bindings::Screen screen_kind() const override { return bindings::Screen::List; }
+    bool job(bindings::Job job, const bindings::Use&) override {
+        using bindings::Job;
+        switch (job) {
+        case Job::ListPush:
             studio.close();
             if (deleting) tracks_of(studio).erase();
             else tracks_of(studio).copy();
             return true;
+        case Job::Back: studio.close(); return true;
+        case Job::ListTurn: case Job::ListTurnFine: case Job::TurnKnob: case Job::TurnKnobFine:
+        case Job::PlayPad: case Job::PlayNote: return true;
+        default: return false;
         }
-        if (button == Button::Back) { studio.close(); return true; }
-        return false;
     }
 
     void lights(move::Lights& lights) override {

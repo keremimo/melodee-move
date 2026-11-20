@@ -40,6 +40,7 @@ enum class Screen : uint8_t {
     Sampling,
     Typing,
     Canvas,     // a module's own page, entered
+    Tracks,     // the sixteen tracks, latched (Shift + Note/Session)
     Count
 };
 
@@ -147,7 +148,8 @@ Screen under(Screen screen);
 // within each, the track's own rows before Any track's (Pitches before Kit).
 const Binding* find(const Where& where, const Use& use);
 Job resolve(const Where& where, const Use& use);
-// Whether a pad pressed now plays its sound (the audio thread's flag).
+// Whether a pad pressed now plays its sound (the audio thread's flag):
+// false only where a row gives the pad another job.
 bool pad_sounds(const Where& where, uint16_t held, unsigned pad);
 bool plays(Job job);
 

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #pragma once
+#include "app/bindings.h"
 #include "app/studio.h"
 #include "move/app.h"
 #include <bitset>
@@ -59,16 +60,27 @@ private:
     void type(char c);
     void draw_typing(juce::Graphics& g);
     void draw_touched(juce::Graphics& g);
-    bool trigger(move::Button button); // a screen that opens from this button, opened
+    // The controls through the bindings table (src/app/bindings.h,
+    // docs/MOVE_CONTROLS.md): each use of a control is a job, done by the
+    // app (global), the screen on top, the track's Play screen under it, or
+    // a screen that opens from it (trigger). Under `lock`.
+    void act(const bindings::Use& use);
+    bool global(bindings::Job job, const bindings::Use& use);
+    bool trigger(bindings::Job job); // a screen that opens from this job, opened
+    bindings::Where where() const;
+    void settle();                   // Shift and the pads' flag, after any input or hold
     bool holding() const { return rows_down.any(); } // a track button is down
+    unsigned held_track() const;     // the first track button down, as a track
     void draw_volume(juce::Graphics& g);
     Screen* tracks() const;            // the sixteen tracks, while a track button is held
 
     std::unique_ptr<Studio> own;
+    bindings::Gestures gestures;
     std::bitset<4> rows_down;           // the track buttons held
     Clock::time_point held_at {};       // since when
-    bool mute_down = false, mute_used = false; // Mute held, and used with a track button
+    unsigned volume_track = 0;          // whose volume is shown
     Clock::time_point volume_until {};  // a track's volume shown, for a moment
+    bindings::Job last_job = bindings::Job::Nothing; // for the status line
     int touched = -1; // a touched knob, for a moment
     Clock::time_point touched_until {};
 };
