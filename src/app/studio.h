@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #pragma once
 #include "app/canvas_page.h"
+#include "app/fx_host.h"
+#include "app/mixing.h"
 #include "app/module_host.h"
 #include "app/project_store.h"
 #include "move/app.h"
@@ -232,6 +234,23 @@ public:
     // than its sound (bindings::pad_sounds()); the audio thread reads it.
     void quiet_pads(bool quiet) { pads_quiet.store(quiet, std::memory_order_relaxed); }
 
+    // ---------------------------------------------------------- the mix and effects, under `lock`
+    // What the mix keeps beside the project (mixing.h: the effect copied,
+    // the pads as punches or Flex Beat's), and Schwung's audio effects in
+    // the chains (fx_host.h), each on an entry of the project's plug-ins.
+    mixing::Desk desk;
+    std::vector<ModuleInfo> fx_catalog; // modules/audio_fx
+    void rescan_fx();
+    // Schwung's effect `id` into slot `at` of chain `chain` (past the last
+    // used one: the next free), loaded on the service thread; it passes the
+    // sound through until then. False: no room, or no such effect.
+    bool load_fx(unsigned chain, unsigned at, const std::string& id);
+    // A copy of entry `entry`'s effect, its own instance set as it is.
+    bool copy_fx(uint8_t entry, unsigned chain, unsigned at);
+    void fx_released(uint8_t entry); // its slot let it go: handed back, then destroyed
+    FxModule* fx_module(uint8_t entry);
+    void fx_set(FxModule& fx, const std::string& key, const std::string& value);
+
 private:
     void forward();                        // audio thread: the ring into the host
     void apply_track(unsigned track);      // the engine's track made whole again from the project's (TrackLoad)
@@ -241,6 +260,13 @@ private:
     void take_back();                      // what the audio thread handed back, freed
     void take_answers();
     void destroy_retired();
+    void setup_fx(const PluginStates& states); // the project's Schwung effects, to load
+    void service_fx();                          // the service thread: each one asked for, loaded and offered
+    std::unique_ptr<FxModule> take_back_fx(melodee::PluginRunner* runner); // the effect whose runner it is, if it was let go
+    void fx_states(PluginStates& states) const;
+    uint8_t reserve_fx_entry(const ModuleInfo& info);
+    void release_chain_fx(const melodee::Chain& chain); // its Schwung effects let go (a track deleted)
+    void copy_chain_fx(melodee::Chain& chain);          // each its own instance (a track copied)
     std::string write(std::vector<uint8_t> bytes, std::string settings_text);
     std::vector<uint8_t> project_bytes() const;
     std::string settings_text() const;
@@ -270,6 +296,11 @@ private:
     std::atomic<bool> pads_quiet {false};
     struct Went { int track = -1, key = -1; };
     std::array<Went, pad_count> pad_went {};
+    // Schwung's effects by plug-in entry, and those handed back by the
+    // audio thread waiting to be destroyed. Before `engine`, which holds
+    // their runners and goes first.
+    std::array<std::unique_ptr<FxModule>, melodee::max_plugins> fx {};
+    std::vector<std::unique_ptr<FxModule>> fx_leaving;
     // Last, so it goes first: it holds the samples and runners above.
     std::unique_ptr<melodee::EngineHost> engine;
 };

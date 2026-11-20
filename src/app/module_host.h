@@ -29,8 +29,9 @@ struct ModuleInfo {
     std::string manifest;                   // module.json, as text
 };
 // The sound generators under `modules_root` (its sound_generators folder),
-// by name.
-std::vector<ModuleInfo> scan_modules(const std::string& modules_root);
+// by name; or, with `folder` "audio_fx", its audio effects, each library
+// where Schwung's Signal Chain looks for it: <id>/<id>.so.
+std::vector<ModuleInfo> scan_modules(const std::string& modules_root, const std::string& folder = "sound_generators");
 
 struct ModuleParam {
     std::string key, name, short_name;
@@ -85,6 +86,9 @@ public:
     // Opens, creates and reads the module: the service thread, never the
     // audio thread. Null with `error` set when it cannot.
     static std::unique_ptr<LoadedModule> load(const ModuleInfo& info, std::string& error);
+    // An audio effect (Schwung's audio_fx v2 API), opened as Signal Chain
+    // opens one: the service thread too.
+    static std::unique_ptr<LoadedModule> load_audio_fx(const ModuleInfo& info, std::string& error);
     ~LoadedModule(); // destroys the instance: never on the audio thread
 
     // Before the module is live only (the service thread that loaded it).
@@ -109,8 +113,9 @@ public:
     int preset = 0, preset_count = 0;
     std::string preset_name;
 
-    // The audio thread's.
+    // The audio thread's. An audio effect has `fx_api` instead of `api`.
     plugin_api_v2_t* api = nullptr;
+    audio_fx_api_v2_t* fx_api = nullptr;
     void* instance = nullptr;
 
 private:
