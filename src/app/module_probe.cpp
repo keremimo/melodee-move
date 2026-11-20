@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "app/module_probe.h"
+#include "app/canvas_page.h"
 #include "app/module_host.h"
+#include <map>
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
@@ -9,7 +11,51 @@
 
 namespace app {
 
-int probe_modules(const std::string& root) {
+namespace {
+
+bool save_screen(const juce::Image& image, const std::string& path) {
+    juce::Image large = image.rescaled(image.getWidth() * 4, image.getHeight() * 4, juce::Graphics::lowResamplingQuality);
+    juce::File file(path);
+    file.deleteFile();
+    juce::FileOutputStream out(file);
+    return out.openedOk() && juce::PNGImageFormat().writeImageToStream(large, out);
+}
+
+// The module's own pages, as Melodee would show them, with no audio thread:
+// their reads and sets go to the module directly.
+void probe_pages(LoadedModule& module, const std::string& pictures) {
+    for (const auto& canvas : module.canvases) {
+        CanvasPage::Host host;
+        host.get = [&](const std::string& key) { return module.get_now(key); };
+        host.set = [&](const std::string& key, const std::string& value) { module.set_now(key, value); };
+        host.text_entry = [&](const std::string& title, const std::string&) { std::printf("    page asks for text: %s\n", title.c_str()); };
+        host.open_file = [&](const std::string& path) { std::printf("    page hands over %s\n", path.c_str()); };
+        std::string error;
+        auto page = CanvasPage::load(canvas.script, host, error);
+        if (!page) { std::printf("    page %s FAILED: %s\n", canvas.key.c_str(), error.c_str()); continue; }
+        auto draw = [&](const char* moment) {
+            std::map<std::string, std::string> values;
+            for (const auto& key : canvas.extra_keys) values[key] = module.get_now(key);
+            juce::Image screen(juce::Image::ARGB, CanvasPage::width, CanvasPage::height, true);
+            {
+                juce::Graphics g(screen);
+                page->draw(g, values);
+            }
+            auto path = pictures + "/" + module.info().id + "-" + canvas.key + "-" + moment + ".png";
+            if (save_screen(screen, path)) std::printf("    page %s: %s\n", canvas.key.c_str(), path.c_str());
+        };
+        draw("first");
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+        draw("later");
+        page->midi(0xb0, 14, 1); // entered: the first gesture proves it
+        page->midi(0xb0, 14, 1);
+        draw("entered");
+    }
+}
+
+} // namespace
+
+int probe_modules(const std::string& root, const std::string& pictures) {
     using Clock = std::chrono::steady_clock;
     auto found = scan_modules(root);
     std::printf("%zu sound generators in %s\n", found.size(), root.c_str());
@@ -28,6 +74,7 @@ int probe_modules(const std::string& root) {
         std::printf("loaded in %.0f ms; %zu params, %zu pages, %u knobs", load_ms, module->params.size(), module->pages.size(), knobs);
         if (!module->preset_param.empty()) std::printf(", %d presets (%s)", module->preset_count, module->preset_name.c_str());
         std::printf("\n");
+        if (!pictures.empty()) probe_pages(*module, pictures);
         for (size_t n = 0; n < module->pages.size() && n < 3; ++n) {
             std::printf("    %-12s", module->pages[n].name.c_str());
             for (const auto& key : module->pages[n].knobs) {

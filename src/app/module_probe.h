@@ -9,6 +9,9 @@
 // or stayed silent.
 namespace app {
 
-int probe_modules(const std::string& root);
+// With `pictures`, each module's own pages (canvas scripts) are started too
+// and drawn there as PNGs, four times size: first, two seconds later (a page
+// that fetches in the background), and entered with a turn of the jogwheel.
+int probe_modules(const std::string& root, const std::string& pictures = {});
 
 } // namespace app

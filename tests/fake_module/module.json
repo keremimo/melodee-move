@@ -50,6 +50,27 @@
         "key": "sample",
         "name": "Sample",
         "type": "filepath"
+      },
+      {
+        "key": "go",
+        "name": "Go",
+        "type": "enum",
+        "options": [
+          "idle",
+          "trigger"
+        ],
+        "default": "idle"
+      },
+      {
+        "key": "browse",
+        "name": "Browse",
+        "type": "canvas",
+        "canvas_script": "page.js",
+        "as_page": true,
+        "enterable": true,
+        "extra_keys": [
+          "level"
+        ]
       }
     ],
     "ui_hierarchy": {

@@ -44,6 +44,18 @@ Three parts so far:
   lays it out: turn to a row; push a value to edit it with the jogwheel,
   push a level to open it (the knobs follow to its page), or a list (a bank,
   a soundfont, a table) to choose from; Back goes up, then closes the menu.
+- **A module's own pages** (Radio Garden's station browser, Webstream's
+  search): the scripts Schwung runs for them (`browser.js`), run here in
+  QuickJS, the engine Schwung uses, drawn in Schwung's own font
+  (`/data/UserData/schwung/host/font.png`). Such a page is one of the
+  module's pages (Left / Right), or a row at the end of its menu. Push to
+  enter it: the jogwheel and its push are then the page's, Back goes up a
+  level and finally out. When a page asks for text the pads are a keyboard
+  (letters top-left to bottom-right, space, `-.'&`, backspace on the last
+  pad; Delete too), the steps `1234567890()/:,!`, Shift for capitals; push
+  is done, Back cancels. A file the page hands over (Webstream's download)
+  goes onto the first empty kit pad, to play and chop. An action such as
+  play/pause or stop is a button: push its menu row, or turn its knob up.
 - The master knob is the volume; Shift + Back goes back to Move.
 - **Saving**: the kit is a Melodee project, `/data/UserData/Melodee/Projects/Move.mldp`
   (`--home` moves the folder), saved three seconds after the last change, as
@@ -83,9 +95,10 @@ for what a host outside Schwung must provide (`src/app/module_host.*`):
   (`slow synth call: surge set preset=12 took 24.1 ms`) and counted in the
   status line (`slow_calls`, `slowest_ms`).
 
-`melodee-move --probe-modules /data/UserData/schwung/modules` loads each one
-beside Ableton's app (the device is not touched), lists its pages, plays a
-chord and times the renders.
+`melodee-move --probe-modules /data/UserData/schwung/modules [PICTURES]`
+loads each one beside Ableton's app (the device is not touched), lists its
+pages, plays a chord and times the renders; with PICTURES it also starts
+each module's own pages and draws them there as PNGs.
 
 Melodee's engine and model are compiled from a melodee-sample checkout
 beside this one (`../melodee-sample`, or `MELODEE_SAMPLE`), unchanged.
@@ -139,7 +152,7 @@ the tap's click and the sound in the waveform is what you hear.
 | --- | --- |
 | `src/move/` | move-base. `app.h` the `App` interface (sample-base's hooks plus `audio_event`); `runtime.*` the threads; `host.*` what a host shares with them; `spi_host.cpp`, `spi_device.*`, `spi_protocol.*` the Move's device and a simulated one; `jack_host.cpp` the JACK host (libjack loaded at run time); `audio.h` blocks and the reblocker; `controls.*`, `lights.*`, `display.*`, `font.*`, `latency.h`, `tools.*` |
 | `src/ui/` | the interface kit for the Rail design (docs/UI.md), and its mockups (`--ui-mockups DIR`) |
-| `src/app/` | Melodee on the Move: `melodee_app.*` the app, `kit_player.*` Melodee's SamplerEngine on the audio thread, `project_store.*` saving, `schwung_api.h` and `module_host.*` Schwung's modules, `module_probe.*` trying them, `previews.*` its screens offline |
+| `src/app/` | Melodee on the Move: `melodee_app.*` the app, `kit_player.*` Melodee's SamplerEngine on the audio thread, `project_store.*` saving, `schwung_api.h` and `module_host.*` Schwung's modules, `canvas_page.*` their own pages' scripts in QuickJS, `module_probe.*` trying them, `previews.*` its screens offline |
 | `src/spike/` | the spike app |
 | `module/` | the Schwung standalone tool: `module.json`, `standalone` |
 | `tests/` | unit tests, the device host against the simulated Move, and `fake_module/`, a stand-in Schwung module |
@@ -259,7 +272,13 @@ On a Move (Ableton's firmware 4.1, Schwung installed):
   realtime and sharing the CPU with Ableton's app. Linein (the older v1
   API) is not loaded yet.
 
-Not yet tested on a Move: the synth track played from the pads.
+- The synth track played from the pads, the modules' menus and presets,
+  by hand: 15 minutes with webstream and others, 10 late exchanges in
+  310,000; one call into a module over 1 ms (a webstream render, 1.4 ms).
+- `--probe-modules` with pictures: Radio Garden's and Webstream's own pages
+  start and draw in QuickJS, in Schwung's font, and follow the jogwheel.
+
+Not yet tested on a Move: typing into a page, a download onto a kit pad.
 
 ## What the crush shows
 

@@ -78,6 +78,12 @@ bool natural(int note) {
     int in_octave = note % 12;
     return in_octave != 1 && in_octave != 3 && in_octave != 6 && in_octave != 8 && in_octave != 10;
 }
+// Typing, for a module's page: the pads a keyboard, top row first ('\b'
+// backspace), the steps digits and marks.
+constexpr const char* keyboard_rows[4] {"abcdefgh", "ijklmnop", "qrstuvwx", "yz -.'&\b"};
+constexpr const char* step_keys = "1234567890()/:,!";
+char key_for_pad(unsigned pad) { return keyboard_rows[3 - pad / 8][pad % 8]; }
+
 // What a cell has room for: a module's short name, or its name.
 std::string cell_name(const ModuleParam& param) { return upper(param.short_name.empty() ? param.name : param.short_name); }
 
@@ -137,6 +143,7 @@ void MelodeeApp::audio_event(const move::SurfaceEvent& event) {
     int& went = pad_went[input.index];
     if (input.kind == Kind::Pad) {
         if (input.pressed) {
+            if (pads_typing.load(std::memory_order_relaxed)) { went = -1; return; } // a letter, not a note
             if (audio_track.load(std::memory_order_relaxed) == int(Track::Synth)) {
                 went = note_for(input.index, audio_octave.load(std::memory_order_relaxed));
                 synth.note_on(went, input.value);
@@ -428,6 +435,8 @@ void MelodeeApp::set_track(Track to) {
     touched = -1;
     held.fill(false);
     menu_open = false;
+    canvas_open = -1;
+    canvas_entered = false;
     if (track == to) return;
     message_until = {}; // the other track's news
     track = to;
@@ -452,6 +461,10 @@ void MelodeeApp::turn_synth_knob(unsigned which, int delta, bool fine) {
     if (keys[which] == module->preset_param) { preset_by(delta); return; }
     ModuleParam* param = module->param(keys[which]);
     if (!param || !delta) return;
+    if (param->trigger()) { // an action: a turn up does it
+        if (delta > 0) synth_set(param->key, "trigger");
+        return;
+    }
     param->turn(delta, fine);
     synth_set(param->key, param->text());
     changed();
@@ -460,6 +473,7 @@ void MelodeeApp::turn_synth_knob(unsigned which, int delta, bool fine) {
 void MelodeeApp::synth_page_by(int way) {
     if (!module || module->pages.empty()) return;
     synth_page = unsigned(std::clamp(int(synth_page) + way, 0, int(module->pages.size()) - 1));
+    canvas_entered = false;
     refresh_synth();
 }
 
@@ -559,6 +573,8 @@ std::vector<MelodeeApp::MenuRow> MelodeeApp::menu_rows() const {
             if (page.level == module->level_index(at->id))
                 for (const auto& key : page.knobs)
                     if (const ModuleParam* param = module->param(key)) rows.push_back({Kind::Param, key, param->label.empty() ? param->name : param->label});
+    if (at->id == "root") // the module's own pages, last
+        for (size_t n = 0; n < module->canvases.size(); ++n) rows.push_back({Kind::Canvas, module->canvases[n].key, module->canvases[n].name, int(n)});
     return rows;
 }
 
@@ -581,7 +597,8 @@ std::string MelodeeApp::menu_text(const MenuRow& row, bool editing) const {
         const ModuleParam* param = module->param(row.key);
         return fit(upper(row.label), param ? upper(param->shown()) : "?");
     }
-    case Kind::Level: return upper(row.label).substr(0, width - 2) + " >";
+    case Kind::Level:
+    case Kind::Canvas: return upper(row.label).substr(0, width - 2) + " >";
     case Kind::Item: {
         const ModuleParam* chosen = module->param(row.key);
         bool current = chosen && std::lround(chosen->value) == row.index;
@@ -644,8 +661,20 @@ void MelodeeApp::menu_push() {
     menu_cursor = std::clamp(menu_cursor, 0, int(rows.size()) - 1);
     const auto row = rows[size_t(menu_cursor)];
     switch (row.kind) {
-    case MenuRow::Kind::Preset:
-    case MenuRow::Kind::Param: menu_editing = !menu_editing; break;
+    case MenuRow::Kind::Preset: menu_editing = !menu_editing; break;
+    case MenuRow::Kind::Param:
+        if (const ModuleParam* param = module->param(row.key); param && param->trigger()) synth_set(row.key, "trigger"); // an action
+        else menu_editing = !menu_editing;
+        break;
+    case MenuRow::Kind::Canvas: {
+        if (module->canvases[size_t(row.index)].as_page) { // to its page, entered
+            for (size_t n = 0; n < module->pages.size(); ++n)
+                if (module->pages[n].canvas == row.index) synth_page = unsigned(n);
+            menu_open = false;
+        } else canvas_open = row.index; // over the menu, until it is left
+        canvas_entered = true;
+        break;
+    }
     case MenuRow::Kind::Level: enter_level(row.key); break;
     case MenuRow::Kind::Item: {
         if (ModuleParam* chosen = module->param(row.key)) chosen->value = row.index;
@@ -707,7 +736,7 @@ SynthFile MelodeeApp::synth_snapshot() const {
     file.module = module->info().id;
     file.preset = module->preset_param.empty() ? -1 : module->preset;
     for (const auto& param : module->params)
-        if (param.key != module->preset_param) file.values.emplace_back(param.key, param.text());
+        if (param.key != module->preset_param && !param.trigger()) file.values.emplace_back(param.key, param.text());
     return file;
 }
 
@@ -719,6 +748,17 @@ void MelodeeApp::surface(const move::SurfaceEvent& event) {
     const auto& input = event.input;
     std::lock_guard<std::mutex> guard(lock);
     bool fine = session().shift.load();
+    if (typing) { // a module's page asked for text: the pads and steps are a keyboard
+        if (input.kind == Kind::Pad && input.pressed && input.index < pad_count) type(key_for_pad(input.index));
+        else if (input.kind == Kind::Step && input.pressed && input.index < 16) type(step_keys[input.index]);
+        else if (input.kind == Kind::Button && input.pressed) {
+            auto button = Button(input.index);
+            if (button == Button::Delete) type('\b');
+            else if (button == Button::MainPush) finish_typing(false);
+            else if (button == Button::Back || button == Button::Menu) finish_typing(true);
+        }
+        return;
+    }
     switch (input.kind) {
     case Kind::Pad:
         if (track == Track::Synth) { if (input.index < pad_count) held[input.index] = input.pressed; break; }
@@ -734,7 +774,16 @@ void MelodeeApp::surface(const move::SurfaceEvent& event) {
             break;
         }
         if (track == Track::Synth) {
-            if (button == Button::Back && page == Page::Play && menu_open) {
+            if (int shown = shown_canvas(); shown >= 0 && (button == Button::MainPush || button == Button::Back)) {
+                CanvasPage* canvas = canvas_pages[size_t(shown)].get();
+                if (button == Button::MainPush) {
+                    if (!canvas_entered) canvas_entered = true; // the entering push is the host's
+                    else if (canvas) canvas->midi(0xb0, move::button_cc(Button::MainPush), 127);
+                } else if (!(canvas_entered && canvas && canvas->back())) { // at its top: leave it
+                    canvas_entered = false;
+                    canvas_open = -1;
+                }
+            } else if (button == Button::Back && page == Page::Play && menu_open) {
                 menu_back();
             } else if (button == Button::MainPush && page == Page::Play) {
                 if (menu_open) menu_push();
@@ -799,6 +848,7 @@ void MelodeeApp::surface(const move::SurfaceEvent& event) {
     case Kind::MainKnob:
         if (track == Track::Synth) {
             if (page == Page::Load) module_cursor = std::clamp(module_cursor + input.delta, 0, std::max(0, int(catalog.size()) - 1));
+            else if (shown_canvas() >= 0 && canvas_entered) canvas_jog(input.delta);
             else if (menu_open) menu_turn(input.delta, fine);
             else preset_by(input.delta);
             break;
@@ -835,6 +885,16 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point) {
     lights.button(Button::Row1, track == Track::Kit ? colour::azure : colour::dark_blue);
     lights.button(Button::Row2, track == Track::Synth ? colour::violet : module ? colour::deep_magenta : colour::dark_grey);
     lights.button(Button::Shift, session().shift ? white_bright : white_dim);
+    lights.button(Button::Delete, typing ? white_dim : 0);
+    if (typing) { // the keyboard
+        for (unsigned at = 0; at < pad_count; ++at) {
+            char c = key_for_pad(at);
+            lights.pad(at, c == '\b' ? colour::red : c == ' ' ? colour::azure : std::isalpha(static_cast<unsigned char>(c)) ? colour::light_grey : colour::dark_grey);
+        }
+        for (unsigned step = 0; step < step_count; ++step) lights.step(step, step < 10 ? colour::light_grey : colour::dark_grey);
+        lights.button(Button::Back, white_dim);
+        return;
+    }
     if (track == Track::Synth) {
         // Every C in the track's colour, the other naturals dim, a pad held white.
         for (unsigned at = 0; at < pad_count; ++at) {
@@ -849,7 +909,7 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point) {
         lights.button(Button::Down, octave > lowest_octave ? white_dim : 0);
         lights.button(Button::Loop, 0);
         lights.button(Button::Menu, page == Page::Load ? white_bright : white_dim);
-        lights.button(Button::Back, page == Page::Play && !menu_open ? 0 : white_dim);
+        lights.button(Button::Back, page == Page::Play && !menu_open && !canvas_entered && canvas_open < 0 ? 0 : white_dim);
         return;
     }
     lights.button(Button::Left, page == Page::Play || page == Page::Chop ? white_dim : 0);
@@ -886,8 +946,15 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point) {
 void MelodeeApp::draw(juce::Graphics& g) {
     std::lock_guard<std::mutex> guard(lock);
     auto now = Clock::now();
+    if (typing) { draw_typing(g); return; }
     if (touched >= 0 && now < touched_until && !knob(unsigned(touched)).name.empty()) draw_touched(g);
-    else if (track == Track::Synth) page == Page::Load ? draw_modules(g) : menu_open && module ? draw_menu(g) : draw_synth(g);
+    else if (track == Track::Synth) {
+        int shown = shown_canvas();
+        if (page == Page::Load) draw_modules(g);
+        else if (shown >= 0) draw_canvas(g, shown);
+        else if (menu_open && module) draw_menu(g);
+        else draw_synth(g);
+    }
     else if (page == Page::Load) draw_load(g);
     else if (page == Page::Chop) draw_chop(g);
     else if (page == Page::ToPads) draw_to_pads(g);
@@ -1023,6 +1090,111 @@ void MelodeeApp::draw_modules(juce::Graphics& g) {
         rows.push_back(row);
     }
     ui::list(g, ui::content(0, ui::height), rows, module_cursor, 1);
+}
+
+// ---------------------------------------------------------------- the module's own pages, under `lock`
+
+int MelodeeApp::shown_canvas() const {
+    if (!module || track != Track::Synth || page != Page::Play) return -1;
+    auto valid = [&](int index) { return index >= 0 && index < int(canvas_pages.size()) ? index : -1; };
+    if (canvas_open >= 0) return valid(canvas_open);
+    if (menu_open || synth_page >= module->pages.size()) return -1;
+    return valid(module->pages[synth_page].canvas);
+}
+
+std::string MelodeeApp::module_get(const std::string& key) {
+    if (!module) return {};
+    if (!synth.rendering()) return module->get_now(key); // no audio thread: the module is this thread's to ask
+    std::string value;
+    synth.get(key, value, std::chrono::milliseconds(20));
+    return value;
+}
+
+CanvasPage::Host MelodeeApp::canvas_host() {
+    CanvasPage::Host host;
+    host.get = [this](const std::string& key) { return module_get(key); };
+    host.set = [this](const std::string& key, const std::string& value) {
+        synth_set(key, value);
+        if (ModuleParam* param = module ? module->param(key) : nullptr) param->take(value); // the knobs and the save see it too
+    };
+    host.text_entry = [this](const std::string& title, const std::string& initial) {
+        typing = true;
+        typed = initial;
+        typing_title = title;
+        typing_canvas = shown_canvas();
+        held.fill(false);
+        pads_typing.store(true);
+    };
+    host.open_file = [this](const std::string& path) { // a download: onto the kit, to play and chop
+        unsigned free_pad = 0;
+        while (free_pad < pad_count && pads[free_pad].used()) ++free_pad;
+        if (free_pad == pad_count) { say("NO EMPTY KIT PAD"); return; }
+        jobs.push_back({path, free_pad});
+        say("TO KIT " + pad_label(free_pad));
+    };
+    return host;
+}
+
+void MelodeeApp::canvas_jog(int delta) {
+    int shown = shown_canvas();
+    if (shown < 0 || !canvas_pages[size_t(shown)] || !delta) return;
+    uint8_t value = uint8_t(delta > 0 ? std::min(delta, 63) : 128 + std::max(delta, -64)); // the jogwheel's own relative CC
+    canvas_pages[size_t(shown)]->midi(0xb0, move::main_knob_cc, value);
+}
+
+void MelodeeApp::type(char c) {
+    if (c == '\b') { if (!typed.empty()) typed.pop_back(); return; }
+    if (typed.size() >= 120) return;
+    typed += session().shift ? char(std::toupper(static_cast<unsigned char>(c))) : c;
+}
+
+void MelodeeApp::finish_typing(bool cancelled) {
+    typing = false;
+    pads_typing.store(false);
+    int index = typing_canvas;
+    typing_canvas = -1;
+    if (index >= 0 && index < int(canvas_pages.size()) && canvas_pages[size_t(index)]) canvas_pages[size_t(index)]->text_entered(typed, cancelled);
+}
+
+void MelodeeApp::draw_typing(juce::Graphics& g) {
+    move::draw_text(g, 1, 1, upper(typing_title.empty() ? "TEXT" : typing_title).substr(0, 21));
+    g.fillRect(0, 10, ui::width, 1);
+    std::string line = typed + "_";
+    if (line.size() > 21) line = line.substr(line.size() - 21);
+    move::draw_text(g, 1, 24, line);
+    move::draw_text(g, 1, 46, "PADS: LETTERS");
+    move::draw_text(g, 1, 56, "PUSH: OK  BACK: CANCEL");
+}
+
+void MelodeeApp::draw_canvas(juce::Graphics& g, int index) {
+    const auto& about = module->canvases[size_t(index)];
+    CanvasPage* canvas = canvas_pages[size_t(index)].get();
+    if (!canvas) {
+        ui::rail(g, upper(module->info().abbrev).substr(0, 4), "2", "PAGE");
+        move::draw_text_centred(g, ui::content_x, 22, ui::content_width, "PAGE FAILED");
+        ui::detail(g, "SEE THE LOG");
+        return;
+    }
+    std::map<std::string, std::string> values;
+    for (const auto& key : about.extra_keys) values[key] = module_get(key);
+    canvas->draw(g, values);
+    // Below the page: whose it is, and what the jogwheel's push does.
+    g.setColour(juce::Colours::black);
+    g.fillRect(0, 47, ui::width, ui::height - 47);
+    g.setColour(juce::Colours::white);
+    move::draw_text(g, 1, 56, upper(module->info().abbrev + " " + about.name).substr(0, 15));
+    std::string hint = canvas_entered ? "BACK: OUT" : "PUSH: IN";
+    move::draw_text(g, ui::width - move::text_width(hint), 56, hint);
+}
+
+std::string MelodeeApp::ask_module(const std::string& key) {
+    std::lock_guard<std::mutex> guard(lock);
+    return module_get(key);
+}
+
+bool MelodeeApp::canvas_pixel(int x, int y) const {
+    std::lock_guard<std::mutex> guard(lock);
+    return !canvas_pages.empty() && canvas_pages.front() && canvas_pages.front()->pixel(x, y);
 }
 
 // ---------------------------------------------------------------- service thread
@@ -1249,6 +1421,15 @@ std::string MelodeeApp::load_module_now(const std::string& id, const SynthFile* 
             }
         if (!loaded->preset_name_param.empty()) loaded->preset_name = loaded->get_now(loaded->preset_name_param);
     }
+    // Its own pages' scripts, started before it plays (never under the lock:
+    // a script's first run may take its time).
+    std::vector<std::unique_ptr<CanvasPage>> started;
+    if (loaded)
+        for (const auto& canvas : loaded->canvases) {
+            std::string failed;
+            started.push_back(CanvasPage::load(canvas.script, canvas_host(), failed));
+            if (!started.back()) std::fprintf(stderr, "melodee-move: %s's page %s would not start: %s\n", id.c_str(), canvas.key.c_str(), failed.c_str());
+        }
     std::unique_lock<std::mutex> guard(lock);
     module_loading = false;
     if (!loaded) return error.empty() ? "would not load" : error;
@@ -1258,6 +1439,10 @@ std::string MelodeeApp::load_module_now(const std::string& id, const SynthFile* 
     }
     if (module) leaving.push_back(std::move(module));
     module = std::move(loaded);
+    canvas_pages.swap(started); // the module before's pages end with this function, outside the lock
+    canvas_open = -1;
+    canvas_entered = false;
+    if (typing) { typing = false; pads_typing.store(false); typing_canvas = -1; }
     set_at.clear();
     synth_page = 0;
     menu_open = false;
@@ -1292,9 +1477,10 @@ std::string MelodeeApp::status() const {
     char text[420];
     std::snprintf(text, sizeof text,
                   "page=%s pad=%s samples=%u slices=%u pads=%u chop=%s loading=%d saves=%u unsaved=%d track=%s synth=%s octave=%d "
-                  "menu=%s slow_calls=%u slowest_ms=%.1f",
+                  "menu=%s canvas=%s entered=%d typing=%d slow_calls=%u slowest_ms=%.1f",
                   names[unsigned(page)], pad_label(pad).c_str(), loaded, slices.count, used, melodee::chop_mode_name(mode), int(loading),
-                  saves, int(dirty), track == Track::Synth ? "synth" : "kit", module ? module->info().id.c_str() : "-", octave, menu_open && !menu_path.empty() ? menu_path.back().c_str() : "-", slow_calls,
+                  saves, int(dirty), track == Track::Synth ? "synth" : "kit", module ? module->info().id.c_str() : "-", octave, menu_open && !menu_path.empty() ? menu_path.back().c_str() : "-",
+                  shown_canvas() >= 0 ? module->canvases[size_t(shown_canvas())].key.c_str() : "-", int(canvas_entered), int(typing), slow_calls,
                   slowest_us / 1000.0);
     return text;
 }

@@ -1,0 +1,72 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+#pragma once
+#include <juce_graphics/juce_graphics.h>
+#include <array>
+#include <cstdint>
+#include <functional>
+#include <map>
+#include <memory>
+#include <string>
+
+// A Schwung module's own page: the script a `type: "canvas"` parameter
+// names (its canvas_script), run in QuickJS as Schwung's shadow UI runs it
+// (Schwung's docs/CANVAS_PAGES.md). Radio Garden's station browser and
+// Webstream's search are such pages.
+//
+// The script sets globalThis.canvas_overlay to an object of hooks, all
+// optional:
+//
+//   drawPage(ctx, info)   paint the page; info: {state, nowMs, values}, the
+//                         values of the parameter's extra_keys
+//   onMidi(ctx, msg)      a jogwheel turn or push while the page is entered;
+//                         msg: {data: [status, number, value]}
+//   handleBack(ctx)       true: "I went up a level, keep me"; anything else:
+//                         "I am at my top", and the page is left
+//   onTextEntry(ctx, p)   the keyboard's answer: {text, cancelled}
+//
+// and reaches the host through ctx: fillRect, setPixel, line, print and
+// textWidth on the 128 x 64 screen (Schwung's own font when the Move has
+// it, /data/UserData/schwung/host/font.png); getParam and setParam on the
+// module; state, an object kept for the page; openTextEntry({title,
+// initial}); openFileInTool(path). QuickJS's std and os modules are there
+// to import, as under Schwung (the pages fetch with wget, read and write
+// files).
+//
+// A hook that throws is reported and not called again, as Schwung does. One
+// page at a time is called, under the app's lock, from whichever thread
+// holds it (the screen's, the MIDI thread's).
+namespace app {
+
+class CanvasPage {
+public:
+    struct Host { // called from inside the hooks, under the app's lock
+        std::function<std::string(const std::string& key)> get;
+        std::function<void(const std::string& key, const std::string& value)> set;
+        std::function<void(const std::string& title, const std::string& initial)> text_entry;
+        std::function<void(const std::string& path)> open_file;
+    };
+    // Reads and starts `script`. Null with `error` set when it cannot.
+    static std::unique_ptr<CanvasPage> load(const std::string& script, Host host, std::string& error);
+    ~CanvasPage();
+
+    // The page on the whole screen, `values` its extra_keys' values.
+    void draw(juce::Graphics& g, const std::map<std::string, std::string>& values);
+    void midi(uint8_t status, uint8_t number, uint8_t value);
+    bool back();
+    void text_entered(const std::string& text, bool cancelled);
+
+    // The screen as the last draw left it, for tests.
+    bool pixel(int x, int y) const { return x >= 0 && x < width && y >= 0 && y < height && screen[size_t(y * width + x)]; }
+
+    static constexpr int width = 128, height = 64;
+
+private:
+    struct Engine;
+    CanvasPage() = default;
+    std::unique_ptr<Engine> engine;
+    Host host;
+    std::array<uint8_t, width * height> screen {};
+    friend struct CanvasBindings;
+};
+
+} // namespace app

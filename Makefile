@@ -25,7 +25,7 @@ WARNINGS := -Wall -Wextra -Werror
 # schwung_move_info is exported for Schwung's modules, which look for it in
 # the process (src/app/module_host.cpp).
 LDFLAGS := -static-libstdc++ -static-libgcc -Wl,--export-dynamic-symbol=schwung_move_info
-LDLIBS := $(shell pkg-config --libs $(PACKAGES)) -ldl -pthread -lrt
+LDLIBS := $(shell pkg-config --libs $(PACKAGES)) -ldl -pthread -lrt -lm
 
 # Melodee's own engine and model, compiled unchanged from a melodee-sample
 # checkout (MELODEE; ./build.sh mounts ../melodee-sample there) into a
@@ -46,20 +46,35 @@ MODULE_CPP := $(wildcard $(JUCE)/juce_core/*.cpp $(JUCE)/juce_events/*.cpp $(JUC
 MODULE_C := $(wildcard $(JUCE)/juce_core/*.c $(JUCE)/juce_graphics/*.c) \
     $(addprefix $(JUCE)/juce_audio_formats/juce_audio_formats_,flac_1.c flac_2.c ogg.c)
 JUCE_OBJECTS := $(addprefix build/obj/juce/,$(notdir $(MODULE_CPP:.cpp=.o) $(MODULE_C:.c=.o)))
+# QuickJS (tools/dependencies.py), for Schwung modules' page scripts: built
+# as its own Makefile builds it, with its std and os modules.
+QUICKJS := build/deps/quickjs
+QUICKJS_SOURCES := quickjs.c dtoa.c libregexp.c libunicode.c cutils.c quickjs-libc.c
+QUICKJS_OBJECTS := $(addprefix build/obj/quickjs/,$(QUICKJS_SOURCES:.c=.o))
+# NDEBUG: a page script's object left over when its runtime is freed is a
+# leak, never an abort of the whole program.
+QUICKJS_CFLAGS := -O2 $(ARCH) -funsigned-char -fwrapv -D_GNU_SOURCE -DCONFIG_VERSION=\"2025-04-26\" -DNDEBUG -w
+CPPFLAGS += -isystem $(QUICKJS)
+build/obj/quickjs/%.o: $(QUICKJS)/%.c
+	@mkdir -p $(@D)
+	$(CC) $(QUICKJS_CFLAGS) -c $< -o $@
 SHARED_OBJECTS := $(patsubst src/%.cpp,build/obj/%.o,$(wildcard src/move/*.cpp src/ui/*.cpp src/spike/*.cpp src/app/*.cpp))
 
 # A stand-in Schwung module for the tests, where Schwung keeps its synths.
 FAKE_MODULE := build/test-modules/sound_generators/fake
-all: $(TARGET) $(TESTS) $(FAKE_MODULE)/dsp.so $(FAKE_MODULE)/module.json
+all: $(TARGET) $(TESTS) $(FAKE_MODULE)/dsp.so $(FAKE_MODULE)/module.json $(FAKE_MODULE)/page.js
 $(FAKE_MODULE)/dsp.so: tests/fake_module/dsp.c
 	@mkdir -p $(@D)
 	$(CC) -O2 -fPIC -shared -Wall -Wextra -Werror $< -o $@
 $(FAKE_MODULE)/module.json: tests/fake_module/module.json
 	@mkdir -p $(@D)
 	cp $< $@
-$(TARGET): build/obj/main.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(MELODEE_LIBRARY)
+$(FAKE_MODULE)/page.js: tests/fake_module/page.js
+	@mkdir -p $(@D)
+	cp $< $@
+$(TARGET): build/obj/main.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS) $(MELODEE_LIBRARY)
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
-$(TESTS): build/obj/tests/move_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(MELODEE_LIBRARY)
+$(TESTS): build/obj/tests/move_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS) $(MELODEE_LIBRARY)
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 $(MELODEE_LIBRARY): $(MELODEE_OBJECTS)
 	rm -f $@ && $(AR) rcs $@ $^

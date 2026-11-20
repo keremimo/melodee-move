@@ -13,6 +13,7 @@
 #include <fstream>
 #include <iterator>
 #include <map>
+#include <thread>
 
 namespace app {
 namespace {
@@ -156,6 +157,7 @@ std::string ModuleParam::text() const {
 
 std::string ModuleParam::shown() const {
     char out[64];
+    if (trigger()) return "PUSH";
     if (kind == Kind::Enum) {
         auto index = size_t(std::clamp<long>(std::lround(value), 0, long(options.size()) - 1));
         return index < options.size() ? options[index] : "?";
@@ -166,6 +168,10 @@ std::string ModuleParam::shown() const {
     std::string shown_value = out;
     if (!unit.empty() && kind != Kind::Enum) shown_value += " " + unit;
     return shown_value;
+}
+
+bool ModuleParam::trigger() const {
+    return kind == Kind::Enum && options.size() == 2 && lower(options[1]) == "trigger";
 }
 
 double ModuleParam::fraction() const {
@@ -266,7 +272,22 @@ void LoadedModule::read_parameters() {
         params.push_back(std::move(p));
     };
     if (auto* entries = chain.getArray())
-        for (const auto& entry : *entries) describe(entry);
+        for (const auto& entry : *entries) {
+            if (lower(text_of(field(entry, "type"))) == "canvas" && has(entry, "canvas_script")) {
+                ModuleCanvas canvas;
+                canvas.key = text_of(field(entry, "key"));
+                canvas.name = has(entry, "name") ? text_of(field(entry, "name")) : canvas.key;
+                canvas.script = (fs::path(about.dir) / text_of(field(entry, "canvas_script"))).string();
+                canvas.as_page = bool(field(entry, "as_page"));
+                canvas.enterable = bool(field(entry, "enterable"));
+                canvas.page_first = bool(field(entry, "page_first"));
+                if (auto* keys = field(entry, "extra_keys").getArray())
+                    for (const auto& key : *keys) canvas.extra_keys.push_back(text_of(key));
+                canvases.push_back(std::move(canvas));
+                continue;
+            }
+            describe(entry);
+        }
 
     // The levels: root first, then the levels it links to, then the rest.
     std::map<std::string, std::string> labels;
@@ -351,6 +372,18 @@ void LoadedModule::read_parameters() {
             pages.push_back(std::move(page));
         }
     }
+    // A page the module draws: with the root level's knobs, first where it
+    // asks to be.
+    for (size_t n = 0; n < canvases.size(); ++n) {
+        if (!canvases[n].as_page) continue;
+        ModulePage page;
+        page.name = canvases[n].name;
+        page.canvas = int(n);
+        for (const auto& [index, knobs] : knob_lists)
+            if (index == 0) page.knobs.assign(knobs.begin(), knobs.begin() + long(std::min<size_t>(knobs.size(), 8)));
+        if (canvases[n].page_first) pages.insert(pages.begin(), std::move(page));
+        else pages.push_back(std::move(page));
+    }
     // A knob or menu entry chain_params does not describe: a plain 0-1.
     auto plain = [&](const std::string& key) {
         if (key.empty() || param(key) || std::find(selectors.begin(), selectors.end(), key) != selectors.end()) return;
@@ -430,6 +463,31 @@ bool SynthPlayer::ask_long(const std::string& key) {
     return true;
 }
 
+bool SynthPlayer::rendering() const {
+    auto now = std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now().time_since_epoch()).count();
+    return now - rendered_at.load(std::memory_order_relaxed) < 50'000'000;
+}
+
+bool SynthPlayer::get(const std::string& key, std::string& out, std::chrono::milliseconds wait) {
+    std::lock_guard<std::mutex> one_at_a_time(sync_lock);
+    auto until = Clock::now() + wait;
+    auto settle = [&](int want) {
+        while (sync_state.load(std::memory_order_acquire) != want) {
+            if (Clock::now() > until) return false;
+            std::this_thread::sleep_for(std::chrono::microseconds(100));
+        }
+        return true;
+    };
+    if (sync_state.load(std::memory_order_acquire) == 2) sync_state.store(0, std::memory_order_release); // one that timed out
+    if (!settle(0)) return false;       // still being answered: leave it be
+    std::snprintf(sync_key, key_size, "%s", key.c_str());
+    sync_state.store(1, std::memory_order_release);
+    if (!settle(2)) return false;       // answered later, and dropped by the next caller
+    out.assign(sync_buffer.data(), size_t(std::clamp(sync_length, 0, int(sync_buffer.size()) - 1)));
+    sync_state.store(0, std::memory_order_release);
+    return sync_length >= 0;
+}
+
 bool SynthPlayer::long_answer(std::string& out) {
     if (long_state.load(std::memory_order_acquire) != 2) return false;
     out.assign(long_buffer.data(), size_t(std::clamp(long_length, 0, int(long_buffer.size()) - 1)));
@@ -481,7 +539,16 @@ void SynthPlayer::apply() {
         }
         }
     }
-    // The long read, after the commands: a module handed over in them answers it.
+    // The read answered now, then the long read, after the commands: a module
+    // handed over in them answers them.
+    if (sync_state.load(std::memory_order_acquire) == 1) {
+        auto begun = Clock::now();
+        sync_length = current && current->api->get_param
+                          ? current->api->get_param(current->instance, sync_key, sync_buffer.data(), int(sync_buffer.size()))
+                          : -1;
+        sync_state.store(2, std::memory_order_release);
+        timed(begun, "get", sync_key, nullptr);
+    }
     if (long_state.load(std::memory_order_acquire) == 1) {
         auto begun = Clock::now();
         long_length = current && current->api->get_param
@@ -506,6 +573,7 @@ void SynthPlayer::note_off(int note) { midi(0x80, uint8_t(std::clamp(note, 0, 12
 void SynthPlayer::pressure(int note, int value) { midi(0xa0, uint8_t(std::clamp(note, 0, 127)), uint8_t(std::clamp(value, 0, 127))); }
 
 void SynthPlayer::render(const move::AudioBlock& input, move::AudioBlock& output, float gain) {
+    rendered_at.store(std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now().time_since_epoch()).count(), std::memory_order_relaxed);
     apply();
     // The input, where a module reading the device page looks for it.
     for (unsigned n = 0; n < input.size(); ++n) {

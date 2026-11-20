@@ -90,6 +90,14 @@ has one, else its `chain_params` eight at a time. Names are cut to the cell
 list, an items list) is never a knob; a `null` in `knobs` is an empty knob,
 and knobs past eight go to the level's next page.
 
+A page the module draws itself (a `canvas` parameter: Radio Garden's
+browser, Webstream's search) takes the whole screen, its own script drawing
+it as under Schwung, with a footer line for the module and `PUSH: IN` /
+`BACK: OUT`. Pushed, the page has the jogwheel until Back brings you out of
+its top level. A page asking for text gets the keyboard screen: its title,
+the text so far, and the pads lit as keys (letters grey, space blue,
+backspace red), the steps as digits.
+
 The jogwheel's push opens the module's menu (`MENU` on the rail), its
 levels as lists: the preset first where the level has one, then values
 (`CUTOFF      57`), levels (`ENVELOPE >`) and lists to choose from (the

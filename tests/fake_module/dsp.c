@@ -8,7 +8,8 @@
  * level; get_param("note") the note held, "tempo" what the host's
  * schwung_move_info() says, "bpm" what get_bpm() says. set_param("stall",
  * milliseconds) holds the caller up that long. "table" is chosen from
- * "table_list", an items list.
+ * "table_list", an items list. Its page (page.js) sets "searched" to what
+ * is typed into it.
  */
 #define _GNU_SOURCE
 #include <dlfcn.h>
@@ -55,6 +56,7 @@ typedef struct {
     int wave, voices, preset, table;
     int note, velocity, pressure;
     int phase;
+    char searched[64];
 } fake_t;
 
 static const host_api_v1_t *host;
@@ -93,6 +95,7 @@ static void set_param(void *instance, const char *key, const char *val) {
     else if (!strcmp(key, "voices")) fake->voices = atoi(val);
     else if (!strcmp(key, "preset")) { fake->preset = atoi(val); fake->level = (float)fake->preset / 10.0f; }
     else if (!strcmp(key, "table")) fake->table = atoi(val);
+    else if (!strcmp(key, "searched")) snprintf(fake->searched, sizeof fake->searched, "%s", val);
     else if (!strcmp(key, "stall")) usleep((useconds_t)atoi(val) * 1000); /* a module slow to set: milliseconds */
 }
 
@@ -106,6 +109,7 @@ static int get_param(void *instance, const char *key, char *buf, int buf_len) {
     if (!strcmp(key, "voices")) return snprintf(buf, (size_t)buf_len, "%d", fake->voices);
     if (!strcmp(key, "preset")) return snprintf(buf, (size_t)buf_len, "%d", fake->preset);
     if (!strcmp(key, "table")) return snprintf(buf, (size_t)buf_len, "%d", fake->table);
+    if (!strcmp(key, "searched")) return snprintf(buf, (size_t)buf_len, "%s", fake->searched);
     if (!strcmp(key, "table_list")) return snprintf(buf, (size_t)buf_len, "[{\"index\":0,\"label\":\"Sine\"},{\"index\":1,\"label\":\"Saw\"},{\"index\":2,\"label\":\"Organ\"}]");
     if (!strcmp(key, "preset_count")) return snprintf(buf, (size_t)buf_len, "10");
     if (!strcmp(key, "preset_name")) return snprintf(buf, (size_t)buf_len, "Fake %d", fake->preset);

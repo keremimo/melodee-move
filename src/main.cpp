@@ -31,7 +31,8 @@ void usage() {
         "       melodee-move --self-test FILE.wav       render offline, fail if silent\n"
         "       melodee-move --preview DIR              the screen as PNGs\n"
         "       melodee-move --melodee-previews DIR [--modules DIR]  Melodee's screens as PNGs\n"
-        "       melodee-move --probe-modules DIR        load and play each of Schwung's synths in DIR\n"
+        "       melodee-move --probe-modules DIR [PICTURES]  load and play each of Schwung's synths in DIR;\n"
+        "                                              PICTURES: their own pages, drawn there\n"
         "       melodee-move --crush PNG|DIR OUT_DIR    320 x 240 pictures on 128 x 64\n";
 }
 
@@ -62,7 +63,7 @@ int main(int argc, char** argv) {
             if (argument == "--ui-mockups" && has_value) return ui::write_mockups(argv[n + 1]);
             if (argument == "--test-loop" && has_value) return move::write_test_loop(argv[n + 1]) ? 0 : 1;
 
-            if (argument == "--probe-modules" && has_value) return app::probe_modules(argv[n + 1]);
+            if (argument == "--probe-modules" && has_value) return app::probe_modules(argv[n + 1], n + 2 < argc ? argv[n + 2] : "");
             if (argument == "--melodee-previews" && has_value) melodee_previews = argv[++n];
             else if (argument == "--previews" && has_value) previews = argv[++n];
             else if (argument == "--samples" && has_value) samples = argv[++n];

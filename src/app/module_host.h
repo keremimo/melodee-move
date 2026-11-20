@@ -6,6 +6,7 @@
 #include <atomic>
 #include <chrono>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -39,6 +40,9 @@ struct ModuleParam {
     bool options_as_string = false;   // the module wants an enum's name, not its index
     std::string unit;
     bool selector = false;            // an items list's choice (a bank, a soundfont): no knob, set first
+    // An action, not a value (webstream's play/pause, stop): an enum of
+    // "idle" and "trigger", sent "trigger" when pushed or turned.
+    bool trigger() const;
     std::string text() const;         // the value as set_param() takes it
     std::string shown() const;        // the value for the screen
     double fraction() const;
@@ -46,8 +50,18 @@ struct ModuleParam {
     void take(const std::string& answer); // a get_param() answer
 };
 // A page of knobs: up to eight keys, "" an empty knob; `level` the menu
-// level it belongs to.
-struct ModulePage { std::string name; std::vector<std::string> knobs; size_t level = 0; };
+// level it belongs to; `canvas` a page the module draws itself (an index
+// into LoadedModule::canvases), with the root level's knobs.
+struct ModulePage { std::string name; std::vector<std::string> knobs; size_t level = 0; int canvas = -1; };
+
+// A page the module draws itself: a `type: "canvas"` parameter, its script
+// run by CanvasPage. `as_page`: one of the module's pages; otherwise opened
+// from its menu. `extra_keys`: values the page is given each time it draws.
+struct ModuleCanvas {
+    std::string key, name, script;
+    bool as_page = false, enterable = false, page_first = false;
+    std::vector<std::string> extra_keys;
+};
 
 // The module's menu, as its ui_hierarchy lays it out (Schwung's
 // docs/MODULES.md, "ui_hierarchy"): levels of parameters and links to other
@@ -82,6 +96,7 @@ public:
     std::vector<ModuleParam> params;
     std::vector<ModulePage> pages;
     std::vector<ModuleLevel> levels; // root first; never empty once loaded
+    std::vector<ModuleCanvas> canvases;
     const ModuleLevel* level(const std::string& id) const;
     size_t level_index(const std::string& id) const; // 0 (root) when unknown
     std::string preset_param, preset_count_param, preset_name_param; // a preset list, where it has one
@@ -114,6 +129,11 @@ public:
     // on a later block. False while one is pending.
     bool ask_long(const std::string& key);
     bool long_answer(std::string& out);
+    // A read answered now, for a page script's getParam: waits for the
+    // audio thread to make it, `wait` at most. Any thread but the audio
+    // thread. False when it was not answered in time.
+    bool get(const std::string& key, std::string& out, std::chrono::milliseconds wait);
+    bool rendering() const; // the audio thread has rendered in the last 50 ms
     bool answer(Answer& out);
     LoadedModule* retired();          // a module the audio thread has let go: destroy it
     // A call into the module that took the audio thread `slow_us` or more:
@@ -151,6 +171,13 @@ private:
     char long_key[key_size] {};
     int long_length = 0;
     std::vector<char> long_buffer = std::vector<char>(65536);
+    // The read answered now: as the long read, one caller at a time.
+    std::mutex sync_lock;
+    std::atomic<int> sync_state {0};
+    char sync_key[key_size] {};
+    int sync_length = 0;
+    std::vector<char> sync_buffer = std::vector<char>(65536);
+    std::atomic<int64_t> rendered_at {0}; // steady_clock, nanoseconds
     LoadedModule* current = nullptr;
     uint64_t serial = 0; // the producer's
     std::array<int16_t, move::audio_frames * move::audio_channels> block {};

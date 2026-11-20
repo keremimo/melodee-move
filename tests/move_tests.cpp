@@ -13,6 +13,7 @@
 #include "move/spi_protocol.h"
 #include "move/tools.h"
 #include "spike/spike_app.h"
+#include "app/canvas_page.h"
 #include "app/melodee_app.h"
 #include <chrono>
 #include <filesystem>
@@ -551,7 +552,7 @@ void test_schwung_modules() {
     if (!loaded) { std::cerr << "fake module: " << error << '\n'; return; }
     // Its parameters: chain_params' four (a file path is no knob), attack,
     // described in its menu instead, and the table chosen from a list, first.
-    CHECK(loaded->params.size() == 6 && !loaded->param("sample") && !loaded->param(""));
+    CHECK(loaded->params.size() == 7 && !loaded->param("sample") && !loaded->param("") && !loaded->param("browse"));
     CHECK(loaded->params.front().key == "table" && loaded->params.front().selector);
     // Its menu: root, then the levels root links to.
     CHECK(loaded->levels.size() == 3 && loaded->levels[0].name == "Fake" && loaded->levels[1].id == "env" && loaded->levels[2].id == "tables");
@@ -560,8 +561,16 @@ void test_schwung_modules() {
     CHECK(loaded->levels[2].items_param == "table_list" && loaded->levels[2].navigate_to == "root");
     // Its knob pages: an empty knob kept in its place, the preset list no
     // knob (it has the jogwheel), a level without knobs no page.
-    CHECK(loaded->pages.size() == 2 && loaded->pages[0].name == "Fake" && loaded->pages[1].name == "Envelope" && loaded->pages[1].level == 1);
+    CHECK(loaded->pages.size() == 3 && loaded->pages[0].name == "Fake" && loaded->pages[1].name == "Envelope" && loaded->pages[1].level == 1);
     CHECK((loaded->pages[0].knobs == std::vector<std::string> {"level", "wave", "", "voices"}));
+    // Its own page, drawn by its script, last (it does not ask to be first),
+    // with root's knobs.
+    CHECK(loaded->canvases.size() == 1 && loaded->canvases[0].as_page && loaded->canvases[0].enterable
+          && loaded->canvases[0].script == info.dir + "/page.js" && loaded->canvases[0].extra_keys == std::vector<std::string> {"level"});
+    CHECK(loaded->pages[2].canvas == 0 && loaded->pages[2].name == "Browse" && loaded->pages[2].knobs == loaded->pages[0].knobs);
+    // An action, not a value.
+    auto* go = loaded->param("go");
+    CHECK(go && go->trigger() && go->shown() == "PUSH" && !loaded->param("level")->trigger());
     // Each value as the module reports it once created.
     auto* attack = loaded->param("attack");
     CHECK(attack && attack->short_name == "ATK" && attack->label == "Attack" && attack->max == 2 && std::abs(attack->value - 0.1) < 1e-6);
@@ -635,6 +644,55 @@ void test_schwung_modules() {
     CHECK(player.set_module(nullptr));
     player.render(in, out, 1.0f);
     CHECK(!player.live() && player.retired() == loaded.get());
+}
+
+void test_canvas_page() {
+    // A module's own page script, hosted as Schwung hosts it.
+    struct Calls { std::vector<std::string> sets; std::string title, initial, opened; } calls;
+    app::CanvasPage::Host host;
+    host.get = [](const std::string& key) { return key == "level" ? std::string("0.42") : std::string(); };
+    host.set = [&](const std::string& key, const std::string& value) { calls.sets.push_back(key + "=" + value); };
+    host.text_entry = [&](const std::string& title, const std::string& initial) { calls.title = title; calls.initial = initial; };
+    host.open_file = [&](const std::string& path) { calls.opened = path; };
+    std::string error;
+    auto page = app::CanvasPage::load("tests/fake_module/page.js", host, error);
+    CHECK(page && error.empty());
+    if (!page) { std::cerr << "page.js: " << error << '\n'; return; }
+    juce::Image screen(juce::Image::ARGB, 128, 64, true);
+    {
+        juce::Graphics g(screen);
+        page->draw(g, {{"level", "0.5"}});
+    }
+    CHECK(page->pixel(0, 0) && page->pixel(9, 9) && !page->pixel(10, 10)); // its block
+    CHECK(page->pixel(50, 30) && !page->pixel(42, 30));                     // the value it was given, not asked for
+    CHECK(page->pixel(1, 41));                                              // QuickJS's std module, imported
+    CHECK(screen.getPixelAt(0, 0).getBrightness() > 0.5f && screen.getPixelAt(64, 50).getBrightness() < 0.5f);
+    page->midi(0xb0, 14, 1);
+    page->midi(0xb0, 3, 127);
+    CHECK((calls.sets == std::vector<std::string> {"level=0.9"}) && calls.title == "Search" && calls.initial == "ab");
+    page->text_entered("drums", false);
+    page->text_entered("ignored", true);
+    CHECK(calls.sets.size() == 2 && calls.sets[1] == "searched=drums");
+    CHECK(page->back());  // a level up
+    CHECK(!page->back()); // at its top
+    // A script that throws is reported and not called again; one that does
+    // not parse, or sets no page, is refused.
+    std::filesystem::create_directories("build/test-pages");
+    std::ofstream("build/test-pages/throws.js") << "let n = 0; globalThis.canvas_overlay = { drawPage(ctx) { n++; ctx.setParam('n', String(n)); throw new Error('boom'); } };\n";
+    std::ofstream("build/test-pages/broken.js") << "globalThis.canvas_overlay = { drawPage( };\n";
+    std::ofstream("build/test-pages/none.js") << "const x = 1;\n";
+    calls.sets.clear();
+    auto throws = app::CanvasPage::load("build/test-pages/throws.js", host, error);
+    CHECK(throws != nullptr);
+    if (throws) {
+        juce::Graphics g(screen);
+        throws->draw(g, {});
+        throws->draw(g, {});
+        CHECK((calls.sets == std::vector<std::string> {"n=1"}));
+    }
+    CHECK(!app::CanvasPage::load("build/test-pages/broken.js", host, error) && !error.empty());
+    CHECK(!app::CanvasPage::load("build/test-pages/none.js", host, error) && has(error, "canvas_overlay"));
+    CHECK(!app::CanvasPage::load("build/test-pages/missing.js", host, error));
 }
 
 void test_synth_track() {
@@ -720,11 +778,13 @@ void test_synth_track() {
     app::SynthFile saved;
     app::load_synth(project, saved);
     CHECK(saved.module == "fake" && saved.preset == 1 && saved.octave == 1 && saved.track == 1);
-    bool level_saved = false, table_saved = false;
+    bool level_saved = false, table_saved = false, action_saved = false;
     for (const auto& [key, value] : saved.values) {
         level_saved |= key == "level" && value == "0.13";
         table_saved |= key == "table" && value == "2";
+        action_saved |= key == "go";
     }
+    CHECK(!action_saved); // an action has no value to keep
     CHECK(level_saved && table_saved && !saved.values.empty() && saved.values.front().first == "table"); // the choice first
     {
         app::MelodeeApp second(folder, home, modules);
@@ -737,6 +797,39 @@ void test_synth_track() {
         CHECK(second.synth_value("wave") == "0");
         second.audio_event(make_event(0x90, pad_note(0), 100));
         CHECK(loudest(second, 1) > 0);
+        second.audio_event(make_event(0x80, pad_note(0), 0));
+        loudest(second, 1);
+
+        // The module's own page: Right to it, after Fake and Envelope.
+        press(second, Button::Right);
+        press(second, Button::Right);
+        CHECK(has(second.status(), "canvas=browse entered=0"));
+        std::this_thread::sleep_for(std::chrono::milliseconds(60)); // no audio thread: the page's reads go to the module directly
+        juce::Image screen(juce::Image::ARGB, 128, 64, true);
+        { juce::Graphics g(screen); g.setColour(juce::Colours::white); second.draw(g); }
+        CHECK(second.canvas_pixel(0, 0) && second.canvas_pixel(13, 30) && second.canvas_pixel(1, 41)); // its block, level 0.13, std
+        press(second, Button::MainPush); // in: the host's push, not the page's
+        CHECK(has(second.status(), "entered=1 typing=0"));
+        second.surface(make_event(0xb0, main_knob_cc, 1)); // the page's: the level to 0.9
+        CHECK(second.synth_value("level") == "0.9");
+        press(second, Button::MainPush); // the page's: a level down, and it asks for text
+        CHECK(has(second.status(), "typing=1"));
+        second.audio_event(make_event(0x90, pad_note(24), 100)); // a letter now, not a note
+        CHECK(loudest(second, 1) == 0);
+        second.audio_event(make_event(0x80, pad_note(24), 0));
+        press(second, Button::Delete);                         // "ab", given, less one: "a"
+        second.surface(make_event(0x90, pad_note(25), 100));   // b
+        second.surface(make_event(0x90, pad_note(26), 100));   // c
+        second.surface(make_event(0x90, step_note(0), 127));   // 1
+        press(second, Button::MainPush);                       // done
+        CHECK(has(second.status(), "typing=0"));
+        loudest(second, 1); // the page's sets reach the module
+        std::this_thread::sleep_for(std::chrono::milliseconds(60));
+        CHECK(second.ask_module("searched") == "abc1" && second.ask_module("level") == "0.9");
+        press(second, Button::Back); // up a level: the page keeps the jogwheel
+        CHECK(has(second.status(), "entered=1"));
+        press(second, Button::Back); // at its top: out
+        CHECK(has(second.status(), "canvas=browse entered=0"));
     }
     {
         // Its module gone: the track keeps naming it, and saves it so.
@@ -775,6 +868,7 @@ int main() {
     test_melodee_app();
     test_saving();
     test_schwung_modules();
+    test_canvas_page();
     test_synth_track();
     std::cout << "move-tests: " << checks - failures << " of " << checks << " checks passed\n";
     return failures ? 1 : 0;

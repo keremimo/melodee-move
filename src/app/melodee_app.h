@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #pragma once
+#include "app/canvas_page.h"
 #include "app/kit_player.h"
 #include "app/module_host.h"
 #include "app/project_store.h"
@@ -40,6 +41,12 @@
 // Push the jogwheel for the module's menu (its ui_hierarchy): turn to a
 // row, push to edit a value with the jogwheel or to open a level or a list
 // (a bank, a soundfont) to choose from; Back goes up, then closes it.
+// A page the module draws itself (Radio Garden's browser, Webstream's
+// search) runs as Schwung runs it (canvas_page.h): push to enter it, then
+// the jogwheel and its push are the page's, Back goes up and out. When it
+// asks for text, the pads are a keyboard (letters, space, backspace), the
+// steps digits; push is done, Back cancels. A file it hands over (a
+// download) goes onto the first empty kit pad.
 // Row 1 is the kit again.
 //
 // The kit is saved as a Melodee project (project_store.h) in
@@ -80,6 +87,8 @@ public:
     // `saved` (a restore) sets it as it was. Empty on success.
     std::string load_module_now(const std::string& id, const SynthFile* saved = nullptr);
     std::string synth_value(const std::string& key) const; // as the screen has it
+    bool canvas_pixel(int x, int y) const;                 // the module's own page as last drawn, for tests
+    std::string ask_module(const std::string& key);       // the module's answer now, for tests
     const std::string& project_path() const { return project; }
 
 private:
@@ -130,7 +139,7 @@ private:
     void destroy_retired();
     // The module's menu.
     struct MenuRow {
-        enum class Kind : uint8_t { Preset, Param, Level, Item } kind = Kind::Param;
+        enum class Kind : uint8_t { Preset, Param, Level, Item, Canvas } kind = Kind::Param;
         std::string key, label;
         int index = 0; // an Item's
     };
@@ -141,6 +150,16 @@ private:
     void menu_turn(int delta, bool fine);
     void menu_push();
     void menu_back();
+    // The module's own pages.
+    int shown_canvas() const;            // the one on screen, else -1
+    CanvasPage::Host canvas_host();
+    std::string module_get(const std::string& key); // now, as a page script asks
+    void draw_canvas(juce::Graphics& g, int index);
+    void canvas_jog(int delta);
+    // Typing, for a page that asked.
+    void type(char c);
+    void finish_typing(bool cancelled);
+    void draw_typing(juce::Graphics& g);
 
     void draw_play(juce::Graphics& g);
     void draw_load(juce::Graphics& g);
@@ -208,6 +227,13 @@ private:
     int menu_cursor = 0;
     std::vector<std::pair<int, std::string>> pick_items; // an items list, as the module gave it
     std::string pick_key;                      // the list being read, until it is
+    std::vector<std::unique_ptr<CanvasPage>> canvas_pages; // one a module->canvases, null where its script failed
+    int canvas_open = -1;                      // a page opened from the menu, over it
+    bool canvas_entered = false;               // the page has the jogwheel
+    bool typing = false;
+    std::string typed, typing_title;
+    int typing_canvas = -1;
+    std::atomic<bool> pads_typing {false};     // the audio thread's: pads are letters, not notes
     bool pick_reading = false;
     std::map<std::string, uint64_t> set_at; // each key's last set (SynthPlayer's serial)
     unsigned slow_calls = 0;              // calls into a module that held the audio thread 1 ms or more
