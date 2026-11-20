@@ -7,7 +7,7 @@ transport and tempo ("Tracks", below). The screens are mockups first, drawn
 by the UI kit (`src/ui/widgets.*`) at the screen's real size, each set in a
 file of its own (`src/ui/mockups*.cpp`); the app's screens are built to
 them. `build/melodee-move --ui-mockups DIR` renders them again
-(`docs/ui/rail.png`, `docs/ui/tracks.png`); `--melodee-previews DIR` draws
+(`docs/ui/rail.png`, `docs/ui/tracks.png`, `docs/ui/sampling.png`); `--melodee-previews DIR` draws
 the app's own screens.
 
 ![The Rail screens](ui/rail.png)
@@ -185,6 +185,61 @@ Chop), Kerem decides with that map. `docs/ui/tracks.png` is the sheet
 | Tempo (Shift + Step 5) | `TMPO` / / signature | BPM large | `PUSH: OK`; bar and beat |
 | Metronome (Shift + Step 6) | `MET` | `ON` or `OFF` large, its level | `PUSH: OK` |
 | Groove (Shift + Step 7) | `GRV` | the groove in % large | `PUSH: OK` |
+
+## Sampling
+
+Melodee's sampling on the Move, approved by Kerem on 2026-11-20 as
+`docs/ui/sampling.png` draws it (`src/ui/mockups_sampling.cpp`), built on
+the approved Sampling and Audio Recall cards of `controls.png` and Record of
+`rail.png`. The Move's **Sampling** button is Melodee's Sample Record, and
+the Move's keys keep their meaning ([MOVE_CONTROLS.md](MOVE_CONTROLS.md),
+Decisions).
+
+![The sampling screens](ui/sampling.png)
+
+- **Sampling** (a kit track): `SMPL`, the record light, `PRESS A PAD`
+  large, the input's level left over right, the source and gain under it.
+  Press a pad to record onto it: at once, or once the input passes START's
+  threshold, or with LENGTH SEQ where the pattern comes round. The pad again,
+  Sampling, the wheel's push or Play stopping ends the take; a pad held 0.4 s
+  ends it as it is let go; another pad carries the take on onto that pad
+  (one file, a part a pad). Back leaves, keeping a take.
+- **The input**: the wheel walks SOURCE, GAIN, MONITOR, START, LENGTH (and
+  TAP for a track) as the Move's walks gain, monitoring and source; its push
+  steps the row on (GAIN and START: push, then the wheel); knobs 1-6 set
+  them. The Move's one input is the mic or the line in as its jack says:
+  SOURCE offers MIC, or LINE, LINE L, LINE R, then RESAMPLE (Melodee's mix)
+  and each TRACK with a sound. With Melodee's own sound as the source the
+  pad pressed is the take's, and from then the pads play the source.
+  Shift + the wheel: the SAMPLING settings (Recall's cut, a Free take's own
+  end, the browser's preview).
+- **Audio Recall** (Shift + Sampling): the last 25 s onto the next empty
+  pad, at once; `RCL` shows what it kept for a moment.
+- **The pads**: the empty ones pink, the kit's in its colour (they can be
+  recorded over), the one taking pulsing red, the parts taken red.
+  Sampling is red in Sampling Mode, pulsing while it records.
+- Takes go to `Melodee/Samples/Recorded` as `TAKE n.wav` (`RESAMPLE n`,
+  `RECALL n`), written as they are recorded.
+
+The rest of the sheet: the new-track sheet's KIT asks where its first sound
+comes from (LIBRARY, EMPTY, INPUT); Sample Options' TRIM and SAVE SAMPLE (its
+name typed on the pads); the browser leads with STARRED and RECENT, plays
+each file as the wheel lands, stars on Shift + push, deletes on Delete
+(asked; what the project plays is kept), installs an MPC expansion on push;
+Chop's manual take (the red pad cuts next), a cut close up while knob 1 or
+2 turns, slices 33-64 on Plus and Minus, slice options on Shift + push, To
+Pads KIT; an audio track's INPUT on Sampling, Rec arming it, its take's CLIP
+and WARP pages.
+
+| Screen | Rail | Subject | Detail |
+| --- | --- | --- | --- |
+| Sampling | `SMPL`, the record light / source | `PRESS A PAD`, the level | source and gain, length |
+| The input's rows | `SMPL` / source | SOURCE, GAIN, MONITOR, START, LENGTH, the level | |
+| Armed | `REC`, the record light / source | the level and threshold, length onto the pad | `WAITS -24 DB` or `NEXT LOOP` |
+| Taking | `REC`, the record light / pad | the time, the take growing, its parts | length, bar or `A06 > A07` |
+| Taken | `SMPL` / source | the take, its parts | name, seconds |
+| Sampling settings | `SMPL` / `2/2` / `SET` | Recall, gap, trim end, auto end, after, silence, preview | |
+| Audio Recall | `RCL` / `25` / `SEC` | what it kept | `NEXT EMPTY: A07` |
 
 ## Screens in code
 

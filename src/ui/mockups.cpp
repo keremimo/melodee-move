@@ -245,6 +245,7 @@ int write_mockups(const std::string& directory) {
         std::cout << file.getFullPathName() << '\n';
     }
     ok = write_controls_mockups(directory) && ok;
+    ok = write_sampling_mockups(directory) && ok;
     return ok ? 0 : 1;
 }
 
