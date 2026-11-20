@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #pragma once
 #include "move/app.h"
+#include "move/latency.h"
 #include "move/queues.h"
 #include <array>
 #include <atomic>
@@ -12,18 +13,25 @@
 //   Audio   32 pads play sines (C3 upward, a semitone a pad, pressure adds
 //           the octave); Play runs a 16-step click at the tempo; the master
 //           knob is the volume. The input level shows on the screen.
+//           Pads sound from audio_event(), on the audio thread in the cycle
+//           they were read, the shortest way the runtime offers.
 //   Input   jog to the INPUTS page: every control names itself there.
+//   Latency jog to LATENCY, push the jog: a quiet click every half second
+//           goes out and is timed coming back in (a cable from the output to
+//           the input, or the speaker into the microphone), beside the time
+//           from reading a pad to the end of its render.
 //   Lights  pads by row, held pads white, steps on and the playhead, Play,
 //           the four row buttons, Shift and Back.
-//   Screen  HOME, INPUTS, then Melodee's own pages crushed to 128 x 64
-//           (--previews DIR): jog turns them, jog push swaps letterbox and
-//           stretch, Shift shows the name.
+//   Screen  HOME, INPUTS, LATENCY, then Melodee's own pages crushed to
+//           128 x 64 (--previews DIR): jog turns them, jog push swaps
+//           letterbox and stretch, Shift shows the name.
 class SpikeApp : public move::App {
 public:
     explicit SpikeApp(std::string previews_directory = {});
 
     void render(const move::AudioBlock& input, move::AudioBlock& output) override; // audio thread
     void audio_opened(const move::AudioFormat& format) override;                    // audio thread
+    void audio_event(const move::SurfaceEvent& event) override;                     // audio thread
     void surface(const move::SurfaceEvent& event) override;                         // MIDI thread
     void lights(move::Lights& lights, Clock::time_point now) override;              // MIDI thread
     void draw(juce::Graphics& g) override;                                          // screen thread
@@ -31,9 +39,10 @@ public:
     std::string status() const override;
 
 private:
-    static constexpr int home_page = 0, inputs_page = 1, first_preview_page = 2;
+    static constexpr int home_page = 0, inputs_page = 1, latency_page = 2, first_preview_page = 3;
     void draw_home(juce::Graphics& g);
     void draw_inputs(juce::Graphics& g);
+    void draw_latency(juce::Graphics& g);
     void draw_preview(juce::Graphics& g, int index);
     void log(const char* text);
 
@@ -50,6 +59,10 @@ private:
     std::atomic<bool> stretch {true};
     struct LogLine { std::array<char, 24> text {}; };
     move::SpscRing<LogLine, 64> log_lines;
+
+    // The round-trip meter: the MIDI thread turns it on, the audio thread runs it.
+    std::atomic<bool> measuring {false};
+    move::LoopbackMeter meter;
 
     // Audio thread only.
     struct Voice { double phase = 0; float level = 0, pressure = 0; };

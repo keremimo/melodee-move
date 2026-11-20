@@ -41,7 +41,7 @@ systemctl stop move-launcher-menu.service
 # waiting on a foreground command holds its traps until that command ends,
 # and on a hang-up only this script, the session leader, is told. The same
 # libjack as jackd-move.service, so client and server match.
-LD_LIBRARY_PATH=$POUNDHARD_LIB "$HERE/melodee-move" "$@" &
+LD_LIBRARY_PATH=$POUNDHARD_LIB "$HERE/melodee-move" --backend jack "$@" &
 spike=$!
 status=0
 while kill -0 "$spike" 2>/dev/null; do

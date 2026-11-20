@@ -34,7 +34,10 @@ void write_wav(const std::string& path, const std::vector<int16_t>& samples, uns
     if (!out) throw std::runtime_error("cannot write " + path);
 }
 
+// As a host and the runtime would: pads to the audio path first, then
+// everything to surface().
 void send(App& app, Session& session, const SurfaceEvent& event) {
+    if (event.input.kind == Input::Kind::Pad || event.input.kind == Input::Kind::PadPressure) app.audio_event(event);
     track_input(session, event.input);
     app.surface(event);
 }

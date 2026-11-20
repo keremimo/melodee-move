@@ -5,15 +5,22 @@
 #include "move/controls.h"
 #include "move/display.h"
 #include "move/font.h"
+#include "move/host.h"
+#include "move/latency.h"
 #include "move/lights.h"
 #include "move/queues.h"
+#include "move/spi_device.h"
+#include "move/spi_protocol.h"
 #include "move/tools.h"
 #include "spike/spike_app.h"
+#include <chrono>
 #include <cmath>
+#include <cstring>
 #include <iostream>
 #include <memory>
 #include <random>
 #include <string>
+#include <thread>
 #include <vector>
 
 using namespace move;
@@ -222,6 +229,154 @@ void test_spike() {
     CHECK(play_lit);
 }
 
+void put_event(uint8_t* page, unsigned slot, uint8_t header, uint8_t status, uint8_t data1, uint8_t data2, uint32_t timestamp) {
+    uint8_t* event = page + spi::in_midi + 8 * slot;
+    event[0] = header; event[1] = status; event[2] = data1; event[3] = data2;
+    spi::DisplayServer::store32(event + 4, timestamp);
+}
+
+void test_spi_protocol() {
+    std::vector<uint8_t> page(spi::page_size, 0);
+    put_event(page.data(), 0, 0x09, 0x90, 68, 100, 5);
+    put_event(page.data(), 1, 0x01, 0x00, 0, 0, 6);  // the XMOS heartbeat: no status byte
+    put_event(page.data(), 2, 0x2b, 0xb0, 7, 64, 7);  // cable 2, external
+    std::array<spi::MidiIn, spi::midi_in_slots> events;
+    unsigned skipped = 0;
+    unsigned count = spi::read_midi_in(page.data(), events, skipped);
+    CHECK(count == 2 && skipped == 1);
+    CHECK(events[0].cable == 0 && events[0].bytes == (std::array<uint8_t, 3> {0x90, 68, 100}) && events[0].size == 3 && events[0].timestamp == 5);
+    CHECK(events[1].cable == 2 && events[1].bytes[0] == 0xb0 && events[1].bytes[2] == 64);
+    spi::clear_midi_in(page.data());
+    CHECK(spi::read_midi_in(page.data(), events, skipped) == 0);
+
+    const uint8_t pad_light[] {0x90, 71, 120};
+    uint32_t packet = spi::usb_midi_packet(0, pad_light, 3);
+    CHECK(packet == (0x09u | 0x90u << 8 | 71u << 16 | 120u << 24));
+    const uint8_t play_light[] {0xb0, 85, 8};
+    CHECK((spi::usb_midi_packet(0, play_light, 3) & 0xff) == 0x0b);
+    const uint8_t program[] {0xc0, 5};
+    CHECK(spi::usb_midi_packet(2, program, 2) == (0x2cu | 0xc0u << 8 | 5u << 16));
+    const uint8_t sysex[] {0xf0, 1, 2};
+    CHECK(spi::usb_midi_packet(0, sysex, 3) == 0 && spi::usb_midi_packet(0, pad_light, 2) == 0);
+    std::memset(page.data(), 0xaa, 80);
+    uint32_t packets[] {packet, packet};
+    spi::write_midi_out(page.data(), packets, 2);
+    CHECK(spi::DisplayServer::load32(page.data() + 4) == packet && spi::DisplayServer::load32(page.data() + 8) == 0
+          && spi::DisplayServer::load32(page.data() + 76) == 0);
+
+    for (unsigned n = 0; n < 256; ++n) { page[spi::in_audio + 2 * n] = 0xe8; page[spi::in_audio + 2 * n + 1] = 0x03; } // 1000
+    AudioBlock block {};
+    spi::read_audio_in(page.data(), block);
+    CHECK(block[0] == 1000 * 65536 && block[255] == 1000 * 65536);
+    spi::Dither dither;
+    block.fill(0);
+    spi::write_audio_out(page.data(), block, dither);
+    bool silent = true;
+    for (unsigned n = 0; n < 512; ++n) silent &= page[spi::out_audio + n] == 0;
+    CHECK(silent); // digital silence stays silence: no dither hiss when idle
+    block.fill(to_s32(0.5f));
+    block[1] = to_s32(1.0f);
+    block[2] = to_s32(-1.0f);
+    spi::write_audio_out(page.data(), block, dither);
+    auto sample = [&](unsigned n) { return int16_t(uint16_t(page[spi::out_audio + 2 * n]) | uint16_t(page[spi::out_audio + 2 * n + 1]) << 8); };
+    CHECK(std::abs(sample(0) - 16384) <= 1 && sample(1) == 32767 && sample(2) <= -32767);
+    double sum = 0;
+    float lowest = 0, highest = 0;
+    for (int n = 0; n < 100000; ++n) {
+        float noise = dither.next();
+        sum += noise; lowest = std::min(lowest, noise); highest = std::max(highest, noise);
+    }
+    CHECK(std::fabs(sum / 100000) < 0.01 && lowest >= -1.0f && highest <= 1.0f && lowest < -0.9f && highest > 0.9f);
+
+    spi::DisplayServer screen;
+    Frame first {}, second {};
+    first.fill(0x11); second.fill(0x22);
+    std::fill(page.begin(), page.end(), 0);
+    CHECK(screen.serve(page.data(), [&] { return first; }) == 0); // nothing asked
+    spi::DisplayServer::store32(page.data() + spi::in_display_index, 1);
+    CHECK(screen.serve(page.data(), [&] { return first; }) == 1);
+    CHECK(spi::DisplayServer::load32(page.data() + spi::out_display_index) == 1 && page[spi::out_display_data] == 0x11
+          && page[spi::out_display_data + 171] == 0x11);
+    spi::DisplayServer::store32(page.data() + spi::in_display_index, 6);
+    std::fill(page.begin() + spi::out_display_data, page.begin() + spi::out_display_data + 172, 0);
+    CHECK(screen.serve(page.data(), [&] { return second; }) == 6); // chunk 6 keeps the picture chunk 1 latched
+    CHECK(page[spi::out_display_data] == 0x11 && page[spi::out_display_data + 163] == 0x11 && page[spi::out_display_data + 164] == 0);
+}
+
+void test_latency_meter() {
+    for (unsigned delay : {300u, 128u, 1000u}) { // never under a block: an input cannot hear its own block
+        LoopbackMeter meter;
+        meter.set_rate(44100);
+        std::vector<int32_t> line(2 * 8192, 0);
+        AudioBlock input {}, output {};
+        uint64_t frame = 0;
+        for (int block = 0; block < 44100 * 3 / 128; ++block) {
+            for (unsigned n = 0; n < audio_frames; ++n) {
+                uint64_t at = frame + n;
+                int32_t back = at >= delay ? line[2 * ((at - delay) % 8192)] : 0;
+                input[2 * n] = input[2 * n + 1] = back / 2 + int32_t(std::sin(at * 0.01) * 0.001 * 2147483647.0); // half level, a little noise
+            }
+            output.fill(0);
+            meter.process(input, output, true);
+            for (unsigned n = 0; n < audio_frames; ++n) line[2 * ((frame + n) % 8192)] = output[2 * n];
+            frame += audio_frames;
+        }
+        CHECK(meter.count() >= 5 && meter.missed() == 0 && meter.last() == int(delay) && meter.best() == int(delay));
+    }
+    LoopbackMeter open_loop; // no cable: every click is missed
+    AudioBlock silence {}, output {};
+    for (int block = 0; block < 44100 * 2 / 128; ++block) { output.fill(0); open_loop.process(silence, output, true); }
+    CHECK(open_loop.count() == 0 && open_loop.missed() >= 3);
+    LoopbackMeter idle; // not measuring: the output is left alone
+    output.fill(5);
+    idle.process(silence, output, false);
+    CHECK(output[0] == 5 && idle.count() == 0);
+}
+
+void test_spi_host() {
+    // A pad hit, then its release, against the simulated XMOS, unpaced.
+    auto owned = std::make_unique<FakeSpiDevice>(false, 300, "3:0x90,68,100;400:0x80,68,0;5:0xb0,49,127");
+    FakeSpiDevice* device = owned.get();
+    SpikeApp app;
+    Session session;
+    app.attach(session);
+    auto host = make_spi_host(app, session, std::move(owned));
+    host->start();
+    // What the runtime's threads would send: a light and a screen.
+    host->leds.push({0x9f, 71, colour::white});
+    Frame picture {};
+    picture[0] = 0x81; picture[1023] = 0x18; picture[500] = 0x42;
+    host->display.back() = display_message(picture);
+    host->display.publish();
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    Frame blank {};
+    host->display.back() = display_message(blank);
+    host->display.publish();
+    host->finish(std::chrono::milliseconds(500));
+    const auto& seen = device->seen();
+    CHECK(seen.transfers > 500 && host->alive());
+    CHECK(seen.led_messages >= 1); // and on channel 1, cable 0:
+    CHECK(seen.chunks_answered > 12 && seen.chunks_wrong == 0 && seen.frames_completed > 2);
+    bool blank_last = true;
+    for (uint8_t byte : seen.frame) blank_last &= byte == 0;
+    CHECK(blank_last); // the screen is cleared on the way out
+    CHECK(seen.output_peak > 1000);
+    CHECK(session.pad_events.load() == 2 && session.midi_in.load() == 3 && session.pad_to_render_ns.load() > 0);
+    CHECK(session.backend.load() == std::string("spi") && session.blocks.load() > 500);
+    // The light went out as a USB-MIDI note-on, channel 1, on the controls' cable.
+    auto run_once = std::make_unique<FakeSpiDevice>(false, 0, "");
+    FakeSpiDevice* lights_device = run_once.get();
+    Session quiet;
+    SpikeApp other;
+    other.attach(quiet);
+    auto lights_host = make_spi_host(other, quiet, std::move(run_once));
+    lights_host->start();
+    lights_host->leds.push({0x9f, 71, colour::white});
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    lights_host->finish(std::chrono::milliseconds(200));
+    CHECK(lights_device->seen().last_led_packet == (0x09u | 0x90u << 8 | 71u << 16 | uint32_t(colour::white) << 24));
+}
+
 } // namespace
 
 int main() {
@@ -231,6 +386,9 @@ int main() {
     test_reblocker();
     test_queues();
     test_spike();
+    test_spi_protocol();
+    test_latency_meter();
+    test_spi_host();
     std::cout << "move-tests: " << checks - failures << " of " << checks << " checks passed\n";
     return failures ? 1 : 0;
 }

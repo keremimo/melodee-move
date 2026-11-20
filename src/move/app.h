@@ -46,8 +46,14 @@ struct Session {
     std::atomic<uint64_t> midi_in {0}, midi_dropped {0}, leds_sent {0}, frames_sent {0}, frames_failed {0};
     std::atomic<float> input_peak {0}, output_peak {0}; // The last period's, 0..1
     std::atomic<float> cpu_load {0};                    // JACK's DSP load, percent
-    std::atomic<uint64_t> process_calls {0}, process_ns {0}; // time in the process callback, ours alone
+    std::atomic<uint64_t> process_calls {0}, process_ns {0}; // time in the audio thread's cycle, ours alone
     std::atomic<uint64_t> process_ns_peak {0};               // the longest since the last status line
+    // Pads handed to App::audio_event(), and for a cycle that carried one,
+    // the time from reading it to the end of the render() it sounds in.
+    std::atomic<uint64_t> pad_events {0}, pad_to_render_ns {0}, pad_to_render_ns_peak {0};
+    std::atomic<uint64_t> device_transfer_ns {0}; // the Move's device: how long the driver's last transfer took
+    std::atomic<bool> realtime {false};           // the audio thread got SCHED_FIFO
+    std::atomic<const char*> backend {""};        // "jack" or "spi"
 };
 
 class App {
@@ -62,6 +68,12 @@ public:
     // Audio, before the first render() and after JACK changes its period.
     virtual void audio_opened(const AudioFormat&) {}
 
+    // Audio thread, before the render() it should sound in: a pad hit,
+    // release or pressure change, read in this very cycle. This is the path
+    // for sound, with no thread in between; surface() still gets the same
+    // event afterwards on the MIDI thread, for everything else. Keeps
+    // render()'s rules.
+    virtual void audio_event(const SurfaceEvent&) {}
     // MIDI thread: a message from the Move's controls. Shift + Back never
     // arrives: the runtime takes it to quit.
     virtual void surface(const SurfaceEvent&) {}

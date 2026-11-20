@@ -1,0 +1,9 @@
+{
+    "id": "melodee-move",
+    "name": "Melodee Spike",
+    "version": "0.0.1",
+    "description": "Melodee's Move runtime: pads, lights, screen and a latency meter, with the Move to itself",
+    "author": "Kerem Kilic (Ellic Studio)",
+    "component_type": "tool",
+    "standalone": true
+}

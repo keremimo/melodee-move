@@ -24,9 +24,20 @@ SpikeApp::SpikeApp(std::string previews_directory) : previews_directory(std::mov
 
 void SpikeApp::audio_opened(const AudioFormat& format) {
     rate = format.rate;
+    meter.set_rate(format.rate);
 }
 
-void SpikeApp::render(const AudioBlock&, AudioBlock& output) {
+void SpikeApp::audio_event(const SurfaceEvent& event) {
+    const auto& input = event.input;
+    if (input.kind == Input::Kind::Pad) {
+        pad_level[input.index].store(input.pressed ? input.value / 127.0f : 0.0f, std::memory_order_relaxed);
+        if (!input.pressed) pad_pressure[input.index].store(0, std::memory_order_relaxed);
+    } else if (input.kind == Input::Kind::PadPressure) {
+        pad_pressure[input.index].store(input.value / 127.0f, std::memory_order_relaxed);
+    }
+}
+
+void SpikeApp::render(const AudioBlock& input, AudioBlock& output) {
     std::array<float, pad_count> target, pressure;
     for (unsigned pad = 0; pad < pad_count; ++pad) {
         target[pad] = pad_level[pad].load(std::memory_order_relaxed);
@@ -68,6 +79,7 @@ void SpikeApp::render(const AudioBlock&, AudioBlock& output) {
         int32_t value = to_s32(std::clamp(sample * gain, -0.95f, 0.95f));
         output[2 * frame] = output[2 * frame + 1] = value;
     }
+    meter.process(input, output, measuring.load(std::memory_order_relaxed));
 }
 
 void SpikeApp::log(const char* text) {
@@ -80,14 +92,11 @@ void SpikeApp::surface(const SurfaceEvent& event) {
     const auto& input = event.input;
     char text[32];
     switch (input.kind) {
-    case Input::Kind::Pad:
-        pad_level[input.index].store(input.pressed ? input.value / 127.0f : 0.0f);
-        if (!input.pressed) pad_pressure[input.index].store(0);
+    case Input::Kind::Pad: // the sound already started in audio_event()
         if (input.pressed) std::snprintf(text, sizeof text, "PAD %u ON %u", input.index + 1u, unsigned(input.value));
         else std::snprintf(text, sizeof text, "PAD %u OFF", input.index + 1u);
         break;
     case Input::Kind::PadPressure:
-        pad_pressure[input.index].store(input.value / 127.0f);
         std::snprintf(text, sizeof text, "PRESS %u %u", input.index + 1u, unsigned(input.value));
         if (input.value % 16) return; // pressure is a stream: log only some of it
         break;
@@ -98,6 +107,7 @@ void SpikeApp::surface(const SurfaceEvent& event) {
     case Input::Kind::Button:
         if (input.pressed && input.index == uint8_t(Button::Play)) playing = !playing;
         if (input.pressed && input.index == uint8_t(Button::MainPush) && page >= first_preview_page) stretch = !stretch;
+        if (input.pressed && input.index == uint8_t(Button::MainPush) && page == latency_page) measuring = !measuring;
         std::snprintf(text, sizeof text, "%s %s", buttons[input.index].name, input.pressed ? "ON" : "OFF");
         break;
     case Input::Kind::Knob: {
@@ -114,7 +124,8 @@ void SpikeApp::surface(const SurfaceEvent& event) {
         break;
     case Input::Kind::MainKnob: {
         int last = first_preview_page + preview_count.load() - 1;
-        page = std::clamp(page + input.delta, home_page, std::max(inputs_page, last));
+        page = std::clamp(page + input.delta, home_page, std::max(latency_page, last));
+        if (page != latency_page) measuring = false;
         std::snprintf(text, sizeof text, "JOG %+d", input.delta);
         break;
     }
@@ -177,7 +188,29 @@ void SpikeApp::draw(juce::Graphics& g) {
     int shown = page.load();
     if (shown == home_page) draw_home(g);
     else if (shown == inputs_page) draw_inputs(g);
+    else if (shown == latency_page) draw_latency(g);
     else draw_preview(g, shown - first_preview_page);
+}
+
+void SpikeApp::draw_latency(juce::Graphics& g) {
+    char text[32];
+    g.fillRect(0, 0, screen_width, 9);
+    g.setColour(juce::Colours::black);
+    draw_text_centred(g, 0, 1, screen_width, "LATENCY");
+    g.setColour(juce::Colours::white);
+    auto ms = [this](int frames) { return frames * 1000.0 / double(rate); };
+    if (meter.count()) std::snprintf(text, sizeof text, "LOOP %.2fMS BEST %.2f", ms(meter.last()), ms(meter.best()));
+    else std::snprintf(text, sizeof text, "LOOP -");
+    draw_text(g, 0, 11, text);
+    std::snprintf(text, sizeof text, "%u TIMED %u MISSED", meter.count(), meter.missed());
+    draw_text(g, 0, 20, text);
+    std::snprintf(text, sizeof text, "PAD>RENDER %lluUS", static_cast<unsigned long long>(session().pad_to_render_ns.load() / 1000));
+    draw_text(g, 0, 29, text);
+    std::snprintf(text, sizeof text, "%s RT %s LATE %llu", session().backend.load(), session().realtime ? "YES" : "NO",
+                  static_cast<unsigned long long>(session().xruns.load()));
+    draw_text(g, 0, 38, text);
+    draw_text(g, 0, 48, measuring ? "TIMING CLICKS" : "CABLE OUT>IN, OR");
+    draw_text(g, 0, 56, measuring ? "PUSH JOG: STOP" : "SPEAKER>MIC. PUSH JOG");
 }
 
 void SpikeApp::draw_home(juce::Graphics& g) {
@@ -241,8 +274,9 @@ void SpikeApp::draw_preview(juce::Graphics& g, int index) {
 }
 
 std::string SpikeApp::status() const {
-    char text[96];
-    std::snprintf(text, sizeof text, "page=%d playing=%d tempo=%.0f steps=%04x previews=%d", page.load(), int(playing.load()),
-                  double(tempo.load()), unsigned(steps_on.load()), preview_count.load());
+    char text[160];
+    std::snprintf(text, sizeof text, "page=%d playing=%d tempo=%.0f steps=%04x previews=%d loop_frames=%d/%d timed=%u missed=%u",
+                  page.load(), int(playing.load()), double(tempo.load()), unsigned(steps_on.load()), preview_count.load(),
+                  meter.last(), meter.best(), meter.count(), meter.missed());
     return text;
 }

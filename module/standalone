@@ -1,0 +1,14 @@
+#!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-only
+# Schwung's Tools menu runs this after stopping Move (launch-standalone.sh),
+# and starts Move again when it exits: Shift + Back on the Move. It runs as
+# the `ableton` user, which Ableton's firmware does not let take realtime
+# priority, so the status line in melodee-move.log says realtime=no.
+HERE=$(cd "$(dirname "$0")" && pwd)
+LOG="$HERE/melodee-move.log"
+[ -f "$LOG" ] && [ "$(wc -c < "$LOG")" -gt 1000000 ] && mv "$LOG" "$LOG.old"
+set --
+[ -d "$HERE/previews" ] && set -- --previews "$HERE/previews"
+export LD_LIBRARY_PATH="$HERE/lib"
+export FONTCONFIG_FILE="$HERE/lib/fonts.conf"
+exec "$HERE/bin/melodee-move" --backend spi "$@" >> "$LOG" 2>&1

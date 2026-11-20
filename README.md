@@ -1,44 +1,66 @@
 # melodee-move
 
-Melodee, the groovebox by Kerem Kiliç (Ellic Studio), on the **Ableton Move**.
+Melodee, the groovebox by Kerem Kiliç (Ellic Studio), on the **Ableton Move**:
+its sampler and Chop on the Move's 32 pads, with the Move to itself and the
+shortest way from a pad to the speaker.
 
-This is the first step: **move-base**, a runtime that hosts an app on the
-Move the way [sample-base](../melodee-sample/base) hosts Melodee on the MPC
-Sample, and a **spike** app that exercises each path through it.
-It builds and its offline tests pass. **It has not run on a Move yet.**
+This is the first step: **move-base**, the runtime that hosts an app on the
+Move as [sample-base](../melodee-sample/base) hosts Melodee on the MPC
+Sample, and a **spike** app that exercises every path through it. It builds,
+its tests pass and it runs against a simulated Move. **It has not yet run on
+a Move.**
 
-## The platform
+## Two ways onto the Move
 
-The Move runs [poundhard-armbian](https://github.com/nzimas/poundhard-armbian):
-Armbian trixie, a 6.18 PREEMPT_RT kernel on the Move's Compute Module 4, and
-`jackd -d move`, whose driver (`jack_move.so`, copied from the owner's own
-RNBO install, never shipped) exposes the whole instrument as JACK ports:
+| | Ableton's firmware (first choice) | poundhard-armbian |
+| --- | --- | --- |
+| Host | `spi`: the Move's own device, `/dev/ablspi0.0` | `jack`: a client of `jackd -d move` |
+| Changes to the Move | none: Ableton's app is stopped while melodee-move runs, started again after | the OS conversion |
+| Launched from | Schwung's Tools menu, or `tools/deploy-stock.sh` over SSH | `tools/deploy.sh` over SSH |
 
-| Port | Carries |
-| --- | --- |
-| `system:playback_1/2`, `system:capture_1/2` | audio, 44.1 kHz, 128-frame periods |
-| `system:midi_capture` | pads, steps, knobs, buttons, jogwheel (MIDI channel 16) |
-| `system:midi_playback` | pad, step and button lights (channel 16 only) |
-| `system:display` | the 128 x 64 screen: `MOVEDISP` + 1024 bytes, one event a frame |
-| `system:midi_capture_ext` | external MIDI |
+On Ableton's firmware the Move's XMOS I/O processor and the CM4 swap one
+4096-byte page every 128 frames (44.1 kHz, 2.9 ms) through a blocking ioctl
+(`src/move/spi_protocol.h`): 16-bit stereo audio both ways, 20 MIDI messages
+out (lights) and 31 in (pads, knobs, buttons), and one chunk of the 1-bit
+screen the XMOS asks for. Only one process may hold the device, so Ableton's
+app has to be stopped first: Schwung's standalone launcher does that for a
+tool, `tools/run-stock.sh` for a run over SSH.
 
-melodee-move is a JACK client on those ports, with no Node, Python or
-Schwung in between.
+## Latency
+
+The device host runs the whole cycle on one thread, in the order that gives
+a pad the shortest way to the speaker:
+
+```
+lights out -> exchange (blocks) -> screen chunk -> MIDI in -> pads to App::audio_event()
+           -> render() -> audio out (sent with the next exchange)
+```
+
+A pad read in one exchange is in the audio sent with the next: no thread, no
+queue, no extra block in between (`App::audio_event()`, `src/move/app.h`).
+What is left is the Move's own: the XMOS's pad scan and its buffers to the
+converters.
+
+The spike measures both halves. Its LATENCY page times a quiet click from
+`render()` out and back in (a cable from the output to the input, or the
+speaker into the microphone: the XMOS's buffering both ways plus the one
+block above), and shows the time from reading a pad to the end of its
+render. The status line (every 5 s, and at exit) has `loop_frames`, `pad_us`,
+`process_us` and `late` (exchanges more than 0.4 ms behind time).
+
+To compare with Ableton's firmware and with Schwung, record a fingernail
+tap on a pad playing a short sound with a phone held close: the gap between
+the tap's click and the sound in the waveform is what you hear.
 
 ## Layout
 
 | Folder | What it holds |
 | --- | --- |
-| `src/move/` | move-base. `app.h` the `App` interface (sample-base's hooks: `render`, `surface`, `lights`, `draw`, `service`); `runtime.*` the JACK client and its threads; `audio.h` 128-frame S32 blocks cut from JACK's float periods; `controls.*` the Move's MIDI map; `lights.*` LEDs and the 128-colour palette; `display.*` the screen format and the crush; `font.*` a 5 x 7 pixel font; `tools.*` the offline modes |
+| `src/move/` | move-base. `app.h` the `App` interface (sample-base's hooks plus `audio_event`); `runtime.*` the threads; `host.*` what a host shares with them; `spi_host.cpp`, `spi_device.*`, `spi_protocol.*` the Move's device and a simulated one; `jack_host.cpp` the JACK host (libjack loaded at run time); `audio.h` blocks and the reblocker; `controls.*`, `lights.*`, `display.*`, `font.*`, `latency.h`, `tools.*` |
 | `src/spike/` | the spike app |
-| `tests/` | unit tests for the pure parts |
-| `tools/` | build image, dependencies, deploy scripts |
-
-The threads follow sample-base: `render()` on JACK's process thread,
-`surface()`/`lights()` on a MIDI thread, `draw()` on a screen thread,
-`service()` on the main thread. They share state through atomics and
-lock-free queues (`queues.h`); the process callback never locks or
-allocates.
+| `module/` | the Schwung standalone tool: `module.json`, `standalone` |
+| `tests/` | unit tests, and the device host against the simulated Move |
+| `tools/` | build image, packaging, deploy and probe scripts |
 
 ## Build
 
@@ -48,95 +70,88 @@ Needs Docker and Python 3.
 ./build.sh
 ```
 
-This builds `build/melodee-move` for linux/arm64 on Debian trixie (the
-Move's release), tuned for the Move's Cortex-A72 and never for the MPC
-Sample's A55, then runs the unit tests, the sound self-test
-(`build/self-test.wav`), the screen previews (`build/preview/`) and, when
-`../melodee-sample/build/melodee-preview` exists (or `MELODEE_PREVIEWS` names
-another folder), crushes Melodee's 320 x 240 page previews to 128 x 64 in
+It builds `build/melodee-move` for linux/arm64 on Ubuntu 22.04: glibc 2.35 is
+the newest Ableton's firmware has, libstdc++ is linked in, and the code is
+tuned for the Move's Cortex-A72. Then: the unit tests, the sound self-test,
+the screen previews, a run against the simulated Move (pad, jogwheel to
+LATENCY, the meter timing clicks through a 300-frame cable, Shift + Back),
+and the packages:
+
+- `dist/melodee-move/`: the binary, the libraries Ableton's firmware lacks,
+  a launcher and `run-stock.sh`;
+- `dist/schwung-tool/melodee-move/`: the same as a Schwung standalone tool.
+
+When `../melodee-sample/build/melodee-preview` exists (or `MELODEE_PREVIEWS`
+names another folder) Melodee's pages are crushed to 128 x 64 in
 `build/crushed/`.
 
 ## Run on the Move
 
-The Move must already run poundhard-armbian, with key-based root SSH. With
-the launcher menu idle (no appliance running):
+**From Schwung's Tools menu** (Schwung installed, root SSH to the Move):
 
 ```sh
-tools/deploy.sh move.local --previews ../melodee-sample/build/melodee-preview
+tools/install-schwung-tool.sh move.local --previews ../melodee-sample/build/melodee-preview
 ```
 
-It copies the binary and `run-spike.sh` to `/data/UserData/melodee-move`,
-stops the launcher menu (it redraws the screen every period), runs the spike
-in your terminal and starts the menu again afterwards. **Shift + Back** on
-the Move, Ctrl-C, or the SSH connection dropping stops it and brings the
-menu back; a spike that does not stop within 5 seconds is killed.
+Restart Move, then Tools > Melodee Spike. Schwung stops Move, runs the
+spike and starts Move again when Shift + Back ends it. Output goes to
+`melodee-move.log` in the tool's folder. Schwung runs tools as the `ableton`
+user, which may not take realtime priority (`realtime=no` in the log); run
+over SSH for realtime. `--remove` takes the tool out again.
 
-Nothing here changes the Move for good. The menu is only stopped, never
-disabled, so a reboot always brings it back (or
-`systemctl start move-launcher-menu`); no boot files, services, packages or
-user data are touched. To remove the spike:
-`ssh root@move.local rm -rf /data/UserData/melodee-move`. A status line every 5 seconds shows blocks,
-xruns, JACK's DSP load, the process callback's own mean and longest time
-(`process_us=mean/peak of period`), MIDI in, lights and frames sent.
+**Over SSH, as root**:
 
-On the Move:
+```sh
+tools/deploy-stock.sh move.local --previews ../melodee-sample/build/melodee-preview
+```
 
-- **Pads** play sines, C3 upward a semitone a pad; pressure adds the octave.
-  Held pads light white.
-- **Play** runs a 16-step click; **steps** toggle it; **knob 1** is the
-  tempo, **knob 2** the overtone; the **master knob** is the volume.
-- **Jogwheel**: HOME, INPUTS (every control names itself as you touch it),
-  then Melodee's pages crushed to the screen. **Jog push** swaps letterbox
-  and stretch; hold **Shift** to see the page's name.
+It copies the package to `/data/UserData/melodee-move` and runs it in your
+terminal: Ableton's app is stopped as the Move's own shutdown stops it, the
+spike runs with realtime priority, and Ableton's app comes back however it
+ends (Shift + Back, Ctrl-C, the connection dropping, a crash; a reboot
+always comes back to stock). As with any quit of Move, save your Set first.
+
+**On poundhard-armbian**: `tools/deploy.sh move.local` (the JACK host; the
+launcher menu is stopped while it runs).
+
+On the Move: pads play sines, C3 upward, pressure adds the octave. Play runs
+a 16-step click, steps toggle it, knob 1 is the tempo, knob 2 the overtone,
+the master knob the volume. The jogwheel turns the pages: HOME, INPUTS
+(every control names itself), LATENCY (jog push starts the clicks), then
+Melodee's pages crushed to the screen (jog push: letterbox or stretch; hold
+Shift for the name).
 
 What to check, in order:
 
-1. Sound from the speaker and headphones; `xruns=0` in the status line.
-2. The INPUTS page names every pad, step, knob, touch and button correctly.
+1. Sound from the speaker and headphones; `late=0` in the status line.
+2. INPUTS names every pad, step, knob, touch and button correctly.
 3. Pads, steps, Play, the row buttons, Shift and Back light as described.
-4. The HOME page's `IN` level moves with the microphone (is
-   `system:capture_1/2` the microphone, the line input, or silent?).
-5. The screen keeps up while playing (`frames_failed=0`).
+4. LATENCY: the round trip, and `pad_us`.
+5. The screen keeps up while playing.
 6. Pad pressure arrives (`PRESS` lines on INPUTS).
 
-## Stock firmware?
+## Probing a Move
 
-move-base is only a JACK client of `jackd -d move`, so it may not need
-Armbian at all: RNBO's takeover already runs that server, with the same
-`jack_move.so`, on Ableton's own firmware. Before trying, ask a Move on stock
-firmware what it has, without changing it:
-
-```sh
-tools/probe-stock.sh move.local
-```
-
-`tools/probe-stock-remote.sh` goes over SSH on stdin (nothing is copied to
-the Move) and only reads: the kernel (PREEMPT_RT or not), glibc and
-libstdc++ versions, free space and which partitions are writable, which of
-melodee-move's libraries exist, who holds `/dev/ablspi0.0`, Ableton's
-processes and their realtime threads, how `/etc/init.d/move` starts the app,
-and whether RNBO's `jackd` and `jack_move.so` are installed. The report is
-saved in `.local/probe/` (ignored by git).
+`tools/probe-stock.sh move.local` reads, and changes nothing: the kernel,
+glibc, free space, libraries, who holds `/dev/ablspi0.0`, how Ableton's app
+starts, Schwung and RNBO, whether the kernel could make the Move a USB sound
+card. The report stays in `.local/probe/`.
 
 ## Tested so far
 
 - Unit tests: control decoding, lights and palette, the screen format, the
-  crush, the reblocker, the queues, the spike's hooks.
-- The self-test renders sound; the previews draw.
-- Against a real JACK server (the dummy driver, in the build image): the
-  client starts, sends lights and frames, cuts 100-frame periods into
-  128-frame blocks with 128 frames of latency and no underruns, stops on
-  `--seconds` and on the server going away. The process callback took about
-  50 µs of a 2.9 ms period on an Apple-silicon Mac (expect more on the
-  Move's A72). That container had no realtime scheduling, so its xruns say
-  nothing about the Move.
-- `run-spike.sh` in a pseudo-terminal, as `ssh -t` runs it, with
-  `systemctl` faked: the spike timing out, Ctrl-C, the terminal hanging up,
-  and a spike that ignores signals (killed after 5 seconds). Each time the
-  menu was stopped once and started once, and no spike was left running.
-- The stock probe in Debian trixie and Alpine (BusyBox) containers: it runs
-  to the end in both, and the containers' filesystems were the same after
-  it as before.
+  crush, the reblocker, the queues, the device protocol (MIDI both ways,
+  audio with dither, the screen's pull handshake), the latency meter, and the
+  device host against the simulated Move (lights out on channel 1, every
+  screen chunk answered, a blank screen on the way out, the pad sounding).
+- `./build.sh`'s simulated run: the meter timed 8 of 8 clicks at exactly 428
+  frames (300 of cable plus the block a render waits for the next exchange);
+  a pad went from read to rendered in 37 µs; the cycle's own work took 33 µs
+  of 2902.
+- The package runs on a bare Ubuntu 22.04 (Ableton's glibc) with only its
+  own libraries.
+- The JACK host against a dummy JACK server, earlier; the scripts' signal
+  handling in a pseudo-terminal.
 
 Not tested: anything on a Move.
 
@@ -149,12 +164,10 @@ to be designed again for this screen.
 
 ## Next
 
-- Run the spike on a Move and settle the checks above.
-- An adapter from sample-base's `App` to move-base's, so Melodee's engine,
-  model and plug-in host build here unchanged.
-- Melodee's pages and controls designed for the 128 x 64 screen, 32 pads,
-  16 steps and 8 knobs.
-- A launcher menu entry instead of stopping the menu.
+- Run the spike on a Move: the checks above, and the latency against
+  Ableton's firmware and Schwung.
+- Melodee's engine on move-base, the sampler and Chop first.
+- Chop's screen and pads for the Move.
 
 ## Licence
 

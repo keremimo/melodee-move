@@ -3,23 +3,29 @@
 #include "move/app.h"
 #include <string>
 
-// Runs one App on the Move, as a JACK client of `jackd -d move`
-// (poundhard-armbian's native server; README.md). It owns:
-//   audio    system:capture_1/2 in, system:playback_1/2 out, cut into
-//            128-frame blocks for render() on JACK's process thread;
-//   controls system:midi_capture, decoded for surface() on the MIDI thread;
-//            system:midi_capture_ext for midi();
-//   lights   lights() every 5 ms, changes only, to system:midi_playback;
-//   screen   draw() up to 60 times a second, changed frames only (and once
-//            a second regardless), to system:display.
+// Runs one App on the Move, through one of two hosts (host.h):
+//   spi   the Move's own device, /dev/ablspi0.0, on Ableton's firmware
+//         with Ableton's app stopped: launched from Schwung's Tools menu
+//         (module/) or tools/run-stock.sh;
+//   jack  a client of `jackd -d move` on poundhard-armbian.
+// Either way: render() and audio_event() on the host's audio thread,
+// surface()/midi()/lights() on a MIDI thread, draw() on a screen thread up
+// to 60 times a second (changed frames only), service() on this thread.
 // Shift + Back, SIGINT, SIGTERM, SIGHUP, --seconds, App::finished() or the
-// JACK server going away all stop it; on the way out every light goes off
-// and the screen is cleared.
+// host going away all stop it; on the way out every light goes off and the
+// screen is cleared.
 namespace move {
 
+enum class Backend { Auto, Spi, Jack, SpiSimulated };
+
 struct RunOptions {
+    Backend backend = Backend::Auto; // Auto: spi where /dev/ablspi0.0 exists, else jack
     std::string client_name = "melodee-move";
-    double seconds = 0; // 0: until stopped
+    double seconds = 0;              // 0: until stopped
+    // SpiSimulated: a cable from the outputs to the inputs this many frames
+    // long, and control messages to play (spi_device.h, FakeSpiDevice).
+    unsigned simulated_loopback_frames = 300;
+    std::string simulated_script;
 };
 
 int run_app(App& app, const RunOptions& options);
