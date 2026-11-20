@@ -58,7 +58,7 @@ CPPFLAGS += -isystem $(QUICKJS)
 build/obj/quickjs/%.o: $(QUICKJS)/%.c
 	@mkdir -p $(@D)
 	$(CC) $(QUICKJS_CFLAGS) -c $< -o $@
-SHARED_OBJECTS := $(patsubst src/%.cpp,build/obj/%.o,$(wildcard src/move/*.cpp src/ui/*.cpp src/spike/*.cpp src/app/*.cpp))
+SHARED_OBJECTS := $(patsubst src/%.cpp,build/obj/%.o,$(wildcard src/move/*.cpp src/ui/*.cpp src/spike/*.cpp src/app/*.cpp src/web/*.cpp))
 
 # A stand-in Schwung module for the tests, where Schwung keeps its synths.
 FAKE_MODULE := build/test-modules/sound_generators/fake

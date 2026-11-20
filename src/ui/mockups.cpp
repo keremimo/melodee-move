@@ -8,10 +8,8 @@
 #include <iostream>
 
 namespace ui {
+namespace mockup {
 namespace {
-
-using Draw = std::function<void(juce::Graphics&)>;
-struct Screen { const char* name; const char* caption; Draw draw; };
 
 const juce::Colour on = juce::Colours::white, off = juce::Colours::black;
 
@@ -47,6 +45,8 @@ std::vector<int> evenly(int width, int slices) {
 
 const std::vector<std::string> modules {"OB-XD", "SURGE XT", "8W8", "9W9", "APHEX", "CHONK", "CLEMENTINE", "HUSH ONE", "WURL"};
 const std::vector<std::string> samples {"DRUMS >", "BREAKS >", "VOX >", "BREAK 94.WAV", "BREAK 120.WAV", "DUSTY KEYS.WAV", "HORN STAB.WAV"};
+
+} // namespace
 
 std::vector<Screen> rail_screens() {
     auto peaks = break_peaks();
@@ -145,7 +145,7 @@ bool write_png(const juce::Image& image, const juce::File& file) {
     return output.openedOk() && juce::PNGImageFormat().writeImageToStream(image, output);
 }
 
-move::Frame render(const Draw& draw) {
+juce::Image screen_image(const Draw& draw, int scale) {
     juce::Image image(juce::Image::ARGB, width, height, true);
     {
         juce::Graphics g(image);
@@ -153,43 +153,50 @@ move::Frame render(const Draw& draw) {
         g.setColour(on);
         draw(g);
     }
-    return move::pack(image);
+    return move::frame_image(move::pack(image), scale);
 }
 
-juce::Image sheet_of(const std::vector<Screen>& screens) {
+juce::Image sheet(const char* title, const char* subtitle, const std::vector<Screen>& screens) {
     constexpr int scale = 4, gap = 24, caption = 30, top = 92;
     int screen_w = width * scale, screen_h = height * scale;
     int rows = int(screens.size() + 1) / 2;
-    juce::Image sheet(juce::Image::RGB, gap + 2 * (screen_w + gap), top + rows * (screen_h + caption + gap), true);
-    juce::Graphics g(sheet);
+    juce::Image image(juce::Image::RGB, gap + 2 * (screen_w + gap), top + rows * (screen_h + caption + gap), true);
+    juce::Graphics g(image);
     g.fillAll(juce::Colour(0xff1b1d22));
     g.setColour(juce::Colour(0xffd8f0ff));
-    move::draw_text(g, gap, 20, "MELODEE ON MOVE: RAIL", 4);
+    move::draw_text(g, gap, 20, title, 4);
     g.setColour(juce::Colour(0xff8a96a3));
-    move::draw_text(g, gap, 60, "SAMPLER, CHOP AND SCHWUNG MODULES. DOCS/UI.MD", 2);
+    move::draw_text(g, gap, 60, subtitle, 2);
     for (size_t n = 0; n < screens.size(); ++n) {
         int x = gap + int(n % 2) * (screen_w + gap), y = top + int(n / 2) * (screen_h + caption + gap);
-        g.drawImageAt(move::frame_image(render(screens[n].draw), scale), x, y);
+        g.drawImageAt(screen_image(screens[n].draw, scale), x, y);
         g.setColour(juce::Colour(0xff8a96a3));
         move::draw_text(g, x, y + screen_h + 8, screens[n].caption, 2);
     }
-    return sheet;
+    return image;
 }
 
-} // namespace
+} // namespace mockup
 
 int write_mockups(const std::string& directory) {
+    using namespace mockup;
     auto folder = juce::File::getCurrentWorkingDirectory().getChildFile(juce::String(directory.c_str()));
     folder.createDirectory();
-    auto screens = rail_screens();
+    struct Set { const char* name; const char* title; const char* subtitle; std::vector<Screen> screens; };
+    std::vector<Set> sets {
+        {"rail", "MELODEE ON MOVE: RAIL", "SAMPLER, CHOP AND SCHWUNG MODULES. DOCS/UI.MD", rail_screens()},
+        {"web", "MELODEE ON MOVE: WEB PAGE", "ITS ADDRESS AND WI-FI PAIRING. DOCS/UI.MD", web_screens()},
+    };
     bool ok = true;
-    auto each = folder.getChildFile("rail");
-    each.createDirectory();
-    for (const auto& screen : screens)
-        ok = write_png(move::frame_image(render(screen.draw), 4), each.getChildFile(juce::String(screen.name) + ".png")) && ok;
-    auto file = folder.getChildFile("rail.png");
-    ok = write_png(sheet_of(screens), file) && ok;
-    std::cout << file.getFullPathName() << '\n';
+    for (const auto& set : sets) {
+        auto each = folder.getChildFile(set.name);
+        each.createDirectory();
+        for (const auto& screen : set.screens)
+            ok = write_png(screen_image(screen.draw, 4), each.getChildFile(juce::String(screen.name) + ".png")) && ok;
+        auto file = folder.getChildFile(juce::String(set.name) + ".png");
+        ok = write_png(sheet(set.title, set.subtitle, set.screens), file) && ok;
+        std::cout << file.getFullPathName() << '\n';
+    }
     return ok ? 0 : 1;
 }
 
