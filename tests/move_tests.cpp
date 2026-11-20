@@ -13,7 +13,9 @@
 #include "move/spi_protocol.h"
 #include "move/tools.h"
 #include "spike/spike_app.h"
+#include "app/melodee_app.h"
 #include <chrono>
+#include <filesystem>
 #include <cmath>
 #include <cstring>
 #include <iostream>
@@ -377,6 +379,59 @@ void test_spi_host() {
     CHECK(lights_device->seen().last_led_packet == (0x09u | 0x90u << 8 | 71u << 16 | uint32_t(colour::white) << 24));
 }
 
+int32_t peak_of(const AudioBlock& block) {
+    int32_t peak = 0;
+    for (int32_t sample : block) peak = std::max(peak, sample == INT32_MIN ? INT32_MAX : std::abs(sample));
+    return peak;
+}
+
+void test_melodee_app() {
+    // Melodee's own sampler and Chop, through the Move app: load a drum
+    // loop, play it, chop it, put the slices on pads.
+    std::string folder = "build/test-samples", loop = folder + "/loop.wav";
+    std::filesystem::create_directories(folder);
+    CHECK(write_test_loop(loop));
+    app::MelodeeApp melodee(folder);
+    Session session;
+    melodee.attach(session);
+    melodee.audio_opened(AudioFormat {});
+    CHECK(melodee.load_now(loop, 0).empty());
+    AudioBlock in {}, out {};
+    auto play = [&](unsigned pad, int blocks) {
+        melodee.audio_event(make_event(0x90, pad_note(pad), 110));
+        int32_t peak = 0;
+        for (int block = 0; block < blocks; ++block) { out.fill(0); melodee.render(in, out); peak = std::max(peak, peak_of(out)); }
+        melodee.audio_event(make_event(0x80, pad_note(pad), 0));
+        return peak;
+    };
+    // Lets a one-shot play out: true once a block comes out silent.
+    auto quiet = [&] {
+        for (int block = 0; block < 4000; ++block) { out.fill(0); melodee.render(in, out); if (!peak_of(out)) return true; }
+        return false;
+    };
+    CHECK(play(5, 40) == 0);                // an empty pad is silent
+    CHECK(play(0, 40) > to_s32(0.1f));      // the loop sounds from pad A01
+    CHECK(quiet());
+    melodee.surface(make_event(0xb0, button_cc(Button::Loop), 127)); // Chop
+    unsigned slices = melodee.slice_count();
+    CHECK(slices >= 4 && slices <= 64);
+    CHECK(melodee.status().find("page=chop") != std::string::npos);
+    CHECK(play(1, 20) > to_s32(0.05f));     // pad 2 plays slice 2
+    CHECK(quiet());
+    CHECK(play(slices, 20) == 0);           // past the last slice: nothing
+    melodee.surface(make_event(0xb0, button_cc(Button::MainPush), 127)); // To Pads
+    melodee.surface(make_event(0xb0, button_cc(Button::MainPush), 127)); // Poly, onto the empty pads
+    CHECK(melodee.status().find("page=play") != std::string::npos);
+    CHECK(melodee.status().find("pad=A02") != std::string::npos); // the first empty pad after A01
+    CHECK(play(1, 20) > to_s32(0.05f));     // A02 now holds slice 1
+    CHECK(quiet());
+    // Knob 1 tunes the last pad; touching it shows it; a turn of Regions' amount re-chops.
+    melodee.surface(make_event(0xb0, knob_first_cc, 3));
+    CHECK(melodee.status().find("page=play") != std::string::npos);
+    melodee.surface(make_event(0xb0, button_cc(Button::Back), 127));
+    CHECK(melodee.load_now(folder + "/missing.wav", 3) != "");
+}
+
 } // namespace
 
 int main() {
@@ -389,6 +444,7 @@ int main() {
     test_spi_protocol();
     test_latency_meter();
     test_spi_host();
+    test_melodee_app();
     std::cout << "move-tests: " << checks - failures << " of " << checks << " checks passed\n";
     return failures ? 1 : 0;
 }

@@ -23,16 +23,32 @@ WARNINGS := -Wall -Wextra -Werror
 LDFLAGS := -static-libstdc++ -static-libgcc
 LDLIBS := $(shell pkg-config --libs $(PACKAGES)) -ldl -pthread -lrt
 
+# Melodee's own engine and model, compiled unchanged from a melodee-sample
+# checkout (MELODEE; ./build.sh mounts ../melodee-sample there) into a
+# library, of which the linker takes only what is used. Melodee is changed
+# in melodee-sample, never here.
+MELODEE ?= ../melodee-sample
+MELODEE_INCLUDES := -I$(MELODEE)/src -I$(MELODEE)/base/src
+MELODEE_SOURCES := $(wildcard $(MELODEE)/src/melodee/engine/*.cpp $(MELODEE)/src/melodee/model/*.cpp)
+MELODEE_OBJECTS := $(patsubst $(MELODEE)/src/%.cpp,build/obj/melodee-sample/%.o,$(MELODEE_SOURCES))
+MELODEE_LIBRARY := build/melodee.a
+CPPFLAGS += $(MELODEE_INCLUDES)
+
 MODULE_CPP := $(wildcard $(JUCE)/juce_core/*.cpp $(JUCE)/juce_events/*.cpp $(JUCE)/juce_graphics/*.cpp)
 MODULE_C := $(wildcard $(JUCE)/juce_core/*.c $(JUCE)/juce_graphics/*.c)
 JUCE_OBJECTS := $(addprefix build/obj/juce/,$(notdir $(MODULE_CPP:.cpp=.o) $(MODULE_C:.c=.o)))
-SHARED_OBJECTS := $(patsubst src/%.cpp,build/obj/%.o,$(wildcard src/move/*.cpp src/ui/*.cpp src/spike/*.cpp))
+SHARED_OBJECTS := $(patsubst src/%.cpp,build/obj/%.o,$(wildcard src/move/*.cpp src/ui/*.cpp src/spike/*.cpp src/app/*.cpp))
 
 all: $(TARGET) $(TESTS)
-$(TARGET): build/obj/main.o $(SHARED_OBJECTS) $(JUCE_OBJECTS)
+$(TARGET): build/obj/main.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(MELODEE_LIBRARY)
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
-$(TESTS): build/obj/tests/move_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS)
+$(TESTS): build/obj/tests/move_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(MELODEE_LIBRARY)
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
+$(MELODEE_LIBRARY): $(MELODEE_OBJECTS)
+	rm -f $@ && $(AR) rcs $@ $^
+build/obj/melodee-sample/%.o: $(MELODEE)/src/%.cpp
+	@mkdir -p $(@D)
+	$(CXX) $(MELODEE_INCLUDES) -DNDEBUG $(CXXFLAGS) -w -c $< -o $@
 build/obj/tests/%.o: tests/%.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(WARNINGS) -c $< -o $@

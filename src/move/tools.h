@@ -24,4 +24,9 @@ int write_previews(App& app, const std::string& directory);
 // <name>.dither.png stretched and dithered.
 int crush_pictures(const std::string& input, const std::string& directory);
 
+// A made-up two-bar drum loop at 120 BPM (kicks, snares, hats), as a 16-bit
+// stereo WAV: something for Load and Chop to work on in tests and the
+// simulated Move.
+bool write_test_loop(const std::string& path);
+
 } // namespace move

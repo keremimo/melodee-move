@@ -3,6 +3,7 @@
 #include "move/display.h"
 #include "move/runtime.h"
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -112,6 +113,28 @@ int write_previews(App& app, const std::string& directory) {
         for (unsigned turn = 0; turn <= knob * 2; ++turn) send(app, session, make_event(cc, uint8_t(knob_first_cc + knob), 3));
     ok = save_frame(app, folder, "playing") && ok;
     return ok ? 0 : 1;
+}
+
+bool write_test_loop(const std::string& path) {
+    constexpr unsigned rate = 44100, sixteenth = rate * 60 / 120 / 4, length = sixteenth * 32;
+    std::vector<int16_t> samples(2 * length, 0);
+    uint32_t noise = 12345;
+    auto random = [&] { noise = noise * 1664525u + 1013904223u; return float(noise >> 8) / float(1 << 24) * 2.0f - 1.0f; };
+    for (unsigned step = 0; step < 32; ++step) {
+        bool kick = step % 8 == 0 || step == 22, snare = step % 8 == 4, hat = step % 2 == 0;
+        for (unsigned n = 0; n < sixteenth; ++n) {
+            float t = float(n) / rate, value = 0;
+            if (kick) value += 0.8f * std::sin(6.2831853f * (50.0f + 90.0f * std::exp(-t * 40.0f)) * t) * std::exp(-t * 9.0f);
+            if (snare) value += 0.5f * random() * std::exp(-t * 18.0f) + 0.3f * std::sin(6.2831853f * 190.0f * t) * std::exp(-t * 20.0f);
+            if (hat) value += 0.18f * random() * std::exp(-t * 90.0f);
+            auto sample = int16_t(std::clamp(value, -1.0f, 1.0f) * 30000.0f);
+            size_t at = 2 * size_t(step * sixteenth + n);
+            samples[at] = sample;
+            samples[at + 1] = sample;
+        }
+    }
+    try { write_wav(path, samples, rate); } catch (const std::exception&) { return false; }
+    return true;
 }
 
 int crush_pictures(const std::string& input, const std::string& directory) {

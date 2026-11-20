@@ -10,6 +10,14 @@
 set -eu
 cd "$(dirname "$0")"
 python3 tools/dependencies.py
+# Melodee's engine comes from a melodee-sample checkout beside this one
+# (MELODEE_SAMPLE), compiled as it is.
+MELODEE_SAMPLE=${MELODEE_SAMPLE:-../melodee-sample}
+[ -f "$MELODEE_SAMPLE/src/melodee/engine/sampler.h" ] && [ -f "$MELODEE_SAMPLE/base/src/surface/midi.h" ] || {
+    echo "Needs melodee-sample, with its base submodule, at $MELODEE_SAMPLE (or set MELODEE_SAMPLE)." >&2
+    exit 1
+}
+echo "melodee-sample: $(git -C "$MELODEE_SAMPLE" describe --always --dirty 2>/dev/null || echo unknown)"
 docker build --platform linux/arm64 -t melodee-move-builder tools
 PREVIEWS=${MELODEE_PREVIEWS:-../melodee-sample/build/melodee-preview}
 MOUNT=""
@@ -18,21 +26,34 @@ if [ -d "$PREVIEWS" ]; then
     MOUNT="-v $(cd "$PREVIEWS" && pwd):/previews:ro"
     CRUSH="build/melodee-move --crush /previews build/crushed"
 fi
-# Transfers are 2.9 ms: a pad at 20, the jogwheel two steps right at 80, its
-# push at 90, Shift + Back at 1300 (about 3.8 s).
+# The spike, its transfers 2.9 ms apart: a pad at 20, the jogwheel two steps
+# right at 80, its push at 90, Shift + Back at 1300 (about 3.8 s).
 SCRIPT='20:0x90,68,100;60:0x80,68,0;80:0xb0,14,2;90:0xb0,3,127;91:0xb0,3,0;1300:0xb0,49,127;1301:0xb0,51,127'
 # The meter hears its click 300 frames of cable plus one block after it
 # left render(): the block a render waits for the next exchange.
 EXPECTED='loop_frames=428/428'
+# Melodee: Menu at 50, the jogwheel's push at 60 loads the loop onto A01; a
+# hit at 400; Loop at 500 chops it (Auto: 16 slices), slice 2 at 520; two
+# pushes at 600 and 620 put them on pads from A02; Shift + Back at 1300.
+MELODEE_SCRIPT='50:0xb0,50,127;60:0xb0,3,127;400:0x90,68,110;430:0x80,68,0;500:0xb0,58,127;520:0x90,69,100;540:0x80,69,0;600:0xb0,3,127;620:0xb0,3,127;1300:0xb0,49,127;1301:0xb0,51,127'
+MELODEE_EXPECTED='page=play pad=A02 samples=1 slices=16'
 # shellcheck disable=SC2086
-docker run --rm --platform linux/arm64 -v "$PWD:/work" $MOUNT melodee-move-builder sh -c "
+docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE" && pwd):/melodee:ro" -e MELODEE=/melodee \
+    $MOUNT melodee-move-builder sh -c "
     make -j4 &&
     build/move-tests &&
     build/melodee-move --self-test build/self-test.wav &&
     build/melodee-move --preview build/preview &&
-    { build/melodee-move --backend simulated --loopback 300 --seconds 8 --script '$SCRIPT' 2> build/simulated.log || true; } &&
+    { build/melodee-move --app spike --backend simulated --loopback 300 --seconds 8 --script '$SCRIPT' 2> build/simulated.log || true; } &&
     tail -n 1 build/simulated.log &&
     grep -q 'Shift + Back' build/simulated.log &&
     grep -q '$EXPECTED' build/simulated.log &&
+    rm -rf build/simulated-samples && mkdir -p build/simulated-samples &&
+    build/melodee-move --test-loop build/simulated-samples/loop.wav &&
+    { build/melodee-move --backend simulated --samples build/simulated-samples --seconds 8 --script '$MELODEE_SCRIPT' 2> build/simulated-melodee.log || true; } &&
+    tail -n 1 build/simulated-melodee.log &&
+    grep -q 'Shift + Back' build/simulated-melodee.log &&
+    grep -q '$MELODEE_EXPECTED' build/simulated-melodee.log &&
+    build/melodee-move --melodee-previews build/melodee-previews > /dev/null &&
     tools/bundle.sh &&
     $CRUSH"
