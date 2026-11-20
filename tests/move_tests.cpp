@@ -711,12 +711,13 @@ void test_schwung_modules() {
 
 void test_canvas_page() {
     // A module's own page script, hosted as Schwung hosts it.
-    struct Calls { std::vector<std::string> sets; std::string title, initial, opened; } calls;
+    struct Calls { std::vector<std::string> sets; std::string title, initial, opened; int changed = 0; } calls;
     app::CanvasPage::Host host;
     host.get = [](const std::string& key) { return key == "level" ? std::string("0.42") : std::string(); };
     host.set = [&](const std::string& key, const std::string& value) { calls.sets.push_back(key + "=" + value); };
     host.text_entry = [&](const std::string& title, const std::string& initial) { calls.title = title; calls.initial = initial; };
     host.open_file = [&](const std::string& path) { calls.opened = path; };
+    host.changed = [&] { ++calls.changed; };
     std::string error;
     auto page = app::CanvasPage::load("tests/fake_module/page.js", host, error);
     CHECK(page && error.empty());
@@ -738,6 +739,22 @@ void test_canvas_page() {
     CHECK(calls.sets.size() == 2 && calls.sets[1] == "searched=drums");
     CHECK(page->back());  // a level up
     CHECK(!page->back()); // at its top
+    CHECK(calls.changed == 6); // each gesture, not the draw
+    // What the page keeps in ctx.state goes with the module and comes back
+    // onto a new page: here a level down, as it was left.
+    page->midi(0xb0, 3, 127);
+    auto kept = page->saved_state();
+    CHECK(kept.find("\"depth\":1") != std::string::npos);
+    auto again = app::CanvasPage::load("tests/fake_module/page.js", host, error);
+    CHECK(again != nullptr);
+    if (again) {
+        CHECK(again->saved_state().empty()); // nothing kept yet
+        again->restore_state("not json");
+        again->restore_state("[1, 2]");
+        again->restore_state(kept);
+        CHECK(again->back() && !again->back());
+        CHECK(again->saved_state() == "{\"depth\":0}");
+    }
     // A script that throws is reported and not called again; one that does
     // not parse, or sets no page, is refused.
     std::filesystem::create_directories("build/test-pages");
@@ -903,6 +920,12 @@ void test_synth_track() {
         CHECK(has(second.status(), "entered=1"));
         press(second, Button::Back); // at its top: out
         CHECK(has(second.status(), "canvas=browse entered=0"));
+        // The page's gestures made the project unsaved; saved, its ctx.state is the module's, the page's own key no value.
+        CHECK(has(second.status(), "unsaved=1"));
+        CHECK(second.save_now().empty());
+        auto with_page = saved_state(project);
+        CHECK(with_page.pages.size() == 1 && with_page.pages[0].first == "browse" && with_page.pages[0].second.find("\"depth\":0") != std::string::npos);
+        CHECK(std::none_of(with_page.values.begin(), with_page.values.end(), [](const auto& value) { return value.first == "browse"; }));
     }
     {
         // Its module gone: the track keeps naming it, and saves it so.
@@ -919,9 +942,11 @@ void test_synth_track() {
     app::SynthFile text;
     text.module = "obxd";
     text.values = {{"mode", "Saw Up"}};
+    text.pages = {{"browse", "{\"provider\":\"sampledig\",\"stack\":[\"dig\"]}"}};
     app::SynthFile back;
     app::read_synth(app::synth_text(text), back);
     CHECK(back.module == "obxd" && back.values.size() == 1 && back.values[0].second == "Saw Up");
+    CHECK(back.pages.size() == 1 && back.pages[0].first == "browse" && back.pages[0].second == text.pages[0].second);
     app::read_synth("something else\nmodule x\n", back);
     CHECK(back.module.empty());
 }
