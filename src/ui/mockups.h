@@ -19,6 +19,8 @@ int write_mockups(const std::string& directory);
 // The screens and lights docs/MOVE_CONTROLS.md moves or adds: controls.png
 // and controls/ (mockups_controls.cpp).
 bool write_controls_mockups(const std::string& directory);
+// The mixer and effects: mixer.png and mixer/ (mockups_mixer.cpp).
+bool write_mixer_mockups(const std::string& directory);
 
 namespace mockup {
 
