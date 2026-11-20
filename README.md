@@ -299,7 +299,16 @@ card. The report stays in `.local/probe/`.
   wait. A pad still sounds in the block after the exchange it was read in:
   this is CPU time, not delay. Resident memory 48 MB before, 222 MB after
   (the engine host's buffers for Record, Audio Recall, renders and the
-  Looper). Neither is measured on a Move yet.
+  Looper).
+- On a Move (Ableton's firmware 4.1), the same project played by hand (a kit
+  of 21 samples, webstream on the synth track), the first scope's build
+  then this one: the cycle's own work 9-10 µs on average, 27 at most, before;
+  66-69 µs, 191 at most, after (2.4 % and 6.6 % of the 2902 µs block); a pad
+  from read to rendered 19 µs, 42 at most, before; 81-110 µs, 193 at most,
+  after; 3 late exchanges in 20,690 before, 3 in 31,024 after (225 pads);
+  resident memory 85 MB before, 259 MB after, with 1.1 GB left free. The
+  first start folded the first scope's project into one file, as
+  intended.
 - The package runs on a bare Ubuntu 22.04 (Ableton's glibc) with only its
   own libraries.
 - The JACK host against a dummy JACK server, earlier; the scripts' signal
@@ -337,9 +346,9 @@ to be designed again for this screen.
 
 ## Next
 
-- On a Move: the sixteen tracks' cycle time and pad time (`process_us`,
-  `pad_us`, `late` in the status line) and memory (`free -m` while it runs),
-  against the first scope's numbers above.
+- The engine host's cost on a Move (66-69 µs a block where the first scope
+  took 9-10): skip the empty tracks' per-block work in melodee-sample, or
+  share the tracks out to render workers, if it is ever needed.
 - The latency meter on a Move (LATENCY page, jogwheel push), against
   Ableton's firmware and Schwung.
 - Wave 2, from docs/PARITY.md: sequencer, sampling, kit depth, instruments,
