@@ -464,6 +464,38 @@ void test_auto_sampler() {
         CHECK(multi.zones.size() == 5 && multi.zones[0].low_key == 36 && multi.zones[0].high_key == 36 && multi.zones[4].root == 40);
         CHECK(app::land_part(*read->instrument, *read->data, 0, nullptr).empty() && multi.parts[0].frames.load() > 4000);
     }
+    {   // From a module track in the studio: the program on the first empty track, a keygroup with its patterns.
+        const std::string home = "build/test-home-auto";
+        fs::remove_all(home);
+        fs::create_directories(home + "/Projects");
+        app::MelodeeApp melodee("build/test-instruments", home, "build/test-modules");
+        Session session;
+        melodee.attach(session);
+        melodee.audio_opened(AudioFormat {});
+        CHECK(melodee.restore_now().empty());
+        auto& studio = melodee.studio();
+        {
+            std::lock_guard<std::mutex> guard(studio.lock);
+            studio.select(1); // a new project's synth track
+            melodee::Event e;
+            e.key = 37; e.length = 4;
+            studio.patterns().at[1][0].events.push_back(e);
+        }
+        CHECK(melodee.load_module_now("fake").empty());
+        melodee::AutoSampleSettings few;
+        few.low = 36; few.high = 38; few.step = 1;
+        {
+            std::lock_guard<std::mutex> guard(studio.lock);
+            CHECK(studio.auto_sample(1, few, true).empty());
+            CHECK(studio.auto_sample(0, few, true) == "NO MODULE");
+        }
+        for (int n = 0; n < 3000 && studio.auto_sampled < 0; ++n) { melodee.service(); std::this_thread::sleep_for(std::chrono::milliseconds(10)); }
+        std::lock_guard<std::mutex> guard(studio.lock);
+        CHECK(studio.auto_sampled == 2);
+        CHECK(studio.kind(2) == app::TrackKind::Keys && studio.keys_sample(2) && studio.keys_sample(2)->instrument);
+        CHECK(studio.patterns().at[2][0].events.size() == 1 && studio.patterns().at[2][0].events[0].key == 37);
+        CHECK(fs::exists(studio.keygroups_folder()));
+    }
     // Called off: what was made goes.
     job.name = "Gone";
     settings.high = 60;

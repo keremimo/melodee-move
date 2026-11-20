@@ -10,6 +10,7 @@
 #include "melodee/engine/engine_host.h"
 #include "melodee/engine/onsets.h"
 #include "melodee/engine/root_find.h"
+#include "melodee/shell/auto_sample.h"
 #include "melodee/engine/sample_data.h"
 #include "melodee/model/project.h"
 #include <array>
@@ -110,7 +111,8 @@ struct ModuleTrack {
 };
 
 class Screen;
-class Landings; // app/instruments.h
+class Landings;    // app/instruments.h
+class AutoSampler; // app/auto_sampler.h
 
 class Studio {
 public:
@@ -272,6 +274,14 @@ public:
     // is Melodee's own, else as a new "Mine N". Empty on success.
     std::string store_chord(unsigned track, unsigned index, const std::vector<int>& keys);
     std::string progressions_folder() const; // <home>/Progressions: Melodee's own
+    // The auto sampler (app/auto_sampler.h) on a module track: the check,
+    // then (`sample`) the program, which goes on the first empty track as a
+    // keygroup track with the module track's patterns and mix. Empty on
+    // success (started).
+    std::string auto_sample(unsigned track, const melodee::AutoSampleSettings& settings, bool sample);
+    AutoSampler& auto_sampler() { return *sampler; }
+    std::string keygroups_folder() const; // <home>/Samples/Keygroups, as Melodee keeps them
+    int auto_sampled = -1;                // the track the last program went on
     // The arp of a note track (Melodee's Stage ARP, the Move's Repeat and Arp),
     // its settings taken from the track and sent to the engine.
     void send_arp(unsigned track);
@@ -330,8 +340,11 @@ private:
     std::array<Went, pad_count> pad_went {};
     // Last, so it goes first: it holds the samples and runners above.
     std::unique_ptr<melodee::EngineHost> engine;
-    // After it, so they end before it: the instruments' files landing.
+    // After it, so they end before it: the instruments' files landing, the
+    // auto sampler (its own module's instance).
     std::unique_ptr<Landings> landings;
+    std::unique_ptr<AutoSampler> sampler;
+    void auto_sample_tick(); // service thread: a program made goes onto its track
 };
 
 } // namespace app

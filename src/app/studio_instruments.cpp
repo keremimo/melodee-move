@@ -9,6 +9,7 @@
 #include "melodee/engine/engine_host.h"
 #include "melodee/model/scales.h"
 #include <algorithm>
+#include <cctype>
 #include <climits>
 #include <cstring>
 
@@ -281,6 +282,65 @@ std::string Studio::store_chord(unsigned t, unsigned index, const std::vector<in
     changed();
     if (!melodee::write_progression((fs::path(progressions_folder()) / (file + ".progression")).string(), track.prog)) return "NOT SAVED";
     return {};
+}
+
+} // namespace app
+
+#include "app/auto_sampler.h"
+
+namespace app {
+
+std::string Studio::keygroups_folder() const { return (std::filesystem::path(home_path) / "Samples" / "Keygroups").string(); }
+
+std::string Studio::auto_sample(unsigned t, const melodee::AutoSampleSettings& settings, bool sample) {
+    t %= melodee::track_count;
+    auto* track = module_track(t);
+    if (!track || !track->module) return "NO MODULE";
+    if (track->module->source) return "NOT AN INSTRUMENT";
+    if (sampler->running()) return "BUSY";
+    // Its own instance, set as the track's: the module, its preset, each value.
+    ModuleInfo info = track->module->info();
+    SynthFile state;
+    state.module = info.id;
+    state.preset = track->module->preset_param.empty() ? -1 : track->module->preset;
+    for (const auto& param : track->module->params)
+        if (param.key != track->module->preset_param && !param.trigger()) state.values.emplace_back(param.key, param.text());
+    AutoSampler::Job job;
+    job.track = t;
+    job.name = !track->module->preset_name.empty() ? track->module->preset_name : info.name;
+    job.folder = keygroups_folder();
+    job.sample = sample;
+    sampler->start(job, settings, [info, state](std::string& error) { return module_source(info, state, error); });
+    return {};
+}
+
+void Studio::auto_sample_tick() {
+    if (sampler->phase_now() != AutoSampler::Phase::Done) return;
+    const auto program = sampler->program();
+    const unsigned from = sampler->track();
+    sampler->reset();
+    std::string error;
+    auto read = read_instrument_sample(program, error); // outside the lock: it reads the program
+    std::lock_guard<std::mutex> guard(lock);
+    if (!read) {
+        for (auto& c : error) c = char(std::toupper(static_cast<unsigned char>(c)));
+        say(error);
+        return;
+    }
+    unsigned to = 0;
+    while (to < melodee::track_count && song->tracks[to].used()) ++to;
+    if (to >= melodee::track_count) { say("NO EMPTY TRACK"); return; }
+    if (!new_track(to, TrackKind::Keys)) { say("NO EMPTY TRACK"); return; }
+    // The module track's patterns and mix, as Melodee's auto sampler gives the new track.
+    auto& made = song->tracks[to];
+    made.mix = song->tracks[from].mix;
+    made.pattern = song->tracks[from].pattern;
+    std::snprintf(made.name, sizeof made.name, "%s", read->name.c_str());
+    bank->at[to] = bank->at[from];
+    apply_track(to);
+    if (auto failed = install_keys(std::move(read), to); !failed.empty()) { say(failed); return; }
+    auto_sampled = int(to);
+    say("ON TRACK " + std::to_string(to + 1));
 }
 
 } // namespace app

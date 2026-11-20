@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "app/studio.h"
 #include "app/screen.h"
+#include "app/auto_sampler.h"
 #include "app/instruments.h"
 #include "melodee/model/scales.h"
 #include "melodee/engine/engine_info.h"
@@ -165,6 +166,7 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
     engine = std::make_unique<melodee::EngineHost>();
     engine->set_overload_guard(true); // as Melodee runs on the MPC
     landings = std::make_unique<Landings>(*engine);
+    sampler = std::make_unique<AutoSampler>();
     keyed_sent.fill(INT16_MIN);
     engine->load(*song, *bank);
     for (unsigned t = 0; t < melodee::track_count; ++t)
@@ -839,6 +841,7 @@ void Studio::service() {
         auto failed = keys ? install_keys(std::move(sample), job.track) : install(std::move(sample), job.track, job.pad);
         if (!failed.empty()) say(failed);
     }
+    auto_sample_tick();
     std::unique_lock<std::mutex> guard(lock);
     loading = false;
     landings->reap();
