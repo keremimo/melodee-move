@@ -167,7 +167,13 @@ public:
     void note_on(int note, int velocity);
     void note_off(int note);
     void pressure(int note, int value);
+    void midi(uint8_t status, uint8_t data1, uint8_t data2); // any message, as a pad's note goes
     void render(const move::AudioBlock& input, move::AudioBlock& output, float gain); // adds
+    // Adds `frames` of the module's sound, as floats, for Melodee's engine
+    // host (SchwungRunner): the module renders whole blocks of 128 frames,
+    // as Schwung calls it, and a call for fewer takes them from the block
+    // made last. The input goes to the device page apart (module_input()).
+    void render_add(float* left, float* right, unsigned frames);
     bool live() const { return current != nullptr; }
 
 private:
@@ -181,7 +187,7 @@ private:
     using Clock = std::chrono::steady_clock;
     bool apply(); // false: the module is now the other thread's to play
     void work();  // the source thread
-    void midi(uint8_t status, uint8_t data1, uint8_t data2);
+    bool next_block(); // `block` filled with the module's next block (false: nothing, silence)
     void timed(Clock::time_point begun, const char* kind, const char* key, const char* value);
 
     move::SpscRing<Command, 256> commands;
@@ -215,7 +221,12 @@ private:
     std::atomic<unsigned> late {0};
     std::thread source_thread;
     std::array<int16_t, move::audio_frames * move::audio_channels> block {};
+    unsigned block_used = move::audio_frames; // render_add(): frames of `block` already handed out
 };
+
+// Audio thread, once a block before any module renders: the input, where a
+// module reading the device page looks for it.
+void module_input(const move::AudioBlock& input);
 
 // What a module reads of Melodee's clock (get_bpm(), schwung_move_info()).
 void set_module_tempo(float bpm);

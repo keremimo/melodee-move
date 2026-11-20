@@ -8,10 +8,8 @@
 #include <iostream>
 
 namespace ui {
+namespace mockup {
 namespace {
-
-using Draw = std::function<void(juce::Graphics&)>;
-struct Screen { const char* name; const char* caption; Draw draw; };
 
 const juce::Colour on = juce::Colours::white, off = juce::Colours::black;
 
@@ -47,6 +45,8 @@ std::vector<int> evenly(int width, int slices) {
 
 const std::vector<std::string> modules {"OB-XD", "SURGE XT", "8W8", "9W9", "APHEX", "CHONK", "CLEMENTINE", "HUSH ONE", "WURL"};
 const std::vector<std::string> samples {"DRUMS >", "BREAKS >", "VOX >", "BREAK 94.WAV", "BREAK 120.WAV", "DUSTY KEYS.WAV", "HORN STAB.WAV"};
+
+} // namespace
 
 std::vector<Screen> rail_screens() {
     auto peaks = break_peaks();
@@ -145,7 +145,7 @@ bool write_png(const juce::Image& image, const juce::File& file) {
     return output.openedOk() && juce::PNGImageFormat().writeImageToStream(image, output);
 }
 
-move::Frame render(const Draw& draw) {
+juce::Image screen_image(const Draw& draw, int scale) {
     juce::Image image(juce::Image::ARGB, width, height, true);
     {
         juce::Graphics g(image);
@@ -153,43 +153,97 @@ move::Frame render(const Draw& draw) {
         g.setColour(on);
         draw(g);
     }
-    return move::pack(image);
+    return move::frame_image(move::pack(image), scale);
 }
 
-juce::Image sheet_of(const std::vector<Screen>& screens) {
+juce::Image surface_image(const Surface& surface, int w, int h) {
+    juce::Image image(juce::Image::RGB, w, h, true);
+    juce::Graphics g(image);
+    g.fillAll(juce::Colour(0xff2a2d33));
+    auto colour = [](uint8_t index) {
+        if (!index) return juce::Colour(0xff121316);
+        auto rgb = move::palette_rgb(index);
+        return juce::Colour(rgb.r, rgb.g, rgb.b);
+    };
+    // Laid out as on the Move: the track buttons left of the pads, the
+    // steps under them, Play bottom left.
+    int cell = w / 11, gap = cell / 6, size = cell - gap;
+    int left = cell + cell / 2, top = gap * 2;
+    for (unsigned row = 0; row < move::pad_rows; ++row) {
+        int y = top + int(move::pad_rows - 1 - row) * cell;
+        g.setColour(colour(surface.tracks[move::pad_rows - 1 - row]));
+        g.fillEllipse(float(gap * 2), float(y + size / 4), float(size / 2), float(size / 2));
+        for (unsigned column = 0; column < move::pad_columns; ++column) {
+            g.setColour(colour(surface.pads[row * move::pad_columns + column]));
+            g.fillRoundedRectangle(float(left + int(column) * cell), float(y), float(size), float(size), float(gap));
+        }
+    }
+    int steps_y = top + 4 * cell + gap, step = (8 * cell) / 16;
+    for (unsigned n = 0; n < move::step_count; ++n) {
+        g.setColour(colour(surface.steps[n]));
+        g.fillRect(left + int(n) * step, steps_y, step - gap, size / 3);
+    }
+    g.setColour(colour(surface.play));
+    juce::Path triangle;
+    float px = float(gap * 2), py = float(steps_y - gap / 2), s = float(size / 2);
+    triangle.addTriangle(px, py, px, py + s, px + s, py + s / 2);
+    g.fillPath(triangle);
+    g.setColour(juce::Colour(0xffb8c2cc));
+    move::draw_text(g, left, h - 9 * 2, surface.note, 2);
+    return image;
+}
+
+juce::Image sheet(const char* title, const char* subtitle, const std::vector<Screen>& screens, const std::vector<Panel>& panels) {
     constexpr int scale = 4, gap = 24, caption = 30, top = 92;
     int screen_w = width * scale, screen_h = height * scale;
-    int rows = int(screens.size() + 1) / 2;
-    juce::Image sheet(juce::Image::RGB, gap + 2 * (screen_w + gap), top + rows * (screen_h + caption + gap), true);
-    juce::Graphics g(sheet);
+    int rows = int(screens.size() + 1) / 2, panel_rows = int(panels.size() + 1) / 2;
+    int panels_top = top + rows * (screen_h + caption + gap);
+    juce::Image image(juce::Image::RGB, gap + 2 * (screen_w + gap), panels_top + panel_rows * (screen_h + caption + gap), true);
+    juce::Graphics g(image);
     g.fillAll(juce::Colour(0xff1b1d22));
     g.setColour(juce::Colour(0xffd8f0ff));
-    move::draw_text(g, gap, 20, "MELODEE ON MOVE: RAIL", 4);
+    move::draw_text(g, gap, 20, title, 4);
     g.setColour(juce::Colour(0xff8a96a3));
-    move::draw_text(g, gap, 60, "SAMPLER, CHOP AND SCHWUNG MODULES. DOCS/UI.MD", 2);
+    move::draw_text(g, gap, 60, subtitle, 2);
+    auto place = [&](size_t n, int from) { return juce::Point<int>(gap + int(n % 2) * (screen_w + gap), from + int(n / 2) * (screen_h + caption + gap)); };
     for (size_t n = 0; n < screens.size(); ++n) {
-        int x = gap + int(n % 2) * (screen_w + gap), y = top + int(n / 2) * (screen_h + caption + gap);
-        g.drawImageAt(move::frame_image(render(screens[n].draw), scale), x, y);
+        auto at = place(n, top);
+        g.drawImageAt(screen_image(screens[n].draw, scale), at.x, at.y);
         g.setColour(juce::Colour(0xff8a96a3));
-        move::draw_text(g, x, y + screen_h + 8, screens[n].caption, 2);
+        move::draw_text(g, at.x, at.y + screen_h + 8, screens[n].caption, 2);
     }
-    return sheet;
+    for (size_t n = 0; n < panels.size(); ++n) {
+        auto at = place(n, panels_top);
+        g.drawImageAt(surface_image(panels[n].surface, screen_w, screen_h), at.x, at.y);
+        g.setColour(juce::Colour(0xff8a96a3));
+        move::draw_text(g, at.x, at.y + screen_h + 8, panels[n].caption, 2);
+    }
+    return image;
 }
 
-} // namespace
+} // namespace mockup
 
 int write_mockups(const std::string& directory) {
+    using namespace mockup;
     auto folder = juce::File::getCurrentWorkingDirectory().getChildFile(juce::String(directory.c_str()));
     folder.createDirectory();
-    auto screens = rail_screens();
+    struct Set { const char* name; const char* title; const char* subtitle; std::vector<Screen> screens; std::vector<Panel> panels; };
+    std::vector<Set> sets {
+        {"rail", "MELODEE ON MOVE: RAIL", "SAMPLER, CHOP AND SCHWUNG MODULES. DOCS/UI.MD", rail_screens(), {}},
+        {"tracks", "MELODEE ON MOVE: TRACKS", "16 TRACKS, TRANSPORT AND TEMPO. DOCS/UI.MD", tracks_screens(), tracks_panels()},
+    };
     bool ok = true;
-    auto each = folder.getChildFile("rail");
-    each.createDirectory();
-    for (const auto& screen : screens)
-        ok = write_png(move::frame_image(render(screen.draw), 4), each.getChildFile(juce::String(screen.name) + ".png")) && ok;
-    auto file = folder.getChildFile("rail.png");
-    ok = write_png(sheet_of(screens), file) && ok;
-    std::cout << file.getFullPathName() << '\n';
+    for (const auto& set : sets) {
+        auto each = folder.getChildFile(set.name);
+        each.createDirectory();
+        for (const auto& screen : set.screens)
+            ok = write_png(screen_image(screen.draw, 4), each.getChildFile(juce::String(screen.name) + ".png")) && ok;
+        for (const auto& panel : set.panels)
+            ok = write_png(surface_image(panel.surface, width * 4, height * 4), each.getChildFile(juce::String(panel.name) + ".png")) && ok;
+        auto file = folder.getChildFile(juce::String(set.name) + ".png");
+        ok = write_png(sheet(set.title, set.subtitle, set.screens, set.panels), file) && ok;
+        std::cout << file.getFullPathName() << '\n';
+    }
     ok = write_controls_mockups(directory) && ok;
     return ok ? 0 : 1;
 }
