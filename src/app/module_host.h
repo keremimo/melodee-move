@@ -124,7 +124,7 @@ private:
 // An instrument is called on the audio thread, its notes in the cycle the
 // pad was read. A source (LoadedModule::source) is called on the player's
 // own thread instead, every call, as Schwung's contract wants one thread
-// for a module: it renders about eight blocks (23 ms) ahead, and the audio
+// for a module: it renders about twelve blocks (35 ms) ahead, and the audio
 // thread only takes the next finished block. Whichever thread plays the
 // current module takes the commands; the hand-over between them happens in
 // the queue, at the module command.
@@ -158,7 +158,7 @@ public:
     // what it was and how long, for the log.
     static constexpr uint32_t slow_us = 1000;
     // On a source's own thread, rendering ahead, only a stall that eats into
-    // its 23 ms lead is worth telling.
+    // its 35 ms lead is worth telling.
     static constexpr uint32_t source_slow_us = 10000;
     struct Slow { char what[96] {}; uint32_t us = 0; };
     bool slow(Slow& out);
@@ -208,7 +208,7 @@ private:
     struct Midi { uint8_t bytes[3] {}; };
     move::SpscRing<Midi, 64> source_midi; // the audio thread's pads, to a source
     using Block = std::array<int16_t, move::audio_frames * move::audio_channels>;
-    static constexpr uint64_t ahead = 8;
+    static constexpr uint64_t ahead = 12; // 35 ms: webstream was seen to stall 22 ms
     move::SpscRing<Block, 16> source_blocks;
     std::atomic<uint64_t> made {0}, taken {0};
     std::atomic<bool> primed {false}, stopping {false};

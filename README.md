@@ -92,10 +92,13 @@ for what a host outside Schwung must provide (`src/app/module_host.*`):
   its library is never closed (modules start threads).
 - A source, not an instrument (a module that takes no MIDI, `"midi_in":
   false`: Webstream, Radio Garden), plays on a thread of its own instead,
-  every call into it there, rendering eight blocks (23 ms) ahead; the audio
+  every call into it there, rendering twelve blocks (35 ms) ahead; the audio
   thread only takes its next finished block. Webstream holds its render up
-  to 13 ms when a stream starts: that is now a moment of the stream missing
-  (`stream_late` in the status line), never a late kit or pad.
+  to 22 ms (seen on a Move): at worst a moment of the stream missing
+  (`stream_late` in the status line), never a late kit or pad. On a Move,
+  webstream before: 132 late exchanges in 15 minutes, its stalls on the
+  audio thread; after: 6, all as a stream started, the audio thread's work
+  0.2 ms at most.
 - SIGPIPE is ignored: a streaming module's broken pipe must not end Melodee.
 - A call into a module that holds the audio thread 1 ms or more is logged
   (`slow synth call: surge set preset=12 took 24.1 ms`) and counted in the

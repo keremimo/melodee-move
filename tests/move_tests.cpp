@@ -654,7 +654,7 @@ void test_schwung_modules() {
             std::this_thread::sleep_for(std::chrono::milliseconds(3));
         }
         CHECK(heard > to_s32(0.05f)); // level 0.25, set above
-        streaming.set("stall", "40"); // its thread waits 40 ms
+        streaming.set("stall", "80"); // its thread waits 80 ms, past its 35 ms lead
         double slowest_ms = 0;
         for (int block = 0; block < 30; ++block) {
             auto begun = std::chrono::steady_clock::now();
@@ -669,7 +669,7 @@ void test_schwung_modules() {
         bool reported = false;
         bool small_reported = false;
         while (streaming.slow(stalled)) {
-            reported |= std::string(stalled.what) == "set stall=40";
+            reported |= std::string(stalled.what) == "set stall=80";
             small_reported |= stalled.us < app::SynthPlayer::source_slow_us;
         }
         CHECK(reported && !small_reported); // ahead of time, only a stall that eats into the lead
