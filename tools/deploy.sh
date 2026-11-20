@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # Copies the spike to a Move running poundhard-armbian and runs it there, in
 # this terminal. Needs key-based root SSH to the Move, as poundhard's
-# installer does. Ctrl-C or Shift + Back on the Move stops it and brings the
-# launcher menu back.
+# installer does. Ctrl-C, Shift + Back on the Move or the connection
+# dropping stops it and brings the launcher menu back. Nothing it does
+# outlasts a reboot except the files in /data/UserData/melodee-move.
 #
 #   tools/deploy.sh [HOST] [--previews DIR]
 #
@@ -31,4 +32,6 @@ if [ -n "$PREVIEWS" ]; then
     (cd "$PREVIEWS" && ls -- *.png | grep -v '@2x' | tar -cf - -T -) | ssh "root@$HOST" "tar -C $REMOTE/previews -xf -"
     ARGUMENTS="--previews $REMOTE/previews"
 fi
-ssh -t "root@$HOST" "sh $REMOTE/run-spike.sh $ARGUMENTS"
+# exec: run-spike.sh becomes the SSH session's leader, the process a dropped
+# connection signals, so it can stop the spike and bring the menu back.
+ssh -t "root@$HOST" "exec sh $REMOTE/run-spike.sh $ARGUMENTS"

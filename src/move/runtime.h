@@ -12,9 +12,9 @@
 //   lights   lights() every 5 ms, changes only, to system:midi_playback;
 //   screen   draw() up to 60 times a second, changed frames only (and once
 //            a second regardless), to system:display.
-// Shift + Back, SIGINT, SIGTERM, --seconds, App::finished() or the JACK
-// server going away all stop it; on the way out every light goes off and
-// the screen is cleared.
+// Shift + Back, SIGINT, SIGTERM, SIGHUP, --seconds, App::finished() or the
+// JACK server going away all stop it; on the way out every light goes off
+// and the screen is cleared.
 namespace move {
 
 struct RunOptions {

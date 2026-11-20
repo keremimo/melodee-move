@@ -262,6 +262,8 @@ void track_input(Session& session, const Input& input) {
 int run_app(App& app, const RunOptions& options) {
     std::signal(SIGINT, on_signal);
     std::signal(SIGTERM, on_signal);
+    std::signal(SIGHUP, on_signal);  // the SSH session it was started from went away
+    std::signal(SIGPIPE, SIG_IGN);   // a closed terminal or socket is an error to ignore, not a reason to die
     if (mlockall(MCL_CURRENT | MCL_FUTURE)) std::cerr << "melodee-move: mlockall failed; pages may fault in the audio thread\n";
 
     Session session;

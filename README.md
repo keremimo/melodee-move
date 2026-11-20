@@ -68,7 +68,14 @@ tools/deploy.sh move.local --previews ../melodee-sample/build/melodee-preview
 It copies the binary and `run-spike.sh` to `/data/UserData/melodee-move`,
 stops the launcher menu (it redraws the screen every period), runs the spike
 in your terminal and starts the menu again afterwards. **Shift + Back** on
-the Move or Ctrl-C stops it. A status line every 5 seconds shows blocks,
+the Move, Ctrl-C, or the SSH connection dropping stops it and brings the
+menu back; a spike that does not stop within 5 seconds is killed.
+
+Nothing here changes the Move for good. The menu is only stopped, never
+disabled, so a reboot always brings it back (or
+`systemctl start move-launcher-menu`); no boot files, services, packages or
+user data are touched. To remove the spike:
+`ssh root@move.local rm -rf /data/UserData/melodee-move`. A status line every 5 seconds shows blocks,
 xruns, JACK's DSP load, the process callback's own mean and longest time
 (`process_us=mean/peak of period`), MIDI in, lights and frames sent.
 
@@ -104,6 +111,10 @@ What to check, in order:
   50 µs of a 2.9 ms period on an Apple-silicon Mac (expect more on the
   Move's A72). That container had no realtime scheduling, so its xruns say
   nothing about the Move.
+- `run-spike.sh` in a pseudo-terminal, as `ssh -t` runs it, with
+  `systemctl` faked: the spike timing out, Ctrl-C, the terminal hanging up,
+  and a spike that ignores signals (killed after 5 seconds). Each time the
+  menu was stopped once and started once, and no spike was left running.
 
 Not tested: anything on a Move.
 
