@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
+#include <filesystem>
 
 namespace app {
 namespace {
@@ -385,6 +386,25 @@ void MelodeeApp::draw_typing(juce::Graphics& g) {
 // ---------------------------------------------------------------- service thread, and the rest
 
 void MelodeeApp::service() { own->service(); }
+
+std::string control_path(const std::string& home) {
+    std::error_code error;
+    std::string folder = !home.empty() ? home : std::filesystem::is_directory("/data/UserData", error) ? "/data/UserData/Melodee" : "Melodee";
+    std::filesystem::create_directories(folder, error);
+    return (std::filesystem::path(folder) / "melodee-move.sock").string();
+}
+
+std::string MelodeeApp::command(const std::string& line) {
+    // melodee-render [serial|parallel]: the render workers left asleep (the
+    // audio thread renders alone) or used, from the next block (MELODEE.md › Remote).
+    if (line.compare(0, 14, "melodee-render") == 0) {
+        auto& host = own->host();
+        if (line.find("serial") != std::string::npos) host.set_render_parallel(false);
+        else if (line.find("parallel") != std::string::npos) host.set_render_parallel(true);
+        return std::string("render=") + (host.render_parallel() ? "parallel" : "serial") + " workers=" + std::to_string(host.render_threads());
+    }
+    return {};
+}
 
 std::string MelodeeApp::status() const {
     std::lock_guard<std::mutex> guard(own->lock);

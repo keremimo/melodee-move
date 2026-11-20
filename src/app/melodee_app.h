@@ -30,6 +30,10 @@
 // in the cycle they were read (Studio::audio_event()).
 namespace app {
 
+// Where the running Melodee listens for commands (move/remote.h): its
+// folder's melodee-move.sock (`home` empty: /data/UserData/Melodee).
+std::string control_path(const std::string& home);
+
 class MelodeeApp : public move::App {
 public:
     explicit MelodeeApp(std::string library = {}, std::string home = {}, std::string modules = {});
@@ -43,6 +47,7 @@ public:
     void draw(juce::Graphics& g) override;                                          // screen thread
     void service() override;                                                        // service thread
     std::string status() const override;
+    std::string command(const std::string& line) override; // melodee-render; the rest is the runtime's
 
     // For tests and tools.
     Studio& studio() { return *own; }

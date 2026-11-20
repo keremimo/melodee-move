@@ -49,4 +49,9 @@ void Host::incoming(const uint8_t* bytes, size_t size, bool external, uint64_t t
     else ++session.midi_dropped;
 }
 
+void Host::take_injected(uint64_t timestamp_ns, bool& arrived) {
+    std::array<uint8_t, 3> bytes;
+    while (injected.pop(bytes)) incoming(bytes.data(), bytes.size(), false, timestamp_ns, arrived);
+}
+
 } // namespace move

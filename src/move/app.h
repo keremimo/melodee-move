@@ -92,6 +92,9 @@ public:
     virtual bool finished() const { return false; }
     // Any thread: extra `key=value` fields for the status line.
     virtual std::string status() const { return {}; }
+    // Service thread: a line from the control channel (move/remote.h) that
+    // is not the runtime's own; the reply, or empty for "unknown".
+    virtual std::string command(const std::string&) { return {}; }
 
     void attach(const Session& session) { attached = &session; }
 

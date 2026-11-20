@@ -141,6 +141,7 @@ private:
         uint64_t pads_before = session.pad_events.load(std::memory_order_relaxed);
         read_midi(surface_in, frames, false, arrived);
         read_midi(external_in, frames, true, arrived);
+        take_injected(began, arrived); // the control channel's presses, as the device's own
         if (arrived) wake();
         bool pad_this_cycle = session.pad_events.load(std::memory_order_relaxed) != pads_before;
 

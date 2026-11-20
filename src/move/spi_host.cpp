@@ -139,6 +139,7 @@ private:
                     incoming(event.bytes.data(), event.size, event.cable == spi::cable_external, began, arrived);
             }
             if (received || skipped) spi::clear_midi_in(page);
+            take_injected(began, arrived); // the control channel's presses, as the device's own
             if (arrived) wake();
             bool pad_this_cycle = session.pad_events.load(std::memory_order_relaxed) != pads_before;
 
