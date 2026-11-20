@@ -355,7 +355,14 @@ to be designed again for this screen.
   longer cleared every block, and a silent Pad FX punch records its history
   a block at a time. In the simulated Move the cycle's work went from 87-114
   µs to 16-19 µs with the first alone and 14-19 µs with both (three runs
-  each); not measured on a Move yet.
+  each). On a Move it is less: the engine host alone, timed on the Move's
+  own CPU, 53.3 µs a block before and 37.6 after for a kit and a synth
+  (45.9 and 29.8 for an empty project); Melodee played by hand, the cycle's
+  work 57-59 µs on average, 124-166 at most (66-69 and 148-191 before), a
+  pad 59 µs from read to rendered, 9 late exchanges in 41,357 (Webstream
+  streaming, its page open), 285 MB resident. What is left is the engine
+  host's fixed work a block (the Looper, the input, the mix); melodee-sample
+  is the place to lighten it further.
 - The latency meter on a Move (LATENCY page, jogwheel push), against
   Ableton's firmware and Schwung.
 - Wave 2, from docs/PARITY.md: sequencer, sampling, kit depth, instruments,
