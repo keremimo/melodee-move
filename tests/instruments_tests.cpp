@@ -9,6 +9,8 @@
 #include "melodee/engine/engine_host.h"
 #include "melodee/engine/sample_data.h"
 #include "melodee/model/scales.h"
+#include "melodee/engine/engine_info.h"
+#include "move/lights.h"
 #include "melodee/shell/xpm_write.h"
 #include "move/controls.h"
 #include "move/app.h"
@@ -256,11 +258,100 @@ void test_keygroup_track() {
     }
 }
 
+void test_keys() {
+    // The Move's Keys & Scale on 32 pads (app/keys.h), C major, the bottom-left pad C2 (48).
+    auto project = std::make_unique<melodee::Project>();
+    project->root = 0;
+    project->scale = 0; // Major
+    auto& track = project->tracks[1];
+    melodee::load_sound(track, melodee::EngineKind::Plugin, 0);
+    track.octave = 3;
+    auto note = [&](unsigned pad, int shift = 0) { auto n = app::pad_notes(*project, track, pad, shift); return n.count ? int(n.keys[0]) : -1; };
+    // In-Key in octaves (Melodee's Scale): a row an octave, the eighth column the next root.
+    app::set_keys_mode(track, app::KeysMode::InKey, false);
+    CHECK(track.layout == melodee::PadLayout::Scale && app::keys_mode(track) == app::KeysMode::InKey && !app::keys_fourths(track));
+    CHECK(note(0) == 48 && note(1) == 50 && note(2) == 52 && note(3) == 53 && note(7) == 60 && note(8) == 60 && note(24) == 84);
+    CHECK(app::pad_notes(*project, track, 0).root && app::pad_notes(*project, track, 7).root && !app::pad_notes(*project, track, 1).root);
+    CHECK(note(0, 1) == 50 && note(0, -1) == 47); // Shift + Plus / Minus: a note of the key
+    // In-Key in 4ths (Melodee's Chords): up a row three notes of the key, a fourth.
+    app::set_keys_mode(track, app::KeysMode::InKey, true);
+    CHECK(track.layout == melodee::PadLayout::Chords && app::keys_fourths(track));
+    CHECK(note(8) == 53 && note(16) == 59 && note(9) == 55);
+    // Chromatic: a semitone right, a fourth up; out of the key not lit.
+    app::set_keys_mode(track, app::KeysMode::Chromatic, true);
+    CHECK(note(1) == 49 && note(8) == 53 && note(31) == 48 + 7 + 15);
+    auto sharp = app::pad_notes(*project, track, 1);
+    CHECK(!sharp.in_key && !sharp.root);
+    CHECK(app::pad_light(sharp, track, 15, 97, false, false) == move::colour::off);
+    CHECK(app::pad_light(app::pad_notes(*project, track, 0), track, 15, 97, false, false) == 15);
+    CHECK(app::pad_light(app::pad_notes(*project, track, 2), track, 15, 97, false, false) == move::colour::light_grey);
+    CHECK(app::pad_light(sharp, track, 15, 97, true, false) == move::colour::white);
+    // A pentatonic in octaves: fewer than eight notes go on into the next octave on the row.
+    project->scale = 9; // Major pent
+    app::set_keys_mode(track, app::KeysMode::InKey, false);
+    CHECK(note(4) == 57 && note(5) == 60 && note(8) == 60);
+    project->scale = 0;
+    // The key's root moves the pads; the transpose too.
+    project->root = 2;
+    CHECK(note(0) == 50 && note(1) == 52);
+    project->root = 0;
+    track.transpose = -12;
+    CHECK(note(0) == 36);
+    track.transpose = 0;
+    // CHORD on: the pad's note the root, the key's thirds stacked (a triad, close).
+    track.chord = true;
+    track.chord_type = 0;
+    auto chord = app::pad_notes(*project, track, 0);
+    CHECK(chord.count == 3 && chord.keys[0] == 48 && chord.keys[1] == 52 && chord.keys[2] == 55);
+    chord = app::pad_notes(*project, track, 1); // D minor, in C major
+    CHECK(chord.count == 3 && chord.keys[0] == 50 && chord.keys[1] == 53 && chord.keys[2] == 57);
+    track.chord_type = 1; // Dia 7
+    CHECK(app::pad_notes(*project, track, 0).count == 4 && app::pad_notes(*project, track, 0).keys[3] == 59);
+    track.chord = false;
+    // Prog: a chord of the progression a pad, at the file's notes on the Move's octave 0.
+    auto& chord0 = track.prog.chords[0];
+    chord0.count = 3; chord0.notes[0] = 60; chord0.notes[1] = 64; chord0.notes[2] = 67; chord0.root = true;
+    track.prog.count = 1;
+    app::set_keys_mode(track, app::KeysMode::Prog, false);
+    auto prog = app::pad_notes(*project, track, 0);
+    CHECK(prog.count == 3 && prog.keys[0] == 60 && prog.keys[2] == 67 && prog.root);
+    CHECK(app::pad_notes(*project, track, 1).count == 0); // no chord there: silent, dark
+    CHECK(app::pad_light(app::pad_notes(*project, track, 1), track, 15, 97, false, false) == move::colour::off);
+    CHECK(app::keys_bank_count(track) == 2);
+    // Drums: notes from 36 as a kit's pads, 16 a bank.
+    app::set_keys_mode(track, app::KeysMode::Drums, false);
+    CHECK(note(0) == 36 && note(31) == 67);
+    track.bank = 1;
+    CHECK(note(0) == 52);
+    track.bank = 0;
+    auto& midi = project->tracks[3];
+    melodee::load_sound(midi, melodee::EngineKind::Midi, 0);
+    app::set_keys_mode(midi, app::KeysMode::Drums, false);
+    midi.midi.drum_note[2] = 40;
+    CHECK(app::pad_notes(*project, midi, 2).keys[0] == 40); // a MIDI track's drum map
+    // The pad map: a note track's route; a kit has none.
+    app::PadMap map;
+    track.arp = true;
+    app::fill_pad_map(map, *project, 1, 0, true);
+    CHECK(map.track == 1 && map.route == app::PadMap::Route::Arp && map.full_velocity && map.pads[0].count == 1);
+    track.arp = false;
+    app::fill_pad_map(map, *project, 1, 0, false);
+    CHECK(map.route == app::PadMap::Route::Notes);
+    melodee::load_sound(project->tracks[0], melodee::EngineKind::Sampler, 0);
+    app::fill_pad_map(map, *project, 0, 0, false);
+    CHECK(map.route == app::PadMap::Route::None);
+    // The arp's settings, on last.
+    track.arp = true; track.arp_mode = 2; track.arp_rate = 6;
+    auto settings = app::arp_settings(track);
+    CHECK(settings[4].first == 0 && settings[4].second == 1 && settings[0].second == 2 && settings[1].second == 6);
+}
+
 } // namespace
 
 int main() {
     test_readers();
     test_sample_note();
+    test_keys();
     test_keygroup_track();
     std::cout << "instruments-tests: " << checks - failures << " of " << checks << " checks passed\n";
     return failures ? 1 : 0;

@@ -123,6 +123,8 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
         // A new project, as the first scope had it: a kit on track 1, a
         // synth (no module yet) on track 2.
         copy_text(song->name, "Move");
+        song->root = 0;  // C major, In-Key: the Move's own Keys & Scale for a new Set (its manual, 9.1)
+        song->scale = 0;
         song->tracks[0] = fresh_track(TrackKind::Kit, 0);
         song->tracks[1] = fresh_track(TrackKind::Synth, 1);
     } else {
@@ -172,6 +174,7 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
     audio_track.store(int(selected));
     audio_kind.store(int(kind(selected)));
     audio_octave.store(octave(selected));
+    publish_pads();
 
     // The screens, one of each, and the track's Play screen shown.
     for (const auto& entry : registered_screens()) {
@@ -230,16 +233,22 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
             if (pads_quiet.load(std::memory_order_relaxed)) return;  // another job (docs/MOVE_CONTROLS.md)
             int track = audio_track.load(std::memory_order_relaxed);
             auto kind = TrackKind(audio_kind.load(std::memory_order_relaxed));
+            if (kind != TrackKind::Kit && kind != TrackKind::Audio && kind != TrackKind::Empty) { note_pad(input, went, track); return; } // app/keys.h
             int key = kind == TrackKind::Kit ? int(melodee::sampler_first_note + input.index)
                     : kind == TrackKind::Synth || kind == TrackKind::Keys || kind == TrackKind::Midi || kind == TrackKind::Plugin
                         ? note_for(input.index, audio_octave.load(std::memory_order_relaxed)) : -1;
             if (key < 0) return;
-            went = {track, key};
-            engine->send({Type::NoteOn, uint8_t(track), 0, uint16_t(key), int16_t(std::max<int>(1, input.value))});
+            went.track = track;
+            went.key = key;
+            engine->send({Type::NoteOn, uint8_t(track), 0, uint16_t(key), int16_t(full_level.load(std::memory_order_relaxed) ? 127 : std::max<int>(1, input.value))});
+        } else if (went.track >= 0 && went.route != PadMap::Route::None) {
+            note_pad(input, went, went.track);
         } else if (went.track >= 0) {
             engine->send({Type::NoteOff, uint8_t(went.track), 0, uint16_t(went.key), 0});
             went = {};
         }
+    } else if (input.kind == Kind::PadPressure && went.track >= 0 && went.route != PadMap::Route::None) {
+        for (unsigned k = 0; k < went.count; ++k) engine->send({Type::Pressure, uint8_t(went.track), 0, went.keys[k], int16_t(input.value)});
     } else if (input.kind == Kind::PadPressure && went.track >= 0 && went.key < 128) {
         // Melodee's sampler takes no pressure; a note track's engine does.
         if (TrackKind(audio_kind.load(std::memory_order_relaxed)) != TrackKind::Kit)
@@ -300,6 +309,7 @@ void Studio::select(unsigned t) {
     audio_track.store(int(t), std::memory_order_relaxed);
     audio_kind.store(int(kind(t)), std::memory_order_relaxed);
     audio_octave.store(octave(t), std::memory_order_relaxed);
+    publish_pads();
     home();
 }
 

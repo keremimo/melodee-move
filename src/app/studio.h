@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #pragma once
 #include "app/canvas_page.h"
+#include "app/keys.h"
 #include "app/module_host.h"
 #include "app/project_store.h"
 #include "move/app.h"
@@ -241,6 +242,20 @@ public:
     // MIDI thread: whether a pad pressed now stays quiet, its job another
     // than its sound (bindings::pad_sounds()); the audio thread reads it.
     void quiet_pads(bool quiet) { pads_quiet.store(quiet, std::memory_order_relaxed); }
+    // The selected track's pads as Keys & Scale lays them out (app/keys.h),
+    // to the audio thread: whenever the model may have changed (each lights
+    // pass, a track selected). Under `lock`.
+    void publish_pads();
+    // Shift + Step 10, the Move's Full Velocity: every pad at 127.
+    bool full_velocity() const { return full_level.load(std::memory_order_relaxed); }
+    void set_full_velocity(bool on) { full_level.store(on, std::memory_order_relaxed); publish_pads(); }
+    // Shift + Plus / Minus: a note track's pads a note of the key up or down
+    // (Control Live's scale step); the Move's, not kept in the project.
+    int key_shift(unsigned track) const { return shifts[track % melodee::track_count]; }
+    // The arp of a note track (Melodee's Stage ARP, the Move's Repeat and Arp),
+    // its settings taken from the track and sent to the engine.
+    void send_arp(unsigned track);
+    void set_key_shift(unsigned track, int shift) { shifts[track % melodee::track_count] = int8_t(std::clamp(shift, -24, 24)); publish_pads(); }
 
 private:
     void forward();                        // audio thread: the ring into the host
@@ -281,7 +296,17 @@ private:
     // another job than its sound (Shift, Copy, Delete, Mute or a step held;
     // bindings::pad_sounds()), so it stays quiet.
     std::atomic<bool> pads_quiet {false};
-    struct Went { int track = -1, key = -1; };
+    struct Went {
+        int track = -1, key = -1;
+        PadMap::Route route = PadMap::Route::None; // a note track's: its notes, the arp's or Note Repeat's keys
+        uint8_t count = 0;
+        std::array<uint8_t, most_keys> keys {};
+    };
+    move::TripleBuffer<PadMap> pad_maps; // the MIDI thread's to write, the audio thread's to read
+    std::atomic<bool> full_level {false};
+    std::array<int8_t, melodee::track_count> shifts {};
+    void note_pad(const move::Input& input, Went& went, int track); // audio thread
+    Went chord_held;                     // CHORD's hold: the chord sounding on (audio thread)
     std::array<Went, pad_count> pad_went {};
     // Last, so it goes first: it holds the samples and runners above.
     std::unique_ptr<melodee::EngineHost> engine;

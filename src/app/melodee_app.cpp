@@ -212,6 +212,7 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point now) {
     // Holds that came due (a track button, Undo, Back held).
     for (const auto& use : gestures.tick(now)) act(use);
     settle();
+    studio.publish_pads(); // the pads as the model has them now, for the audio thread (app/keys.h)
     // The track buttons: the selected track's bank, each its colour, the selected one bright.
     // Soloed blue, as on the Move; muted grey.
     unsigned first = ui::bank_of(studio.track()) * ui::tracks_a_bank;

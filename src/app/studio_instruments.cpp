@@ -95,3 +95,76 @@ void Studio::sync_keyed_roots() {
 }
 
 } // namespace app
+
+namespace app {
+
+void Studio::publish_pads() {
+    fill_pad_map(pad_maps.back(), *song, selected, shifts[selected], full_level.load(std::memory_order_relaxed));
+    pad_maps.publish();
+}
+
+void Studio::send_arp(unsigned t) {
+    t %= melodee::track_count;
+    for (const auto& [index, value] : arp_settings(song->tracks[t])) send({Type::Arp, uint8_t(t), 0, index, value});
+    publish_pads();
+    changed();
+}
+
+// A note track's pad, on the audio thread in the cycle it was read: its
+// notes as Keys & Scale lays them (app/keys.h), straight to the engine, to
+// the arp, or to Note Repeat; let go, the same keys go.
+void Studio::note_pad(const move::Input& input, Went& went, int track) {
+    pad_maps.take();
+    const PadMap& map = pad_maps.front();
+    auto all = [&](const Went& w, Type type, int16_t value) {
+        for (unsigned k = 0; k < w.count; ++k) engine->send({type, uint8_t(w.track), 0, w.keys[k], value});
+    };
+    if (chord_held.count && (!map.chord_hold || map.track != chord_held.track)) { all(chord_held, Type::NoteOff, 0); chord_held = {}; }
+    if (input.pressed) {
+        went = {};
+        if (map.track != track || map.route == PadMap::Route::None) { // nothing published for this track yet: the rows of fourths
+            went.key = note_for(input.index, audio_octave.load(std::memory_order_relaxed));
+            went.keys[0] = uint8_t(went.key);
+            went.count = 1;
+            went.route = PadMap::Route::Notes;
+        } else {
+            const auto& notes = map.pads[input.index % keys_pads];
+            if (!notes.count) return; // a Prog pad with no chord
+            went.keys = notes.keys;
+            went.count = notes.count;
+            went.route = map.route;
+        }
+        went.track = track;
+        const auto velocity = int16_t(map.full_velocity ? 127 : std::max<int>(1, input.value));
+        switch (went.route) {
+        case PadMap::Route::Arp:
+            if (map.latch) { // a fresh latch: the keys it held go
+                bool others = false;
+                for (const auto& w : pad_went) others = others || (&w != &went && w.track == track && w.route == PadMap::Route::Arp && w.count);
+                if (!others) { engine->send({Type::Arp, uint8_t(track), 0, 0, 0}); engine->send({Type::Arp, uint8_t(track), 0, 0, 1}); }
+            }
+            all(went, Type::ArpKey, velocity);
+            break;
+        case PadMap::Route::Repeat: all(went, Type::RepeatKey, velocity); break;
+        default:
+            if (chord_held.count) { all(chord_held, Type::NoteOff, 0); chord_held = {}; }
+            all(went, Type::NoteOn, velocity);
+            break;
+        }
+        return;
+    }
+    switch (went.route) {
+    case PadMap::Route::Arp:
+        if (map.latch) all(went, Type::Pressure, 0); // a latched arp plays on, without the pad's pressure
+        else all(went, Type::ArpKey, 0);
+        break;
+    case PadMap::Route::Repeat: all(went, Type::RepeatKey, 0); break;
+    default:
+        if (map.chord_hold && went.count > 1) chord_held = went; // sounds on until the next pad
+        else all(went, Type::NoteOff, 0);
+        break;
+    }
+    went = {};
+}
+
+} // namespace app
