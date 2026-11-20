@@ -242,6 +242,7 @@ private:
     void take_answers();
     void destroy_retired();
     std::string write(std::vector<uint8_t> bytes, std::string settings_text);
+    SynthFile module_state(unsigned track) const; // a Schwung track's module as it is now: values, preset, its pages' state
     std::vector<uint8_t> project_bytes() const;
     std::string settings_text() const;
     uint8_t free_plugin_entry() const;
