@@ -20,9 +20,12 @@ Three parts so far:
 
 - **Play**: the last pad's sample. Knobs 1-8: tune, level, pan, start, end,
   attack, decay, cutoff (Shift: finer). Touch a knob to see it large.
-- **Load** (Menu): WAV, AIFF, FLAC, Ogg and MP3 files, from a list of places: My Samples, Recordings, Ableton's Core Library (`/data/CoreLibrary/Samples`) and all of `/data/UserData`
-  (`/data/UserData/UserLibrary/Samples`, or `--samples DIR`) onto the last
-  pad. The jogwheel picks, its push opens a folder or loads, Back goes up.
+- **Load** (Menu): WAV, AIFF, FLAC, Ogg and MP3 files onto the last pad,
+  read by Melodee's own `read_audio`. It opens on a list of places: My
+  Samples, Recordings, Ableton's Core Library (`/data/CoreLibrary/Samples`)
+  and all of `/data/UserData` (or only `--samples DIR`). The jogwheel picks,
+  its push opens a place or folder or loads, Back goes up, then back to the
+  places.
 - **Chop** (Loop): the last pad's sample, cut by Melodee's Auto, Beats,
   Regions or Threshold (knob 3 the type, knob 4 the amount). The pads play
   the slices, the steps show where the cuts fall, the jogwheel or Left /
