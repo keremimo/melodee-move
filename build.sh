@@ -5,7 +5,8 @@
 # whole runtime against a simulated Move (the spike: a pad, the jogwheel to
 # LATENCY, the meter timing clicks through a 300-frame cable, Shift + Back to
 # quit; Melodee: load, chop, To Pads, saved and restored, transport and
-# tempo, the synth track saved and restored),
+# tempo, MIDI in and out on the USB port, the synth track saved and
+# restored),
 # and the packages in dist/. When Melodee's own page previews are at hand
 # (MELODEE_PREVIEWS, by default ../melodee-sample/build/melodee-preview),
 # also crush them to the Move's 128 x 64 screen in build/crushed.
@@ -57,6 +58,13 @@ TRANSPORT_EXPECTED='page=kit-play .*playing=1 tick=[1-9][0-9]* tempo=122.0 click
 # modules (none loaded yet), its push at 80 loads the one in
 # build/test-modules (the tests' stand-in), a pad plays it, knob 1 turns its
 # level up three, Plus an octave. The next start has it back as it was.
+# MIDI on the Move's USB port (cable 2; docs/MIDI.md), on that project with
+# MIDI clock out and Pad MIDI Out on: a note and its release in on cable 2
+# at 100 and 130 (A01 plays), Play at 200 (Start and the clock go out), a CC
+# in at 300, a pad at 400 (its note goes out). Three in, the clock and the
+# pad's note out, nothing dropped.
+MIDI_SCRIPT='100:x0x90,36,100;130:x0x80,36,0;200:0xb0,85,127;201:0xb0,85,0;300:x0xb0,7,100;400:0x90,68,110;430:0x80,68,0'
+MIDI_EXPECTED='playing=1 .* melodee_midi_in=3 melodee_midi_out=[1-9][0-9]+ melodee_midi_dropped=0'
 SYNTH_SCRIPT='50:0xb0,42,127;51:0xb0,42,0;60:0xb0,3,127;61:0xb0,3,0;80:0xb0,3,127;81:0xb0,3,0;400:0x90,68,110;430:0x80,68,0;500:0xb0,71,3;520:0xb0,55,127;521:0xb0,55,0'
 SYNTH_EXPECTED='kind=synth .*synth=fake octave=1'
 SYNTH_FLAGS='--backend simulated --samples build/simulated-samples --home build/simulated-synth --modules build/test-modules'
@@ -86,6 +94,11 @@ docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE
     { build/melodee-move --backend simulated --samples build/simulated-samples --home build/simulated-home --seconds 3 --script '$TRANSPORT_SCRIPT' 2> build/simulated-transport.log || true; } &&
     tail -n 1 build/simulated-transport.log &&
     grep -qE '$TRANSPORT_EXPECTED' build/simulated-transport.log &&
+    rm -rf build/simulated-midi && cp -R build/simulated-home build/simulated-midi &&
+    printf 'midi_sync_out 1\npad_midi_out 1\n' >> build/simulated-midi/Move.settings &&
+    { build/melodee-move --backend simulated --samples build/simulated-samples --home build/simulated-midi --seconds 3 --script '$MIDI_SCRIPT' 2> build/simulated-midi.log || true; } &&
+    tail -n 1 build/simulated-midi.log &&
+    grep -qE '$MIDI_EXPECTED' build/simulated-midi.log &&
     rm -rf build/simulated-synth &&
     { build/melodee-move $SYNTH_FLAGS --seconds 5 --script '$SYNTH_SCRIPT' 2> build/simulated-synth.log || true; } &&
     tail -n 1 build/simulated-synth.log &&

@@ -278,7 +278,7 @@ void test_in() {
     rig.melodee->service();
     auto remote = rig.blocks(6);
     CHECK(count_of(remote, 0x92, 48) == 1);
-    CHECK(rig.melodee->status().find("midi_panics=1") != std::string::npos);
+    CHECK(rig.melodee->status().find("melodee_midi_panics=1") != std::string::npos);
 }
 
 uint64_t now_ns() { return uint64_t(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count()); }
@@ -363,7 +363,7 @@ void test_sysex() {
     wanted.insert(wanted.end(), file.begin() + 11, file.end()); // the stray byte between them is left out
     CHECK(got == wanted && !note_inside);
     rig.melodee->service(); // the buffer it sent, freed
-    CHECK(rig.melodee->status().find("midi_sysex=1/") != std::string::npos);
+    CHECK(rig.melodee->status().find("melodee_midi_sysex=1/") != std::string::npos);
 }
 
 void test_saved() {
@@ -533,7 +533,7 @@ void test_screens() {
     hand.wheel(20); // to the end: PANIC
     hand.press(Button::MainPush);
     rig.blocks(4);
-    CHECK(has(*rig.melodee, "midi_panics=1") && has(*rig.melodee, "midi_panicked=1"));
+    CHECK(has(*rig.melodee, "melodee_midi_panics=1") && has(*rig.melodee, "midi_panicked=1"));
     snap(*rig.melodee, "config-panic");
     hand.press(Button::Back); // the list again
     CHECK(has(*rig.melodee, "page=midi-config") && has(*rig.melodee, "midi_panicked=0"));
@@ -546,6 +546,43 @@ void test_screens() {
     hand.shift([&] { hand.step(4); });
     CHECK(has(*rig.melodee, "page=tempo"));
     snap(*rig.melodee, "tempo-ext");
+}
+
+// What the MIDI path adds to each block on the audio thread: after_render()
+// (the engine's events, the queue, the rings) and take() (the next
+// exchange's), idle and with the clock going out.
+void test_cost() {
+    Rig rig("cost");
+    rig.pump();
+    rig.blocks(4);
+    auto& studio = rig.studio();
+    auto& host = studio.host();
+    std::array<ExternalMidi, 16> out {};
+    auto per_block = [&](int blocks) {
+        auto start = std::chrono::steady_clock::now();
+        for (int n = 0; n < blocks; ++n) { studio.midi.after_render(host); studio.midi.take(out.data(), 16); }
+        return double(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start).count()) / blocks;
+    };
+    double idle = per_block(100000);
+    {
+        std::lock_guard<std::mutex> hold(studio.lock);
+        studio.midi.config.sync_out = melodee::MidiSync::Clock;
+    }
+    rig.pump();
+    { std::lock_guard<std::mutex> hold(studio.lock); studio.play(); }
+    rig.blocks(2); // Play and Sync Out reach the engine
+    CHECK(studio.playing());
+    double busy = 0;
+    unsigned before = studio.host().midi_dropped();
+    for (int n = 0; n < 2000; ++n) { // the engine renders (and emits the clock); only the MIDI path is timed
+        rig.out.fill(0);
+        studio.host().render(rig.out.data(), audio_frames, 0.8f, rig.in.data());
+        busy += per_block(1);
+    }
+    busy /= 2000;
+    CHECK(studio.host().midi_dropped() == before);
+    std::cout << "midi path a block: " << int(idle) << " ns idle, " << int(busy) << " ns with MIDI clock out\n";
+    CHECK(idle < 5000 && busy < 20000);
 }
 
 // Setup (Shift + Step 2) is move-projects': once its screen is here, MIDI
@@ -576,6 +613,7 @@ int main() {
     test_saved();
     test_screens();
     test_setup_trigger();
+    test_cost();
     std::cout << "midi-tests: " << checks - failures << '/' << checks << " checks passed\n";
     return failures ? 1 : 0;
 }

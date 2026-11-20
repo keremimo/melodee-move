@@ -101,6 +101,19 @@ Three parts so far:
   is folded into one file on the first start; the old side files stay as
   `*.migrated`.
 
+- **MIDI and sync** ([docs/MIDI.md](docs/MIDI.md)): the Move gives Melodee
+  one MIDI port, USB-MIDI cable 2 of its device page, where a class-compliant
+  device on USB-A and a computer on USB-C (the "Ableton Move Standalone
+  Port") both arrive, in and out. MIDI in plays the selected track, or a
+  track by its own channel (Shift + a track button: MIDI IN, MIDI OUT); MIDI
+  Config (Setup, Shift + Step 2) has the channels, pad MIDI in and out, MIDI
+  clock and MTC in and out, Thru, program change, the Remote CCs and Panic.
+  A MIDI track plays outside gear: its pages (DEVICE, PROGRAM, three of CC
+  slots, EXPRESS, PADS, AUDIO, SYSEX) on the knobs, Shift + the wheel
+  walking them, its Sounds (`.mlds`) on the wheel's push. MIDI goes out with
+  the exchange that carries the audio it is heard in (a block, 2.9 ms);
+  `melodee-midi` puts a message in, or Panics, over SSH.
+
 Not yet: more than one project, editing patterns, samples over 60 seconds,
 Record, Capture, Schwung's effects, mixer pages; docs/PARITY.md has the rest.
 

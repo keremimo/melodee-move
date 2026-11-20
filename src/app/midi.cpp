@@ -766,14 +766,14 @@ int Midi::module_send(const uint8_t* packets, int length) {
 }
 
 std::string Midi::status() const {
-    return " midi_in=" + std::to_string(ins.load()) + " midi_out=" + std::to_string(outs.load()) + " midi_dropped=" + std::to_string(dropped.load()) +
-           " midi_clock_in=" + std::to_string(pulses_in.load()) + " midi_ext=" + std::to_string(int(ext_running.load())) +
-           " midi_ext_tempo=" + std::to_string(tempo_seen.load()) + " midi_mtc_in=" + std::to_string(mtc_in.load()) +
-           " midi_mtc_leads=" + std::to_string(int(mtc_leads.load())) + " midi_echo=" + std::to_string(echoed.load()) + "/" +
-           std::to_string(echo_guarded.load()) + " midi_thru=" + std::to_string(thru_sent.load()) + " midi_sysex=" +
-           std::to_string(sysex_sent.load()) + "/" + std::to_string(sysex_bytes.load()) + " midi_sysex_in_dropped=" +
-           std::to_string(sysex_dropped_in.load()) + " midi_panics=" + std::to_string(panics.load()) + " midi_module=" +
-           std::to_string(module_msgs.load()) + " midi_superseded=" + std::to_string(superseded.load());
+    return " melodee_midi_in=" + std::to_string(ins.load()) + " melodee_midi_out=" + std::to_string(outs.load()) + " melodee_midi_dropped=" + std::to_string(dropped.load()) +
+           " melodee_midi_clock_in=" + std::to_string(pulses_in.load()) + " melodee_midi_ext=" + std::to_string(int(ext_running.load())) +
+           " melodee_midi_ext_tempo=" + std::to_string(tempo_seen.load()) + " melodee_midi_mtc_in=" + std::to_string(mtc_in.load()) +
+           " melodee_midi_mtc_leads=" + std::to_string(int(mtc_leads.load())) + " melodee_midi_echo=" + std::to_string(echoed.load()) + "/" +
+           std::to_string(echo_guarded.load()) + " melodee_midi_thru=" + std::to_string(thru_sent.load()) + " melodee_midi_sysex=" +
+           std::to_string(sysex_sent.load()) + "/" + std::to_string(sysex_bytes.load()) + " melodee_midi_sysex_in_dropped=" +
+           std::to_string(sysex_dropped_in.load()) + " melodee_midi_panics=" + std::to_string(panics.load()) + " melodee_midi_module=" +
+           std::to_string(module_msgs.load()) + " melodee_midi_superseded=" + std::to_string(superseded.load());
 }
 
 } // namespace app
