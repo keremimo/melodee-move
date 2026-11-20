@@ -190,6 +190,7 @@ int write_mockups(const std::string& directory) {
     auto file = folder.getChildFile("rail.png");
     ok = write_png(sheet_of(screens), file) && ok;
     std::cout << file.getFullPathName() << '\n';
+    ok = write_controls_mockups(directory) && ok;
     return ok ? 0 : 1;
 }
 

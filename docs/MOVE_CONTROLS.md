@@ -9,7 +9,9 @@ Melodee, and where it stands. `src/app/bindings.*` holds the same map as a
 table, and `build/controls-tests` checks one against the other (below).
 
 Source: Ableton's Move manual (<https://www.ableton.com/en/move/manual/>,
-chapters 2 and 5-17 and its Control Reference) and the Move release notes
+chapters 2 and 5-17, its Control Reference and its controls figure,
+`MoveControls.png`, which names each Shift job and hold) and the Move
+release notes
 (<https://www.ableton.com/en/release-notes/move-1/>), read on 2026-11-20.
 The newest firmware Ableton lists is **Move 2.1.5** (2 November 2026);
 release-note changes to controls (Shift + turn for banks since 1.5, Shift +
@@ -44,12 +46,13 @@ after Schwung) differ for some buttons:
   and *Canvas* (a module's own page, entered) are Melodee's. A row with no
   screen holds wherever no row for that screen says otherwise; Typing
   takes every control but the Volume knob and Shift + Back.
-- **Tap and hold.** A button with a hold job (Note/Session, Back, Undo,
-  the track buttons, Shift) does its tap job when let go within 0.4 s with
-  nothing else used; held 0.4 s it does its hold job; used as a modifier
-  (another control pressed while it is down) it does neither. A button with
-  no hold job acts on its press. *Long* (long Plus, long Left) is a press
-  held 0.4 s; a *double press* is two within 0.3 s.
+- **Tap and hold.** A button with a hold job (Note/Session, Undo, the
+  track buttons) does its tap job when let go within 0.4 s with nothing
+  else used; held 0.4 s it does its hold job; used as a modifier (another
+  control pressed while it is down) it does neither. A button with no hold
+  job acts on its press (Back too: a press goes up a level at once, and
+  held on it goes all the way out). *Long* (long Plus, long Left) is a
+  press held 0.4 s; a *double press* is two within 0.3 s.
 - **Pads never wait.** A pad sounds from `App::audio_event()` in the cycle
   it was read, whatever the table says. The table decides only what the
   MIDI thread does with it and whether it should sound at all: while a
@@ -156,7 +159,7 @@ while Shift is held.
 | Shift + Step 5 | Tempo (the wheel; Shift for fine; push confirms) | Tempo | core |
 | Shift + Step 6 | Metronome on or off | The same | core |
 | Shift + Step 7 | Groove: triplet sixteenth swing, 0-100 % and beyond | Swing | core |
-| Shift + Step 8 | 16 Pitches on or off (drums) | 16 Pitches on the right 16 pads | wave 2: kit depth |
+| Shift + Step 8 | Layout: 16 Pitches on or off (drums) | 16 Pitches on the right 16 pads | wave 2: kit depth |
 | Shift + Step 9 | Keys & Scales: In-Key or Chromatic, octaves or 4ths, key, scale | The project's key and scale, a synth's layout | wave 2: instruments |
 | Shift + Step 10 | Full Velocity on or off | Full Level | wave 2: instruments |
 | Shift + Step 11 | Repeat and the Arpeggiator (rate; Repeat, Up, Down, Random) | Note Repeat and Arp | wave 2: sequencer |
@@ -211,7 +214,7 @@ while Shift is held.
 | Wheel touch (Play) | Highlights the sample (audio track) | Names the item in focus | next |
 | Wheel turn (Browser) | Moves through the list, loading each preset (Autoload) | Moves through the list; a module's presets load as it turns | done |
 | Wheel push (Browser) | Opens a folder; loads (Autoload off); leaves with the preset chosen | Opens a folder, loads onto the pad or the track | done |
-| Shift (Browser) | Options: Save Preset | Options: save the sample or the module's preset | wave 2: kit depth |
+| Shift held (Browser) | Options: Save Preset (Shift held) | Options: save the sample or the module's preset | wave 2: kit depth |
 | Wheel turn (list) | Moves through a menu; turns a value | The same | done |
 | Shift + Wheel turn (list) | Fine (tempo, groove) | Fine | done |
 | Wheel push (list) | Opens an entry, switches it, confirms | The same | done |
@@ -279,6 +282,7 @@ while Shift is held.
 | Back held (Typing) | Leaves the text entry | Cancels the typing | next |
 | Shift + Back | No job | Back to Ableton's Move app (the runtime takes it) | done |
 | Shift held | Lights the icons under the steps with a Shift job; fine turns | The steps with a Shift job light; held alone 0.4 s, the Shift card names them | next |
+| Shift double press | Locks Shift on until pressed again (Shift + Play then does not retrigger) | The same | next |
 | Shift held (Typing) | Uppercase while held | The same | next |
 
 ### Plus and Minus, Left and Right
