@@ -16,8 +16,13 @@ again; `docs/ui/rail.png` is the sheet.
 - **The rail answers "where am I"**, on every screen, in the same place.
 - **The pads, steps and lights carry as much as the screen.** The screen
   never repeats what the pads already show.
-- **A fresh design** for the Move's own controls, holding to neither the
-  stock Move's conventions nor the MPC Sample's.
+- **The Move's controls keep Ableton's meaning** (Kerem, 2026-11-20). Every
+  key and shortcut does what Ableton's Move manual says it does: Loop is
+  Loop Mode, Note/Session switches Play and the Patterns grid, Shift + Step 5
+  is Tempo. Melodee's own jobs take the controls the Move leaves free
+  (Shift + push for Chop, Shift + Sampling for Audio Recall, Shift + Steps 4,
+  12 and 13), as melodee-sample keeps the MPC Sample's printed labels.
+  [MOVE_CONTROLS.md](MOVE_CONTROLS.md) is the map and its decisions.
 - **Nothing between a pad and its sound.** Pads sound from the audio thread
   in the cycle they were read (`App::audio_event()`); the interface runs
   beside that path, never on it.
@@ -106,27 +111,31 @@ open it; Back goes up, then closes the menu.
 
 ## Controls
 
-A first proposal, to settle while building.
+As on the Move, by the rule above; [MOVE_CONTROLS.md](MOVE_CONTROLS.md)
+has every control and shortcut, where each one stands, and the tests that
+hold the code to it. In short:
 
 | Control | Does |
 | --- | --- |
-| Pads | play: a kit's pads; in Chop, its slices (32 at once); on a module track, notes |
-| Steps | in Chop, the sample in 16 parts, lit where a cut falls, pressed to hear from there; later the sequencer |
-| Knobs 1-8 | the screen's eight parameters; touch one to see it large |
-| Jogwheel | turn to choose (slice, list row, fine move of a cut; on a module track, its preset); push to confirm, and on a module track to open its menu; Shift + turn jumps a cut to the next hit |
-| Track buttons | tracks 1-4, each a kit or a module |
-| Loop | Chop the last pad; again to leave |
-| Sample | Record: armed, hit a pad to record onto it; again to stop |
-| Capture | the last phrase of the always-on input onto the next empty pad |
-| Menu | Load samples, modules and effects |
-| Left / Right | the page before / after |
-| Up / Down | the pad bank (slices 33-64, kit banks); on a module track, the octave |
-| Delete | with a pad: empty it; in Chop: take the selected cut out; with Loop: every cut |
-| Copy | a pad, then another: copy it |
-| Undo | undo; Shift + Undo: redo |
-| Back | leave a screen or sheet; Shift + Back: back to Move |
-| Play / Rec / Mute | transport, record, mute |
-| Master knob | the main volume |
+| Pads | Play: a kit's 32 pads (two banks of 16), a module's notes; Chop: its slices; with a step held, notes on the step; Session: patterns |
+| Steps | Step Edit (a pattern's sixteenths; in Loop Mode its bars); held with a pad, the volume knob, the wheel, Plus/Minus or Left/Right, that step's notes |
+| Shift + steps | 1 projects, 2 Setup, 3 Workflow, **4 Mixer**, 5 Tempo, 6 metronome, 7 swing, 8 16 Pitches, 9 Keys & Scales, 10 Full Level, 11 Repeat and Arp, **12 Looper**, **13 Song**, 14 a new pattern, 15 double, 16 Time Correct (Melodee's own in bold) |
+| Track buttons | the four tracks of the bank in view; held, a look at that track, and with a step any of the 16; Shift + one, its options |
+| Knobs 1-8 | the screen's eight parameters; touch one to see it large; Shift for fine |
+| Volume knob | the main volume; with a pad held its level, a track button its level, a step its velocity |
+| Wheel | on Play, turn to walk the track's items (the track, its sound, its effects) and push to open that item's browser; Shift + turn the pages; Shift + push Sample Options (Chop) or a module's menu; in lists, turn and push |
+| Note/Session | Play or the Patterns grid; Shift + it, the 16 tracks |
+| Play / Shift + Play | start and stop / restart every pattern |
+| Rec | Seq Record |
+| Capture / Shift + Capture | Recall the notes just played / clear them |
+| Sampling / Shift + Sampling | Record onto a pad / Audio Recall onto the next empty pad |
+| Loop | Loop Mode; held with the wheel, the pattern's length |
+| Mute | the selected track; held with a track or a pad, mutes it; Shift + Mute + track solos |
+| Undo / Shift + Undo / held | undo / redo / the undo list |
+| Copy, Delete | the pattern, or held with a step, pad or track what it names |
+| Plus / Minus | a synth's octave, a kit's 16 pads; with a step held, transpose |
+| Left / Right | the pattern's bar; in Chop, the slice |
+| Back | out a level; held, back to Play; Shift + Back, back to Ableton's Move app |
 
 ## Lights
 
@@ -144,6 +153,8 @@ A first proposal, to settle while building.
 - The pad pages' exact contents.
 - A module track's note layout: rows of fourths for now, C2 at the bottom
   left (Ableton's names); a scale or chromatic later.
-- More than four tracks (Shift + a track button for 5-8?).
+- ~~More than four tracks~~ decided 2026-11-20 (Kerem): banks of four on
+  the track buttons, a track button held + a step for any of 16, Shift +
+  Note/Session for all 16 ([MOVE_CONTROLS.md](MOVE_CONTROLS.md)).
 - Realtime priority when Schwung launches melodee-move as `ableton`: a
   small root helper, as EvilGenius uses, or not.
