@@ -37,9 +37,11 @@ LDLIBS := $(shell pkg-config --libs $(PACKAGES)) -ldl -pthread -lrt -lm
 MELODEE ?= ../melodee-sample
 MELODEE_INCLUDES := -I$(MELODEE)/src -I$(MELODEE)/base/src
 # shell/sample_decode.cpp: Melodee's own reader for WAV, and AIFF, FLAC, Ogg
-# and MP3 through JUCE, as on the MPC.
+# and MP3 through JUCE, as on the MPC; shell/mpc_project.cpp and what it
+# needs: MPC Sample and MPC 3 projects (.xpj) opened as a copy.
 MELODEE_SOURCES := $(wildcard $(MELODEE)/src/melodee/engine/*.cpp $(MELODEE)/src/melodee/model/*.cpp) \
-    $(MELODEE)/src/melodee/shell/sample_decode.cpp
+    $(MELODEE)/src/melodee/shell/sample_decode.cpp \
+    $(MELODEE)/src/melodee/shell/mpc_project.cpp $(MELODEE)/src/melodee/shell/mpc_wav_slices.cpp $(MELODEE)/src/melodee/shell/mpc_program.cpp
 MELODEE_OBJECTS := $(patsubst $(MELODEE)/src/%.cpp,build/obj/melodee-sample/%.o,$(MELODEE_SOURCES))
 MELODEE_LIBRARY := build/melodee.a
 CPPFLAGS += $(MELODEE_INCLUDES)

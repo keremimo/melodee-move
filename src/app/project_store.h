@@ -24,12 +24,26 @@ namespace app {
 
 using PluginStates = std::array<std::vector<uint8_t>, melodee::max_plugins>;
 
+// The Move's own part of a project, beside Melodee's: kept in the file's
+// Move section ("MVPJ", text: `colour N`, `track_colour T N`), which
+// Melodee's reader skips, and covered by undo (history.h).
+struct MoveExtras {
+    std::array<uint8_t, melodee::track_count> track_colour {}; // a palette index; 0: the track's own (ui/track_style.h)
+    uint8_t colour = 0;                                         // the project's, on its Set Overview pad; 0: none picked
+    uint8_t spare[15] {};
+};
+
 // Each file whole or not at all: a temporary file beside it, flushed,
 // renamed over it. Empty on success.
 std::string write_whole(const std::string& path, const void* bytes, size_t size);
-std::vector<uint8_t> project_file_bytes(const melodee::Project& project, const melodee::PatternBank& patterns, const PluginStates& states);
+std::vector<uint8_t> project_file_bytes(const melodee::Project& project, const melodee::PatternBank& patterns, const PluginStates& states,
+                                        const MoveExtras* extras = nullptr);
 // Empty on success; "missing" when there is no file.
-std::string read_project_file(const std::string& path, melodee::Project& project, melodee::PatternBank& patterns, PluginStates& states);
+std::string read_project_file(const std::string& path, melodee::Project& project, melodee::PatternBank& patterns, PluginStates& states,
+                              MoveExtras* extras = nullptr);
+// The same from bytes (an MPC project imported, a test).
+std::string read_project_bytes(const std::vector<uint8_t>& bytes, melodee::Project& project, melodee::PatternBank& patterns, PluginStates& states,
+                               MoveExtras* extras = nullptr);
 
 // A Schwung module's state, as its PLUG entry keeps it. Text, a line a
 // setting (and, from the first scope, the whole of "<project>.synth"):

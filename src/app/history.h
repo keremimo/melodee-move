@@ -35,14 +35,6 @@
 // on the audio thread. The studio tells the engine what an undo changed.
 namespace app {
 
-// The Move's own part of a project, beside Melodee's: kept in the project
-// file's Move section (project_store.h) and covered by undo.
-struct MoveExtras {
-    std::array<uint8_t, melodee::track_count> track_colour {}; // a palette index; 0: the track's own (ui/track_style.h)
-    uint8_t colour = 0;                                         // the project's, on its Set Overview pad; 0: none picked
-    uint8_t spare[15] {};
-};
-
 // A Schwung module as a step sees it: which, its preset, its values.
 struct ModuleState {
     bool present = false; // the track plays a module (or waits for one)
