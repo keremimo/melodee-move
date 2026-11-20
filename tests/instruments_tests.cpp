@@ -3,6 +3,7 @@
 // instrument files read by Melodee's own readers into a keygroup's zones,
 // their files landed and read in place, a sample's note found, a keygroup
 // track playing them from the pads.
+#include "app/auto_sampler.h"
 #include "app/instruments.h"
 #include "app/melodee_app.h"
 #include "app/studio.h"
@@ -420,6 +421,58 @@ void test_instrument_keys() {
     }
 }
 
+void test_auto_sampler() {
+    // The auto sampler on a module of its own (the tests' stand-in, a square whose pitch does not follow the keys:
+    // drums to the check), into an MPC keygroup program Melodee's reader plays back.
+    auto modules = app::scan_modules("build/test-modules");
+    const app::ModuleInfo* fake = nullptr;
+    for (const auto& info : modules) if (info.id == "fake") fake = &info;
+    CHECK(fake != nullptr);
+    if (!fake) return;
+    app::SynthFile state;
+    state.values.push_back({"level", "0.9"});
+    std::string error;
+    auto source = app::module_source(*fake, state, error);
+    CHECK(source && error.empty());
+    if (!source) return;
+    melodee::AutoSampleSettings settings;
+    settings.low = 36;
+    settings.high = 40;
+    settings.step = 1;
+    std::vector<std::string> rows;
+    auto found = app::check_source(*source, settings, &rows);
+    CHECK(found.heard && found.kind == melodee::AutoKind::Drums && found.sounding() == 5);
+    CHECK(!rows.empty() && rows[0] == "DRUMS, 5 SOUNDS");
+    CHECK(found.takes == 1 && found.speed > 1.0f); // faster than real time
+    // Sampled whole: five one-shot keygroups.
+    const std::string folder = "build/test-auto/Keygroups";
+    fs::remove_all("build/test-auto");
+    app::AutoSampler sampler;
+    app::AutoSampler::Job job;
+    job.track = 1; job.name = "Fake Kit"; job.folder = folder; job.sample = true;
+    CHECK(sampler.start(job, settings, [&](std::string& why) { return app::module_source(*fake, state, why); }));
+    for (int n = 0; n < 3000 && sampler.running(); ++n) std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    CHECK(sampler.phase_now() == app::AutoSampler::Phase::Done);
+    CHECK(sampler.done() == 5 && sampler.total() == 5);
+    auto program = sampler.program();
+    CHECK(fs::exists(program) && has_suffix(program, "Fake Kit/Fake Kit.xpm"));
+    CHECK(!fs::exists(folder + "/Fake Kit/.parts"));
+    auto read = app::read_instrument_sample(program, error);
+    CHECK(read && error.empty());
+    if (read) {
+        const auto& multi = *read->data->multi;
+        CHECK(multi.zones.size() == 5 && multi.zones[0].low_key == 36 && multi.zones[0].high_key == 36 && multi.zones[4].root == 40);
+        CHECK(app::land_part(*read->instrument, *read->data, 0, nullptr).empty() && multi.parts[0].frames.load() > 4000);
+    }
+    // Called off: what was made goes.
+    job.name = "Gone";
+    settings.high = 60;
+    CHECK(sampler.start(job, settings, [&](std::string& why) { return app::module_source(*fake, state, why); }));
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    sampler.cancel();
+    CHECK(!fs::exists(folder + "/Gone/Gone.xpm"));
+}
+
 } // namespace
 
 int main() {
@@ -427,6 +480,7 @@ int main() {
     test_sample_note();
     test_keys();
     test_instrument_keys();
+    test_auto_sampler();
     test_keygroup_track();
     std::cout << "instruments-tests: " << checks - failures << " of " << checks << " checks passed\n";
     return failures ? 1 : 0;
