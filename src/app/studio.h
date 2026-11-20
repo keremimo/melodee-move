@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #pragma once
 #include "app/canvas_page.h"
+#include "app/loop_desk.h"
 #include "app/module_host.h"
 #include "app/project_store.h"
 #include "move/app.h"
@@ -218,8 +219,18 @@ public:
     std::atomic<float> volume {0.8f};
     bool shift = false;
 
+    // The Looper (app/loop_desk.h, docs/UI.md "Looper"): four loops on
+    // tracks L1-L4. loop_pads(): the MIDI thread's word to the audio thread
+    // that a Looper screen is on top (its left 16 pads the loops' rows).
+    LoopDesk& loops() { return *desk; }
+    const LoopDesk& loops() const { return *desk; }
+    void loop_pads(bool shown, bool free); // free: no modifier but Shift held
+
     // ---------------------------------------------------------- service thread
     void service();
+    // The run is ending, the audio thread still running: the loops' files
+    // and the project written now (the runtime's App::stopping()).
+    void stopping();
     std::string restore();  // the project's samples and modules read (the first service() does it)
     std::string save_now(); // empty on success
     std::string load_now(const std::string& path, unsigned pad); // onto the selected kit, waited for
@@ -270,6 +281,7 @@ private:
     std::atomic<bool> pads_quiet {false};
     struct Went { int track = -1, key = -1; };
     std::array<Went, pad_count> pad_went {};
+    std::unique_ptr<LoopDesk> desk; // made with the engine host, after the project is read
     // Last, so it goes first: it holds the samples and runners above.
     std::unique_ptr<melodee::EngineHost> engine;
 };

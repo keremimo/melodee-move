@@ -187,6 +187,7 @@ int run_app(App& app, const RunOptions& options) {
         if (now >= next_status) { std::cerr << status_line(session, app) << '\n'; next_status = now + status_interval; }
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
+    app.stopping(); // the audio thread still runs: the app's last writes that need it
     running = false;
     midi_thread.join();
     screen_thread.join();

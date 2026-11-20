@@ -124,7 +124,9 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
     } else {
         migrated = migrate(path, *song, states, folder_of, this, played);
     }
-    // The Move's own settings: the track played last, the metronome.
+    // The Move's own settings: the track played last, the metronome, the
+    // input's round trip for the Looper (`loop_latency`, device frames).
+    int loop_latency = LoopDesk::default_latency;
     if (std::ifstream in(settings_path); in) {
         std::string line;
         if (std::getline(in, line) && line == settings_header)
@@ -136,6 +138,7 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
                 if (word == "track") played = value % melodee::track_count;
                 else if (word == "click") click_on = value != 0;
                 else if (word == "click_level") click_volume = std::min(value, 100u);
+                else if (word == "loop_latency") loop_latency = int(std::min(value, 48000u));
             }
     }
     selected = played;
@@ -162,6 +165,8 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
     for (unsigned t = 0; t < melodee::track_count; ++t)
         if (modules[t] && modules[t]->entry != melodee::no_plugin) engine->offer_plugin(modules[t]->entry, &modules[t]->runner);
     send({Type::Click, 0, 0, uint16_t(click_volume), int16_t(click_on)});
+    desk = std::make_unique<LoopDesk>(*this);
+    desk->set_latency(loop_latency);
     set_module_tempo(song->tempo / 10.0f);
     audio_track.store(int(selected));
     audio_kind.store(int(kind(selected)));
@@ -205,10 +210,12 @@ void Studio::render(const move::AudioBlock& input, move::AudioBlock& output) {
     forward();
     module_input(input);
     engine->render(output.data(), move::audio_frames, volume.load(std::memory_order_relaxed), input.data());
+    desk->meter.process(input, output, desk->measuring.load(std::memory_order_relaxed)); // the Looper's input delay, measured
 }
 
 void Studio::audio_opened(const move::AudioFormat& format) {
     engine->set_audio_format(double(format.rate), 0);
+    desk->meter.set_rate(format.rate);
 }
 
 void Studio::audio_event(const move::SurfaceEvent& event) {
@@ -218,15 +225,33 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
     if (input.index >= pad_count) return;
     Went& went = pad_went[input.index];
     if (input.kind == Kind::Pad) {
+        // The Looper on top: a loop's row of pads (L1 the top row) acts in
+        // the cycle it was read; a clear is held, the MIDI thread's.
+        bool looping = desk->pads_shown.load(std::memory_order_relaxed);
+        unsigned column = move::pad_column(input.index), row = move::pad_row(input.index);
+        if (looping && column < LoopDesk::PadJobs) {
+            went = {};
+            if (!input.pressed || pads_typing.load(std::memory_order_relaxed) || !desk->pads_free.load(std::memory_order_relaxed)) return;
+            using Do = melodee::looper::Do;
+            Do what = column == LoopDesk::RecordPad ? Do::Primary
+                    : column == LoopDesk::PlayPad ? (desk->pads_shift.load(std::memory_order_relaxed) ? Do::Now : Do::Toggle)
+                    : column == LoopDesk::UndoPad ? Do::Undo : Do::Enable;
+            if (what != Do::Enable) engine->send({Type::Looper, uint8_t(move::pad_rows - 1 - row), 0, uint16_t(what), 0});
+            return;
+        }
         if (input.pressed) {
             went = {};
             if (pads_typing.load(std::memory_order_relaxed)) return; // a letter, not a note
             if (pads_quiet.load(std::memory_order_relaxed)) return;  // another job (docs/MOVE_CONTROLS.md)
             int track = audio_track.load(std::memory_order_relaxed);
             auto kind = TrackKind(audio_kind.load(std::memory_order_relaxed));
-            int key = kind == TrackKind::Kit ? int(melodee::sampler_first_note + input.index)
-                    : kind == TrackKind::Synth || kind == TrackKind::Keys || kind == TrackKind::Midi || kind == TrackKind::Plugin
-                        ? note_for(input.index, audio_octave.load(std::memory_order_relaxed)) : -1;
+            bool note_track = kind == TrackKind::Synth || kind == TrackKind::Keys || kind == TrackKind::Midi || kind == TrackKind::Plugin;
+            int key = kind == TrackKind::Kit ? int(melodee::sampler_first_note + input.index) : note_track ? note_for(input.index, audio_octave.load(std::memory_order_relaxed)) : -1;
+            if (looping) { // the right 16 on the Looper: a kit's bank of 16, or 16 notes up from C
+                unsigned at = row * LoopDesk::PadJobs + column - LoopDesk::PadJobs;
+                key = kind == TrackKind::Kit ? int(melodee::sampler_first_note + unsigned(desk->pads_bank.load(std::memory_order_relaxed)) * 16 + at)
+                    : note_track ? std::clamp(synth_base_note + 12 * audio_octave.load(std::memory_order_relaxed) + int(at), 0, 127) : -1;
+            }
             if (key < 0) return;
             went = {track, key};
             engine->send({Type::NoteOn, uint8_t(track), 0, uint16_t(key), int16_t(std::max<int>(1, input.value))});
@@ -592,6 +617,7 @@ void Studio::close() {
 std::string Studio::settings_text() const {
     std::ostringstream out;
     out << settings_header << '\n' << "track " << selected << '\n' << "click " << int(click_on) << '\n' << "click_level " << click_volume << '\n';
+    out << "loop_latency " << desk->latency() << '\n';
     return out.str();
 }
 
@@ -634,6 +660,7 @@ std::string Studio::write(std::vector<uint8_t> bytes, std::string settings) {
 
 std::string Studio::save_now() {
     std::unique_lock<std::mutex> guard(lock);
+    desk->keep_values();
     auto bytes = project_bytes();
     auto settings = settings_text();
     dirty = false;
@@ -782,6 +809,7 @@ void Studio::destroy_retired() {
 void Studio::service() {
     if (!restored) restore();
     take_back();
+    desk->service(); // the Looper's memory and fits, its files, commits
     take_answers();
     destroy_retired();
     // A module asked for (a track's job).
@@ -819,6 +847,7 @@ void Studio::service() {
     // Autosave: three seconds after the last change, as on the MPC.
     auto now = Clock::now();
     if (dirty && now - changed_at >= autosave_idle && now >= retry_at) {
+        desk->keep_values(); // the loops' lengths and tempos, their files written next pass
         auto bytes = project_bytes();
         auto settings = settings_text();
         dirty = false;
@@ -828,6 +857,23 @@ void Studio::service() {
         if (error.empty()) ++saves;
         else { dirty = true; retry_at = now + autosave_retry; say("NOT SAVED"); }
     }
+}
+
+void Studio::stopping() {
+    desk->flush(std::chrono::milliseconds(300)); // a loop being written is waited for, a moment
+    bool unsaved = false;
+    {
+        std::lock_guard<std::mutex> guard(lock);
+        unsaved = dirty;
+    }
+    if (unsaved) save_now();
+}
+
+void Studio::loop_pads(bool shown, bool free) {
+    desk->pads_shown.store(shown, std::memory_order_relaxed);
+    desk->pads_free.store(free, std::memory_order_relaxed);
+    desk->pads_shift.store(shift, std::memory_order_relaxed);
+    desk->pads_bank.store(int(current().last_pad / 16 % 2), std::memory_order_relaxed);
 }
 
 std::string Studio::load_now(const std::string& file, unsigned at) {
@@ -950,6 +996,7 @@ std::string Studio::status() const {
                   int(track.mix.solo), slow_calls, slowest_us / 1000.0,
                   module ? module->player.stream_late() : 0u, engine->dropped());
     std::string line = text;
+    line += desk->status();
     for (const auto& screen : screens) line += screen->status();
     return line;
 }
