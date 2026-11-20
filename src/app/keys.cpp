@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "app/keys.h"
+#include "app/pad_layout.h"
 #include "move/controls.h"
 #include "move/lights.h"
 #include "melodee/model/chords.h"
@@ -9,7 +10,7 @@
 
 namespace app {
 
-using melodee::PadLayout;
+using Layout = melodee::PadLayout; // Melodee's pad layouts (app::PadLayout is the pads' physical order)
 using melodee::Track;
 
 namespace {
@@ -89,21 +90,21 @@ const char* keys_mode_name(KeysMode mode) {
 
 KeysMode keys_mode(const Track& track) {
     switch (track.layout) {
-    case PadLayout::Chromatic: return KeysMode::Chromatic;
-    case PadLayout::Prog: return KeysMode::Prog;
-    case PadLayout::Drums: return KeysMode::Drums;
+    case Layout::Chromatic: return KeysMode::Chromatic;
+    case Layout::Prog: return KeysMode::Prog;
+    case Layout::Drums: return KeysMode::Drums;
     default: return KeysMode::InKey; // Scale, Chords (In-Key in 4ths), Melodee's 16 Levels layout
     }
 }
 
-bool keys_fourths(const Track& track) { return track.layout == PadLayout::Chords || track.layout == PadLayout::Chromatic; }
+bool keys_fourths(const Track& track) { return track.layout == Layout::Chords || track.layout == Layout::Chromatic; }
 
 void set_keys_mode(Track& track, KeysMode mode, bool fourths) {
     switch (mode) {
-    case KeysMode::Chromatic: track.layout = PadLayout::Chromatic; break;
-    case KeysMode::Prog: track.layout = PadLayout::Prog; break;
-    case KeysMode::Drums: track.layout = PadLayout::Drums; break;
-    default: track.layout = fourths ? PadLayout::Chords : PadLayout::Scale; break;
+    case KeysMode::Chromatic: track.layout = Layout::Chromatic; break;
+    case KeysMode::Prog: track.layout = Layout::Prog; break;
+    case KeysMode::Drums: track.layout = Layout::Drums; break;
+    default: track.layout = fourths ? Layout::Chords : Layout::Scale; break;
     }
     if (mode == KeysMode::Prog || mode == KeysMode::Drums) track.bank = uint8_t(std::min<unsigned>(track.bank, keys_bank_count(track) - 1));
 }
@@ -123,7 +124,8 @@ PadNotes pad_notes(const melodee::Project& project, const Track& track, unsigned
     std::array<int, most_keys> keys {};
     switch (keys_mode(track)) {
     case KeysMode::Prog: {
-        unsigned index = 16 * std::min<unsigned>(track.bank, keys_bank_count(track) - 1) + pad;
+        // "Pad n": numbered in the layout the pads are in (app/pad_layout.h).
+        unsigned index = 16 * std::min<unsigned>(track.bank, keys_bank_count(track) - 1) + logical_pad(uint8_t(pad), pad_layout());
         if (index >= melodee::prog_chords) return out;
         std::array<int, melodee::notes_per_step> prog {};
         unsigned n = melodee::prog_keys(track, index, prog);
@@ -134,7 +136,7 @@ PadNotes pad_notes(const melodee::Project& project, const Track& track, unsigned
         return out;
     }
     case KeysMode::Drums: {
-        unsigned at = 16 * std::min<unsigned>(track.bank, keys_bank_count(track) - 1) + pad;
+        unsigned at = 16 * std::min<unsigned>(track.bank, keys_bank_count(track) - 1) + logical_pad(uint8_t(pad), pad_layout());
         int key = track.engine == melodee::EngineKind::Midi ? int(track.midi.drum_note[at % melodee::sampler_pads]) : int(melodee::drum_first_key + at);
         if (key > 127) return out;
         keys[0] = key;

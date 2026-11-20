@@ -46,6 +46,9 @@ struct PadNotes {
     std::array<uint8_t, most_keys> keys {};
     bool root = false, in_key = false;
 };
+// `pad` is the physical pad (move::Input's): In-Key and Chromatic lay their
+// notes out on the Move's rows; Prog's chords and Drums' notes go by the
+// pad's number in the layout the pads are in (app/pad_layout.h).
 // `shift`: Shift + Plus / Minus, the bottom-left pad that many notes of the
 // key up (In-Key; Chromatic a semitone each); not kept in the project.
 PadNotes pad_notes(const melodee::Project& project, const melodee::Track& track, unsigned pad, int shift = 0);
