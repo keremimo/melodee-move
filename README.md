@@ -99,6 +99,25 @@ What to check, in order:
 5. The screen keeps up while playing (`frames_failed=0`).
 6. Pad pressure arrives (`PRESS` lines on INPUTS).
 
+## Stock firmware?
+
+move-base is only a JACK client of `jackd -d move`, so it may not need
+Armbian at all: RNBO's takeover already runs that server, with the same
+`jack_move.so`, on Ableton's own firmware. Before trying, ask a Move on stock
+firmware what it has, without changing it:
+
+```sh
+tools/probe-stock.sh move.local
+```
+
+`tools/probe-stock-remote.sh` goes over SSH on stdin (nothing is copied to
+the Move) and only reads: the kernel (PREEMPT_RT or not), glibc and
+libstdc++ versions, free space and which partitions are writable, which of
+melodee-move's libraries exist, who holds `/dev/ablspi0.0`, Ableton's
+processes and their realtime threads, how `/etc/init.d/move` starts the app,
+and whether RNBO's `jackd` and `jack_move.so` are installed. The report is
+saved in `.local/probe/` (ignored by git).
+
 ## Tested so far
 
 - Unit tests: control decoding, lights and palette, the screen format, the
@@ -115,6 +134,9 @@ What to check, in order:
   `systemctl` faked: the spike timing out, Ctrl-C, the terminal hanging up,
   and a spike that ignores signals (killed after 5 seconds). Each time the
   menu was stopped once and started once, and no spike was left running.
+- The stock probe in Debian trixie and Alpine (BusyBox) containers: it runs
+  to the end in both, and the containers' filesystems were the same after
+  it as before.
 
 Not tested: anything on a Move.
 
