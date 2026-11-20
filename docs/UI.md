@@ -2,10 +2,13 @@
 
 The design is **Rail**, chosen from three directions (Panel, Full Bleed,
 Rail) on 2026-11-20. The first scope is Melodee's sampler, Chop, and loading
-Schwung's modules as instruments and effects. The screens below are mockups,
-drawn by the UI kit (`src/ui/widgets.*`) at the screen's real size; the app
-does not draw them yet. `build/melodee-move --ui-mockups DIR` renders them
-again; `docs/ui/rail.png` is the sheet.
+Schwung's modules as instruments and effects; then sixteen tracks,
+transport and tempo ("Tracks", below). The screens are mockups first, drawn
+by the UI kit (`src/ui/widgets.*`) at the screen's real size, each set in a
+file of its own (`src/ui/mockups*.cpp`); the app's screens are built to
+them. `build/melodee-move --ui-mockups DIR` renders them again
+(`docs/ui/rail.png`, `docs/ui/tracks.png`); `--melodee-previews DIR` draws
+the app's own screens.
 
 ![The Rail screens](ui/rail.png)
 
@@ -56,8 +59,8 @@ a meter, a big parameter, or a page of knob cells under a large title.
 unit under it; the rail says `KNOB` and its number. The screen goes back a
 moment after the knob is let go.
 
-**Sheets** (a choice such as TO PADS) take the subject; the jogwheel picks,
-a push confirms, Back leaves.
+**Sheets** (a choice such as TO PADS, NEW TRACK) take the subject; the
+jogwheel picks, a push confirms, Back leaves.
 
 ## Screens
 
@@ -104,6 +107,71 @@ levels as lists: the preset first where the level has one, then values
 current one marked `*`). Push a value to edit it (`[57]`), push a level to
 open it; Back goes up, then closes the menu.
 
+## Tracks
+
+Sixteen tracks, as in Melodee, chosen on 2026-11-20 from three ways of
+picking among them (design **A**). `docs/ui/tracks.png` is the sheet
+(`src/ui/mockups_tracks.cpp`); the screens are built to it.
+
+![The tracks screens](ui/tracks.png)
+
+- **The track buttons** are the four tracks of the selected track's bank
+  (1-4, 5-8, 9-12, 13-16), each in its track's colour (`ui/track_style.h`),
+  the selected one bright, an empty one dark. A tap picks one.
+- **A track button held** shows the sixteen as a grid on the screen, a row a
+  bank, each cell the track's kind (a synth's module), the selected one
+  inverted; the rail says `TRKS` / the track / `/16`. The 16 steps are the
+  sixteen tracks, each in its colour, the selected one white, an empty one
+  grey. A step picks its track; an empty step opens the new-track sheet for
+  it (shown as the button is let go).
+- **Copy held**, with a track button: a step, then another, copies the first
+  track onto the second: its sound, kit and patterns; the second keeps its
+  mix strip; a synth gets its own instance of the module. Onto a track that
+  has something it asks first (`COPY` / from / `> to`, push yes, Back no).
+- **Delete held**, with a track button: a step asks to delete that track
+  (`DEL`), push yes, Back no. Its mix strip stays, as Melodee's Delete.
+- **The new-track sheet** (`NEW` / track / `TRK`): kit, synth (a Schwung
+  module), keygroup, MIDI, audio; the jogwheel picks, push makes it. A kit
+  goes on to Load, a synth to its modules. Push on an empty track's screen
+  opens it too.
+- **Each kind's Play screen**: a kit's (`KIT`) and a synth's (the module's
+  short name) as before; a keygroup (`KEYS`), a MIDI track (`MIDI`), an
+  audio track (`AUD`) and another host's plug-in (`PLUG`) show what they are
+  and play (pads as notes on the note tracks, Up / Down the octave), their
+  own pages coming in wave 2 (`docs/PARITY.md`); an empty track (`----`)
+  says `PUSH: NEW TRACK`.
+- **Transport**: Play plays and stops the patterns; while it plays the
+  steps show the selected track's playhead (a sixteenth a step) and the
+  detail line the bar and beat (`3.2`).
+- **Tempo** (Shift + Play): the BPM large; the jogwheel or knob 1 the tempo
+  (Shift: tenths), knob 2 the swing, knob 3 the metronome's level; push the
+  metronome on or off (`CLICK` underlined when on). The steps count the
+  bar's beats, the one playing white. Back or Shift + Play leaves.
+
+| Screen | Rail | Subject | Detail |
+| --- | --- | --- | --- |
+| Track button held | `TRKS` / track / `/16` | the sixteen as a grid, a row a bank | track, kind, name; `COPY: A STEP`, `DELETE: A STEP` |
+| New track | `NEW` / track / `TRK` | kit, synth, keygroup, MIDI, audio | `PUSH: MAKE` |
+| Copy onto a used track | `COPY` / from / `> to` | the question | `PUSH YES`, `BACK NO` |
+| Delete | `DEL` / track / kind | the question | `PUSH YES`, `BACK NO` |
+| Empty track | `----` / track | `EMPTY` | `PUSH: NEW TRACK` |
+| Keygroup, MIDI, audio, plug-in | `KEYS`, `MIDI`, `AUD`, `PLUG` / track / lowest note or channel | what it plays | kind; the bar and beat while playing |
+| Tempo | `TMPO` / / signature | BPM large, swing, `CLICK` | push: click on / off; bar and beat |
+
+## Screens in code
+
+Each screen is a file of its own in `src/app/screens/`, a `Screen`
+(`src/app/screen.h`) registered there with a `RegisterScreen`: its id, how
+it is made, the buttons that open it from a track's Play screen (a
+`Trigger`: Menu on a kit opens `load-samples`, Loop `chop`, Shift + Play
+`tempo`), or the track kinds whose Play screen it is. A new screen is a new
+file; no other file changes. The app (`melodee_app.cpp`) keeps only what is
+the same everywhere: the track buttons, Play, the master knob, a touched
+knob shown large, typing for a module's page, and the sixteen tracks while
+a track button is held. What the screens share is the studio
+(`src/app/studio.h`): Melodee's project and engine host, samples, modules,
+transport, saving.
+
 ## Controls
 
 A first proposal, to settle while building.
@@ -114,18 +182,19 @@ A first proposal, to settle while building.
 | Steps | in Chop, the sample in 16 parts, lit where a cut falls, pressed to hear from there; later the sequencer |
 | Knobs 1-8 | the screen's eight parameters; touch one to see it large |
 | Jogwheel | turn to choose (slice, list row, fine move of a cut; on a module track, its preset); push to confirm, and on a module track to open its menu; Shift + turn jumps a cut to the next hit |
-| Track buttons | tracks 1-4, each a kit or a module |
+| Track buttons | the four tracks of the selected track's bank; held: the sixteen, the steps pick (Tracks, above) |
 | Loop | Chop the last pad; again to leave |
 | Sample | Record: armed, hit a pad to record onto it; again to stop |
 | Capture | the last phrase of the always-on input onto the next empty pad |
 | Menu | Load samples, modules and effects |
 | Left / Right | the page before / after |
 | Up / Down | the pad bank (slices 33-64, kit banks); on a module track, the octave |
-| Delete | with a pad: empty it; in Chop: take the selected cut out; with Loop: every cut |
-| Copy | a pad, then another: copy it |
+| Delete | with a pad: empty it; in Chop: take the selected cut out; with Loop: every cut; with a track button held, a track |
+| Copy | a pad, then another: copy it; with a track button held, a track onto another |
 | Undo | undo; Shift + Undo: redo |
 | Back | leave a screen or sheet; Shift + Back: back to Move |
-| Play / Rec / Mute | transport, record, mute |
+| Play | play / stop; Shift + Play: the tempo |
+| Rec / Mute | record, mute |
 | Master knob | the main volume |
 
 ## Lights
@@ -135,7 +204,12 @@ A first proposal, to settle while building.
   the pad that cuts next blinking red; on a module track every C in the
   track's colour, the other naturals dim, a held pad white.
 - **Steps**: in Chop, the parts where a cut falls; the playhead while playing.
-- **Track buttons**: each track's colour, the selected one bright.
+- **Track buttons**: the bank's four, each its track's colour, dim; the
+  selected one bright; an empty one dark.
+- **Steps, a track button held**: the sixteen tracks, each its colour, the
+  selected one white, an empty one grey; Copy and Delete lit.
+- **Steps, on the tempo screen**: the bar's beats, the one playing white.
+- **Play**: green while playing.
 - **Knob lights**: lit for the knobs the screen uses, dark for the rest.
 - **Buttons**: lit where they do something on this screen.
 
@@ -144,6 +218,5 @@ A first proposal, to settle while building.
 - The pad pages' exact contents.
 - A module track's note layout: rows of fourths for now, C2 at the bottom
   left (Ableton's names); a scale or chromatic later.
-- More than four tracks (Shift + a track button for 5-8?).
 - Realtime priority when Schwung launches melodee-move as `ableton`: a
   small root helper, as EvilGenius uses, or not.
