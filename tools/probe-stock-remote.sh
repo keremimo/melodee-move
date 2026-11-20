@@ -95,7 +95,7 @@ for pid in $(pgrep -f '/opt/move/|MoveOriginal' 2>/dev/null); do
     printf 'libraries from outside /lib and /usr/lib:\n%s\n' "$(awk '$6 ~ /\.so/ {print $6}' "/proc/$pid/maps" 2>/dev/null | sort -u | grep -vE '^/(lib|usr/lib)/')"
 done
 show "ls -l /opt/move/Move /opt/move/MoveOriginal"
-show "head -c 2 /opt/move/Move | grep -q '#!' && cat /opt/move/Move || echo '/opt/move/Move is a binary'"
+show "dd if=/opt/move/Move bs=2 count=1 2>/dev/null | grep -q '#!' && cat /opt/move/Move || echo '/opt/move/Move is a binary'"
 LIMIT=40 show "ls -la /dev/shm"
 
 section "Ableton's software"
