@@ -157,6 +157,9 @@ std::string synth_text(const SynthFile& synth) {
         if (synth.preset >= 0) out << "preset " << synth.preset << '\n';
         for (const auto& [key, value] : synth.values)
             if (key.find_first_of(" \n") == std::string::npos && value.find('\n') == std::string::npos) out << "param " << key << ' ' << value << '\n';
+        for (const auto& [key, state] : synth.pages) // JSON never holds a raw newline
+            if (!key.empty() && key.find_first_of(" \n") == std::string::npos && !state.empty() && state.find('\n') == std::string::npos)
+                out << "page " << key << ' ' << state << '\n';
     }
     return out.str();
 }
@@ -177,6 +180,9 @@ bool read_synth(const std::string& text, SynthFile& synth) {
         else if (word == "param") {
             auto gap = rest.find(' ');
             if (gap != std::string::npos && gap) synth.values.emplace_back(rest.substr(0, gap), rest.substr(gap + 1));
+        } else if (word == "page") {
+            auto gap = rest.find(' ');
+            if (gap != std::string::npos && gap) synth.pages.emplace_back(rest.substr(0, gap), rest.substr(gap + 1));
         }
     }
     return true;
