@@ -37,6 +37,17 @@ Three parts so far:
   volume; Mute mutes the selected track, Mute + a track button that one,
   Shift + Mute + a track button solos it. Editing patterns comes next
   (docs/PARITY.md, sequencer); a project from the MPC plays its patterns.
+- **Looper** (Shift + Step 12; docs/UI.md, "Looper"): Melodee's four
+  tempo-synced loops, L1-L4, each on a loop track of its own. A pad row is
+  a loop (L1 on top: record / overdub, play / stop, undo, held to clear),
+  the right 16 keep playing the selected track; the track buttons pick,
+  mute and solo the loops; Rec records the selected one; knobs 1-8 its
+  source, length, level, feedback, pan, send, quantize and after take;
+  Shift + the wheel the four strips; the wheel's push its sheet (play / stop,
+  commit to a kit pad, clear, off, IN DELAY: the input's round trip
+  measured through a cable). Loops play on the beat at any tempo (a
+  stretch), are fitted to a new one before an overdub, and are kept with
+  the project as `Projects/Move Loops/Loop N.wav`.
 - **Play** (a kit track): the last pad's sample. Knobs 1-8: tune, level, pan, start, end,
   attack, decay, cutoff (Shift: finer). Touch a knob to see it large.
 - **Load** (the wheel's push on the pad, the Move's Device View): WAV,
@@ -307,6 +318,17 @@ card. The report stays in `.local/probe/`.
   this is CPU time, not delay. Resident memory 48 MB before, 222 MB after
   (the engine host's buffers for Record, Audio Recall, renders and the
   Looper). Neither is measured on a Move yet.
+- The Looper, simulated: a bar taken from the input through a 300-frame
+  cable, with the input delay measured from the sheet (428 frames: the
+  cable and the runtime's one block), has its first click at frame 3-4
+  (at 413 without it); Melodee's metronome itself clicks on block starts,
+  so its beats 2-4 come up to a block early in any take. Fitted from 120 to
+  140 BPM (88200 to 75600 frames), overdubbed, undone and redone from the
+  pads; kept, restored, committed to a pad with its note. With the Looper
+  on, L1 playing from Track 1 and the right 16 hit: the cycle's own work
+  32-56 µs on average, against 25-43 with it off in the same busy
+  container; a pad from read to rendered 27-61 µs (15-41 off); resident
+  memory 389 MB against 219 (its eight 22.5 MB buffers).
 - The package runs on a bare Ubuntu 22.04 (Ableton's glibc) with only its
   own libraries.
 - The JACK host against a dummy JACK server, earlier; the scripts' signal
@@ -349,6 +371,11 @@ to be designed again for this screen.
   against the first scope's numbers above.
 - The latency meter on a Move (LATENCY page, jogwheel push), against
   Ableton's firmware and Schwung.
+- The Looper on a Move: memory (`free -m`) with it on; IN DELAY with a
+  cable from the headphone output into the line in (the number it keeps,
+  against the spike's LATENCY page); a take from the line in played back
+  against the metronome; L1-L4 together from tracks, the mix and the input
+  while sixteen tracks play (`process_us`, `late`).
 - Wave 2, from docs/PARITY.md: sequencer, sampling, kit depth, instruments,
   mixer & effects, song & export, looper, MIDI & sync & undo & projects.
 
