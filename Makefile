@@ -26,7 +26,7 @@ LDLIBS := $(shell pkg-config --libs $(PACKAGES)) -ldl -pthread -lrt
 MODULE_CPP := $(wildcard $(JUCE)/juce_core/*.cpp $(JUCE)/juce_events/*.cpp $(JUCE)/juce_graphics/*.cpp)
 MODULE_C := $(wildcard $(JUCE)/juce_core/*.c $(JUCE)/juce_graphics/*.c)
 JUCE_OBJECTS := $(addprefix build/obj/juce/,$(notdir $(MODULE_CPP:.cpp=.o) $(MODULE_C:.c=.o)))
-SHARED_OBJECTS := $(patsubst src/%.cpp,build/obj/%.o,$(wildcard src/move/*.cpp src/spike/*.cpp))
+SHARED_OBJECTS := $(patsubst src/%.cpp,build/obj/%.o,$(wildcard src/move/*.cpp src/ui/*.cpp src/spike/*.cpp))
 
 all: $(TARGET) $(TESTS)
 $(TARGET): build/obj/main.o $(SHARED_OBJECTS) $(JUCE_OBJECTS)

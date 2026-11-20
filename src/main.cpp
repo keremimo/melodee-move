@@ -3,6 +3,7 @@
 #include "move/runtime.h"
 #include "move/tools.h"
 #include "spike/spike_app.h"
+#include "ui/mockups.h"
 #include <cstring>
 #include <exception>
 #include <iostream>
@@ -42,6 +43,7 @@ int main(int argc, char** argv) {
             if (argument == "--self-test" && has_value) { SpikeApp app; return move::self_test(app, argv[n + 1]); }
             if (argument == "--preview" && has_value) { SpikeApp app; return move::write_previews(app, argv[n + 1]); }
             if (argument == "--crush" && n + 2 < argc) return move::crush_pictures(argv[n + 1], argv[n + 2]);
+            if (argument == "--ui-mockups" && has_value) return ui::write_mockups(argv[n + 1]);
             if (argument == "--previews" && has_value) previews = argv[++n];
             else if (argument == "--seconds" && has_value) options.seconds = std::stod(argv[++n]);
             else if (argument == "--name" && has_value) options.client_name = argv[++n];

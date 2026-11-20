@@ -57,6 +57,7 @@ the tap's click and the sound in the waveform is what you hear.
 | Folder | What it holds |
 | --- | --- |
 | `src/move/` | move-base. `app.h` the `App` interface (sample-base's hooks plus `audio_event`); `runtime.*` the threads; `host.*` what a host shares with them; `spi_host.cpp`, `spi_device.*`, `spi_protocol.*` the Move's device and a simulated one; `jack_host.cpp` the JACK host (libjack loaded at run time); `audio.h` blocks and the reblocker; `controls.*`, `lights.*`, `display.*`, `font.*`, `latency.h`, `tools.*` |
+| `src/ui/` | the interface kit for the Rail design (docs/UI.md), and its mockups (`--ui-mockups DIR`) |
 | `src/spike/` | the spike app |
 | `module/` | the Schwung standalone tool: `module.json`, `standalone` |
 | `tests/` | unit tests, and the device host against the simulated Move |
@@ -164,10 +165,11 @@ to be designed again for this screen.
 
 ## Next
 
-- Run the spike on a Move: the checks above, and the latency against
+- The latency meter on a Move (LATENCY page, jogwheel push), against
   Ableton's firmware and Schwung.
 - Melodee's engine on move-base, the sampler and Chop first.
-- Chop's screen and pads for the Move.
+- The interface: the Rail design ([docs/UI.md](docs/UI.md)), Chop first.
+- Loading Schwung's modules as instruments and effects.
 
 ## Licence
 
