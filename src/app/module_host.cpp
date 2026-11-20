@@ -352,6 +352,7 @@ void LoadedModule::read_parameters() {
         knob_lists.emplace_back(0, std::move(knobs));
         levels.push_back(std::move(root));
     }
+    source = has(capabilities, "midi_in") && !bool(field(capabilities, "midi_in"));
     const auto& root = levels.front();
     preset_param = root.list_param;
     preset_count_param = root.count_param;
@@ -511,17 +512,38 @@ void SynthPlayer::timed(Clock::time_point begun, const char* kind, const char* k
     slows.push(slow); // full: dropped, the next will tell
 }
 
-void SynthPlayer::apply() {
+SynthPlayer::SynthPlayer() : source_thread([this] { work(); }) {}
+
+SynthPlayer::~SynthPlayer() { stop(); }
+
+void SynthPlayer::stop() {
+    stopping.store(true);
+    if (source_thread.joinable()) source_thread.join();
+}
+
+bool SynthPlayer::apply() {
     on_audio_thread = true;
     Command command;
     unsigned asked = 0;
     while (asked < 4 && commands.pop(command)) { // a few reads a block: each is the module's own time
         auto begun = Clock::now();
         switch (command.kind) {
-        case Command::Kind::Module:
+        case Command::Kind::Module: {
             if (current) retiring.push(current);
             current = command.module;
+            int wanted = current && current->source ? source_thread_plays : audio_thread_plays;
+            if (wanted != player.load(std::memory_order_relaxed)) {
+                // Handed over: the other thread takes the commands from the next.
+                if (wanted == source_thread_plays) {
+                    Block stale;
+                    while (source_blocks.pop(stale)) taken.fetch_add(1, std::memory_order_relaxed); // a source before's
+                    primed.store(false, std::memory_order_relaxed);
+                }
+                player.store(wanted, std::memory_order_release);
+                return false;
+            }
             break;
+        }
         case Command::Kind::Set:
             if (current && current->api->set_param) current->api->set_param(current->instance, command.key, command.value);
             timed(begun, "set", command.key, command.value);
@@ -557,10 +579,42 @@ void SynthPlayer::apply() {
         long_state.store(2, std::memory_order_release);
         timed(begun, "get", long_key, nullptr);
     }
+    return true;
+}
+
+void SynthPlayer::work() {
+    on_audio_thread = true;
+    while (!stopping.load(std::memory_order_relaxed)) {
+        if (player.load(std::memory_order_acquire) != source_thread_plays || !apply()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            continue;
+        }
+        Midi midi;
+        while (current && current->api->on_midi && source_midi.pop(midi)) current->api->on_midi(current->instance, midi.bytes, 3, schwung::midi_source_internal);
+        if (!current || made.load(std::memory_order_relaxed) - taken.load(std::memory_order_acquire) >= ahead) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            continue;
+        }
+        Block next {};
+        auto begun = Clock::now();
+        current->api->render_block(current->instance, next.data(), int(move::audio_frames));
+        timed(begun, "render", nullptr, nullptr);
+        if (source_blocks.push(next)) {
+            made.fetch_add(1, std::memory_order_release);
+            primed.store(true, std::memory_order_relaxed);
+        }
+    }
 }
 
 void SynthPlayer::midi(uint8_t status, uint8_t data1, uint8_t data2) {
-    apply();
+    if (player.load(std::memory_order_acquire) == source_thread_plays || !apply()) { // a source's: to its thread
+        Midi queued;
+        queued.bytes[0] = status;
+        queued.bytes[1] = data1;
+        queued.bytes[2] = data2;
+        source_midi.push(queued);
+        return;
+    }
     if (!current || !current->api->on_midi) return;
     const uint8_t message[3] {status, data1, data2};
     auto begun = Clock::now();
@@ -574,18 +628,26 @@ void SynthPlayer::pressure(int note, int value) { midi(0xa0, uint8_t(std::clamp(
 
 void SynthPlayer::render(const move::AudioBlock& input, move::AudioBlock& output, float gain) {
     rendered_at.store(std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now().time_since_epoch()).count(), std::memory_order_relaxed);
-    apply();
     // The input, where a module reading the device page looks for it.
     for (unsigned n = 0; n < input.size(); ++n) {
         auto sample = uint16_t(int16_t(input[n] >> 16));
         mapped_page[audio_in_offset + 2 * n] = uint8_t(sample);
         mapped_page[audio_in_offset + 2 * n + 1] = uint8_t(sample >> 8);
     }
-    if (!current) return;
-    block.fill(0);
-    auto begun = Clock::now();
-    current->api->render_block(current->instance, block.data(), int(move::audio_frames));
-    timed(begun, "render", nullptr, nullptr);
+    if (player.load(std::memory_order_acquire) == source_thread_plays || !apply()) {
+        // A source: the next block its thread made, if it is there.
+        if (source_blocks.pop(block)) taken.fetch_add(1, std::memory_order_release);
+        else {
+            if (primed.load(std::memory_order_relaxed)) late.fetch_add(1, std::memory_order_relaxed);
+            return;
+        }
+    } else {
+        if (!current) return;
+        block.fill(0);
+        auto begun = Clock::now();
+        current->api->render_block(current->instance, block.data(), int(move::audio_frames));
+        timed(begun, "render", nullptr, nullptr);
+    }
     for (unsigned n = 0; n < block.size(); ++n) {
         int64_t mixed = int64_t(output[n]) + int64_t(float(block[n]) * gain * 65536.0f);
         output[n] = int32_t(std::clamp<int64_t>(mixed, INT32_MIN + 1, INT32_MAX));

@@ -639,6 +639,50 @@ void test_schwung_modules() {
     player.set("stall", "3");
     player.render(in, out, 1.0f);
     CHECK(player.slow(slow) && std::string(slow.what) == "set stall=3" && slow.us >= 3000);
+    // A source (a stream, no MIDI) plays on the player's own thread, ahead:
+    // a stall of its holds that thread up, never the audio thread.
+    {
+        app::SynthPlayer streaming;
+        loaded->source = true;
+        CHECK(streaming.set_module(loaded.get()));
+        streaming.note_on(60, 127); // to its thread, in order
+        int32_t heard = 0;
+        for (int block = 0; block < 60; ++block) {
+            out.fill(0);
+            streaming.render(in, out, 1.0f);
+            heard = std::max(heard, peak_of(out));
+            std::this_thread::sleep_for(std::chrono::milliseconds(3));
+        }
+        CHECK(heard > to_s32(0.05f)); // level 0.25, set above
+        streaming.set("stall", "40"); // its thread waits 40 ms
+        double slowest_ms = 0;
+        for (int block = 0; block < 30; ++block) {
+            auto begun = std::chrono::steady_clock::now();
+            out.fill(0);
+            streaming.render(in, out, 1.0f);
+            slowest_ms = std::max(slowest_ms, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - begun).count());
+            std::this_thread::sleep_for(std::chrono::milliseconds(3));
+        }
+        CHECK(slowest_ms < 5);             // the audio thread was never held
+        CHECK(streaming.stream_late() > 0); // and the stream ran dry for a moment instead
+        app::SynthPlayer::Slow stalled;
+        bool reported = false;
+        while (streaming.slow(stalled)) reported |= std::string(stalled.what) == "set stall=40";
+        CHECK(reported);
+        // Let go: its thread hands the commands back, and the module.
+        CHECK(streaming.set_module(nullptr));
+        app::LoadedModule* back = nullptr;
+        for (int tries = 0; tries < 100 && !back; ++tries) {
+            streaming.render(in, out, 1.0f);
+            back = streaming.retired();
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        }
+        CHECK(back == loaded.get());
+        streaming.note_off(60);
+        loaded->source = false;
+    }
+    loaded->api->on_midi(loaded->instance, std::array<uint8_t, 3> {0x80, 60, 0}.data(), 3, 0);
+
     // Let go: handed back, to be destroyed off the audio thread.
     CHECK(!player.retired());
     CHECK(player.set_module(nullptr));

@@ -7,6 +7,7 @@
 #include <chrono>
 #include <memory>
 #include <mutex>
+#include <thread>
 #include <string>
 #include <vector>
 
@@ -96,6 +97,11 @@ public:
     std::vector<ModuleParam> params;
     std::vector<ModulePage> pages;
     std::vector<ModuleLevel> levels; // root first; never empty once loaded
+    // A source, not an instrument: it takes no MIDI ("midi_in": false, as
+    // Webstream and Radio Garden declare). SynthPlayer renders it ahead, on
+    // a thread of its own, so a stall of its (a stream starting) is never
+    // the audio thread's.
+    bool source = false;
     std::vector<ModuleCanvas> canvases;
     const ModuleLevel* level(const std::string& id) const;
     size_t level_index(const std::string& id) const; // 0 (root) when unknown
@@ -114,8 +120,20 @@ private:
 };
 
 // The audio side of one synth track.
+//
+// An instrument is called on the audio thread, its notes in the cycle the
+// pad was read. A source (LoadedModule::source) is called on the player's
+// own thread instead, every call, as Schwung's contract wants one thread
+// for a module: it renders about eight blocks (23 ms) ahead, and the audio
+// thread only takes the next finished block. Whichever thread plays the
+// current module takes the commands; the hand-over between them happens in
+// the queue, at the module command.
 class SynthPlayer {
 public:
+    SynthPlayer();
+    ~SynthPlayer();
+    void stop(); // ends the source thread: before the modules it may play are destroyed
+    unsigned stream_late() const { return late.load(std::memory_order_relaxed); } // blocks a source had not made in time
     static constexpr size_t key_size = 64, value_size = 192;
     // `serial`: the ask's, to tell an answer from before a later set.
     struct Answer { char key[key_size] {}; char value[value_size] {}; uint64_t serial = 0; };
@@ -158,7 +176,8 @@ private:
         uint64_t serial = 0;
     };
     using Clock = std::chrono::steady_clock;
-    void apply();
+    bool apply(); // false: the module is now the other thread's to play
+    void work();  // the source thread
     void midi(uint8_t status, uint8_t data1, uint8_t data2);
     void timed(Clock::time_point begun, const char* kind, const char* key, const char* value);
 
@@ -178,8 +197,20 @@ private:
     int sync_length = 0;
     std::vector<char> sync_buffer = std::vector<char>(65536);
     std::atomic<int64_t> rendered_at {0}; // steady_clock, nanoseconds
-    LoadedModule* current = nullptr;
+    LoadedModule* current = nullptr; // the playing thread's
     uint64_t serial = 0; // the producer's
+    // A source's thread, and what passes between it and the audio thread.
+    enum : int { audio_thread_plays = 0, source_thread_plays = 1 };
+    std::atomic<int> player {audio_thread_plays};
+    struct Midi { uint8_t bytes[3] {}; };
+    move::SpscRing<Midi, 64> source_midi; // the audio thread's pads, to a source
+    using Block = std::array<int16_t, move::audio_frames * move::audio_channels>;
+    static constexpr uint64_t ahead = 8;
+    move::SpscRing<Block, 16> source_blocks;
+    std::atomic<uint64_t> made {0}, taken {0};
+    std::atomic<bool> primed {false}, stopping {false};
+    std::atomic<unsigned> late {0};
+    std::thread source_thread;
     std::array<int16_t, move::audio_frames * move::audio_channels> block {};
 };
 

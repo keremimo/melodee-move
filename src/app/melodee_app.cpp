@@ -115,6 +115,7 @@ MelodeeApp::MelodeeApp(std::string library_folder, std::string home_folder, std:
 }
 
 MelodeeApp::~MelodeeApp() {
+    synth.stop(); // a source's thread ends before the modules it plays are destroyed
     std::unique_lock<std::mutex> guard(lock);
     if (!dirty) return;
     auto kit = snapshot();
@@ -1477,11 +1478,11 @@ std::string MelodeeApp::status() const {
     char text[420];
     std::snprintf(text, sizeof text,
                   "page=%s pad=%s samples=%u slices=%u pads=%u chop=%s loading=%d saves=%u unsaved=%d track=%s synth=%s octave=%d "
-                  "menu=%s canvas=%s entered=%d typing=%d slow_calls=%u slowest_ms=%.1f",
+                  "menu=%s canvas=%s entered=%d typing=%d slow_calls=%u slowest_ms=%.1f stream_late=%u",
                   names[unsigned(page)], pad_label(pad).c_str(), loaded, slices.count, used, melodee::chop_mode_name(mode), int(loading),
                   saves, int(dirty), track == Track::Synth ? "synth" : "kit", module ? module->info().id.c_str() : "-", octave, menu_open && !menu_path.empty() ? menu_path.back().c_str() : "-",
                   shown_canvas() >= 0 ? module->canvases[size_t(shown_canvas())].key.c_str() : "-", int(canvas_entered), int(typing), slow_calls,
-                  slowest_us / 1000.0);
+                  slowest_us / 1000.0, synth.stream_late());
     return text;
 }
 
