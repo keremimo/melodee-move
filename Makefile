@@ -6,6 +6,8 @@ TESTS := build/move-tests
 # The controls map (docs/MOVE_CONTROLS.md) against its table, alone: it
 # needs only src/app/bindings.*.
 CONTROLS_TESTS := build/controls-tests
+# Melodee's instruments on the Move (src/app/instruments.*, keygroups, keys).
+INSTRUMENTS_TESTS := build/instruments-tests
 JUCE := build/deps/JUCE/modules
 # libjack is loaded at run time by the JACK host (src/move/jack_host.cpp), so
 # only its headers are needed here and the binary runs where there is no JACK.
@@ -40,6 +42,12 @@ MELODEE_INCLUDES := -I$(MELODEE)/src -I$(MELODEE)/base/src
 # and MP3 through JUCE, as on the MPC.
 MELODEE_SOURCES := $(wildcard $(MELODEE)/src/melodee/engine/*.cpp $(MELODEE)/src/melodee/model/*.cpp) \
     $(MELODEE)/src/melodee/shell/sample_decode.cpp
+# Melodee's instrument files (src/app/instruments.*): MPC programs (.xpm,
+# MPC 3's .xty and projects' keygroups), SoundFonts, DecentSampler presets,
+# MPC 3 progressions, and the .xpm the auto sampler writes. Each reads or
+# writes its file alone, through JUCE's XML and JSON as on the MPC.
+MELODEE_SOURCES += $(addprefix $(MELODEE)/src/melodee/shell/,mpc_program.cpp mpc_project.cpp mpc_wav_slices.cpp \
+    sf2_file.cpp dspreset_file.cpp progression_file.cpp xpm_write.cpp)
 MELODEE_OBJECTS := $(patsubst $(MELODEE)/src/%.cpp,build/obj/melodee-sample/%.o,$(MELODEE_SOURCES))
 MELODEE_LIBRARY := build/melodee.a
 CPPFLAGS += $(MELODEE_INCLUDES)
@@ -65,7 +73,7 @@ SHARED_OBJECTS := $(patsubst src/%.cpp,build/obj/%.o,$(wildcard src/move/*.cpp s
 
 # A stand-in Schwung module for the tests, where Schwung keeps its synths.
 FAKE_MODULE := build/test-modules/sound_generators/fake
-all: $(TARGET) $(TESTS) $(CONTROLS_TESTS) $(FAKE_MODULE)/dsp.so $(FAKE_MODULE)/module.json $(FAKE_MODULE)/page.js
+all: $(TARGET) $(TESTS) $(CONTROLS_TESTS) $(INSTRUMENTS_TESTS) $(FAKE_MODULE)/dsp.so $(FAKE_MODULE)/module.json $(FAKE_MODULE)/page.js
 $(FAKE_MODULE)/dsp.so: tests/fake_module/dsp.c
 	@mkdir -p $(@D)
 	$(CC) -O2 -fPIC -shared -Wall -Wextra -Werror $< -o $@
@@ -78,6 +86,8 @@ $(FAKE_MODULE)/page.js: tests/fake_module/page.js
 $(TARGET): build/obj/main.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS) $(MELODEE_LIBRARY)
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 $(TESTS): build/obj/tests/move_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS) $(MELODEE_LIBRARY)
+	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
+$(INSTRUMENTS_TESTS): build/obj/tests/instruments_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS) $(MELODEE_LIBRARY)
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 $(CONTROLS_TESTS): build/obj/tests/controls_tests.o build/obj/app/bindings.o
 	$(CXX) -static-libstdc++ -static-libgcc $^ -pthread -o $@
@@ -108,5 +118,5 @@ $(foreach m,$(MODULE_C),$(eval $(call c_module_rule,$(m))))
 juce: $(JUCE_OBJECTS)
 .PHONY: all clean juce
 clean:
-	rm -rf build/obj $(TARGET) $(TESTS) $(CONTROLS_TESTS)
+	rm -rf build/obj $(TARGET) $(TESTS) $(CONTROLS_TESTS) $(INSTRUMENTS_TESTS)
 -include $(shell find build/obj -name '*.d' 2>/dev/null)

@@ -8,6 +8,7 @@
 #include "melodee/engine/auto_chop.h"
 #include "melodee/engine/engine_host.h"
 #include "melodee/engine/onsets.h"
+#include "melodee/engine/root_find.h"
 #include "melodee/engine/sample_data.h"
 #include "melodee/model/project.h"
 #include <array>
@@ -47,6 +48,8 @@ enum class TrackKind : uint8_t { Empty, Kit, Synth, Keys, Midi, Audio, Plugin, C
 const char* kind_name(TrackKind kind); // "empty", "kit", "synth", ...
 const char* kind_tag(TrackKind kind);  // the rail's: "----", "KIT", "SYN", "KEYS", "MIDI", "AUD", "PLUG"
 
+struct Instrument; // app/instruments.h
+
 // A sample in memory, with what Chop needs found in it.
 struct Sample {
     std::string name, path;
@@ -56,6 +59,8 @@ struct Sample {
     unsigned hit_count = 0;
     melodee::BeatGrid beats;
     melodee::AutoRead autos;
+    std::shared_ptr<Instrument> instrument; // a multisampled instrument's (app/instruments.h): its zones and files
+    melodee::SampleRoot root;               // the note it holds (engine/root_find.h), found as it is read
 };
 // Reads a sound file and finds its hits, beats and what Auto reads. Slow
 // and allocating: never on the audio thread, never under the lock.
@@ -104,6 +109,7 @@ struct ModuleTrack {
 };
 
 class Screen;
+class Landings; // app/instruments.h
 
 class Studio {
 public:
@@ -161,6 +167,10 @@ public:
     void sound_pads(unsigned track);                                             // the engine's back to the project's
     melodee::SampleChop* chop_of(unsigned slot);
     std::string install(std::unique_ptr<Sample> sample, unsigned track, unsigned pad); // empty on success
+    // A keygroup track's sound (docs/UI.md, "Instruments"): an instrument or
+    // one sample on its pad 1, its files landing on a thread of their own.
+    std::string install_keys(std::unique_ptr<Sample> sample, unsigned track); // empty on success
+    const Sample* keys_sample(unsigned track) const { return sample_of(track, 0); }
     struct Job { std::string path; unsigned track, pad; };
     std::vector<Job> jobs; // files to load (the service thread's)
     bool loading = false;
@@ -235,6 +245,9 @@ public:
 private:
     void forward();                        // audio thread: the ring into the host
     void apply_track(unsigned track);      // the engine's track made whole again from the project's (TrackLoad)
+    void sync_keyed_roots();               // a keygroup of one sample plays from its note (KeyedRoot)
+    std::array<int16_t, melodee::track_count> keyed_sent {};
+    unsigned free_slot() const;
     void setup_modules();                  // a ModuleTrack for each Schwung track of the project, offered
     ModuleTrack& make_module_track(unsigned track);
     void drop_module_track(unsigned track);
@@ -272,6 +285,8 @@ private:
     std::array<Went, pad_count> pad_went {};
     // Last, so it goes first: it holds the samples and runners above.
     std::unique_ptr<melodee::EngineHost> engine;
+    // After it, so they end before it: the instruments' files landing.
+    std::unique_ptr<Landings> landings;
 };
 
 } // namespace app

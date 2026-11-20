@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "app/studio.h"
 #include "app/screen.h"
+#include "app/instruments.h"
+#include "melodee/model/scales.h"
 #include "melodee/engine/engine_info.h"
 #include "melodee/shell/sample_decode.h"
 #include <juce_core/juce_core.h>
@@ -83,6 +85,7 @@ std::unique_ptr<Sample> read_sample(const std::string& path, std::string& error)
     melodee::make_overview(*sample->data, sample->overview);
     auto mono = melodee::model_mono(*sample->data);
     sample->hit_count = melodee::find_hits_in(mono, sample->hits, sample->beats, &sample->autos);
+    sample->root = melodee::find_root(mono); // the note it holds: a keygroup of it plays from there
     return sample;
 }
 
@@ -97,6 +100,7 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
     settings_path = (fs::path(home_path) / "Move.settings").string();
     modules_root = modules_folder.empty() ? move_modules : std::move(modules_folder);
     catalog = scan_modules(modules_root);
+    set_instrument_cache((fs::path(home_path) / "Cache" / "Instruments").string());
     pad_went.fill({});
     melodee::dsp::device_rate.store(44100.0f); // the Move's; audio_opened() says if it is not
 
@@ -158,6 +162,8 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
     }
     engine = std::make_unique<melodee::EngineHost>();
     engine->set_overload_guard(true); // as Melodee runs on the MPC
+    landings = std::make_unique<Landings>(*engine);
+    keyed_sent.fill(INT16_MIN);
     engine->load(*song, *bank);
     for (unsigned t = 0; t < melodee::track_count; ++t)
         if (modules[t] && modules[t]->entry != melodee::no_plugin) engine->offer_plugin(modules[t]->entry, &modules[t]->runner);
@@ -298,6 +304,7 @@ void Studio::select(unsigned t) {
 }
 
 void Studio::apply_track(unsigned t) {
+    keyed_sent[t % melodee::track_count] = INT16_MIN; // its keyed root sent again
     auto* pack = new melodee::TrackPack(t, song->tracks[t], bank->at[t]); // freed once the audio thread hands it back
     Command command {Type::TrackLoad, uint8_t(t)};
     command.track_pack = pack;
@@ -414,15 +421,14 @@ melodee::SampleChop* Studio::chop_of(unsigned slot) {
 
 std::string Studio::install(std::unique_ptr<Sample> sample, unsigned t, unsigned at) {
     if (song->tracks[t].engine != EngineKind::Sampler) return "NOT A KIT";
-    // The first slot no file of the project names.
-    unsigned slot = 0;
-    while (slot < melodee::sample_slots && (song->samples[slot].path[0] || (slot < samples.size() && samples[slot]))) ++slot;
+    unsigned slot = free_slot();
     if (slot >= melodee::sample_slots) return "MEMORY FULL";
     if (!engine->offer_sample(slot, sample->data.get())) return "BUSY, TRY AGAIN";
     auto& ref = song->samples.edit(slot);
     copy_text(ref.path, sample->path);
     copy_text(ref.name, sample->name);
     ref.frames = sample->data->model_frames();
+    ref.root = sample->root.found() ? int8_t(sample->root.pitch_class) : melodee::root_none;
     if (slot >= samples.size()) samples.resize(slot + 1);
     samples[slot] = std::move(sample);
     melodee::PadSound sound;
@@ -659,13 +665,16 @@ std::string Studio::restore() {
     unsigned missing = 0;
     for (const auto& [slot, file] : wanted) {
         std::string failed;
-        auto sample = read_sample(file, failed);
+        auto sample = read_any_sample(file, failed); // a sample, or an instrument (app/instruments.h)
         std::lock_guard<std::mutex> guard(lock);
         if (!sample) { ++missing; continue; }
         if (!engine->offer_sample(slot, sample->data.get())) { ++missing; continue; }
-        song->samples.edit(slot).frames = sample->data->model_frames();
+        auto& ref = song->samples.edit(slot);
+        ref.frames = sample->data->model_frames();
+        if (ref.root == melodee::root_unread) ref.root = sample->instrument || !sample->root.found() ? melodee::root_none : int8_t(sample->root.pitch_class);
         if (slot >= samples.size()) samples.resize(slot + 1);
         samples[slot] = std::move(sample);
+        if (samples[slot]->instrument) landings->start(*samples[slot]);
     }
     // The modules, each as it was saved.
     for (unsigned t = 0; t < melodee::track_count; ++t) {
@@ -808,14 +817,22 @@ void Studio::service() {
         loading = !todo.empty();
     }
     for (const auto& job : todo) {
+        bool keys = false;
+        {
+            std::lock_guard<std::mutex> guard(lock);
+            keys = song->tracks[job.track % melodee::track_count].engine == EngineKind::Keygroup;
+        }
         std::string error;
-        auto sample = read_sample(job.path, error);
+        auto sample = keys ? read_any_sample(job.path, error) : read_sample(job.path, error);
         std::lock_guard<std::mutex> guard(lock);
         if (!sample) { say(upper(error).substr(0, 16)); continue; }
-        if (auto failed = install(std::move(sample), job.track, job.pad); !failed.empty()) say(failed);
+        auto failed = keys ? install_keys(std::move(sample), job.track) : install(std::move(sample), job.track, job.pad);
+        if (!failed.empty()) say(failed);
     }
     std::unique_lock<std::mutex> guard(lock);
     loading = false;
+    landings->reap();
+    sync_keyed_roots();
     // Autosave: three seconds after the last change, as on the MPC.
     auto now = Clock::now();
     if (dirty && now - changed_at >= autosave_idle && now >= retry_at) {
