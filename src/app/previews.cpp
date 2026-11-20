@@ -38,7 +38,7 @@ int write_previews(const std::string& directory) {
     auto loop = samples.getChildFile("Break 120.wav").getFullPathName().toStdString();
     if (!move::write_test_loop(loop)) return 1;
 
-    MelodeeApp melodee(samples.getFullPathName().toStdString());
+    MelodeeApp melodee(samples.getFullPathName().toStdString(), folder.getChildFile("home").getFullPathName().toStdString());
     move::Session session;
     melodee.attach(session);
     melodee.audio_opened(move::AudioFormat {});

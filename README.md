@@ -30,9 +30,17 @@ Three parts so far:
   jogwheel for **To Pads** (Poly, Mono, Thru), onto the first empty pads.
   Back or Loop leaves Chop without changing the pads.
 - The master knob is the volume; Shift + Back goes back to Move.
+- **Saving**: the kit is a Melodee project, `/data/UserData/Melodee/Projects/Move.mldp`
+  (`--home` moves the folder), saved three seconds after the last change, as
+  Melodee autosaves on the MPC, and on the way out; the next start opens it.
+  Samples are kept by path; one that has gone keeps its pads, silent, until
+  it is back. Melodee keeps a sample's chop in the WAV file itself; here the
+  samples are the Move's own library, left untouched, so each chop goes
+  beside the project in `Move.mldp.chops`. Each file is written whole or not
+  at all (a temporary file, flushed, renamed).
 
-Not yet: saving (everything is gone when it quits), formats other than WAV,
-samples over 60 seconds, Record, Capture, Schwung's modules, more tracks.
+Not yet: more than one project, formats other than WAV, samples over 60
+seconds, Record, Capture, Schwung's modules, more tracks.
 
 Melodee's engine and model are compiled from a melodee-sample checkout
 beside this one (`../melodee-sample`, or `MELODEE_SAMPLE`), unchanged.

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #pragma once
 #include "app/kit_player.h"
+#include "app/project_store.h"
 #include "move/app.h"
 #include "melodee/engine/auto_chop.h"
 #include "melodee/engine/onsets.h"
@@ -27,6 +28,10 @@
 //         jogwheel for To Pads: Poly, Mono or Thru, onto the first empty
 //         pads. Back leaves without changing the pads.
 //
+// The kit is saved as a Melodee project (project_store.h) in
+// `home`/Projects/Move.mldp three seconds after the last change, as Melodee
+// autosaves on the MPC, and when the app quits; it is loaded again at start.
+//
 // Pads sound from audio_event(), in the cycle they were read. The screen,
 // the MIDI thread and the service thread share the model under one lock;
 // the audio thread never takes it (KitPlayer's queue).
@@ -34,9 +39,11 @@ namespace app {
 
 class MelodeeApp : public move::App {
 public:
-    // `library`: the folder Load opens (the Move's own sample library by default).
-    explicit MelodeeApp(std::string library = {});
-    ~MelodeeApp() override;
+    // `library`: the folder Load opens (the Move's own sample library by
+    // default). `home`: Melodee's folder, its projects in Projects
+    // (/data/UserData/Melodee on the Move by default).
+    explicit MelodeeApp(std::string library = {}, std::string home = {});
+    ~MelodeeApp() override; // saves what is not saved yet
 
     void render(const move::AudioBlock& input, move::AudioBlock& output) override; // audio thread
     void audio_opened(const move::AudioFormat& format) override;                    // audio thread
@@ -47,14 +54,18 @@ public:
     void service() override;                                                        // service thread
     std::string status() const override;
 
-    // For tests and tools: load a file onto a pad and wait for it.
+    // For tests and tools: load a file onto a pad and wait for it; save the
+    // project now; read it back now (what the first service() does).
     std::string load_now(const std::string& path, unsigned pad);
+    std::string save_now();
+    std::string restore_now();
     unsigned slice_count() const;
+    const std::string& project_path() const { return project; }
 
 private:
     enum class Page : uint8_t { Play, Load, Chop, ToPads };
     struct Sample {
-        std::string name;
+        std::string name, path;
         std::unique_ptr<melodee::SampleData> data;
         melodee::Overview overview {};
         std::array<melodee::Hit, melodee::max_hits> hits {};
@@ -79,6 +90,11 @@ private:
     const Sample* sample_of(unsigned pad) const;
     void say(std::string text);
     std::string install(std::unique_ptr<Sample> sample, unsigned pad);
+    void place(std::unique_ptr<Sample> sample, uint16_t slot, const melodee::SampleChop& chop);
+    void changed();
+    void remember_chop();
+    KitFile snapshot() const;               // the kit as it stands, to save outside the lock
+    std::string write(const KitFile& kit);  // to `project`, the folders made first
 
     void draw_play(juce::Graphics& g);
     void draw_load(juce::Graphics& g);
@@ -88,7 +104,8 @@ private:
 
     mutable std::mutex lock;
     KitPlayer player;
-    std::vector<std::unique_ptr<Sample>> samples; // slot = index; kept for the run
+    std::vector<std::unique_ptr<Sample>> samples; // slot = index (null where a file was missing); kept for the run
+    std::vector<melodee::SampleChop> chops;       // each slot's chop, as Chop left it
     std::array<melodee::PadSound, pad_count> pads {};
     unsigned pad = 0;
     Page page = Page::Play;
@@ -110,6 +127,11 @@ private:
     int touched = -1;
     Clock::time_point touched_until {}, message_until {};
     std::string message;
+    // Saving.
+    std::string home, project;
+    bool dirty = false, restored = false;
+    Clock::time_point changed_at {}, retry_at {};
+    unsigned saves = 0;
 
     std::atomic<float> volume {0.8f};
 };

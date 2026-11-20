@@ -36,7 +36,13 @@ EXPECTED='loop_frames=428/428'
 # hit at 400; Loop at 500 chops it (Auto: 16 slices), slice 2 at 520; two
 # pushes at 600 and 620 put them on pads from A02; Shift + Back at 1300.
 MELODEE_SCRIPT='50:0xb0,50,127;60:0xb0,3,127;400:0x90,68,110;430:0x80,68,0;500:0xb0,58,127;520:0x90,69,100;540:0x80,69,0;600:0xb0,3,127;620:0xb0,3,127;1300:0xb0,49,127;1301:0xb0,51,127'
-MELODEE_EXPECTED='page=play pad=A02 samples=1 slices=16'
+MELODEE_EXPECTED='page=play pad=A02 samples=1 slices=16 pads=17'
+# Saving: the run above quits within three seconds of its last change, so
+# it saves on the way out; the next start reads the kit back (A01 and the 16
+# slices, A02 last), knob 1 tunes A02 at 100, and the autosave follows three
+# seconds after.
+RESTORE_SCRIPT='100:0xb0,71,2'
+RESTORE_EXPECTED='page=play pad=A02 samples=1 slices=0 pads=17 .* saves=1 unsaved=0'
 # shellcheck disable=SC2086
 docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE" && pwd):/melodee:ro" -e MELODEE=/melodee \
     $MOUNT melodee-move-builder sh -c "
@@ -48,12 +54,16 @@ docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE
     tail -n 1 build/simulated.log &&
     grep -q 'Shift + Back' build/simulated.log &&
     grep -q '$EXPECTED' build/simulated.log &&
-    rm -rf build/simulated-samples && mkdir -p build/simulated-samples &&
+    rm -rf build/simulated-samples build/simulated-home && mkdir -p build/simulated-samples &&
     build/melodee-move --test-loop build/simulated-samples/loop.wav &&
-    { build/melodee-move --backend simulated --samples build/simulated-samples --seconds 8 --script '$MELODEE_SCRIPT' 2> build/simulated-melodee.log || true; } &&
+    { build/melodee-move --backend simulated --samples build/simulated-samples --home build/simulated-home --seconds 8 --script '$MELODEE_SCRIPT' 2> build/simulated-melodee.log || true; } &&
     tail -n 1 build/simulated-melodee.log &&
     grep -q 'Shift + Back' build/simulated-melodee.log &&
     grep -q '$MELODEE_EXPECTED' build/simulated-melodee.log &&
+    test -s build/simulated-home/Projects/Move.mldp &&
+    { build/melodee-move --backend simulated --samples build/simulated-samples --home build/simulated-home --seconds 5 --script '$RESTORE_SCRIPT' 2> build/simulated-restore.log || true; } &&
+    tail -n 1 build/simulated-restore.log &&
+    grep -qE '$RESTORE_EXPECTED' build/simulated-restore.log &&
     build/melodee-move --melodee-previews build/melodee-previews > /dev/null &&
     tools/bundle.sh &&
     $CRUSH"

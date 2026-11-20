@@ -18,10 +18,11 @@ namespace {
 
 void usage() {
     std::cerr <<
-        "usage: melodee-move [--app melodee|spike] [--samples DIR] [--previews DIR]\n"
+        "usage: melodee-move [--app melodee|spike] [--samples DIR] [--home DIR] [--previews DIR]\n"
         "                    [--backend auto|spi|jack|simulated] [--seconds S] [--name CLIENT]\n"
         "                    [--loopback FRAMES] [--script 'TRANSFER:STATUS,DATA1,DATA2;...']\n"
-        "         run on the Move: Melodee (its sample library in --samples, by default the Move's own), or the\n"
+        "         run on the Move: Melodee (its sample library in --samples, by default the Move's own; its\n"
+        "         projects in --home/Projects, by default /data/UserData/Melodee), or the\n"
         "         spike (--previews: Melodee's pages crushed). spi is the Move's own device on Ableton's firmware,\n"
         "         jack is jackd -d move on Armbian, simulated a stand-in for the device (--loopback, --script)\n"
         "       melodee-move --self-test FILE.wav       render offline, fail if silent\n"
@@ -41,7 +42,7 @@ move::Backend backend_named(const std::string& name) {
 
 int main(int argc, char** argv) {
     try {
-        std::string previews, samples, which = "melodee";
+        std::string previews, samples, home, which = "melodee";
         move::RunOptions options;
         for (int n = 1; n < argc; ++n) {
             std::string argument = argv[n];
@@ -54,6 +55,7 @@ int main(int argc, char** argv) {
             if (argument == "--melodee-previews" && has_value) return app::write_previews(argv[n + 1]);
             if (argument == "--previews" && has_value) previews = argv[++n];
             else if (argument == "--samples" && has_value) samples = argv[++n];
+            else if (argument == "--home" && has_value) home = argv[++n];
             else if (argument == "--app" && has_value) which = argv[++n];
             else if (argument == "--seconds" && has_value) options.seconds = std::stod(argv[++n]);
             else if (argument == "--name" && has_value) options.client_name = argv[++n];
@@ -67,7 +69,7 @@ int main(int argc, char** argv) {
             return move::run_app(app, options);
         }
         if (which != "melodee") { usage(); return 2; }
-        auto app = std::make_unique<app::MelodeeApp>(samples);
+        auto app = std::make_unique<app::MelodeeApp>(samples, home);
         return move::run_app(*app, options);
     } catch (const std::exception& error) {
         std::cerr << "melodee-move: " << error.what() << '\n';

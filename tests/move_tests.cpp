@@ -391,7 +391,8 @@ void test_melodee_app() {
     std::string folder = "build/test-samples", loop = folder + "/loop.wav";
     std::filesystem::create_directories(folder);
     CHECK(write_test_loop(loop));
-    app::MelodeeApp melodee(folder);
+    std::filesystem::remove_all("build/test-home");
+    app::MelodeeApp melodee(folder, "build/test-home");
     Session session;
     melodee.attach(session);
     melodee.audio_opened(AudioFormat {});
@@ -432,6 +433,83 @@ void test_melodee_app() {
     CHECK(melodee.load_now(folder + "/missing.wav", 3) != "");
 }
 
+bool has(const std::string& text, const std::string& part) { return text.find(part) != std::string::npos; }
+
+void test_saving() {
+    // A kit saved as a Melodee project and read back by a new start: its
+    // samples, pads, last pad and each sample's chop; a file gone missing
+    // keeps its place.
+    std::string folder = "build/test-samples", home = "build/test-home-saving";
+    std::string loop = folder + "/loop.wav", other = folder + "/other.wav";
+    std::filesystem::create_directories(folder);
+    std::filesystem::remove_all(home);
+    CHECK(write_test_loop(loop) && write_test_loop(other));
+    auto press = [](app::MelodeeApp& melodee, Button button) { melodee.surface(make_event(0xb0, button_cc(button), 127)); };
+    unsigned chopped = 0;
+    std::string project;
+    {
+        app::MelodeeApp first(folder, home);
+        Session session;
+        first.attach(session);
+        first.audio_opened(AudioFormat {});
+        CHECK(first.restore_now().empty()); // no file yet: a new project
+        CHECK(first.load_now(loop, 0).empty());
+        CHECK(first.load_now(other, 20).empty());
+        first.surface(make_event(0x90, pad_note(0), 100)); // A01 again
+        press(first, Button::Loop);
+        first.surface(make_event(0xb0, uint8_t(knob_first_cc + 2), 1)); // type: Beats
+        chopped = first.slice_count();
+        CHECK(chopped > 1);
+        press(first, Button::MainPush);
+        press(first, Button::MainPush); // To Pads: Poly, from A02
+        CHECK(has(first.status(), "pad=A02") && has(first.status(), "unsaved=1"));
+        CHECK(first.save_now().empty());
+        CHECK(has(first.status(), "saves=1") && has(first.status(), "unsaved=0"));
+        project = first.project_path();
+        CHECK(std::filesystem::exists(project) && !std::filesystem::exists(project + ".writing"));
+    }
+    std::filesystem::remove(other); // gone before the next start
+    app::MelodeeApp second(folder, home);
+    Session session;
+    second.attach(session);
+    second.audio_opened(AudioFormat {});
+    CHECK(second.restore_now().empty());
+    std::string status = second.status();
+    unsigned expected_pads = 2 + std::min(chopped, 32u - 2u); // A01, the missing file's pad, the slices
+    CHECK(has(status, "samples=1") && has(status, "pad=A02") && has(status, "pads=" + std::to_string(expected_pads)));
+    AudioBlock in {}, out {};
+    second.audio_event(make_event(0x90, pad_note(1), 110)); // A02: the first slice
+    int32_t peak = 0;
+    for (int block = 0; block < 20; ++block) { out.fill(0); second.render(in, out); peak = std::max(peak, peak_of(out)); }
+    CHECK(peak > to_s32(0.05f));
+    second.surface(make_event(0x90, pad_note(0), 100));
+    press(second, Button::Loop); // A01's chop as it was left: Beats, the same slices
+    CHECK(second.slice_count() == chopped && has(second.status(), "chop=Beats"));
+    press(second, Button::Back);
+    CHECK(second.save_now().empty());
+    app::KitFile kit;
+    CHECK(app::load_kit(project, kit).empty());
+    CHECK(kit.samples.size() == 2); // the missing file is kept, by path
+    CHECK(app::load_kit(home + "/nothing.mldp", kit) == "missing");
+    // The chops' lines: what is written reads back; a damaged line is left out.
+    app::KitFile original;
+    original.samples.push_back({3, "/a.wav", "a.wav", 1000, {}});
+    original.samples[0].chop.mode = melodee::ChopMode::Regions;
+    original.samples[0].chop.amount = 4;
+    original.samples[0].chop.slices.count = 2;
+    original.samples[0].chop.slices.start = {0, 500};
+    original.samples[0].chop.slices.stop = {500, 0};
+    app::KitFile back;
+    back.samples.push_back({3, "/a.wav", "a.wav", 1000, {}});
+    app::read_chops(app::chops_text(original), back);
+    CHECK(back.samples[0].chop.slices.same(original.samples[0].chop.slices) && back.samples[0].chop.mode == melodee::ChopMode::Regions
+          && back.samples[0].chop.amount == 4);
+    app::KitFile damaged;
+    damaged.samples.push_back({3, "/a.wav", "a.wav", 1000, {}});
+    app::read_chops("melodee-move chops 1\n3 0 0 1 4 2 500 0 0 500\n", damaged); // starts out of order
+    CHECK(!damaged.samples[0].chop.used());
+}
+
 } // namespace
 
 int main() {
@@ -445,6 +523,7 @@ int main() {
     test_latency_meter();
     test_spi_host();
     test_melodee_app();
+    test_saving();
     std::cout << "move-tests: " << checks - failures << " of " << checks << " checks passed\n";
     return failures ? 1 : 0;
 }

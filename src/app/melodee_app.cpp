@@ -18,6 +18,10 @@ using melodee::PadSound;
 namespace fs = std::filesystem;
 
 constexpr const char* move_library = "/data/UserData/UserLibrary/Samples";
+constexpr const char* move_user_data = "/data/UserData";
+constexpr const char* move_home = "/data/UserData/Melodee";
+constexpr auto autosave_idle = std::chrono::milliseconds(3000); // as Melodee's autosave on the MPC (shell/autosave.h)
+constexpr auto autosave_retry = std::chrono::seconds(10);
 constexpr auto touch_linger = std::chrono::milliseconds(600);
 constexpr auto turn_linger = std::chrono::milliseconds(1200);
 constexpr auto message_time = std::chrono::milliseconds(1500);
@@ -56,13 +60,23 @@ bool is_wav(const fs::path& path) {
 
 } // namespace
 
-MelodeeApp::MelodeeApp(std::string library_folder) : library(std::move(library_folder)) {
+MelodeeApp::MelodeeApp(std::string library_folder, std::string home_folder)
+    : library(std::move(library_folder)), home(std::move(home_folder)) {
     std::error_code error;
     if (library.empty()) library = fs::is_directory(move_library, error) ? move_library : fs::current_path(error).string();
+    if (home.empty()) home = fs::is_directory(move_user_data, error) ? move_home : (fs::current_path(error) / "Melodee").string();
     folder = library;
+    project = (fs::path(home) / "Projects" / "Move.mldp").string();
 }
 
-MelodeeApp::~MelodeeApp() = default;
+MelodeeApp::~MelodeeApp() {
+    std::unique_lock<std::mutex> guard(lock);
+    if (!dirty) return;
+    auto kit = snapshot();
+    dirty = false;
+    guard.unlock();
+    write(kit);
+}
 
 // ---------------------------------------------------------------- audio thread
 
@@ -85,7 +99,8 @@ void MelodeeApp::audio_event(const move::SurfaceEvent& event) {
 
 const MelodeeApp::Sample* MelodeeApp::sample_of(unsigned at) const {
     if (at >= pad_count || !pads[at].used() || pads[at].sample >= samples.size()) return nullptr;
-    return samples[pads[at].sample].get();
+    const auto& sample = samples[pads[at].sample];
+    return sample && sample->data ? sample.get() : nullptr; // a file that was missing at load plays nothing
 }
 
 void MelodeeApp::say(std::string text) {
@@ -93,13 +108,33 @@ void MelodeeApp::say(std::string text) {
     message_until = Clock::now() + message_time;
 }
 
+void MelodeeApp::changed() {
+    dirty = true;
+    changed_at = Clock::now();
+}
+
 void MelodeeApp::select_pad(unsigned at) {
-    if (at < pad_count) pad = at;
+    if (at < pad_count && at != pad) { pad = at; changed(); }
 }
 
 void MelodeeApp::set_pad(unsigned at, const PadSound& sound) {
     pads[at] = sound;
     if (page != Page::Chop && page != Page::ToPads) player.set_pad(at, sound);
+    changed();
+}
+
+void MelodeeApp::remember_chop() {
+    const Sample* sample = sample_of(pad);
+    uint16_t slot = pads[pad].sample;
+    if (!sample || slot >= chops.size()) return;
+    auto& chop = chops[slot];
+    chop.from = pads[pad].start;
+    chop.to = pads[pad].end;
+    chop.mode = mode;
+    chop.amount = int16_t(amounts[unsigned(mode)]);
+    chop.slices = slices;
+    chop.hand = {};
+    changed();
 }
 
 void MelodeeApp::list_folder() {
@@ -119,9 +154,22 @@ void MelodeeApp::list_folder() {
 }
 
 void MelodeeApp::enter_chop() {
-    if (!sample_of(pad)) { say("EMPTY PAD"); return; }
+    const Sample* sample = sample_of(pad);
+    if (!sample) { say("EMPTY PAD"); return; }
     page = Page::Chop;
     selected = 0;
+    // The sample's chop as it was left, where it was of this same region.
+    uint16_t slot = pads[pad].sample;
+    uint32_t frames = sample->data->model_frames();
+    if (slot < chops.size() && chops[slot].used() && chops[slot].from == pads[pad].start &&
+        (chops[slot].to ? chops[slot].to : frames) == (pads[pad].end ? pads[pad].end : frames)) {
+        const auto& kept = chops[slot];
+        mode = kept.mode;
+        amounts[unsigned(mode)] = kept.amount;
+        slices = kept.slices;
+        play_slices();
+        return;
+    }
     chop_again();
 }
 
@@ -152,6 +200,7 @@ void MelodeeApp::chop_again() {
     }
     selected = std::min(selected, slices.count ? slices.count - 1 : 0);
     play_slices();
+    remember_chop();
 }
 
 void MelodeeApp::play_slices() {
@@ -178,6 +227,7 @@ void MelodeeApp::slices_to_pads() {
     if (!placed) { say("NO EMPTY PADS"); return; }
     leave_chop();
     select_pad(first);
+    changed();
     say(std::to_string(placed) + " SLICES FROM " + pad_label(first));
 }
 
@@ -222,6 +272,7 @@ void MelodeeApp::turn_knob(unsigned which, int delta, bool fine) {
             return;
         } else return;
         play_slices();
+        remember_chop();
         return;
     }
     PadSound sound = pads[pad];
@@ -487,6 +538,7 @@ namespace {
 template <class Sample> std::unique_ptr<Sample> read_sample(const std::string& path, std::string& error) {
     auto sample = std::make_unique<Sample>();
     sample->name = fs::path(path).filename().string();
+    sample->path = path;
     sample->data = std::make_unique<melodee::SampleData>();
     error = melodee::read_wav(path, *sample->data, 60);
     if (!error.empty()) return nullptr;
@@ -505,12 +557,100 @@ std::string MelodeeApp::install(std::unique_ptr<Sample> sample, unsigned at) {
     PadSound sound;
     sound.sample = slot;
     samples.push_back(std::move(sample));
+    chops.resize(samples.size());
     set_pad(at, sound);
     say("ON " + pad_label(at));
     return {};
 }
 
+void MelodeeApp::place(std::unique_ptr<Sample> sample, uint16_t slot, const melodee::SampleChop& chop) {
+    if (slot >= melodee::sample_slots) return;
+    if (slot >= samples.size()) { samples.resize(size_t(slot) + 1); chops.resize(samples.size()); }
+    if (sample->data && !player.set_sample(slot, sample->data.get())) sample->data.reset(); // the queue was full: as missing
+    samples[slot] = std::move(sample);
+    chops[slot] = chop;
+}
+
+KitFile MelodeeApp::snapshot() const {
+    KitFile kit;
+    kit.pads = pads;
+    kit.last_pad = pad;
+    for (size_t slot = 0; slot < samples.size(); ++slot) {
+        const auto& sample = samples[slot];
+        if (!sample || sample->path.empty()) continue;
+        kit.samples.push_back({uint16_t(slot), sample->path, sample->name, sample->data ? sample->data->model_frames() : 0, chops[slot]});
+    }
+    return kit;
+}
+
+std::string MelodeeApp::write(const KitFile& kit) {
+    std::error_code error;
+    auto projects = fs::path(project).parent_path();
+    fs::create_directories(projects, error);
+    give_to_owner_of(home, move_user_data);
+    give_to_owner_of(projects.string(), move_user_data);
+    auto failed = save_kit(kit, project);
+    if (failed.empty()) {
+        give_to_owner_of(project, move_user_data);
+        give_to_owner_of(project + ".chops", move_user_data);
+    }
+    return failed;
+}
+
+std::string MelodeeApp::save_now() {
+    std::unique_lock<std::mutex> guard(lock);
+    auto kit = snapshot();
+    dirty = false;
+    guard.unlock();
+    auto error = write(kit);
+    guard.lock();
+    if (error.empty()) ++saves;
+    else dirty = true;
+    return error;
+}
+
+std::string MelodeeApp::restore_now() {
+    {
+        std::lock_guard<std::mutex> guard(lock);
+        if (restored) return {};
+        restored = true;
+        if (!samples.empty()) return {}; // something was loaded first: that is the kit now
+    }
+    KitFile kit;
+    auto error = load_kit(project, kit);
+    if (error == "missing") return {}; // a first start: a new project
+    if (!error.empty()) {
+        std::lock_guard<std::mutex> guard(lock);
+        say("PROJECT UNREADABLE");
+        return error;
+    }
+    // Every sample read again, outside the lock; a file that has gone keeps
+    // its place (and its pads), silent, so saving again keeps it too.
+    std::vector<std::unique_ptr<Sample>> read;
+    unsigned missing = 0;
+    for (const auto& entry : kit.samples) {
+        std::string failed;
+        auto sample = read_sample<Sample>(entry.path, failed);
+        if (!sample) {
+            ++missing;
+            sample = std::make_unique<Sample>();
+            sample->name = entry.name;
+            sample->path = entry.path;
+        }
+        read.push_back(std::move(sample));
+    }
+    std::lock_guard<std::mutex> guard(lock);
+    for (size_t n = 0; n < kit.samples.size(); ++n) place(std::move(read[n]), kit.samples[n].slot, kit.samples[n].chop);
+    pads = kit.pads;
+    pad = kit.last_pad;
+    for (unsigned at = 0; at < pad_count; ++at) player.set_pad(at, pads[at]);
+    dirty = false;
+    say(missing ? std::to_string(missing) + " FILES MISSING" : "PROJECT LOADED");
+    return {};
+}
+
 void MelodeeApp::service() {
+    if (!restored) restore_now();
     std::vector<Job> todo;
     {
         std::lock_guard<std::mutex> guard(lock);
@@ -524,8 +664,19 @@ void MelodeeApp::service() {
         if (!sample) { say(upper(error).substr(0, 16)); continue; }
         if (auto failed = install(std::move(sample), job.pad); !failed.empty()) say(failed);
     }
-    std::lock_guard<std::mutex> guard(lock);
+    std::unique_lock<std::mutex> guard(lock);
     loading = false;
+    // Autosave: three seconds after the last change, as on the MPC.
+    auto now = Clock::now();
+    if (dirty && now - changed_at >= autosave_idle && now >= retry_at) {
+        auto kit = snapshot();
+        dirty = false;
+        guard.unlock();
+        auto error = write(kit);
+        guard.lock();
+        if (error.empty()) ++saves;
+        else { dirty = true; retry_at = now + autosave_retry; say("NOT SAVED"); }
+    }
 }
 
 std::string MelodeeApp::load_now(const std::string& path, unsigned at) {
@@ -544,9 +695,13 @@ unsigned MelodeeApp::slice_count() const {
 std::string MelodeeApp::status() const {
     std::lock_guard<std::mutex> guard(lock);
     static const char* names[] {"play", "load", "chop", "to-pads"};
-    char text[160];
-    std::snprintf(text, sizeof text, "page=%s pad=%s samples=%zu slices=%u chop=%s loading=%d", names[unsigned(page)], pad_label(pad).c_str(),
-                  samples.size(), slices.count, melodee::chop_mode_name(mode), int(loading));
+    unsigned used = 0, loaded = 0;
+    for (const auto& sound : pads) used += sound.used();
+    for (const auto& sample : samples) loaded += sample && sample->data;
+    char text[200];
+    std::snprintf(text, sizeof text, "page=%s pad=%s samples=%u slices=%u pads=%u chop=%s loading=%d saves=%u unsaved=%d",
+                  names[unsigned(page)], pad_label(pad).c_str(), loaded, slices.count, used, melodee::chop_mode_name(mode), int(loading),
+                  saves, int(dirty));
     return text;
 }
 
