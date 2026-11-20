@@ -76,7 +76,8 @@ after Schwung) differ for some buttons:
 | Track buttons / 16 tracks | **The track buttons are the four tracks of the bank in view.** Holding a track button and pressing step 1-16 picks any track (core's mockup A); **Shift + Note/Session** opens the 16-track overview (as Control Live's Session Overview); in Session, Plus and Minus move the bank. Shift + track button stays the Move's track options. |
 | Capture / Audio Recall | **Capture is Melodee's Recall** (the notes played, into a pattern), Shift + Capture clears it. **Shift + Sampling is Audio Recall**: the last 25 s of the input onto the next empty pad, as Shift + Sample Record on the MPC. |
 | Kit pads | **32 kit pads** (two banks of 16) as today; **Plus and Minus move 16 pads** through the kit's 8 banks (as Control Live's Drum mode). **Shift + Step 8** turns the right 16 into **16 Pitches** of the last pad (Melodee's 16 Levels, Tune), the left 16 staying the kit; Plus and Minus are then the pitches' octave. |
-| Shift + Steps 4, 12, 13 | No Move job (no icon): **4 the Mixer** (16 tracks, their effects), **12 the Looper**, **13 Song**. The Shift card names them (Mockups, below). |
+| Shift + Steps 4, 12, 13 | No Move job (no icon): **4 the Mixer** (16 tracks, their effects), **12 the Looper**, **13 Song**. |
+| Shift held | **Nothing on the screen**, as on the stock Move: the steps with a Shift job light, Melodee's 4, 12 and 13 too (Kerem dropped the on-screen Shift card from the mockups). |
 | Undo, quit | **Undo held 0.4 s opens the undo list** (as Melodee's Shift + − hold on the MPC). **Shift + Back goes back to Ableton's Move app**, as today, and Setup (Shift + Step 2) lists it too. |
 
 Followed from the rule without a choice: Left and Right become the
@@ -281,7 +282,7 @@ while Shift is held.
 | Back (Typing) | Deletes a character | The same | next |
 | Back held (Typing) | Leaves the text entry | Cancels the typing | next |
 | Shift + Back | No job | Back to Ableton's Move app (the runtime takes it) | done |
-| Shift held | Lights the icons under the steps with a Shift job; fine turns | The steps with a Shift job light; held alone 0.4 s, the Shift card names them | next |
+| Shift held | Lights the icons under the steps with a Shift job; fine turns | The steps with a Shift job light, 4, 12 and 13 too; the screen stays as it is | next |
 | Shift double press | Locks Shift on until pressed again (Shift + Play then does not retrigger) | The same | next |
 | Shift held (Typing) | Uppercase while held | The same | next |
 

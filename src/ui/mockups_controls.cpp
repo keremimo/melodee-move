@@ -4,8 +4,9 @@
 // jobs reach new screens by new doors: the Device View on Play (the wheel
 // walks the track's items, the push opens one's browser), Shift + push for
 // Sample Options and a module's menu, Shift + turn for pages, Shift +
-// Sampling for Audio Recall, the Shift card for Shift + Steps 4, 12 and 13.
-// The light panels draw the whole Move as Ableton's controls figure lays it
+// Sampling for Audio Recall. Shift held draws nothing on the screen, as on
+// the stock Move (Kerem dropped the Shift card): the steps with a job light,
+// Melodee's Steps 4, 12 and 13 too (lights-shift). The light panels draw the whole Move as Ableton's controls figure lays it
 // out (the manual's MoveControls.png).
 #include "ui/mockups.h"
 #include "move/controls.h"
@@ -85,23 +86,6 @@ void items(juce::Graphics& g, const std::array<const char*, 4>& names, int selec
 
 std::vector<Screen> controls_screens() {
     return {
-        {"shift-card", "SHIFT HELD ALONE: THE SHIFT CARD", [](juce::Graphics& g) {
-            rail(g, "SHFT", "", "STEP");
-            // Steps 1-16 in reading order; Melodee's own (no icon on the Move) inverted.
-            static const char* jobs[16] {"SET", "STP", "FLW", "MIX", "BPM", "CLK", "SWG", "LAY",
-                                         "SCL", "VEL", "RPT", "LPR", "SNG", "NEW", "X2", "QNT"};
-            int cell_w = content_width / 4, cell_h = 13;
-            for (int n = 0; n < 16; ++n) {
-                int x = content_x + (n % 4) * cell_w, y = (n / 4) * cell_h;
-                bool melodee = n == 3 || n == 11 || n == 12;
-                g.setColour(on);
-                if (melodee) g.fillRect(x, y, cell_w - 1, cell_h - 1);
-                g.setColour(melodee ? off : on);
-                move::draw_text_centred(g, x, y + 3, cell_w - 1, jobs[n]);
-            }
-            g.setColour(on);
-            detail(g, "4 12 13: MELODEE");
-        }},
         {"play-pad", "PLAY: WHEEL ON THE PAD, PUSH: SAMPLES", [](juce::Graphics& g) {
             rail(g, "KIT", "1", "A05");
             items(g, {"KIT", "A05", "FX1", "FX2"}, 1);
