@@ -22,6 +22,7 @@ public:
         using bindings::Job;
         switch (job) {
         case Job::PlayPad: case Job::SelectPadQuietly: studio.select_pad(unsigned(use.index)); return true;
+        case Job::MutePad: mixing::toggle_pad_mute(studio, studio.track(), unsigned(use.index)); return true; // Mute held + pad (the Move's 16.5)
         case Job::TurnKnob: turn(unsigned(use.index), use.delta, false); return true;
         case Job::TurnKnobFine: turn(unsigned(use.index), use.delta, true); return true;
         case Job::PadLevel: turn(1, use.delta, false); return true;
@@ -43,8 +44,10 @@ public:
         using namespace move;
         const auto& track = studio.current();
         auto colour = ui::track_colour(studio.track()).bright;
+        static const uint8_t dim_white = move::nearest_colour({96, 96, 96});
         for (unsigned at = 0; at < pad_count; ++at)
-            lights.pad(at, track.pads[at].used() ? (at == studio.pad() ? colour::white : colour) : at == studio.pad() ? colour::dark_grey : colour::off);
+            lights.pad(at, track.pad_muted(at) ? dim_white : track.pads[at].used() ? (at == studio.pad() ? colour::white : colour)
+                         : at == studio.pad() ? colour::dark_grey : colour::off); // a muted pad dim white, as on the Move
         steps_playhead(studio, lights);
         // Left / Right (bars), Plus / Minus (pad banks), Loop (Loop Mode) and
         // Note/Session (Patterns) wait for wave 2.

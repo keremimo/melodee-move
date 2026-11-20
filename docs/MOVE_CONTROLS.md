@@ -112,7 +112,7 @@ the amount, as the Move's wheel sets the number of slices.
 | Delete held + Pad (Session) | Deletes the clip at once | Deletes the pattern | wave 2: sequencer |
 | Delete held + Pad (Overview) | Deletes the Set, the pad again to confirm | Deletes the project, asked first | wave 2: MIDI/sync/undo/projects |
 | Delete held + Pad (Chop) | No job (Control Live's Slicing mode: deletes the slice) | Takes the slice's cut out | wave 2: sampling |
-| Mute held + Pad (Play, kit) | Mutes or unmutes the drum pad (dim white) | Mutes or unmutes the kit pad | wave 2: mixer & effects |
+| Mute held + Pad (Play, kit) | Mutes or unmutes the drum pad (dim white) | Mutes or unmutes the kit pad, saved with the kit (dim white) | done |
 | Step held + Pad | Adds or removes that note on the step | The same on the pattern | wave 2: sequencer |
 | Step held + Pad (Loop) | The note on every step of the bar | The same | wave 2: sequencer |
 | Shift + Step 16 held + Pad | Quantizes that drum pad's notes | Time Correct on that pad | wave 2: sequencer |

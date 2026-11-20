@@ -8,6 +8,8 @@
 // it saved and opened again.
 #include "app/melodee_app.h"
 #include "app/mixing.h"
+#include "app/project_store.h"
+#include "melodee/engine/engine_info.h"
 #include "move/audio.h"
 #include "move/controls.h"
 #include "move/host.h"
@@ -315,6 +317,89 @@ void test_schwung_fx(Rig& rig) {
     rig.melodee.service();
 }
 
+// The Move's own keys for the mix, through the app and the bindings table
+// (docs/MOVE_CONTROLS.md), as a hand uses them: buttons pressed and let go.
+void button(Rig& rig, Button which, bool down) { rig.melodee.surface(make_event(0xb0, button_cc(which), down ? 127 : 0)); }
+void pad(Rig& rig, unsigned at, bool down) {
+    auto event = make_event(down ? 0x90 : 0x80, pad_note(at), down ? 100 : 0);
+    rig.melodee.audio_event(event); // the runtime hands a pad to both, the audio thread first
+    rig.melodee.surface(event);
+}
+
+void test_keys(Rig& rig) {
+    auto& studio = rig.studio();
+    // Mute held + a kit pad: that pad muted, and quiet as it is pressed; again, back.
+    rig.quiet();
+    button(rig, Button::Mute, true);
+    pad(rig, 0, true);
+    rig.blocks(8);
+    int32_t heard = 0;
+    for (int b = 0; b < 20; ++b) { rig.out.fill(0); rig.melodee.render(rig.in, rig.out); heard = std::max(heard, peak_of(rig.out)); }
+    pad(rig, 0, false);
+    button(rig, Button::Mute, false);
+    CHECK(studio.project().tracks[0].pad_muted(0) && heard < to_s32(0.001f));
+    CHECK(!studio.current().mix.mute); // Mute was a modifier: the track stays as it was
+    button(rig, Button::Mute, true);
+    pad(rig, 0, true);
+    pad(rig, 0, false);
+    button(rig, Button::Mute, false);
+    CHECK(!studio.project().tracks[0].pad_muted(0));
+    rig.quiet();
+}
+
+// Two projects for timing the cycle in the simulated Move (docs/PARITY.md,
+// mixer & effects: process_us with a busy chain on all sixteen tracks):
+// sixteen kit tracks each playing the loop on every beat, and, in the busy
+// one, six effects on every track (a reverb and a tape echo among them),
+// on every bus (each track sending into all four) and on the master, with
+// the compressor on and Knob FX over every track.
+void write_bench_project(const std::string& home, const std::string& loop, bool busy) {
+    std::filesystem::remove_all(home);
+    std::filesystem::create_directories(home + "/Projects");
+    auto project = std::make_unique<melodee::Project>();
+    auto patterns = std::make_unique<melodee::PatternBank>();
+    auto& ref = project->samples.edit(0);
+    std::snprintf(ref.path, sizeof ref.path, "%s", loop.c_str());
+    std::snprintf(ref.name, sizeof ref.name, "loop.wav");
+    auto fill = [](melodee::Chain& chain, std::initializer_list<EffectKind> kinds) {
+        unsigned k = 0;
+        for (auto kind : kinds) {
+            auto& slot = chain.slots[k++];
+            slot.kind = uint8_t(kind);
+            const auto& info = melodee::effect_info(kind);
+            for (unsigned q = 0; q < melodee::effect_params; ++q) slot.params[q] = info.params[q].label ? info.params[q].initial : 0;
+        }
+    };
+    for (unsigned t = 0; t < melodee::track_count; ++t) {
+        auto& track = project->tracks[t];
+        melodee::load_sound(track, melodee::EngineKind::Sampler, 0);
+        track.pads[0].sample = 0;
+        track.mix.level = 40;
+        for (uint32_t beat = 0; beat < 4; ++beat) {
+            melodee::Event step;
+            step.tick = beat * melodee::ticks_per_quarter + t % 4 * melodee::sixteenth_ticks;
+            step.key = uint8_t(melodee::sampler_first_note);
+            step.length = 4;
+            patterns->at[t][0].events.push_back(step);
+        }
+        if (!busy) continue;
+        // Two that hold delay memory a track (the pool has 48 blocks: 32 here, 10 more below).
+        fill(track.fx, {EffectKind::Compressor, EffectKind::Eq, EffectKind::AmpSim, EffectKind::Phaser, EffectKind::TapeEcho, EffectKind::Reverb});
+        track.mix.sends = {20, 20, 20, 20};
+    }
+    if (busy) {
+        for (unsigned b = 0; b < melodee::bus_count; ++b)
+            fill(project->buses[b].fx, {EffectKind::Plate, EffectKind::Echo, EffectKind::Eq, EffectKind::Compressor, EffectKind::Width, EffectKind::Filter});
+        fill(project->master, {EffectKind::Eq, EffectKind::Tape, EffectKind::Transient, EffectKind::SoftClip, EffectKind::Width, EffectKind::Limiter});
+        project->compressor.on = true;
+        project->knob_fx.kind = uint8_t(EffectKind::Filter);
+        project->knob_fx.tracks = 0xffff;
+    }
+    app::PluginStates none;
+    auto bytes = app::project_file_bytes(*project, *patterns, none);
+    CHECK(app::write_whole(home + "/Projects/Move.mldp", bytes.data(), bytes.size()).empty());
+}
+
 } // namespace
 
 int main() {
@@ -333,6 +418,7 @@ int main() {
         test_knob_fx(rig);
         test_pads(rig);
         test_schwung_fx(rig);
+        test_keys(rig);
         // Left for the file: an Echo keyed... a Compressor on track 2 keyed by bus C, a send, a return, the
         // compressor, Knob FX, a pad muted, the Schwung effect on track 1 at gain 1.
         mixing::set_send(rig.studio(), 0, 1, 40);
@@ -353,6 +439,8 @@ int main() {
         CHECK(fx && fx->module && fx->module->param("gain") && fx->module->param("gain")->value == 1.0);
         CHECK(has(rig.melodee.status(), "schwung_fx=1"));
     }
+    write_bench_project("build/bench-home-dry", samples + "/loop.wav", false);
+    write_bench_project("build/bench-home-busy", samples + "/loop.wav", true);
     std::cout << "mixer-tests: " << checks - failures << " of " << checks << " checks passed\n";
     return failures ? 1 : 0;
 }

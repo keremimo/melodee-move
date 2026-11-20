@@ -6,6 +6,7 @@
 #include <juce_core/juce_core.h>
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -160,6 +161,13 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
     setup_fx(states); // Schwung's effects in the chains: loaded by the service thread
     engine = std::make_unique<melodee::EngineHost>();
     engine->set_overload_guard(true); // as Melodee runs on the MPC
+    // Render workers (Melodee's, roadmap P2): MELODEE_RENDER_THREADS=N
+    // shares each block's tracks and chains among N threads beside the
+    // audio thread, at its priority, once a block takes more than 150 us.
+    // Off unless asked: the Move's numbers with and without are to be
+    // measured on the Move (docs/PARITY.md, mixer & effects).
+    if (const char* workers = std::getenv("MELODEE_RENDER_THREADS"))
+        engine->set_render_threads(unsigned(std::clamp(std::atoi(workers), 0, 3)));
     engine->load(*song, *bank);
     for (unsigned t = 0; t < melodee::track_count; ++t)
         if (modules[t] && modules[t]->entry != melodee::no_plugin) engine->offer_plugin(modules[t]->entry, &modules[t]->runner);
@@ -976,7 +984,8 @@ std::string Studio::status() const {
     for (unsigned n = 0; n < melodee::chain_count; ++n) effects += song->chain(n).count();
     for (const auto& effect : fx)
         if (effect) { schwung_fx += effect->module != nullptr; fx_slow += effect->runner.slow_calls(); }
-    std::snprintf(text, sizeof text, " effects=%u schwung_fx=%u fx_slow=%u", effects, schwung_fx, fx_slow);
+    std::snprintf(text, sizeof text, " effects=%u schwung_fx=%u fx_slow=%u render_threads=%u load=%.2f", effects, schwung_fx, fx_slow,
+                  engine->render_threads(), double(engine->render_load()));
     line += text;
     for (const auto& screen : screens) line += screen->status();
     return line;

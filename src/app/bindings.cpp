@@ -47,7 +47,7 @@ std::vector<Binding> make_table() {
         {"Delete held + Pad (Session)", S::Session, T::Any, H::del, C::Pad, G::Press, J::DeletePattern, St::Wave2, sequencer},
         {"Delete held + Pad (Overview)", S::Overview, T::Any, H::del, C::Pad, G::Press, J::DeleteProject, St::Wave2, projects},
         {"Delete held + Pad (Chop)", S::Chop, T::Any, H::del, C::Pad, G::Press, J::RemoveCut, St::Wave2, sampling},
-        {"Mute held + Pad (Play, kit)", S::Play, T::Kit, H::mute, C::Pad, G::Press, J::MutePad, St::Wave2, mixer},
+        {"Mute held + Pad (Play, kit)", S::Play, T::Kit, H::mute, C::Pad, G::Press, J::MutePad, St::Done},
         {"Step held + Pad", S::Play, T::Any, H::step, C::Pad, G::Press, J::NoteOnStep, St::Wave2, sequencer},
         {"Step held + Pad (Loop)", S::Loop, T::Any, H::step, C::Pad, G::Press, J::NoteOnBar, St::Wave2, sequencer},
         {"Shift + Step 16 held + Pad", S::Play, T::Any, H::shift | H::step, C::Pad, G::Press, J::QuantizePad, St::Wave2, sequencer, 0, 15},
