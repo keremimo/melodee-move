@@ -169,6 +169,7 @@ public:
     bool playing() const { return engine->playing(); }
     void play();
     void stop();
+    void restart(); // every playing pattern from its top again (the Move's Shift + Play); nothing while stopped
     unsigned tempo() const { return song->tempo; } // tenths of a BPM
     void set_tempo(unsigned tenths);
     void set_swing(unsigned percent);

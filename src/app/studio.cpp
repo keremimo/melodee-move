@@ -437,6 +437,12 @@ std::string Studio::install(std::unique_ptr<Sample> sample, unsigned t, unsigned
 
 void Studio::play() { send({Type::Play}); }
 void Studio::stop() { send({Type::Stop}); }
+void Studio::restart() {
+    if (!engine->playing()) return;
+    Command command {Type::Locate};
+    command.position = 0;
+    send(command);
+}
 
 void Studio::set_tempo(unsigned tenths) {
     song->tempo = uint16_t(std::clamp(tenths, 300u, 3000u));
