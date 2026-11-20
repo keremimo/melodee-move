@@ -205,10 +205,19 @@ void MelodeeApp::surface(const move::SurfaceEvent& event) {
     settle();
 }
 
+// MIDI from the Move's port (USB-A and USB-C): Melodee's MIDI in (midi.h).
+void MelodeeApp::midi(const move::ExternalMidi& message) {
+    std::lock_guard<std::mutex> guard(own->lock);
+    own->midi.receive(*own, message);
+}
+
+unsigned MelodeeApp::midi_out(move::ExternalMidi* out, unsigned room) { return own->midi.take(out, room); }
+
 void MelodeeApp::lights(move::Lights& lights, Clock::time_point now) {
     using namespace move;
     std::lock_guard<std::mutex> guard(own->lock);
     auto& studio = *own;
+    studio.midi.pump(studio, now); // MIDI Config and the tracks' channels to the engine
     // Holds that came due (a track button, Undo, Back held).
     for (const auto& use : gestures.tick(now)) act(use);
     settle();

@@ -136,9 +136,14 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
                 if (word == "track") played = value % melodee::track_count;
                 else if (word == "click") click_on = value != 0;
                 else if (word == "click_level") click_volume = std::min(value, 100u);
+                else midi.read_setting(word, int(value)); // MIDI Config's keys
             }
     }
     selected = played;
+    if (!fresh) midi.read_section_of(path); // each track's MIDI OUT
+    static Studio* running = nullptr; // the one studio a process runs: its modules' MIDI out goes to its port
+    running = this;
+    set_external_midi([](const uint8_t* packets, int length) { return running ? running->midi.module_send(packets, length) : 0; });
     // Schwung's modules: each PLUGIN track whose entry holds a module's
     // state, and each PLUGIN track with none yet (a synth track waiting for
     // one). Any other plug-in is another host's to play.
@@ -185,6 +190,7 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
 Studio::~Studio() {
     for (auto& module : modules) if (module) module->player.stop();
     for (auto& module : modules_leaving) if (module) module->player.stop();
+    set_external_midi(nullptr); // the modules' MIDI out had this studio's port
     std::unique_lock<std::mutex> guard(lock);
     if (!dirty) return;
     auto bytes = project_bytes();
@@ -205,10 +211,12 @@ void Studio::render(const move::AudioBlock& input, move::AudioBlock& output) {
     forward();
     module_input(input);
     engine->render(output.data(), move::audio_frames, volume.load(std::memory_order_relaxed), input.data());
+    midi.after_render(*engine); // what is heard in this block goes out with it
 }
 
 void Studio::audio_opened(const move::AudioFormat& format) {
     engine->set_audio_format(double(format.rate), 0);
+    Midi::audio_thread();
 }
 
 void Studio::audio_event(const move::SurfaceEvent& event) {
@@ -592,6 +600,7 @@ void Studio::close() {
 std::string Studio::settings_text() const {
     std::ostringstream out;
     out << settings_header << '\n' << "track " << selected << '\n' << "click " << int(click_on) << '\n' << "click_level " << click_volume << '\n';
+    midi.write_settings(out);
     return out.str();
 }
 
@@ -616,7 +625,9 @@ std::vector<uint8_t> Studio::project_bytes() const {
         }
         states[module->entry] = synth_state(file);
     }
-    return project_file_bytes(*song, *bank, states);
+    auto bytes = project_file_bytes(*song, *bank, states);
+    midi.append_section(bytes); // each track's MIDI OUT
+    return bytes;
 }
 
 std::string Studio::write(std::vector<uint8_t> bytes, std::string settings) {
@@ -684,6 +695,10 @@ std::string Studio::restore() {
     std::lock_guard<std::mutex> guard(lock);
     if (missing) say(std::to_string(missing) + " FILES MISSING");
     else if (!wanted.empty()) say("PROJECT LOADED");
+    // A MIDI track's SysEx, sent as the project loads (its ON LOAD).
+    for (unsigned t = 0; t < melodee::track_count; ++t)
+        if (song->tracks[t].engine == EngineKind::Midi && song->tracks[t].params[melodee::midi_track::SysexOnLoad] && song->tracks[t].midi.sysex[0])
+            midi.send_sysex(*this, t);
     return {};
 }
 
@@ -814,6 +829,7 @@ void Studio::service() {
         if (!sample) { say(upper(error).substr(0, 16)); continue; }
         if (auto failed = install(std::move(sample), job.track, job.pad); !failed.empty()) say(failed);
     }
+    midi.service(*this); // SysEx files read for the audio thread, the sent ones freed
     std::unique_lock<std::mutex> guard(lock);
     loading = false;
     // Autosave: three seconds after the last change, as on the MPC.
@@ -951,6 +967,7 @@ std::string Studio::status() const {
                   module ? module->player.stream_late() : 0u, engine->dropped());
     std::string line = text;
     for (const auto& screen : screens) line += screen->status();
+    line += midi.status();
     return line;
 }
 

@@ -55,6 +55,7 @@ public:
         surface_in = register_port("surface", JACK_DEFAULT_MIDI_TYPE, JackPortIsInput);
         external_in = register_port("midi_in", JACK_DEFAULT_MIDI_TYPE, JackPortIsInput);
         leds_out = register_port("leds", JACK_DEFAULT_MIDI_TYPE, JackPortIsOutput);
+        external_out = register_port("midi_out", JACK_DEFAULT_MIDI_TYPE, JackPortIsOutput);
         display_out = register_port("display", JACK_DEFAULT_MIDI_TYPE, JackPortIsOutput);
         session.rate = jack.jack_get_sample_rate(client);
         session.backend = "jack";
@@ -77,6 +78,7 @@ public:
         connect("system:midi_capture", surface_in, true);
         connect("system:midi_capture_ext", external_in, false);
         connect(leds_out, "system:midi_playback", true);
+        connect(external_out, "system:midi_playback_ext", false);
         connect(display_out, "system:display", true);
         warn_about_other_screen_writers();
     }
@@ -183,6 +185,27 @@ private:
         }
         session.leds_sent.fetch_add(sent, std::memory_order_relaxed);
 
+        // MIDI out on the external port: whole messages (a SysEx gathered
+        // from its pieces, up to the buffer's size).
+        void* out_buffer = jack.jack_port_get_buffer(external_out, frames);
+        jack.jack_midi_clear_buffer(out_buffer);
+        std::array<ExternalMidi, 64> outgoing {};
+        unsigned taken = app.midi_out(outgoing.data(), unsigned(outgoing.size()));
+        for (unsigned n = 0; n < taken; ++n) {
+            const auto& message = outgoing[n];
+            bool piece = message.size && (message.bytes[0] == 0xf0 || message.bytes[0] == 0xf7 || message.bytes[0] < 0x80);
+            if (!piece) {
+                if (!jack.jack_midi_event_write(out_buffer, 0, message.bytes.data(), message.size)) ++session.midi_out;
+                continue;
+            }
+            if (message.bytes[0] == 0xf0) sysex_size = 0;
+            for (unsigned k = 0; k < message.size && sysex_size < sysex.size(); ++k) sysex[sysex_size++] = message.bytes[k];
+            if (message.bytes[message.size - 1] == 0xf7 && sysex_size && sysex[0] == 0xf0) {
+                if (!jack.jack_midi_event_write(out_buffer, 0, sysex.data(), sysex_size)) ++session.midi_out;
+                sysex_size = 0;
+            }
+        }
+
         void* display_buffer = jack.jack_port_get_buffer(display_out, frames);
         jack.jack_midi_clear_buffer(display_buffer);
         if (display.take()) display_pending = true;
@@ -203,7 +226,9 @@ private:
     Jack jack;
     jack_client_t* client = nullptr;
     std::array<jack_port_t*, 2> audio_in {}, audio_out {};
-    jack_port_t *surface_in = nullptr, *external_in = nullptr, *leds_out = nullptr, *display_out = nullptr;
+    jack_port_t *surface_in = nullptr, *external_in = nullptr, *leds_out = nullptr, *display_out = nullptr, *external_out = nullptr;
+    std::array<uint8_t, 1024> sysex {}; // a SysEx going out, gathered
+    size_t sysex_size = 0;
     std::unique_ptr<Reblocker> reblocker = std::make_unique<Reblocker>();
     jack_nframes_t period = 0;
     bool display_pending = false;

@@ -39,6 +39,8 @@ public:
     void audio_opened(const move::AudioFormat& format) override;                    // audio thread
     void audio_event(const move::SurfaceEvent& event) override;                     // audio thread
     void surface(const move::SurfaceEvent& event) override;                         // MIDI thread
+    void midi(const move::ExternalMidi& message) override;                          // MIDI thread
+    unsigned midi_out(move::ExternalMidi* out, unsigned room) override;             // audio thread
     void lights(move::Lights& lights, Clock::time_point now) override;              // MIDI thread
     void draw(juce::Graphics& g) override;                                          // screen thread
     void service() override;                                                        // service thread

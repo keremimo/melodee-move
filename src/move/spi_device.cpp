@@ -71,7 +71,7 @@ std::unique_ptr<SpiDevice> open_move_device() { return std::make_unique<MoveDevi
 struct FakeSpiDevice::State {
     bool paced;
     unsigned loopback;
-    struct Scripted { uint64_t transfer; uint8_t status, data1, data2; };
+    struct Scripted { uint64_t transfer; uint8_t status, data1, data2; bool external; };
     std::vector<Scripted> script;
     size_t next_scripted = 0;
     alignas(64) uint8_t memory[spi::page_size] {};
@@ -88,6 +88,8 @@ FakeSpiDevice::FakeSpiDevice(bool paced, unsigned loopback_frames, std::string s
     state->paced = paced;
     state->loopback = loopback_frames;
     state->line.assign(2 * 16384, 0);
+    state->seen.external.reserve(4096); // kept on the device's thread: no allocation there
+    state->seen.external_at.reserve(4096);
     // "transfer:status,data1,data2;..." with numbers in decimal or 0x hex.
     for (size_t at = 0; at < script.size();) {
         size_t end = script.find(';', at);
@@ -98,6 +100,7 @@ FakeSpiDevice::FakeSpiDevice(bool paced, unsigned loopback_frames, std::string s
         char* cursor = item.data();
         State::Scripted entry {};
         entry.transfer = std::strtoull(cursor, &cursor, 0); if (*cursor) ++cursor;
+        if (*cursor == 'x') { entry.external = true; ++cursor; }
         entry.status = uint8_t(std::strtoul(cursor, &cursor, 0)); if (*cursor) ++cursor;
         entry.data1 = uint8_t(std::strtoul(cursor, &cursor, 0)); if (*cursor) ++cursor;
         entry.data2 = uint8_t(std::strtoul(cursor, &cursor, 0));
@@ -121,6 +124,11 @@ bool FakeSpiDevice::transfer() {
     for (unsigned slot = 0; slot < spi::midi_out_slots; ++slot) {
         uint32_t packet = spi::DisplayServer::load32(page + spi::out_midi + slot * 4);
         if (!packet) continue;
+        if ((packet >> 4 & 0x0f) == spi::cable_external) { // MIDI out, not a light
+            ++s.seen.external_messages;
+            if (s.seen.external.size() < 4096) { s.seen.external.push_back(packet); s.seen.external_at.push_back(s.seen.transfers); }
+            continue;
+        }
         ++s.seen.led_messages;
         s.seen.last_led_packet = packet;
     }
@@ -153,8 +161,13 @@ bool FakeSpiDevice::transfer() {
     while (s.next_scripted < s.script.size() && s.script[s.next_scripted].transfer <= s.seen.transfers && events < spi::midi_in_slots) {
         const auto& entry = s.script[s.next_scripted++];
         uint8_t* event = page + spi::in_midi + 8 * events++;
-        event[0] = uint8_t(spi::cable_controls << 4 | entry.status >> 4);
-        event[1] = entry.status; event[2] = entry.data1; event[3] = entry.data2;
+        if (entry.external) { // as the XMOS puts external MIDI in: cable 2, its code index
+            const uint8_t bytes[3] {entry.status, entry.data1, entry.data2};
+            spi::DisplayServer::store32(event, spi::usb_midi_out_packet(spi::cable_external, bytes, 3));
+        } else {
+            event[0] = uint8_t(spi::cable_controls << 4 | entry.status >> 4);
+            event[1] = entry.status; event[2] = entry.data1; event[3] = entry.data2;
+        }
         spi::DisplayServer::store32(event + 4, uint32_t(s.seen.transfers));
     }
     if (events < spi::midi_in_slots && events) std::memset(page + spi::in_midi + 8 * events, 0, 8);

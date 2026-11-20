@@ -2,6 +2,7 @@
 #pragma once
 #include <cstdint>
 #include <memory>
+#include <vector>
 #include <string>
 
 // The Move's own device, /dev/ablspi0.0 (spi_protocol.h), or a simulation
@@ -28,7 +29,9 @@ std::unique_ptr<SpiDevice> open_move_device();
 // with `paced` false), asks for the screen's chunks 1 to 6 in turn and
 // assembles them, plays out what was written into its input
 // `loopback_frames` later (a cable from the outputs to the inputs), and
-// sends a script of control messages ("frame:status,data1,data2;...").
+// sends a script of control messages ("frame:status,data1,data2;...");
+// a message marked x ("frame:x0x90,60,100") comes from the external MIDI
+// port (cable 2) instead, and what goes out there is kept for tests.
 class FakeSpiDevice : public SpiDevice {
 public:
     FakeSpiDevice(bool paced, unsigned loopback_frames, std::string script);
@@ -48,6 +51,9 @@ private:
 struct FakeSpiDevice::Seen {
     uint64_t transfers = 0;
     uint64_t led_messages = 0, last_led_packet = 0;
+    uint64_t external_messages = 0;   // packets out on cable 2 (MIDI out)
+    std::vector<uint32_t> external;   // the first 4096 of them, as sent
+    std::vector<uint64_t> external_at; // the transfer each went out with
     uint64_t chunks_answered = 0, chunks_wrong = 0, frames_completed = 0;
     uint8_t frame[1024] {};          // the last complete screen
     int32_t output_peak = 0;         // int16 units
