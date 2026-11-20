@@ -435,6 +435,7 @@ void test_looper() {
     CHECK(resolve(looper, use_of(Control::WheelTurn, Gesture::Turn)) == Job::PickLoop);
     CHECK(resolve(looper, use_of(Control::WheelPush)) == Job::LoopSheet);
     CHECK(resolve(looper, use_of(Control::WheelTurn, Gesture::Turn, held::shift)) == Job::Page);
+    CHECK(resolve(looper, use_of(Control::WheelPush, Gesture::Press, held::shift)) == Job::Nothing); // not Play's Sample Options
     // The rest as on Play: transport, knobs, Back, Plus and Minus; the steps do nothing.
     CHECK(resolve(looper, use_of(Control::Play)) == Job::PlayStop);
     CHECK(resolve(looper, use_of(Control::Play, Gesture::Press, held::shift)) == Job::Restart);

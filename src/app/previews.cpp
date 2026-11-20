@@ -144,6 +144,27 @@ int write_previews(const std::string& directory, const std::string& modules) {
     melodee.render(in, out); // a list is read on the audio thread
     melodee.service();
     ok = save(melodee, folder, "synth-items") && ok;
+    // The Looper (Shift + Step 12) on the kit: off, on, a take armed, MIX, the loop's sheet.
+    press(move::Button::Back);
+    press(move::Button::Back);
+    press(move::Button::Row1);
+    send(0xbf, move::button_cc(move::Button::Shift), 127);
+    send(0x9f, move::step_note(11), 127);
+    send(0x9f, move::step_note(11), 0);
+    send(0xbf, move::button_cc(move::Button::Shift), 0);
+    ok = save(melodee, folder, "looper-off") && ok;
+    press(move::Button::MainPush);
+    for (int pass = 0; pass < 12; ++pass) { melodee.service(); melodee.render(in, out); }
+    press(move::Button::Rec);
+    melodee.render(in, out);
+    ok = save(melodee, folder, "looper-armed") && ok;
+    send(0xbf, move::button_cc(move::Button::Shift), 127); // Shift + the wheel: MIX, and back
+    send(0xbf, move::main_knob_cc, 1);
+    ok = save(melodee, folder, "looper-mix") && ok;
+    send(0xbf, move::main_knob_cc, 127);
+    send(0xbf, move::button_cc(move::Button::Shift), 0);
+    press(move::Button::MainPush);
+    ok = save(melodee, folder, "looper-more") && ok;
     return ok ? 0 : 1;
 }
 

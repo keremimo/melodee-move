@@ -335,6 +335,7 @@ their touch, Plus and Minus, Back, a track button held and a step).
 | Wheel turn (Looper) | (Moves through a list) | Picks the loop; on the loop's sheet, its item | done |
 | Wheel push (Looper) | (Opens, confirms) | The loop's sheet (MORE); on it, its item; the Looper off, turns it on | done |
 | Shift + Wheel turn (Looper) | The parameter banks | LOOPS and MIX | done |
+| Shift + Wheel push (Looper) | Options for the item in focus | Nothing yet: the loop's sheet is the push | free |
 | Step (Looper) | (Step Edit) | Nothing: the steps show the selected loop's place | free |
 
 ## Lights
