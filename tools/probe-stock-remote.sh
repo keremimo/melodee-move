@@ -74,6 +74,26 @@ for process in /proc/[0-9]*; do
     done
 done
 
+section "USB audio gadget (24-bit to a computer over USB-C)"
+# The audio jacks are fixed at 44.1 kHz / 16-bit by the XMOS link; the CM4's
+# own USB-C port (dwc2, in gadget mode) is not. It could be a USB sound card
+# if the kernel has the UAC2 gadget function (f_uac2) and ALSA's core, which
+# that function needs. Read only: configfs is listed if mounted, never mounted.
+release=$(uname -r)
+modules=/lib/modules/$release
+show "ls -d '$modules' /boot 2>&1; ls /boot 2>&1 | head -n 20"
+LIMIT=80 show "find '$modules' -name '*.ko*' 2>/dev/null | grep -E '/usb/gadget/|/sound/' | sed 's|.*/||' | sort || true"
+LIMIT=80 show "grep -E 'usb/gadget|/sound/' '$modules/modules.builtin' 2>/dev/null | sed 's|.*/||' | sort || echo 'no gadget or sound entries in modules.builtin'"
+show "for c in /boot/config-$release /boot/config*; do [ -f \"\$c\" ] && { echo \"\$c\"; grep -E '^CONFIG_(USB_CONFIGFS_F_UAC[12]|USB_F_UAC[12]|USB_CONFIGFS_F_MIDI|USB_LIBCOMPOSITE|SND|SND_PCM)=' \"\$c\"; break; }; done; true"
+show "grep -E ' (afunc_bind|u_audio_start_capture|u_audio_start_playback|f_midi_bind|snd_pcm_new|snd_card_new)\$' /proc/kallsyms | head -n 8 || true"
+show "grep -E '^(usb_f_|u_audio|libcomposite|snd|g_)' /proc/modules || echo 'no gadget or sound modules loaded'"
+show "ls /proc/asound 2>&1 | head -n 5"
+show "grep configfs /proc/mounts || echo 'configfs not mounted'"
+show "for u in /sys/class/udc/*; do [ -e \"\$u\" ] && echo \"\$u: \$(cat \"\$u/state\" 2>/dev/null)\"; done; true"
+show "for g in /sys/kernel/config/usb_gadget/*; do [ -d \"\$g\" ] || continue; echo \"-- \$g UDC=\$(cat \"\$g/UDC\" 2>/dev/null)\"; ls \"\$g/functions\"; ls -l \"\$g\"/configs/*/ 2>/dev/null | grep -- '->'; done; true"
+show "find /sys/firmware/devicetree/base -name dr_mode 2>/dev/null | while read -r f; do echo \"\$f: \$(tr -d '\\000' < \"\$f\")\"; done"
+LIMIT=120 show "cat /etc/init.d/setup-usb-network-gadget"
+
 section "Processes, kernel threads left out (realtime threads below)"
 LIMIT=120 show "ps -eo pid,ppid,cls,rtprio,nlwp,rss,user,args 2>/dev/null | awk 'NR == 1 || \$2 != 2' || ps w 2>/dev/null || ps"
 LIMIT=80 show "ps -eLo pid,tid,cls,rtprio,comm 2>/dev/null | awk 'NR == 1 || (\$3 != \"TS\" && \$3 != \"-\")'"
