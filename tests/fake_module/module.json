@@ -11,11 +11,46 @@
     "audio_out": true,
     "midi_in": true,
     "chain_params": [
-      {"key": "level", "name": "Level", "type": "float", "min": 0, "max": 1, "step": 0.01, "default": 0.5},
-      {"key": "wave", "name": "Wave", "type": "enum", "options": ["Sine", "Square"], "default": "Square"},
-      {"key": "voices", "name": "Voices", "type": "int", "min": 1, "max": 8, "default": 4},
-      {"key": "preset", "name": "Preset", "type": "int", "min": 0, "max": 99, "max_param": "preset_count"},
-      {"key": "sample", "name": "Sample", "type": "filepath"}
+      {
+        "key": "level",
+        "name": "Level",
+        "type": "float",
+        "min": 0,
+        "max": 1,
+        "step": 0.01,
+        "default": 0.5
+      },
+      {
+        "key": "wave",
+        "name": "Wave",
+        "type": "enum",
+        "options": [
+          "Sine",
+          "Square"
+        ],
+        "default": "Square"
+      },
+      {
+        "key": "voices",
+        "name": "Voices",
+        "type": "int",
+        "min": 1,
+        "max": 8,
+        "default": 4
+      },
+      {
+        "key": "preset",
+        "name": "Preset",
+        "type": "int",
+        "min": 0,
+        "max": 99,
+        "max_param": "preset_count"
+      },
+      {
+        "key": "sample",
+        "name": "Sample",
+        "type": "filepath"
+      }
     ],
     "ui_hierarchy": {
       "levels": {
@@ -24,13 +59,51 @@
           "list_param": "preset",
           "count_param": "preset_count",
           "name_param": "preset_name",
-          "knobs": ["level", "wave", "voices", "preset"],
-          "params": [{"level": "env", "label": "Envelope"}]
+          "knobs": [
+            "level",
+            "wave",
+            null,
+            "voices",
+            "preset"
+          ],
+          "params": [
+            "level",
+            {
+              "key": "wave",
+              "label": "Waveform"
+            },
+            {
+              "level": "env",
+              "label": "Envelope"
+            },
+            {
+              "level": "tables",
+              "label": "Tables"
+            }
+          ]
         },
         "env": {
           "name": "Envelope",
-          "knobs": ["attack"],
-          "params": [{"key": "attack", "short_name": "ATK"}]
+          "knobs": [
+            "attack"
+          ],
+          "params": [
+            {
+              "key": "attack",
+              "label": "Attack",
+              "short_name": "ATK",
+              "type": "float",
+              "min": 0,
+              "max": 2,
+              "step": 0.01
+            }
+          ]
+        },
+        "tables": {
+          "label": "Tables",
+          "items_param": "table_list",
+          "select_param": "table",
+          "navigate_to": "root"
         }
       }
     }

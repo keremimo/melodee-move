@@ -4,6 +4,7 @@
 #include <dlfcn.h>
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -238,6 +239,16 @@ ModuleParam* LoadedModule::param(const std::string& key) {
     return nullptr;
 }
 
+const ModuleLevel* LoadedModule::level(const std::string& id) const {
+    for (const auto& one : levels) if (one.id == id) return &one;
+    return nullptr;
+}
+
+size_t LoadedModule::level_index(const std::string& id) const {
+    for (size_t n = 0; n < levels.size(); ++n) if (levels[n].id == id) return n;
+    return 0;
+}
+
 void LoadedModule::read_parameters() {
     auto manifest = parse(about.manifest);
     const auto& capabilities = field(manifest, "capabilities");
@@ -248,63 +259,135 @@ void LoadedModule::read_parameters() {
     if (!hierarchy.isObject()) hierarchy = field(capabilities, "ui_hierarchy");
 
     std::map<std::string, std::string> max_params;
+    auto describe = [&](const juce::var& entry) {
+        ModuleParam p;
+        if (!param_from(entry, p) || param(p.key)) return;
+        if (has(entry, "max_param")) max_params[p.key] = text_of(field(entry, "max_param"));
+        params.push_back(std::move(p));
+    };
     if (auto* entries = chain.getArray())
-        for (const auto& entry : *entries) {
-            ModuleParam p;
-            if (!param_from(entry, p) || param(p.key)) continue;
-            if (has(entry, "max_param")) max_params[p.key] = text_of(field(entry, "max_param"));
-            params.push_back(std::move(p));
-        }
+        for (const auto& entry : *entries) describe(entry);
 
-    // Its pages: the root level, then the levels it names, then the rest;
-    // each page the level's knobs, eight at most.
-    std::map<std::string, std::string> short_names;
-    if (const auto* levels = field(hierarchy, "levels").getDynamicObject()) {
+    // The levels: root first, then the levels it links to, then the rest.
+    std::map<std::string, std::string> labels;
+    std::vector<std::pair<size_t, std::vector<std::string>>> knob_lists; // a level's knobs, holes as ""
+    std::vector<std::string> selectors;
+    if (const auto* declared = field(hierarchy, "levels").getDynamicObject()) {
         std::vector<std::string> order {"root"};
-        const auto& root = levels->getProperty("root");
-        if (auto* items = field(root, "params").getArray())
+        if (auto* items = field(declared->getProperty("root"), "params").getArray())
             for (const auto& item : *items)
                 if (has(item, "level")) order.push_back(text_of(field(item, "level")));
-        for (const auto& property : levels->getProperties()) order.push_back(property.name.toString().toStdString());
-        preset_param = text_of(field(root, "list_param"));
-        preset_count_param = text_of(field(root, "count_param"));
-        preset_name_param = text_of(field(root, "name_param"));
-        std::vector<std::string> done;
-        for (const auto& name : order) {
-            if (std::find(done.begin(), done.end(), name) != done.end() || !levels->hasProperty(juce::Identifier(name))) continue;
-            done.push_back(name);
-            const auto& level = levels->getProperty(juce::Identifier(name));
-            ModulePage page;
-            page.name = has(level, "name") ? text_of(field(level, "name")) : name;
-            if (auto* knobs = field(level, "knobs").getArray())
-                for (const auto& knob : *knobs) if (page.knobs.size() < 8) page.knobs.push_back(text_of(knob));
-            if (auto* items = field(level, "params").getArray())
+        for (const auto& property : declared->getProperties()) order.push_back(property.name.toString().toStdString());
+        for (const auto& id : order) {
+            if (level(id) || !declared->hasProperty(juce::Identifier(id))) continue;
+            const auto& entry = declared->getProperty(juce::Identifier(id));
+            ModuleLevel made;
+            made.id = id;
+            made.name = has(entry, "name") ? text_of(field(entry, "name")) : has(entry, "label") ? text_of(field(entry, "label")) : id;
+            if (id == "root" && (made.name.empty() || made.name == "root")) made.name = about.name;
+            made.list_param = text_of(field(entry, "list_param"));
+            made.count_param = text_of(field(entry, "count_param"));
+            made.name_param = text_of(field(entry, "name_param"));
+            made.items_param = text_of(field(entry, "items_param"));
+            made.select_param = text_of(field(entry, "select_param"));
+            made.navigate_to = text_of(field(entry, "navigate_to"));
+            for (const auto* chooser : {&made.list_param, &made.count_param, &made.name_param, &made.items_param, &made.select_param})
+                if (!chooser->empty()) selectors.push_back(*chooser);
+            if (auto* items = field(entry, "params").getArray())
                 for (const auto& item : *items) {
-                    if (item.isString() && page.knobs.size() < 8 && !field(level, "knobs").isArray()) page.knobs.push_back(text_of(item));
-                    if (has(item, "key") && has(item, "short_name")) short_names[text_of(field(item, "key"))] = text_of(field(item, "short_name"));
+                    MenuItem added;
+                    if (item.isString()) added.key = text_of(item);
+                    else if (has(item, "level")) {
+                        added.kind = MenuItem::Kind::Level;
+                        added.key = text_of(field(item, "level"));
+                        added.label = text_of(field(item, "label"));
+                    } else if (has(item, "key")) {
+                        added.key = text_of(field(item, "key"));
+                        added.label = has(item, "label") ? text_of(field(item, "label")) : std::string();
+                        describe(item); // its metadata may be here rather than in chain_params
+                        if (has(item, "short_name")) labels[added.key + "\n"] = text_of(field(item, "short_name"));
+                    } else continue;
+                    if (added.key.empty()) continue;
+                    if (added.kind == MenuItem::Kind::Param && !added.label.empty()) labels[added.key] = added.label;
+                    made.items.push_back(std::move(added));
                 }
-            if (!page.knobs.empty()) pages.push_back(std::move(page));
+            if (auto* menu = field(entry, "menu").getArray()) // its own list: the links in it (actions are Schwung's)
+                for (const auto& item : *menu)
+                    if (has(item, "level")) made.items.push_back({MenuItem::Kind::Level, text_of(field(item, "level")), text_of(field(item, "label"))});
+            std::vector<std::string> knobs;
+            if (auto* listed = field(entry, "knobs").getArray())
+                for (const auto& knob : *listed) knobs.push_back(knob.isString() ? text_of(knob) : std::string()); // null: an empty knob
+            knob_lists.emplace_back(levels.size(), std::move(knobs));
+            levels.push_back(std::move(made));
         }
     }
-    // A knob a page names but chain_params does not describe: a plain 0-1.
-    for (const auto& page : pages)
-        for (const auto& key : page.knobs)
-            if (!param(key)) { ModuleParam p; p.key = p.name = key; params.push_back(p); }
-    if (pages.empty())
-        for (size_t at = 0; at < params.size(); at += 8) {
+    if (levels.empty()) { // no menu: one level of every parameter
+        ModuleLevel root;
+        root.id = "root";
+        root.name = about.name;
+        for (const auto& p : params) root.items.push_back({MenuItem::Kind::Param, p.key, {}});
+        std::vector<std::string> knobs;
+        for (const auto& p : params) knobs.push_back(p.key);
+        knob_lists.emplace_back(0, std::move(knobs));
+        levels.push_back(std::move(root));
+    }
+    const auto& root = levels.front();
+    preset_param = root.list_param;
+    preset_count_param = root.count_param;
+    preset_name_param = root.name_param;
+
+    // Each level's knobs, eight a page. A chooser is never a knob (it has its
+    // list); a trailing empty knob describes nothing.
+    for (auto& [index, knobs] : knob_lists) {
+        knobs.erase(std::remove_if(knobs.begin(), knobs.end(),
+                                   [&](const std::string& key) { return std::find(selectors.begin(), selectors.end(), key) != selectors.end(); }),
+                    knobs.end());
+        while (!knobs.empty() && knobs.back().empty()) knobs.pop_back();
+        for (size_t at = 0; at < knobs.size(); at += 8) {
             ModulePage page;
-            page.name = about.name + " " + std::to_string(at / 8 + 1);
-            for (size_t n = at; n < std::min(params.size(), at + 8); ++n) page.knobs.push_back(params[n].key);
+            page.level = index;
+            page.name = levels[index].name + (at ? " " + std::to_string(at / 8 + 1) : std::string());
+            page.knobs.assign(knobs.begin() + long(at), knobs.begin() + long(std::min(knobs.size(), at + 8)));
             pages.push_back(std::move(page));
         }
+    }
+    // A knob or menu entry chain_params does not describe: a plain 0-1.
+    auto plain = [&](const std::string& key) {
+        if (key.empty() || param(key) || std::find(selectors.begin(), selectors.end(), key) != selectors.end()) return;
+        ModuleParam p;
+        p.key = p.name = key;
+        params.push_back(p);
+    };
+    for (const auto& page : pages) for (const auto& key : page.knobs) plain(key);
+    for (const auto& one : levels)
+        for (const auto& item : one.items)
+            if (item.kind == MenuItem::Kind::Param) plain(item.key);
+    // An items list's choice (a bank, a soundfont) is kept and restored as a
+    // parameter of its own, set before the rest.
+    for (const auto& one : levels) {
+        if (one.select_param.empty()) continue;
+        ModuleParam* chosen = param(one.select_param);
+        if (!chosen) {
+            ModuleParam p;
+            p.key = p.name = one.select_param;
+            p.kind = ModuleParam::Kind::Int;
+            p.max = 1e9;
+            params.push_back(p);
+            chosen = &params.back();
+        }
+        chosen->selector = true;
+    }
     for (auto& p : params) {
-        if (auto shorter = short_names.find(p.key); shorter != short_names.end()) p.short_name = shorter->second;
+        if (auto named = labels.find(p.key); named != labels.end()) p.label = named->second;
+        if (auto shorter = labels.find(p.key + "\n"); shorter != labels.end()) p.short_name = shorter->second;
         if (auto bound = max_params.find(p.key); bound != max_params.end()) {
             auto answer = get_now(bound->second);
             if (!answer.empty()) p.max = std::max(p.min, std::strtod(answer.c_str(), nullptr) - (p.key == preset_param ? 1 : 0));
         }
         p.take(get_now(p.key));
     }
+    // Selectors first, so a bank is chosen before the preset in it.
+    std::stable_partition(params.begin(), params.end(), [](const ModuleParam& p) { return p.selector; });
     if (!preset_param.empty()) {
         preset = std::atoi(get_now(preset_param).c_str());
         preset_count = std::atoi(get_now(preset_count_param).c_str());
@@ -324,6 +407,7 @@ bool SynthPlayer::set_module(LoadedModule* module) {
 bool SynthPlayer::set(const std::string& key, const std::string& value) {
     Command command;
     command.kind = Command::Kind::Set;
+    command.serial = ++serial;
     std::snprintf(command.key, key_size, "%s", key.c_str());
     std::snprintf(command.value, value_size, "%s", value.c_str());
     return commands.push(command);
@@ -332,15 +416,41 @@ bool SynthPlayer::set(const std::string& key, const std::string& value) {
 bool SynthPlayer::ask(const std::string& key) {
     Command command;
     command.kind = Command::Kind::Ask;
+    command.serial = ++serial;
     std::snprintf(command.key, key_size, "%s", key.c_str());
     return commands.push(command);
 }
 
 bool SynthPlayer::answer(Answer& out) { return answers.pop(out); }
 
+bool SynthPlayer::ask_long(const std::string& key) {
+    if (long_state.load(std::memory_order_acquire) != 0) return false;
+    std::snprintf(long_key, key_size, "%s", key.c_str());
+    long_state.store(1, std::memory_order_release);
+    return true;
+}
+
+bool SynthPlayer::long_answer(std::string& out) {
+    if (long_state.load(std::memory_order_acquire) != 2) return false;
+    out.assign(long_buffer.data(), size_t(std::clamp(long_length, 0, int(long_buffer.size()) - 1)));
+    long_state.store(0, std::memory_order_release);
+    return true;
+}
+
 LoadedModule* SynthPlayer::retired() {
     LoadedModule* module = nullptr;
     return retiring.pop(module) ? module : nullptr;
+}
+
+bool SynthPlayer::slow(Slow& out) { return slows.pop(out); }
+
+void SynthPlayer::timed(Clock::time_point begun, const char* kind, const char* key, const char* value) {
+    auto took = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - begun).count();
+    if (took < long(slow_us)) return;
+    Slow slow;
+    slow.us = uint32_t(std::min<long long>(took, UINT32_MAX));
+    std::snprintf(slow.what, sizeof slow.what, "%s%s%s%s%s", kind, key ? " " : "", key ? key : "", value ? "=" : "", value ? value : "");
+    slows.push(slow); // full: dropped, the next will tell
 }
 
 void SynthPlayer::apply() {
@@ -348,6 +458,7 @@ void SynthPlayer::apply() {
     Command command;
     unsigned asked = 0;
     while (asked < 4 && commands.pop(command)) { // a few reads a block: each is the module's own time
+        auto begun = Clock::now();
         switch (command.kind) {
         case Command::Kind::Module:
             if (current) retiring.push(current);
@@ -355,17 +466,29 @@ void SynthPlayer::apply() {
             break;
         case Command::Kind::Set:
             if (current && current->api->set_param) current->api->set_param(current->instance, command.key, command.value);
+            timed(begun, "set", command.key, command.value);
             break;
         case Command::Kind::Ask: {
             ++asked;
             Answer answer;
+            answer.serial = command.serial;
             std::memcpy(answer.key, command.key, key_size);
             int n = current && current->api->get_param ? current->api->get_param(current->instance, command.key, answer.value, int(value_size)) : -1;
             answer.value[n > 0 ? std::min(n, int(value_size) - 1) : 0] = 0;
             answers.push(answer);
+            timed(begun, "get", command.key, nullptr);
             break;
         }
         }
+    }
+    // The long read, after the commands: a module handed over in them answers it.
+    if (long_state.load(std::memory_order_acquire) == 1) {
+        auto begun = Clock::now();
+        long_length = current && current->api->get_param
+                          ? current->api->get_param(current->instance, long_key, long_buffer.data(), int(long_buffer.size()))
+                          : -1;
+        long_state.store(2, std::memory_order_release);
+        timed(begun, "get", long_key, nullptr);
     }
 }
 
@@ -373,7 +496,9 @@ void SynthPlayer::midi(uint8_t status, uint8_t data1, uint8_t data2) {
     apply();
     if (!current || !current->api->on_midi) return;
     const uint8_t message[3] {status, data1, data2};
+    auto begun = Clock::now();
     current->api->on_midi(current->instance, message, 3, schwung::midi_source_internal);
+    timed(begun, (status & 0xf0) == 0x90 ? "note on" : (status & 0xf0) == 0x80 ? "note off" : "pressure", nullptr, nullptr);
 }
 
 void SynthPlayer::note_on(int note, int velocity) { midi(0x90, uint8_t(std::clamp(note, 0, 127)), uint8_t(std::clamp(velocity, 1, 127))); }
@@ -390,7 +515,9 @@ void SynthPlayer::render(const move::AudioBlock& input, move::AudioBlock& output
     }
     if (!current) return;
     block.fill(0);
+    auto begun = Clock::now();
     current->api->render_block(current->instance, block.data(), int(move::audio_frames));
+    timed(begun, "render", nullptr, nullptr);
     for (unsigned n = 0; n < block.size(); ++n) {
         int64_t mixed = int64_t(output[n]) + int64_t(float(block[n]) * gain * 65536.0f);
         output[n] = int32_t(std::clamp<int64_t>(mixed, INT32_MIN + 1, INT32_MAX));

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "app/melodee_app.h"
+#include <juce_core/juce_core.h>
 #include "move/display.h"
 #include "move/font.h"
 #include "ui/widgets.h"
@@ -426,6 +427,7 @@ void MelodeeApp::set_track(Track to) {
     page = Page::Play;
     touched = -1;
     held.fill(false);
+    menu_open = false;
     if (track == to) return;
     message_until = {}; // the other track's news
     track = to;
@@ -451,7 +453,7 @@ void MelodeeApp::turn_synth_knob(unsigned which, int delta, bool fine) {
     ModuleParam* param = module->param(keys[which]);
     if (!param || !delta) return;
     param->turn(delta, fine);
-    synth.set(param->key, param->text());
+    synth_set(param->key, param->text());
     changed();
 }
 
@@ -469,7 +471,7 @@ void MelodeeApp::preset_by(int way) {
     if (to == module->preset) return;
     module->preset = to;
     if (auto* param = module->param(module->preset_param)) param->value = to;
-    synth.set(module->preset_param, std::to_string(to));
+    synth_set(module->preset_param, std::to_string(to));
     // A preset sets every parameter: ask for each again, to show and save.
     for (const auto& param : module->params)
         if (param.key != module->preset_param) synth.ask(param.key);
@@ -482,15 +484,199 @@ void MelodeeApp::refresh_synth() {
     for (const auto& key : module->pages[synth_page].knobs) synth.ask(key);
 }
 
+void MelodeeApp::synth_set(const std::string& key, const std::string& value) {
+    synth.set(key, value);
+    set_at[key] = synth.last_serial();
+}
+
 void MelodeeApp::take_answers() {
     std::lock_guard<std::mutex> guard(lock);
+    // A call that held the audio thread up: logged, with what it was.
+    SynthPlayer::Slow slow;
+    while (synth.slow(slow)) {
+        ++slow_calls;
+        slowest_us = std::max(slowest_us, slow.us);
+        std::fprintf(stderr, "melodee-move: slow synth call: %s %s took %.1f ms\n", module ? module->info().id.c_str() : "-", slow.what,
+                     slow.us / 1000.0);
+    }
     SynthPlayer::Answer answer;
     while (synth.answer(answer)) {
         if (!module) continue;
         std::string key = answer.key, value = answer.value;
+        // Asked before a later set of the same key: the module has the newer value.
+        if (auto set = set_at.find(key); set != set_at.end() && answer.serial < set->second) continue;
         if (key == module->preset_name_param) module->preset_name = value;
-        else if (auto* param = module->param(key)) param->take(value);
+        else if (key == module->preset_count_param) module->preset_count = std::atoi(value.c_str());
+        else if (auto* param = module->param(key)) {
+            param->take(value);
+            if (key == module->preset_param) module->preset = int(param->value);
+        }
     }
+    // An items list, read whole: [{"index": 0, "label": "GM"}, ...] or names.
+    std::string text;
+    if (pick_reading && synth.long_answer(text)) {
+        pick_reading = false;
+        pick_items.clear();
+        juce::var list;
+        if (juce::JSON::parse(juce::String::fromUTF8(text.c_str()), list).wasOk())
+            if (auto* entries = list.getArray())
+                for (int n = 0; n < entries->size(); ++n) {
+                    const auto& entry = entries->getReference(n);
+                    if (entry.isString()) { pick_items.emplace_back(n, entry.toString().toStdString()); continue; }
+                    auto* object = entry.getDynamicObject();
+                    if (!object) continue;
+                    int index = object->hasProperty("index") ? int(object->getProperty("index")) : n;
+                    auto label = object->hasProperty("label") ? object->getProperty("label") : object->getProperty("name");
+                    pick_items.emplace_back(index, label.toString().toStdString());
+                }
+        pick_key.clear();
+    }
+    if (!pick_key.empty() && !pick_reading) pick_reading = synth.ask_long(pick_key);
+}
+
+// ---------------------------------------------------------------- the module's menu, under `lock`
+
+std::vector<MelodeeApp::MenuRow> MelodeeApp::menu_rows() const {
+    std::vector<MenuRow> rows;
+    if (!module || menu_path.empty()) return rows;
+    const ModuleLevel* at = module->level(menu_path.back());
+    if (!at) return rows;
+    using Kind = MenuRow::Kind;
+    if (!at->list_param.empty() && at->list_param == module->preset_param) rows.push_back({Kind::Preset, at->list_param, "PRESET"});
+    if (!at->items_param.empty())
+        for (const auto& [index, label] : pick_items) rows.push_back({Kind::Item, at->select_param, label, index});
+    for (const auto& item : at->items) {
+        if (item.kind == MenuItem::Kind::Level) {
+            const ModuleLevel* to = module->level(item.key);
+            if (to) rows.push_back({Kind::Level, item.key, item.label.empty() ? to->name : item.label});
+            continue;
+        }
+        const ModuleParam* param = module->param(item.key);
+        if (param && !param->selector) rows.push_back({Kind::Param, item.key, item.label.empty() ? (param->label.empty() ? param->name : param->label) : item.label});
+    }
+    if (rows.empty()) // a level that lists nothing: its knobs
+        for (const auto& page : module->pages)
+            if (page.level == module->level_index(at->id))
+                for (const auto& key : page.knobs)
+                    if (const ModuleParam* param = module->param(key)) rows.push_back({Kind::Param, key, param->label.empty() ? param->name : param->label});
+    return rows;
+}
+
+std::string MelodeeApp::menu_text(const MenuRow& row, bool editing) const {
+    constexpr size_t width = 16; // characters in a list row
+    auto fit = [&](std::string label, std::string value) {
+        if (editing) value = "[" + value + "]";
+        value = value.substr(0, width - 2);
+        label = label.substr(0, width - value.size() - 1);
+        return label + std::string(width - label.size() - value.size(), ' ') + value;
+    };
+    using Kind = MenuRow::Kind;
+    switch (row.kind) {
+    case Kind::Preset: {
+        char number[16];
+        std::snprintf(number, sizeof number, "%03d", std::clamp(module->preset + 1, 0, 999));
+        return fit(std::string(number) + " " + upper(module->preset_name), editing ? "<>" : "");
+    }
+    case Kind::Param: {
+        const ModuleParam* param = module->param(row.key);
+        return fit(upper(row.label), param ? upper(param->shown()) : "?");
+    }
+    case Kind::Level: return upper(row.label).substr(0, width - 2) + " >";
+    case Kind::Item: {
+        const ModuleParam* chosen = module->param(row.key);
+        bool current = chosen && std::lround(chosen->value) == row.index;
+        return (current ? "* " : "  ") + upper(row.label).substr(0, width - 2);
+    }
+    }
+    return {};
+}
+
+void MelodeeApp::open_menu() {
+    if (!module) return;
+    menu_open = true;
+    menu_path.clear();
+    enter_level("root");
+    // Where the knobs are: that level's menu.
+    if (synth_page < module->pages.size() && module->pages[synth_page].level != 0)
+        enter_level(module->levels[module->pages[synth_page].level].id);
+}
+
+void MelodeeApp::enter_level(const std::string& id) {
+    const ModuleLevel* to = module ? module->level(id) : nullptr;
+    if (!to) return;
+    menu_path.push_back(id);
+    menu_cursor = 0;
+    menu_editing = false;
+    pick_items.clear();
+    pick_key = to->items_param;
+    if (!pick_key.empty() && !pick_reading) pick_reading = synth.ask_long(pick_key);
+    if (!to->select_param.empty()) synth.ask(to->select_param);
+    // The knobs follow to the level's own page, where it has one.
+    size_t index = module->level_index(id);
+    bool here = synth_page < module->pages.size() && module->pages[synth_page].level == index;
+    for (size_t n = 0; n < module->pages.size() && !here; ++n)
+        if (module->pages[n].level == index) { synth_page = unsigned(n); here = true; }
+    unsigned asked = 0;
+    for (const auto& row : menu_rows())
+        if (row.kind == MenuRow::Kind::Param && asked++ < 48) synth.ask(row.key);
+}
+
+void MelodeeApp::menu_turn(int delta, bool fine) {
+    auto rows = menu_rows();
+    if (rows.empty() || !delta) return;
+    menu_cursor = std::clamp(menu_cursor, 0, int(rows.size()) - 1);
+    if (!menu_editing) {
+        menu_cursor = std::clamp(menu_cursor + delta, 0, int(rows.size()) - 1);
+        return;
+    }
+    const auto& row = rows[size_t(menu_cursor)];
+    if (row.kind == MenuRow::Kind::Preset) { preset_by(delta); return; }
+    ModuleParam* param = module->param(row.key);
+    if (row.kind != MenuRow::Kind::Param || !param) return;
+    param->turn(delta, fine);
+    synth_set(param->key, param->text());
+    changed();
+}
+
+void MelodeeApp::menu_push() {
+    auto rows = menu_rows();
+    if (rows.empty()) return;
+    menu_cursor = std::clamp(menu_cursor, 0, int(rows.size()) - 1);
+    const auto row = rows[size_t(menu_cursor)];
+    switch (row.kind) {
+    case MenuRow::Kind::Preset:
+    case MenuRow::Kind::Param: menu_editing = !menu_editing; break;
+    case MenuRow::Kind::Level: enter_level(row.key); break;
+    case MenuRow::Kind::Item: {
+        if (ModuleParam* chosen = module->param(row.key)) chosen->value = row.index;
+        synth_set(row.key, std::to_string(row.index));
+        // A bank changes the presets: ask for them again.
+        for (const auto* key : {&module->preset_param, &module->preset_count_param, &module->preset_name_param})
+            if (!key->empty()) synth.ask(*key);
+        changed();
+        const ModuleLevel* at = module->level(menu_path.back());
+        std::string to = at ? at->navigate_to : std::string();
+        if (!to.empty() && module->level(to)) {
+            menu_path.clear();
+            if (to != "root") enter_level("root");
+            enter_level(to);
+        } else menu_back();
+        break;
+    }
+    }
+}
+
+void MelodeeApp::menu_back() {
+    if (menu_editing) { menu_editing = false; return; }
+    if (menu_path.size() <= 1) { menu_open = false; return; }
+    std::string left = menu_path.back();
+    menu_path.pop_back();
+    pick_items.clear();
+    pick_key.clear();
+    auto rows = menu_rows();
+    menu_cursor = 0;
+    for (size_t n = 0; n < rows.size(); ++n)
+        if (rows[n].kind == MenuRow::Kind::Level && rows[n].key == left) menu_cursor = int(n);
 }
 
 void MelodeeApp::destroy_retired() {
@@ -548,7 +734,13 @@ void MelodeeApp::surface(const move::SurfaceEvent& event) {
             break;
         }
         if (track == Track::Synth) {
-            if (button == Button::Menu || (button == Button::Back && page == Page::Load)) {
+            if (button == Button::Back && page == Page::Play && menu_open) {
+                menu_back();
+            } else if (button == Button::MainPush && page == Page::Play) {
+                if (menu_open) menu_push();
+                else open_menu();
+            } else if (button == Button::Menu || (button == Button::Back && page == Page::Load)) {
+                menu_open = false;
                 page = page == Page::Load ? Page::Play : Page::Load;
                 if (page == Page::Load) {
                     catalog = scan_modules(modules_root);
@@ -607,6 +799,7 @@ void MelodeeApp::surface(const move::SurfaceEvent& event) {
     case Kind::MainKnob:
         if (track == Track::Synth) {
             if (page == Page::Load) module_cursor = std::clamp(module_cursor + input.delta, 0, std::max(0, int(catalog.size()) - 1));
+            else if (menu_open) menu_turn(input.delta, fine);
             else preset_by(input.delta);
             break;
         }
@@ -656,7 +849,7 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point) {
         lights.button(Button::Down, octave > lowest_octave ? white_dim : 0);
         lights.button(Button::Loop, 0);
         lights.button(Button::Menu, page == Page::Load ? white_bright : white_dim);
-        lights.button(Button::Back, page == Page::Play ? 0 : white_dim);
+        lights.button(Button::Back, page == Page::Play && !menu_open ? 0 : white_dim);
         return;
     }
     lights.button(Button::Left, page == Page::Play || page == Page::Chop ? white_dim : 0);
@@ -694,7 +887,7 @@ void MelodeeApp::draw(juce::Graphics& g) {
     std::lock_guard<std::mutex> guard(lock);
     auto now = Clock::now();
     if (touched >= 0 && now < touched_until && !knob(unsigned(touched)).name.empty()) draw_touched(g);
-    else if (track == Track::Synth) page == Page::Load ? draw_modules(g) : draw_synth(g);
+    else if (track == Track::Synth) page == Page::Load ? draw_modules(g) : menu_open && module ? draw_menu(g) : draw_synth(g);
     else if (page == Page::Load) draw_load(g);
     else if (page == Page::Chop) draw_chop(g);
     else if (page == Page::ToPads) draw_to_pads(g);
@@ -798,6 +991,21 @@ void MelodeeApp::draw_synth(juce::Graphics& g) {
         std::snprintf(number, sizeof number, "%03d", std::clamp(module->preset + 1, 0, 999));
         ui::detail(g, upper(module->preset_name.empty() ? module->info().name : module->preset_name).substr(0, 12), number);
     } else ui::detail(g, upper(module->info().name).substr(0, 16));
+}
+
+void MelodeeApp::draw_menu(juce::Graphics& g) {
+    ui::rail(g, upper(module->info().abbrev).substr(0, 4), "2", "MENU");
+    const ModuleLevel* at = menu_path.empty() ? nullptr : module->level(menu_path.back());
+    move::draw_text(g, ui::content_x + 1, 1, upper(at ? at->name : module->info().name).substr(0, 16));
+    auto rows = menu_rows();
+    if (rows.empty()) {
+        move::draw_text_centred(g, ui::content_x, 26, ui::content_width, pick_reading || !pick_key.empty() ? "READING" : "NOTHING HERE");
+        return;
+    }
+    std::vector<std::string> texts;
+    int cursor = std::clamp(menu_cursor, 0, int(rows.size()) - 1);
+    for (size_t n = 0; n < rows.size(); ++n) texts.push_back(menu_text(rows[n], menu_editing && int(n) == cursor));
+    ui::list(g, ui::content(10, ui::height - 10), texts, cursor, 1);
 }
 
 void MelodeeApp::draw_modules(juce::Graphics& g) {
@@ -1022,13 +1230,20 @@ std::string MelodeeApp::load_module_now(const std::string& id, const SynthFile* 
     std::string error;
     auto loaded = LoadedModule::load(info, error);
     if (loaded && saved && saved->module == id) {
+        // A bank (an items list's choice) first, then the preset in it, then
+        // each parameter.
+        for (const auto& [key, value] : saved->values)
+            if (ModuleParam* param = loaded->param(key); param && param->selector) {
+                loaded->set_now(key, value);
+                param->take(value);
+            }
         if (saved->preset >= 0 && !loaded->preset_param.empty()) {
             loaded->set_now(loaded->preset_param, std::to_string(saved->preset));
             loaded->preset = saved->preset;
             for (auto& param : loaded->params) param.take(loaded->get_now(param.key));
         }
         for (const auto& [key, value] : saved->values)
-            if (ModuleParam* param = loaded->param(key); param && key != loaded->preset_param) {
+            if (ModuleParam* param = loaded->param(key); param && key != loaded->preset_param && !param->selector) {
                 loaded->set_now(key, value);
                 param->take(value);
             }
@@ -1043,7 +1258,11 @@ std::string MelodeeApp::load_module_now(const std::string& id, const SynthFile* 
     }
     if (module) leaving.push_back(std::move(module));
     module = std::move(loaded);
+    set_at.clear();
     synth_page = 0;
+    menu_open = false;
+    pick_items.clear();
+    pick_key.clear();
     if (!saved) {
         saved_synth = {};
         if (track == Track::Synth && page == Page::Load) page = Page::Play; // to play it
@@ -1070,10 +1289,13 @@ std::string MelodeeApp::status() const {
     unsigned used = 0, loaded = 0;
     for (const auto& sound : pads) used += sound.used();
     for (const auto& sample : samples) loaded += sample && sample->data;
-    char text[320];
-    std::snprintf(text, sizeof text, "page=%s pad=%s samples=%u slices=%u pads=%u chop=%s loading=%d saves=%u unsaved=%d track=%s synth=%s octave=%d",
+    char text[420];
+    std::snprintf(text, sizeof text,
+                  "page=%s pad=%s samples=%u slices=%u pads=%u chop=%s loading=%d saves=%u unsaved=%d track=%s synth=%s octave=%d "
+                  "menu=%s slow_calls=%u slowest_ms=%.1f",
                   names[unsigned(page)], pad_label(pad).c_str(), loaded, slices.count, used, melodee::chop_mode_name(mode), int(loading),
-                  saves, int(dirty), track == Track::Synth ? "synth" : "kit", module ? module->info().id.c_str() : "-", octave);
+                  saves, int(dirty), track == Track::Synth ? "synth" : "kit", module ? module->info().id.c_str() : "-", octave, menu_open && !menu_path.empty() ? menu_path.back().c_str() : "-", slow_calls,
+                  slowest_us / 1000.0);
     return text;
 }
 

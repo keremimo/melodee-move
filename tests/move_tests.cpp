@@ -549,15 +549,24 @@ void test_schwung_modules() {
     auto loaded = app::LoadedModule::load(info, error);
     CHECK(loaded && error.empty());
     if (!loaded) { std::cerr << "fake module: " << error << '\n'; return; }
-    // Its knobs: chain_params' four (a file path is no knob) and attack,
-    // which only a page names; the pages, root first.
-    CHECK(loaded->params.size() == 5 && !loaded->param("sample"));
-    CHECK(loaded->pages.size() == 2 && loaded->pages[0].name == "Fake" && loaded->pages[1].name == "Envelope");
-    CHECK((loaded->pages[0].knobs == std::vector<std::string> {"level", "wave", "voices", "preset"}));
+    // Its parameters: chain_params' four (a file path is no knob), attack,
+    // described in its menu instead, and the table chosen from a list, first.
+    CHECK(loaded->params.size() == 6 && !loaded->param("sample") && !loaded->param(""));
+    CHECK(loaded->params.front().key == "table" && loaded->params.front().selector);
+    // Its menu: root, then the levels root links to.
+    CHECK(loaded->levels.size() == 3 && loaded->levels[0].name == "Fake" && loaded->levels[1].id == "env" && loaded->levels[2].id == "tables");
+    CHECK(loaded->levels[0].items.size() == 4 && loaded->levels[0].items[2].kind == app::MenuItem::Kind::Level
+          && loaded->levels[0].items[2].label == "Envelope");
+    CHECK(loaded->levels[2].items_param == "table_list" && loaded->levels[2].navigate_to == "root");
+    // Its knob pages: an empty knob kept in its place, the preset list no
+    // knob (it has the jogwheel), a level without knobs no page.
+    CHECK(loaded->pages.size() == 2 && loaded->pages[0].name == "Fake" && loaded->pages[1].name == "Envelope" && loaded->pages[1].level == 1);
+    CHECK((loaded->pages[0].knobs == std::vector<std::string> {"level", "wave", "", "voices"}));
     // Each value as the module reports it once created.
     auto* attack = loaded->param("attack");
-    CHECK(attack && attack->short_name == "ATK" && std::abs(attack->value - 0.1) < 1e-6);
+    CHECK(attack && attack->short_name == "ATK" && attack->label == "Attack" && attack->max == 2 && std::abs(attack->value - 0.1) < 1e-6);
     auto* wave = loaded->param("wave");
+    CHECK(wave && wave->label == "Waveform");
     CHECK(wave && wave->kind == Kind::Enum && wave->value == 1 && wave->shown() == "Square" && wave->text() == "1");
     if (wave) {
         wave->turn(-1, false);
@@ -615,6 +624,12 @@ void test_schwung_modules() {
     player.render(in, out, 1.0f);
     CHECK(peak_of(out) == 0);
     CHECK(player.answer(answer) && std::string(answer.key) == "level" && std::string(answer.value) == "0.25");
+    // A call that holds the audio thread up is reported, with what it was.
+    app::SynthPlayer::Slow slow;
+    CHECK(!player.slow(slow)); // nothing slow so far
+    player.set("stall", "3");
+    player.render(in, out, 1.0f);
+    CHECK(player.slow(slow) && std::string(slow.what) == "set stall=3" && slow.us >= 3000);
     // Let go: handed back, to be destroyed off the audio thread.
     CHECK(!player.retired());
     CHECK(player.set_module(nullptr));
@@ -670,6 +685,26 @@ void test_synth_track() {
         CHECK(melodee.synth_value("preset") == "1" && melodee.synth_value("level") == "0.1");
         melodee.surface(make_event(0xb0, knob_first_cc, 3)); // knob 1: level, up three
         CHECK(melodee.synth_value("level") == "0.13");
+        // The jogwheel's push: the module's menu. Root's rows: the preset,
+        // level, Waveform, Envelope >, Tables >.
+        press(melodee, Button::MainPush);
+        CHECK(has(melodee.status(), "menu=root"));
+        melodee.surface(make_event(0xb0, main_knob_cc, 2)); // Waveform
+        press(melodee, Button::MainPush);                   // edit it
+        melodee.surface(make_event(0xb0, main_knob_cc, 127)); // one back: Sine
+        CHECK(melodee.synth_value("wave") == "0");
+        press(melodee, Button::MainPush); // done
+        melodee.surface(make_event(0xb0, main_knob_cc, 2)); // Tables
+        press(melodee, Button::MainPush);
+        CHECK(has(melodee.status(), "menu=tables"));
+        loudest(melodee, 1); // the list read on the audio thread
+        melodee.service();
+        melodee.surface(make_event(0xb0, main_knob_cc, 2)); // Organ
+        press(melodee, Button::MainPush);                   // chosen: back to root, as the module asks
+        CHECK(has(melodee.status(), "menu=root") && melodee.synth_value("table") == "2");
+        loudest(melodee, 1);
+        press(melodee, Button::Back);
+        CHECK(has(melodee.status(), "menu=-"));
         press(melodee, Button::Up);
         CHECK(has(melodee.status(), "octave=1"));
         // Row 1: the kit again; its pads its own.
@@ -685,9 +720,12 @@ void test_synth_track() {
     app::SynthFile saved;
     app::load_synth(project, saved);
     CHECK(saved.module == "fake" && saved.preset == 1 && saved.octave == 1 && saved.track == 1);
-    bool level_saved = false;
-    for (const auto& [key, value] : saved.values) level_saved |= key == "level" && value == "0.13";
-    CHECK(level_saved);
+    bool level_saved = false, table_saved = false;
+    for (const auto& [key, value] : saved.values) {
+        level_saved |= key == "level" && value == "0.13";
+        table_saved |= key == "table" && value == "2";
+    }
+    CHECK(level_saved && table_saved && !saved.values.empty() && saved.values.front().first == "table"); // the choice first
     {
         app::MelodeeApp second(folder, home, modules);
         Session session;
@@ -695,7 +733,8 @@ void test_synth_track() {
         second.audio_opened(AudioFormat {});
         CHECK(second.restore_now().empty());
         CHECK(has(second.status(), "track=synth synth=fake octave=1"));
-        CHECK(second.synth_value("level") == "0.13" && second.synth_value("preset") == "1");
+        CHECK(second.synth_value("level") == "0.13" && second.synth_value("preset") == "1" && second.synth_value("table") == "2");
+        CHECK(second.synth_value("wave") == "0");
         second.audio_event(make_event(0x90, pad_note(0), 100));
         CHECK(loudest(second, 1) > 0);
     }

@@ -12,6 +12,7 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -36,6 +37,9 @@
 // rows of fourths, C2 (note 48) at the bottom left; Up and Down move an octave;
 // pressure is polyphonic aftertouch. Knobs 1-8 are the module's page,
 // Left/Right its pages, the jogwheel its presets. Menu lists the modules.
+// Push the jogwheel for the module's menu (its ui_hierarchy): turn to a
+// row, push to edit a value with the jogwheel or to open a level or a list
+// (a bank, a soundfont) to choose from; Back goes up, then closes it.
 // Row 1 is the kit again.
 //
 // The kit is saved as a Melodee project (project_store.h) in
@@ -122,7 +126,21 @@ private:
     void preset_by(int way);
     void refresh_synth();                   // ask the module what its page's knobs and preset are now
     void take_answers();
+    void synth_set(const std::string& key, const std::string& value); // remembers when, so an older answer is not taken
     void destroy_retired();
+    // The module's menu.
+    struct MenuRow {
+        enum class Kind : uint8_t { Preset, Param, Level, Item } kind = Kind::Param;
+        std::string key, label;
+        int index = 0; // an Item's
+    };
+    std::vector<MenuRow> menu_rows() const;
+    std::string menu_text(const MenuRow& row, bool editing) const;
+    void open_menu();
+    void enter_level(const std::string& id);
+    void menu_turn(int delta, bool fine);
+    void menu_push();
+    void menu_back();
 
     void draw_play(juce::Graphics& g);
     void draw_load(juce::Graphics& g);
@@ -131,6 +149,7 @@ private:
     void draw_touched(juce::Graphics& g);
     void draw_synth(juce::Graphics& g);
     void draw_modules(juce::Graphics& g);
+    void draw_menu(juce::Graphics& g);
 
     mutable std::mutex lock;
     KitPlayer player;
@@ -184,6 +203,15 @@ private:
     int octave = 0;
     std::array<bool, pad_count> held {}; // pads down, for their lights
     SynthFile saved_synth;                // read at start, for the module it names
+    bool menu_open = false, menu_editing = false;
+    std::vector<std::string> menu_path;        // level ids, root first
+    int menu_cursor = 0;
+    std::vector<std::pair<int, std::string>> pick_items; // an items list, as the module gave it
+    std::string pick_key;                      // the list being read, until it is
+    bool pick_reading = false;
+    std::map<std::string, uint64_t> set_at; // each key's last set (SynthPlayer's serial)
+    unsigned slow_calls = 0;              // calls into a module that held the audio thread 1 ms or more
+    uint32_t slowest_us = 0;
 
     // The audio thread's: where each pad's press went (a synth note, or -1:
     // the kit), so its release and pressure go there too.

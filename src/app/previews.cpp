@@ -93,6 +93,20 @@ int write_previews(const std::string& directory, const std::string& modules) {
     send(0x9f, 1, 127); // touch knob 2
     ok = save(melodee, folder, "synth-touch") && ok;
     send(0x9f, 1, 0);
+    // Its menu (the jogwheel's push), a value being edited, a list to choose from.
+    std::this_thread::sleep_for(std::chrono::milliseconds(700));
+    press(move::Button::MainPush);
+    send(0xbf, move::main_knob_cc, 2);
+    ok = save(melodee, folder, "synth-menu") && ok;
+    press(move::Button::MainPush);
+    ok = save(melodee, folder, "synth-edit") && ok;
+    press(move::Button::MainPush);
+    send(0xbf, move::main_knob_cc, 2);
+    press(move::Button::MainPush);
+    move::AudioBlock in {}, out {};
+    melodee.render(in, out); // a list is read on the audio thread
+    melodee.service();
+    ok = save(melodee, folder, "synth-items") && ok;
     return ok ? 0 : 1;
 }
 

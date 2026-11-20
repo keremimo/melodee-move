@@ -40,7 +40,10 @@ Three parts so far:
   such as 9w9 wants notes from 36: one octave down); pressure is polyphonic
   aftertouch. Knobs 1-8 are the module's page (from its `ui_hierarchy`, or
   its parameters eight at a time), Left / Right its pages, the jogwheel its
-  presets.
+  presets. Push the jogwheel for the module's menu, as its `ui_hierarchy`
+  lays it out: turn to a row; push a value to edit it with the jogwheel,
+  push a level to open it (the knobs follow to its page), or a list (a bank,
+  a soundfont, a table) to choose from; Back goes up, then closes the menu.
 - The master knob is the volume; Shift + Back goes back to Move.
 - **Saving**: the kit is a Melodee project, `/data/UserData/Melodee/Projects/Move.mldp`
   (`--home` moves the folder), saved three seconds after the last change, as
@@ -76,6 +79,9 @@ for what a host outside Schwung must provide (`src/app/module_host.*`):
   render). One replaced is handed back and destroyed off the audio thread;
   its library is never closed (modules start threads).
 - SIGPIPE is ignored: a streaming module's broken pipe must not end Melodee.
+- A call into a module that holds the audio thread 1 ms or more is logged
+  (`slow synth call: surge set preset=12 took 24.1 ms`) and counted in the
+  status line (`slow_calls`, `slowest_ms`).
 
 `melodee-move --probe-modules /data/UserData/schwung/modules` loads each one
 beside Ableton's app (the device is not touched), lists its pages, plays a

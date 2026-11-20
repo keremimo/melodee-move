@@ -86,8 +86,15 @@ reverse), **CLOUD** (position, size, density, scan, spread, on).
 
 A Schwung module's pages come from its `module.json`: `ui_hierarchy` where it
 has one, else its `chain_params` eight at a time. Names are cut to the cell
-(3 to 5 characters); the touched knob shows the full name. A knob that is
-the module's preset list turns presets, as the jogwheel does.
+(3 to 5 characters); the touched knob shows the full name. A chooser (a preset
+list, an items list) is never a knob; a `null` in `knobs` is an empty knob,
+and knobs past eight go to the level's next page.
+
+The jogwheel's push opens the module's menu (`MENU` on the rail), its
+levels as lists: the preset first where the level has one, then values
+(`CUTOFF      57`), levels (`ENVELOPE >`) and lists to choose from (the
+current one marked `*`). Push a value to edit it (`[57]`), push a level to
+open it; Back goes up, then closes the menu.
 
 ## Controls
 
@@ -98,7 +105,7 @@ A first proposal, to settle while building.
 | Pads | play: a kit's pads; in Chop, its slices (32 at once); on a module track, notes |
 | Steps | in Chop, the sample in 16 parts, lit where a cut falls, pressed to hear from there; later the sequencer |
 | Knobs 1-8 | the screen's eight parameters; touch one to see it large |
-| Jogwheel | turn to choose (slice, list row, fine move of a cut; on a module track, its preset); push to confirm; Shift + turn jumps a cut to the next hit |
+| Jogwheel | turn to choose (slice, list row, fine move of a cut; on a module track, its preset); push to confirm, and on a module track to open its menu; Shift + turn jumps a cut to the next hit |
 | Track buttons | tracks 1-4, each a kit or a module |
 | Loop | Chop the last pad; again to leave |
 | Sample | Record: armed, hit a pad to record onto it; again to stop |

@@ -6,7 +6,9 @@
  * flat "sine" of half its height) while a note is held, its height the
  * level, the velocity and the pressure; ten presets, each setting the
  * level; get_param("note") the note held, "tempo" what the host's
- * schwung_move_info() says, "bpm" what get_bpm() says.
+ * schwung_move_info() says, "bpm" what get_bpm() says. set_param("stall",
+ * milliseconds) holds the caller up that long. "table" is chosen from
+ * "table_list", an items list.
  */
 #define _GNU_SOURCE
 #include <dlfcn.h>
@@ -14,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 typedef struct {
     uint32_t api_version;
@@ -49,7 +52,7 @@ typedef struct {
 
 typedef struct {
     float level, attack;
-    int wave, voices, preset;
+    int wave, voices, preset, table;
     int note, velocity, pressure;
     int phase;
 } fake_t;
@@ -89,6 +92,8 @@ static void set_param(void *instance, const char *key, const char *val) {
     else if (!strcmp(key, "wave")) fake->wave = atoi(val);
     else if (!strcmp(key, "voices")) fake->voices = atoi(val);
     else if (!strcmp(key, "preset")) { fake->preset = atoi(val); fake->level = (float)fake->preset / 10.0f; }
+    else if (!strcmp(key, "table")) fake->table = atoi(val);
+    else if (!strcmp(key, "stall")) usleep((useconds_t)atoi(val) * 1000); /* a module slow to set: milliseconds */
 }
 
 typedef int (*move_info_fn)(void *out, size_t cap);
@@ -100,6 +105,8 @@ static int get_param(void *instance, const char *key, char *buf, int buf_len) {
     if (!strcmp(key, "wave")) return snprintf(buf, (size_t)buf_len, "%d", fake->wave);
     if (!strcmp(key, "voices")) return snprintf(buf, (size_t)buf_len, "%d", fake->voices);
     if (!strcmp(key, "preset")) return snprintf(buf, (size_t)buf_len, "%d", fake->preset);
+    if (!strcmp(key, "table")) return snprintf(buf, (size_t)buf_len, "%d", fake->table);
+    if (!strcmp(key, "table_list")) return snprintf(buf, (size_t)buf_len, "[{\"index\":0,\"label\":\"Sine\"},{\"index\":1,\"label\":\"Saw\"},{\"index\":2,\"label\":\"Organ\"}]");
     if (!strcmp(key, "preset_count")) return snprintf(buf, (size_t)buf_len, "10");
     if (!strcmp(key, "preset_name")) return snprintf(buf, (size_t)buf_len, "Fake %d", fake->preset);
     if (!strcmp(key, "note")) return snprintf(buf, (size_t)buf_len, "%d", fake->note);
