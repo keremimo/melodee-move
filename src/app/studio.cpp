@@ -980,6 +980,7 @@ std::string Studio::status() const {
                   int(track.mix.solo), slow_calls, slowest_us / 1000.0,
                   module ? module->player.stream_late() : 0u, engine->dropped());
     std::string line = text;
+    line += instruments_status();
     for (const auto& screen : screens) line += screen->status();
     return line;
 }

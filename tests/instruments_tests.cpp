@@ -564,6 +564,18 @@ void test_auto_sampler() {
         CHECK(studio.patterns().at[2][0].events.size() == 1 && studio.patterns().at[2][0].events[0].key == 37);
         CHECK(fs::exists(studio.keygroups_folder()));
     }
+    {   // melodee-autosample's words, as Melodee takes them.
+        app::AutoCommand command;
+        std::string why;
+        CHECK(app::parse_autosample("3 c2-c5 step 4 layers 2 hold 3 tail 6 post loop peak check", command, why) && why.empty());
+        CHECK(command.track == 2 && command.check && command.settings.low == 36 && command.settings.high == 72 && command.settings.step == 4);
+        CHECK(command.settings.layers == 2 && !command.settings.hold_auto && command.settings.hold == 3.0f && command.settings.tail == 6.0f);
+        CHECK(command.settings.post_fx && command.settings.loop && !command.settings.loop_auto && command.settings.normalize);
+        CHECK(app::parse_autosample("2 40-50", command, why) && command.settings.low == 40 && command.settings.high == 50);
+        CHECK(!app::parse_autosample("17", command, why) && !why.empty());
+        CHECK(!app::parse_autosample("1 step 99", command, why));
+        CHECK(!app::parse_autosample("1 sideways", command, why) && why == "not known: sideways");
+    }
     // Called off: what was made goes.
     job.name = "Gone";
     settings.high = 60;

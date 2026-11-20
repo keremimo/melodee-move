@@ -344,3 +344,30 @@ void Studio::auto_sample_tick() {
 }
 
 } // namespace app
+
+namespace app {
+
+std::string Studio::autosample_command(const std::string& arguments) {
+    AutoCommand command;
+    std::string error;
+    if (!parse_autosample(arguments, command, error)) return "melodee-autosample: " + error;
+    if (auto failed = auto_sample(command.track, command.settings, !command.check); !failed.empty()) return "melodee-autosample: " + failed;
+    return std::string(command.check ? "checking" : "sampling") + " track " + std::to_string(command.track + 1);
+}
+
+std::string Studio::instruments_status() const {
+    std::string line;
+    const auto& track = current();
+    if (track.engine == EngineKind::Keygroup || track.engine == EngineKind::Plugin || track.engine == EngineKind::Midi) {
+        line += " keys=" + std::string(keys_mode_name(keys_mode(track))) + (keys_fourths(track) ? "/4THS" : "") + " key=" + std::to_string(song->root) + "/"
+                + std::to_string(song->scale) + " arp=" + std::to_string(int(track.arp)) + " chord=" + std::to_string(int(track.chord));
+    }
+    if (const auto* sample = keys_sample(selected); sample && sample->instrument)
+        line += " zones=" + std::to_string(sample->data->multi->zones.size()) + " landed=" + std::to_string(sample->instrument->landed.load()) + "/"
+                + std::to_string(sample->instrument->parts.size());
+    if (sampler->phase_now() != AutoSampler::Phase::Idle)
+        line += std::string(" auto=") + phase_name(sampler->phase_now()) + " " + std::to_string(sampler->done()) + "/" + std::to_string(sampler->total());
+    return line;
+}
+
+} // namespace app

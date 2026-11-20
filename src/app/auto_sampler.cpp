@@ -14,6 +14,8 @@
 #include <fstream>
 #include <pthread.h>
 #include <sched.h>
+#include <sstream>
+#include "melodee/engine/sfz.h"
 
 namespace app {
 namespace fs = std::filesystem;
@@ -157,6 +159,47 @@ std::unique_ptr<NoteSource> module_source(const ModuleInfo& info, const SynthFil
     if (state.preset >= 0 && !module->preset_param.empty()) module->set_now(module->preset_param, std::to_string(state.preset));
     for (const auto& [key, value] : state.values) module->set_now(key, value);
     return std::make_unique<ModuleSource>(std::move(module));
+}
+
+bool parse_autosample(const std::string& text, AutoCommand& out, std::string& error) {
+    std::istringstream words(text);
+    std::string word;
+    auto number = [](const std::string& w, double& v) { char* end = nullptr; v = std::strtod(w.c_str(), &end); return end && *end == 0 && !w.empty(); };
+    auto key = [](const std::string& w) -> int {
+        char* end = nullptr;
+        long n = std::strtol(w.c_str(), &end, 10);
+        if (end && *end == 0 && !w.empty()) return n >= 0 && n <= 127 ? int(n) : -1;
+        auto named = melodee::sfz_note(w); // c4 is 60, c#4, db4
+        return named && *named >= 0 && *named <= 127 ? *named : -1;
+    };
+    if (!(words >> word)) { error = "which track?"; return false; }
+    double value = 0;
+    if (!number(word, value) || value < 1 || value > 16) { error = "a track is 1-16"; return false; }
+    out.track = unsigned(value) - 1;
+    auto& s = out.settings;
+    while (words >> word) {
+        std::string next;
+        auto take = [&](double low, double high, double& v) {
+            if (!(words >> next) || !number(next, v) || v < low || v > high) { error = word + " wants a number from " + std::to_string(int(low)) + " to " + std::to_string(int(high)); return false; }
+            return true;
+        };
+        if (auto dash = word.find('-'); dash != std::string::npos && dash > 0) {
+            int low = key(word.substr(0, dash)), high = key(word.substr(dash + 1));
+            if (low < 0 || high < low) { error = "keys: LOW-HIGH, " + word; return false; }
+            s.low = uint8_t(low); s.high = uint8_t(high);
+        } else if (word == "step") { if (!take(1, 24, value)) return false; s.step = uint8_t(value); }
+        else if (word == "layers") { if (!take(0, 8, value)) return false; s.layers = uint8_t(value); }
+        else if (word == "hold") { if (!take(0, 20, value)) return false; s.hold = float(value); s.hold_auto = value == 0; }
+        else if (word == "tail") { if (!take(0, 30, value)) return false; s.tail = float(value); }
+        else if (word == "pre") s.post_fx = false;
+        else if (word == "post") s.post_fx = true;
+        else if (word == "loop") { s.loop = true; s.loop_auto = false; }
+        else if (word == "raw") s.normalize = false;
+        else if (word == "peak") s.normalize = true;
+        else if (word == "check") out.check = true;
+        else { error = "not known: " + word; return false; }
+    }
+    return true;
 }
 
 const char* phase_name(AutoSampler::Phase phase) {

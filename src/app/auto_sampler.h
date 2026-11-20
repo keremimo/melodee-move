@@ -82,6 +82,18 @@ private:
 };
 const char* phase_name(AutoSampler::Phase phase); // "IDLE", "OPENING", "CHECKING", ...
 
+// `melodee-autosample`'s words after the command (MELODEE.md, Print and
+// freeze): "TRACK [LOW-HIGH] [step N] [layers N] [hold S] [tail S]
+// [pre|post] [loop] [raw|peak] [check]"; TRACK 1-16, keys as numbers or
+// names (C4 is 60, as Melodee names them). False and `error` set where it
+// cannot be read.
+struct AutoCommand {
+    unsigned track = 0; // 0-15
+    bool check = false; // the check alone
+    melodee::AutoSampleSettings settings;
+};
+bool parse_autosample(const std::string& text, AutoCommand& out, std::string& error);
+
 // The check alone (the thread's; tests call it directly): what `source` is.
 melodee::AutoFindings check_source(NoteSource& source, const melodee::AutoSampleSettings& settings, std::vector<std::string>* rows = nullptr,
                                    const std::atomic<bool>* cancelled = nullptr);

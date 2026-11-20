@@ -282,6 +282,11 @@ public:
     AutoSampler& auto_sampler() { return *sampler; }
     std::string keygroups_folder() const; // <home>/Samples/Keygroups, as Melodee keeps them
     int auto_sampled = -1;                // the track the last program went on
+    // `melodee-autosample` as Melodee takes it (MELODEE.md, Print and freeze):
+    // "TRACK [LOW-HIGH] [step N] [layers N] [hold S] [tail S] [pre|post]
+    // [loop] [raw|peak] [check]". What it started, or why not.
+    std::string autosample_command(const std::string& arguments);
+    std::string instruments_status() const; // " keys=... auto=..." for the status line
     // The arp of a note track (Melodee's Stage ARP, the Move's Repeat and Arp),
     // its settings taken from the track and sent to the engine.
     void send_arp(unsigned track);
