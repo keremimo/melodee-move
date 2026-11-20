@@ -4,14 +4,18 @@
 #include "melodee/engine/engine_info.h"
 #include "melodee/model/scales.h"
 #include "melodee/shell/pad_gap.h"
+#include "melodee/shell/project_kits.h"
 #include "melodee/shell/sample_decode.h"
 #include "melodee/shell/sample_memory.h"
+#include "melodee/shell/stream_holds.h"
 #include <juce_core/juce_core.h>
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <sstream>
 
 namespace app {
@@ -76,16 +80,85 @@ const char* kind_tag(TrackKind kind) {
     return tags[unsigned(kind) % unsigned(TrackKind::Count)];
 }
 
-std::unique_ptr<Sample> read_sample(const std::string& path, std::string& error) {
+namespace {
+
+// A long sample's waveform, read from its file a piece at a time: the peak of
+// each of the overview's columns.
+void overview_from_file(const std::string& path, melodee::Overview& overview) {
+    overview.fill(0);
+    melodee::WavReader file;
+    if (!file.open(path, melodee::stream_most_seconds).empty() || !file.frames()) return;
+    constexpr uint32_t piece = 65536;
+    std::vector<float> left(piece), right(piece);
+    uint64_t total = file.frames(), at = 0;
+    while (at < total) {
+        uint32_t n = file.read(left.data(), right.data(), piece);
+        if (!n) break;
+        for (uint32_t k = 0; k < n; ++k) {
+            size_t column = size_t((at + k) * overview.size() / total);
+            float peak = std::max(std::abs(left[k]), std::abs(right[k]));
+            overview[column] = std::max<uint8_t>(overview[column], uint8_t(std::min(255.0f, peak * 255.0f)));
+        }
+        at += n;
+    }
+}
+
+} // namespace
+
+std::unique_ptr<Sample> read_sample(const std::string& path, std::string& error, const melodee::SampleCache* cache) {
+    using namespace melodee;
     auto sample = std::make_unique<Sample>();
     sample->name = fs::path(path).filename().string();
     sample->path = path;
-    sample->data = std::make_unique<melodee::SampleData>();
-    error = melodee::read_audio(path, *sample->data, 60, nullptr); // WAV, AIFF, FLAC, Ogg, MP3, as Melodee reads them
+    sample->data = std::make_unique<SampleData>();
+    // A long one, or one memory has no room for, read from storage as it
+    // plays (Melodee's SampleLibrary::dispatch, card_copy).
+    WavReader wav;
+    std::string from = path;
+    bool pcm = wav.open(from, stream_most_seconds).empty(), copied = false;
+    if (!pcm) {
+        AudioReader file;
+        if (file.open(path, stream_most_seconds).empty()) {
+            const uint64_t bytes = kit_sample_bytes(file.frames(), file.rate());
+            const bool lasting = uint64_t(file.frames()) > uint64_t(stream_seconds) * file.rate();
+            const bool room = !lasting && memory_for(bytes);
+            if (file.decoded() && cache && !cache->folder().empty() && streams_from_card(file.frames(), file.rate(), room)) {
+                WavCopy what;
+                what.rate = file.rate(); what.frames = file.frames(); what.channels = file.channels();
+                what.bits = wav_copy_bits(file.bits(), file.floating());
+                what.dither = !file.bits();
+                bool made = false;
+                std::string copy = cache->wav_copy(path, what, [&](float* left, float* right, uint32_t frames) { return file.read(left, right, frames); }, &made);
+                if (made && file.failed()) {
+                    std::error_code gone;
+                    fs::remove(copy, gone);
+                    error = "cannot read it";
+                    return nullptr;
+                }
+                if (!copy.empty()) { from = copy; pcm = copied = wav.open(from, stream_most_seconds).empty(); }
+            }
+            if (!pcm && !(lasting ? memory_for(bytes) : room)) { error = "memory full"; return nullptr; }
+        }
+    }
+    if (pcm) {
+        const bool room = !copied && (uint64_t(wav.frames()) > uint64_t(stream_seconds) * wav.rate() || memory_for(kit_sample_bytes(wav.frames(), wav.rate())));
+        auto part = std::make_shared<ZonePart>();
+        if ((copied || streams_from_card(wav.frames(), wav.rate(), room)) && read_in_place(from, wav.layout(), *part)) {
+            part->frames.store(part->total, std::memory_order_release);
+            sample->data->stream = part;
+            sample->data->frames = part->total;
+            sample->data->rate = wav.rate();
+            sample->streamed = true;
+            overview_from_file(from, sample->overview);
+            return sample; // no hits found in it: Chop cuts it by Regions or Beats
+        }
+        if (!memory_for(kit_sample_bytes(wav.frames(), wav.rate()))) { error = "memory full"; return nullptr; }
+    }
+    error = read_audio(path, *sample->data, stream_seconds * 6, nullptr); // WAV, AIFF, FLAC, Ogg, MP3, as Melodee reads them
     if (!error.empty()) return nullptr;
-    melodee::make_overview(*sample->data, sample->overview);
-    auto mono = melodee::model_mono(*sample->data);
-    sample->hit_count = melodee::find_hits_in(mono, sample->hits, sample->beats, &sample->autos);
+    make_overview(*sample->data, sample->overview);
+    auto mono = model_mono(*sample->data);
+    sample->hit_count = find_hits_in(mono, sample->hits, sample->beats, &sample->autos);
     return sample;
 }
 
@@ -161,6 +234,8 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
     }
     engine = std::make_unique<melodee::EngineHost>();
     engine->set_overload_guard(true); // as Melodee runs on the MPC
+    cache.set_folder((fs::path(home_path) / "Cache").string());
+    engine->streams().start(); // long samples read from storage as they play
     engine->load(*song, *bank);
     for (unsigned t = 0; t < melodee::track_count; ++t)
         if (modules[t] && modules[t]->entry != melodee::no_plugin) engine->offer_plugin(modules[t]->entry, &modules[t]->runner);
@@ -585,6 +660,7 @@ std::string Studio::install(std::unique_ptr<Sample> sample, unsigned t, unsigned
     copy_text(ref.path, sample->path);
     copy_text(ref.name, sample->name);
     ref.frames = sample->data->model_frames();
+    ref.streamed = sample->streamed;
     if (slot >= samples.size()) samples.resize(slot + 1);
     samples[slot] = std::move(sample);
     if (layer_target.layer > 0 && layer_target.track == int(t) && layer_target.pad == int(at) && song->tracks[t].pads[at].used()) {
@@ -855,11 +931,12 @@ std::string Studio::restore() {
     unsigned missing = 0;
     for (const auto& [slot, file] : wanted) {
         std::string failed;
-        auto sample = read_sample(file, failed);
+        auto sample = read_sample(file, failed, &cache);
         std::lock_guard<std::mutex> guard(lock);
         if (!sample) { ++missing; continue; }
         if (!engine->offer_sample(slot, sample->data.get())) { ++missing; continue; }
         song->samples.edit(slot).frames = sample->data->model_frames();
+        song->samples.edit(slot).streamed = sample->streamed;
         if (slot >= samples.size()) samples.resize(slot + 1);
         samples[slot] = std::move(sample);
     }
@@ -976,7 +1053,9 @@ void Studio::destroy_retired() {
 }
 
 void Studio::service() {
+    if (!cache_tidied) { cache_tidied = true; cache.tidy(); } // before any copy of this run: Melodee's 4 GB, 30 days
     if (!restored) restore();
+    hold_streams();
     take_back();
     take_answers();
     destroy_retired();
@@ -1005,12 +1084,32 @@ void Studio::service() {
     }
     for (const auto& job : todo) {
         std::string error;
-        auto sample = read_sample(job.path, error);
+        auto sample = read_sample(job.path, error, &cache);
         std::lock_guard<std::mutex> guard(lock);
         if (!sample) { say(upper(error).substr(0, 16)); continue; }
         if (auto failed = install(std::move(sample), job.track, job.pad, job.keep); !failed.empty()) say(failed);
     }
     run_file_jobs();
+    // The files a kit or bank loaded names, each read once (as restore() reads a project's).
+    std::vector<std::pair<unsigned, std::string>> wanted;
+    {
+        std::lock_guard<std::mutex> guard(lock);
+        for (unsigned slot : slots_wanted)
+            if (song->samples[slot].used() && !song->samples[slot].instrument()) wanted.emplace_back(slot, song->samples[slot].path);
+        slots_wanted.clear();
+    }
+    for (const auto& [slot, file] : wanted) {
+        std::string failed;
+        auto sample = read_sample(file, failed, &cache);
+        std::lock_guard<std::mutex> guard(lock);
+        if (!sample) { if (failed == "memory full") say("MEMORY FULL"); continue; }
+        if (!engine->offer_sample(slot, sample->data.get())) continue;
+        auto& ref = song->samples.edit(slot);
+        ref.frames = sample->data->model_frames();
+        ref.streamed = sample->streamed;
+        if (slot >= samples.size()) samples.resize(slot + 1);
+        samples[slot] = std::move(sample);
+    }
     std::unique_lock<std::mutex> guard(lock);
     loading = false;
     // Autosave: three seconds after the last change, as on the MPC.
@@ -1066,6 +1165,109 @@ std::string write_region(const Sample& sample, uint32_t start, uint32_t end, con
 
 } // namespace
 
+void Studio::hold_streams() {
+    // What each long sample's pads need held (Melodee's SampleLibrary::holds_service()).
+    std::vector<std::pair<const melodee::SampleData*, std::vector<melodee::HeldRange>>> wanted;
+    {
+        std::lock_guard<std::mutex> guard(lock);
+        bool any = false;
+        for (const auto& sample : samples) any |= sample && sample->streamed;
+        if (!any) return;
+        auto holds = melodee::stream_holds(*song);
+        for (size_t slot = 0; slot < samples.size(); ++slot) {
+            const auto& sample = samples[slot];
+            if (!sample || !sample->streamed || !sample->data->stream) continue;
+            auto found = std::find_if(holds.begin(), holds.end(), [slot](const auto& h) { return h.first == slot; });
+            wanted.emplace_back(sample->data.get(), found == holds.end() ? std::vector<melodee::HeldRange> {} : found->second);
+        }
+    }
+    // The samples are kept for the run, and `held` is this thread's: no lock while the file is read.
+    for (const auto& [data, ranges] : wanted) {
+        melodee::ZonePart& part = *data->stream;
+        const uint32_t head = melodee::stream_head_frames(part.rate);
+        std::vector<uint32_t> want;
+        for (const auto& range : ranges) {
+            uint32_t from = data->own(range.from), to = data->own(range.to);
+            if (range.back) from = std::min(from, to > head ? to - head : 0);
+            else to = std::max(to, from + head);
+            to = std::min(to, part.total);
+            for (uint32_t c = from / melodee::stream_chunk; from < to && c <= (to - 1) / melodee::stream_chunk; ++c) want.push_back(c);
+        }
+        std::sort(want.begin(), want.end());
+        want.erase(std::unique(want.begin(), want.end()), want.end());
+        auto& held = data->held;
+        for (size_t i = 0; i < held.size();) {
+            if (std::binary_search(want.begin(), want.end(), held[i])) { ++i; continue; }
+            engine->streams().let_go(part, held[i]);
+            held.erase(held.begin() + std::ptrdiff_t(i));
+        }
+        for (uint32_t c : want)
+            if (!std::binary_search(held.begin(), held.end(), c) && engine->streams().hold_chunk(part, c))
+                held.insert(std::lower_bound(held.begin(), held.end(), c), c);
+    }
+}
+
+int Studio::slot_for(const melodee::SampleRef& ref) {
+    if (!ref.used()) return -1;
+    for (unsigned slot = 0; slot < melodee::sample_slots; ++slot)
+        if (song->samples[slot].used() && std::strcmp(song->samples[slot].path, ref.path) == 0) return int(slot);
+    for (unsigned slot = 0; slot < melodee::sample_slots; ++slot) {
+        if (song->samples[slot].used() || (slot < samples.size() && samples[slot])) continue;
+        auto& made = song->samples.edit(slot);
+        made = melodee::SampleRef {};
+        copy_text(made.path, ref.path);
+        copy_text(made.name, ref.name);
+        made.root = ref.root;
+        slots_wanted.push_back(slot);
+        return int(slot);
+    }
+    return -1;
+}
+
+std::string Studio::load_program(const melodee::Project& program, int from_bank, unsigned into_bank) {
+    if (kind() != TrackKind::Kit) return "NOT A KIT";
+    auto& into = song->tracks[selected];
+    auto slots = [this](const melodee::SampleRef& ref) { return slot_for(ref); };
+    auto done = from_bank < 0 ? melodee::import_kit(program, 0, into, slots)
+                              : melodee::import_kit_bank(program, 0, unsigned(from_bank), into_bank % melodee::sampler_banks, into, slots);
+    apply_track(selected);
+    refresh_pads();
+    changed();
+    unsigned silent = 0; // pads of more than four layers: an instrument, played by the instruments' loading
+    for (const auto& pad : into.pads) silent += pad.used() && song->samples[pad.sample % melodee::sample_slots].instrument();
+    std::string pads = std::to_string(done.pads) + " PADS";
+    if (silent) say(pads + ", " + std::to_string(silent) + " SILENT");
+    else if (done.missing) say(pads + ", " + std::to_string(done.missing) + " MISSING");
+    else say(pads + " LOADED");
+    return {};
+}
+
+std::string Studio::load_bank_file(const std::string& file, unsigned into_bank) {
+    if (kind() != TrackKind::Kit) return "NOT A KIT";
+    std::ifstream in(file, std::ios::binary);
+    std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    melodee::BankFile bank_file;
+    if (bytes.empty() || !melodee::load_bank(bytes, bank_file)) return "NOT A BANK";
+    auto& into = song->tracks[selected];
+    auto done = melodee::import_bank(bank_file, into_bank % melodee::sampler_banks, into, [this](const melodee::SampleRef& ref) { return slot_for(ref); });
+    apply_track(selected);
+    refresh_pads();
+    changed();
+    say("BANK " + std::string(1, char('A' + into_bank % 8)) + ": " + std::to_string(done.pads) + " PADS");
+    return {};
+}
+
+std::string Studio::save_bank_file(unsigned which, const std::string& name) {
+    auto bank_file = melodee::bank_of(*song, selected, which % melodee::sampler_banks, name.c_str());
+    auto bytes = melodee::save_bank(bank_file);
+    auto folder = fs::path(samples_folder()) / "Banks";
+    std::error_code error;
+    fs::create_directories(folder, error);
+    auto failed = write_whole((folder / (name + ".mldb")).string(), bytes.data(), bytes.size());
+    if (failed.empty()) say(("SAVED " + upper(name)).substr(0, 16));
+    return failed;
+}
+
 void Studio::run_file_jobs() {
     std::vector<FileJob> todo;
     {
@@ -1092,7 +1294,7 @@ void Studio::run_file_jobs() {
             continue;
         }
         std::string error;
-        auto trimmed = read_sample(job.path, error);
+        auto trimmed = read_sample(job.path, error, &cache);
         std::lock_guard<std::mutex> guard(lock);
         if (!trimmed) { say(upper(error).substr(0, 16)); continue; }
         if (auto failed_install = install(std::move(trimmed), job.track, job.pad, true); !failed_install.empty()) say(failed_install);
@@ -1102,7 +1304,7 @@ void Studio::run_file_jobs() {
 
 std::string Studio::load_now(const std::string& file, unsigned at) {
     std::string error;
-    auto sample = read_sample(file, error);
+    auto sample = read_sample(file, error, &cache);
     std::lock_guard<std::mutex> guard(lock);
     if (!sample) return error.empty() ? "unreadable" : error;
     return install(std::move(sample), selected, at);
@@ -1206,19 +1408,21 @@ std::string Studio::load_module_now(unsigned t, const std::string& id, const Syn
 std::string Studio::status() const {
     unsigned used = 0, loaded = 0, tracks = 0;
     const auto& track = current();
-    for (unsigned at = 0; at < pad_count; ++at) used += track.pads[at].used();
-    for (const auto& sample : samples) loaded += sample && sample->data;
+    for (unsigned at = 0; at < melodee::sampler_pads; ++at) used += track.pads[at].used();
+    unsigned streamed = 0;
+    for (const auto& sample : samples) { loaded += sample && sample->data; streamed += sample && sample->streamed; }
     for (const auto& each : song->tracks) tracks += each.used();
     const auto* module = modules[selected].get();
     char text[512];
     std::snprintf(text, sizeof text,
                   "page=%s track=%u kind=%s tracks=%u pad=%c%02u samples=%u pads=%u loading=%d saves=%u unsaved=%d synth=%s octave=%d "
-                  "typing=%d playing=%d tick=%u tempo=%.1f click=%d swing=%u mute=%d solo=%d slow_calls=%u slowest_ms=%.1f stream_late=%u dropped=%u",
+                  "typing=%d playing=%d tick=%u tempo=%.1f click=%d swing=%u mute=%d solo=%d slow_calls=%u slowest_ms=%.1f stream_late=%u dropped=%u "
+                  "streamed=%u pager_late=%u",
                   top() ? top()->id().c_str() : "-", selected + 1, kind_name(kind()), tracks, 'A' + int(pad() / 16), pad() % 16 + 1, loaded, used,
                   int(loading), saves, int(dirty), module && module->module ? module->module->info().id.c_str() : "-", octave(selected), int(typing),
                   int(engine->playing()), engine->ticks(), song->tempo / 10.0, int(click_on), unsigned(song->swing), int(track.mix.mute),
                   int(track.mix.solo), slow_calls, slowest_us / 1000.0,
-                  module ? module->player.stream_late() : 0u, engine->dropped());
+                  module ? module->player.stream_late() : 0u, engine->dropped(), streamed, engine->streams().underruns());
     std::string line = text;
     for (const auto& screen : screens) line += screen->status();
     return line;

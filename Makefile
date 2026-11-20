@@ -38,8 +38,12 @@ MELODEE ?= ../melodee-sample
 MELODEE_INCLUDES := -I$(MELODEE)/src -I$(MELODEE)/base/src
 # shell/sample_decode.cpp: Melodee's own reader for WAV, and AIFF, FLAC, Ogg
 # and MP3 through JUCE, as on the MPC.
+# Kit depth: shell/sample_cache.cpp (long MP3, FLAC, Ogg and AIFF decoded once
+# into Melodee/Cache as WAVs, read from storage as they play), project_kits.cpp
+# (Load Kit, bank files) and the MPC drum programs' readers.
 MELODEE_SOURCES := $(wildcard $(MELODEE)/src/melodee/engine/*.cpp $(MELODEE)/src/melodee/model/*.cpp) \
-    $(MELODEE)/src/melodee/shell/sample_decode.cpp
+    $(MELODEE)/src/melodee/shell/sample_decode.cpp $(MELODEE)/src/melodee/shell/sample_cache.cpp \
+    $(addprefix $(MELODEE)/src/melodee/shell/,project_kits.cpp mpc_program.cpp mpc_project.cpp mpc_wav_slices.cpp)
 MELODEE_OBJECTS := $(patsubst $(MELODEE)/src/%.cpp,build/obj/melodee-sample/%.o,$(MELODEE_SOURCES))
 MELODEE_LIBRARY := build/melodee.a
 CPPFLAGS += $(MELODEE_INCLUDES)

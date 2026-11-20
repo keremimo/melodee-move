@@ -10,6 +10,7 @@
 #include "melodee/engine/onsets.h"
 #include "melodee/engine/sample_data.h"
 #include "melodee/model/project.h"
+#include "melodee/shell/sample_cache.h"
 #include <array>
 #include <atomic>
 #include <chrono>
@@ -48,9 +49,13 @@ enum class TrackKind : uint8_t { Empty, Kit, Synth, Keys, Midi, Audio, Plugin, C
 const char* kind_name(TrackKind kind); // "empty", "kit", "synth", ...
 const char* kind_tag(TrackKind kind);  // the rail's: "----", "KIT", "SYN", "KEYS", "MIDI", "AUD", "PLUG"
 
-// A sample in memory, with what Chop needs found in it.
+// A sample in memory, with what Chop needs found in it. A long one (over
+// ten seconds, up to six hours), or one memory has no room for, is not read
+// into memory: it is read from storage as it plays (`streamed`, Melodee's
+// engine/stream_pager.h), its waveform read from the file once.
 struct Sample {
     std::string name, path;
+    bool streamed = false;
     std::unique_ptr<melodee::SampleData> data;
     melodee::Overview overview {};
     std::array<melodee::Hit, melodee::max_hits> hits {};
@@ -59,8 +64,12 @@ struct Sample {
     melodee::AutoRead autos;
 };
 // Reads a sound file and finds its hits, beats and what Auto reads. Slow
-// and allocating: never on the audio thread, never under the lock.
-std::unique_ptr<Sample> read_sample(const std::string& path, std::string& error);
+// and allocating: never on the audio thread, never under the lock. As
+// Melodee's SampleLibrary: refused ("Memory full") when what it would take
+// leaves less than 256 MB free (shell/sample_memory.h); a long WAV read in
+// place; a long MP3, FLAC, Ogg or AIFF decoded once into `cache` (Melodee/Cache,
+// shell/sample_cache.h) and read in place from there.
+std::unique_ptr<Sample> read_sample(const std::string& path, std::string& error, const melodee::SampleCache* cache = nullptr);
 
 // Melodee's PLUGIN track's plug-in, for one of Schwung's modules: the
 // engine host calls it on the audio thread (engine/plugin_engine.h).
@@ -201,6 +210,17 @@ public:
     struct FileJob { bool trim = false; unsigned track = 0, pad = 0; int layer = 0; std::string path; };
     std::vector<FileJob> file_jobs;
     std::string samples_folder() const; // Melodee's Samples, under its home
+    // Kits and banks from files, onto the selected kit (Melodee's
+    // shell/project_kits.h): an MPC drum program (.xpm, .xty) whole or a bank
+    // of it into a bank (`from_bank` -1: the whole kit), a bank file (.mldb)
+    // into a bank; Save Bank writes Samples/Banks/<name>.mldb. Their files
+    // are read by the service thread (`slots_wanted`). Empty on success.
+    std::string load_program(const melodee::Project& program, int from_bank, unsigned into_bank);
+    std::string load_bank_file(const std::string& path, unsigned bank);
+    std::string save_bank_file(unsigned bank, const std::string& name);
+    int slot_for(const melodee::SampleRef& ref); // this project's slot for a file, a new one queued to be read; -1 none free
+    std::vector<unsigned> slots_wanted;
+    std::string program_path; // the MPC drum program the LOAD KIT sheet loads (load_kit.cpp)
     // Typing for Melodee's own use (Save Sample's name): `done` with the text unless cancelled.
     void ask_text(std::string title, std::string initial, std::function<void(const std::string&)> done);
     std::function<void(const std::string&)> typing_done;
@@ -281,6 +301,9 @@ private:
     void drop_module_track(unsigned track);
     void take_back();                      // what the audio thread handed back, freed
     void run_file_jobs();                  // Trim Sample, Save Sample: regions written as WAVs
+    void hold_streams();                   // the long samples' chunks where pads start, held in memory (shell/stream_holds.h)
+    melodee::SampleCache cache;            // long MP3, FLAC, Ogg and AIFF as WAVs (home/Cache)
+    bool cache_tidied = false;
     void take_answers();
     void destroy_retired();
     std::string write(std::vector<uint8_t> bytes, std::string settings_text);
