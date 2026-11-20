@@ -142,6 +142,74 @@ void test_readers() {
     }
 }
 
+// A SoundFont of one preset ("Test Piano") playing one sound, a sine at
+// middle C with a loop, written as the format lays it out.
+bool write_soundfont(const std::string& path) {
+    std::string out;
+    auto u16 = [](std::string& s, unsigned v) { s += char(v & 0xff); s += char((v >> 8) & 0xff); };
+    auto u32 = [&](std::string& s, uint32_t v) { u16(s, v & 0xffff); u16(s, v >> 16); };
+    auto name = [](std::string& s, const char* text) { std::string n(text); n.resize(20, '\0'); s += n; };
+    auto chunk = [&](const char* id, const std::string& body) { std::string c(id, 4); u32(c, uint32_t(body.size())); return c + body + (body.size() % 2 ? std::string(1, '\0') : ""); };
+    const uint32_t frames = 22050;
+    std::string smpl;
+    for (uint32_t n = 0; n < frames + 46; ++n) u16(smpl, uint16_t(int16_t(n < frames ? std::lround(12000 * std::sin(2 * M_PI * 261.63 * n / 44100)) : 0)));
+    std::string phdr, pbag, pmod(10, '\0'), pgen, inst, ibag, imod(10, '\0'), igen, shdr;
+    name(phdr, "Test Piano"); u16(phdr, 0); u16(phdr, 0); u16(phdr, 0); u32(phdr, 0); u32(phdr, 0); u32(phdr, 0);
+    name(phdr, "EOP"); u16(phdr, 0); u16(phdr, 0); u16(phdr, 1); u32(phdr, 0); u32(phdr, 0); u32(phdr, 0);
+    u16(pbag, 0); u16(pbag, 0); u16(pbag, 1); u16(pbag, 0);
+    u16(pgen, 41); u16(pgen, 0); u16(pgen, 0); u16(pgen, 0); // instrument 0
+    name(inst, "Inst"); u16(inst, 0); name(inst, "EOI"); u16(inst, 1);
+    u16(ibag, 0); u16(ibag, 0); u16(ibag, 1); u16(ibag, 0);
+    u16(igen, 54); u16(igen, 1); u16(igen, 53); u16(igen, 0); u16(igen, 0); u16(igen, 0); // loop on, sample 0
+    name(shdr, "Sine"); u32(shdr, 0); u32(shdr, frames); u32(shdr, 100); u32(shdr, frames - 100); u32(shdr, 44100);
+    shdr += char(60); shdr += char(0); u16(shdr, 0); u16(shdr, 1);
+    name(shdr, "EOS"); u32(shdr, 0); u32(shdr, 0); u32(shdr, 0); u32(shdr, 0); u32(shdr, 0); shdr += char(0); shdr += char(0); u16(shdr, 0); u16(shdr, 0);
+    // igen's bag 1 starts after both gens
+    ibag.replace(4, 2, std::string("\x02\x00", 2));
+    std::string ifil; u16(ifil, 2); u16(ifil, 1);
+    std::string info = "INFO" + chunk("ifil", ifil);
+    std::string sdta = "sdta" + chunk("smpl", smpl);
+    std::string pdta = "pdta" + chunk("phdr", phdr) + chunk("pbag", pbag) + chunk("pmod", pmod) + chunk("pgen", pgen) + chunk("inst", inst)
+                     + chunk("ibag", ibag) + chunk("imod", imod) + chunk("igen", igen) + chunk("shdr", shdr);
+    std::string body = "sfbk" + chunk("LIST", info) + chunk("LIST", sdta) + chunk("LIST", pdta);
+    out = chunk("RIFF", body);
+    std::ofstream file(path, std::ios::binary | std::ios::trunc);
+    file << out;
+    return bool(file);
+}
+
+void test_soundfont() {
+    // A SoundFont opens as a folder of its presets; a preset is an instrument whose sounds are decoded, laid out in
+    // the cache as WAVs and read in place.
+    const std::string folder = "build/test-instruments";
+    fs::create_directories(folder);
+    CHECK(write_soundfont(folder + "/gm.sf2"));
+    CHECK(app::soundfont_file(folder + "/gm.sf2") && !app::instrument_file(folder + "/gm.sf2"));
+    std::string error;
+    auto presets = app::soundfont_presets(folder + "/gm.sf2", error);
+    CHECK(error.empty() && presets.size() == 1 && presets[0].name == "Test Piano");
+    auto path = app::preset_path(folder + "/gm.sf2", 0);
+    CHECK(app::instrument_file(path) && app::instrument_format(path) == "SF2");
+    auto preset = app::read_instrument_sample(path, error);
+    CHECK(preset && error.empty() && preset->name == "Test Piano");
+    if (!preset) return;
+    fs::remove_all(folder + "/Cache");
+    app::set_instrument_cache(folder + "/Cache");
+    CHECK(app::land_part(*preset->instrument, *preset->data, 0, nullptr).empty());
+    const auto& multi = *preset->data->multi;
+    CHECK(multi.parts[0].frames.load() == 22050 && multi.parts[0].source != nullptr); // read in place from the cache
+    CHECK(multi.zones[0].loop != melodee::ZoneLoop::Off && multi.zones[0].loop_start == 100);
+    unsigned laid = 0;
+    for (const auto& entry : fs::directory_iterator(folder + "/Cache")) laid += entry.path().extension() == ".wav";
+    CHECK(laid == 1);
+    // Again: the cache's file is used, not made twice.
+    auto again = app::read_instrument_sample(path, error);
+    CHECK(again && app::land_part(*again->instrument, *again->data, 0, nullptr).empty());
+    laid = 0;
+    for (const auto& entry : fs::directory_iterator(folder + "/Cache")) laid += entry.path().extension() == ".wav";
+    CHECK(laid == 1);
+}
+
 void test_sample_note() {
     // A sample's note, found as it is read: E (329.63 Hz) is pitch class 4; a noise has none.
     const std::string folder = "build/test-instruments";
@@ -510,6 +578,7 @@ void test_auto_sampler() {
 int main() {
     test_readers();
     test_sample_note();
+    test_soundfont();
     test_keys();
     test_instrument_keys();
     test_auto_sampler();
