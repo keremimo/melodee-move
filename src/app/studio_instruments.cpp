@@ -168,3 +168,119 @@ void Studio::note_pad(const move::Input& input, Went& went, int track) {
 }
 
 } // namespace app
+
+#include "melodee/engine/macros.h"
+#include "melodee/model/progression.h"
+#include "melodee/shell/progression_file.h"
+#include <filesystem>
+
+namespace app {
+
+void Studio::set_macro(unsigned t, unsigned slot, int value) {
+    t %= melodee::track_count;
+    slot %= melodee::macro_slots;
+    auto& track = song->tracks[t];
+    if (track.engine != EngineKind::Plugin) return;
+    const auto& info = melodee::macro_param(melodee::macro_kind(track.params[melodee::plugin_track::Kind1 + slot], slot));
+    value = std::clamp(value, int(info.min), int(info.max));
+    track.params[melodee::plugin_track::Macro1 + slot] = int16_t(value);
+    send({Type::Param, uint8_t(t), 0, uint16_t(melodee::plugin_track::Macro1 + slot), int16_t(value)});
+    changed();
+}
+
+void Studio::set_wheel(unsigned t, int value) {
+    t %= melodee::track_count;
+    value = std::clamp(value, 0, 127);
+    song->tracks[t].wheel = uint8_t(value);
+    send({Type::Wheel, uint8_t(t), 0, 0, int16_t(value * 1000 / 127)});
+}
+
+void Studio::set_bend(unsigned t, int value) {
+    t %= melodee::track_count;
+    value = std::clamp(value, -64, 63);
+    song->tracks[t].bend = int8_t(value);
+    send({Type::Bend, uint8_t(t), 0, 0, int16_t(value * 128)});
+}
+
+void Studio::set_key(unsigned root, unsigned scale) {
+    song->root = uint8_t(root % 12);
+    song->scale = uint8_t(scale % melodee::scales().size());
+    publish_pads();
+    changed();
+}
+
+void Studio::set_keys(unsigned t, KeysMode mode, bool fourths) {
+    set_keys_mode(song->tracks[t % melodee::track_count], mode, fourths);
+    publish_pads();
+    changed();
+}
+
+void Studio::set_transpose(unsigned t, int semitones) {
+    song->tracks[t % melodee::track_count].transpose = int8_t(std::clamp(semitones, -12, 12));
+    publish_pads();
+    changed();
+}
+
+void Studio::changed_playing(unsigned t) {
+    send_arp(t); // publishes the pads and marks the change too
+}
+
+std::string Studio::progressions_folder() const { return (std::filesystem::path(home_path) / "Progressions").string(); }
+
+std::vector<std::string> Studio::progressions() const {
+    // Melodee's own folder is <card>/Melodee/Progressions; here the card is the folder Melodee's home is in.
+    auto card = std::filesystem::path(home_path).parent_path().string();
+    auto found = melodee::list_progressions(card);
+    // A home not named Melodee (tests, --home): its own folder first.
+    if (std::filesystem::path(home_path).filename() != "Melodee") {
+        std::error_code error;
+        std::vector<std::string> own;
+        for (const auto& entry : std::filesystem::directory_iterator(progressions_folder(), error))
+            if (entry.path().extension() == ".progression") own.push_back(entry.path().string());
+        std::sort(own.begin(), own.end());
+        found.insert(found.begin(), own.begin(), own.end());
+    }
+    return found;
+}
+
+std::string Studio::load_progression(unsigned t, const std::string& path) {
+    t %= melodee::track_count;
+    melodee::Progression prog;
+    auto error = melodee::read_progression(path, prog);
+    if (!error.empty()) return error;
+    auto& track = song->tracks[t];
+    track.prog = prog;
+    track.prog_shift = 0;
+    set_keys_mode(track, KeysMode::Prog, false);
+    track.bank = 0;
+    publish_pads();
+    changed();
+    return {};
+}
+
+std::string Studio::store_chord(unsigned t, unsigned index, const std::vector<int>& keys) {
+    t %= melodee::track_count;
+    auto& track = song->tracks[t];
+    std::vector<int> held(keys.begin(), keys.end());
+    if (!melodee::store_prog_chord(track.prog, index, held.data(), unsigned(held.size()))) return "NO KEYS HELD";
+    // Into Melodee's own folder: the file it came from when that is there, else Mine N (a file from elsewhere is
+    // never written: its changed copy goes into Melodee's folder).
+    namespace fs = std::filesystem;
+    std::error_code error;
+    fs::create_directories(progressions_folder(), error);
+    std::string file = track.prog.file;
+    if (file.empty() || !fs::exists(fs::path(progressions_folder()) / (file + ".progression"), error)) {
+        unsigned n = 1;
+        while (fs::exists(fs::path(progressions_folder()) / ("Mine " + std::to_string(n) + ".progression"), error)) ++n;
+        file = "Mine " + std::to_string(n);
+        std::snprintf(track.prog.file, sizeof track.prog.file, "%s", file.c_str());
+        std::snprintf(track.prog.name, sizeof track.prog.name, "%s", file.c_str());
+    }
+    set_keys_mode(track, KeysMode::Prog, false);
+    publish_pads();
+    changed();
+    if (!melodee::write_progression((fs::path(progressions_folder()) / (file + ".progression")).string(), track.prog)) return "NOT SAVED";
+    return {};
+}
+
+} // namespace app

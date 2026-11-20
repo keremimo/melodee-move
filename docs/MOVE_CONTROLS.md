@@ -161,7 +161,7 @@ while Shift is held.
 | Shift + Step 7 | Groove: triplet sixteenth swing, 0-100 % and beyond | Swing (today knob 2 on the Tempo screen) | done |
 | Shift + Step 8 | Layout: 16 Pitches on or off (drums) | 16 Pitches on the right 16 pads | wave 2: kit depth |
 | Shift + Step 9 | Keys & Scales: In-Key or Chromatic, octaves or 4ths, key, scale | The project's key and scale, a synth's layout | wave 2: instruments |
-| Shift + Step 10 | Full Velocity on or off | Full Level | wave 2: instruments |
+| Shift + Step 10 | Full Velocity on or off | Full Level: every pad at 127; its step bright while Shift is held | done |
 | Shift + Step 11 | Repeat and the Arpeggiator (rate; Repeat, Up, Down, Random) | Note Repeat and Arp | wave 2: sequencer |
 | Shift + Step 12 | No job | The Looper | wave 2: looper |
 | Shift + Step 13 | No job | Song | wave 2: song & export |
@@ -295,7 +295,8 @@ while Shift is held.
 | Plus or Minus (Play, synth) | The octave | The same | done |
 | Plus or Minus (Play, kit) | No job without 16 Pitches (Control Live's Drum mode: the next or previous 16 pads) | The next or previous 16 pads of the kit's 8 banks | wave 2: kit depth |
 | Plus or Minus (16 Pitches) | The pitches' octave | The same | wave 2: kit depth |
-| Shift + Plus or Minus | No job (Control Live: a scale degree; four pads) | A synth a scale degree, a kit four pads | wave 2: instruments |
+| Shift + Plus or Minus (Play, synth) | No job (Control Live: a scale degree) | The pads a note of the key up or down (a semitone on Chromatic); a note track's, not kept | done |
+| Shift + Plus or Minus (Play, kit) | No job (Control Live: four pads) | A kit four pads | wave 2: kit depth |
 | Plus or Minus (Session) | No job (Control Live: the session ring a scene) | The bank of four tracks | wave 2: sequencer |
 | Plus or Minus (Chop) | No job | Slices 33-64 | wave 2: sampling |
 | Left or Right (Play) | The clip's previous or next bar (or page of steps) | The pattern's bar (today the page, which moves to Shift + turn) | wave 2: sequencer |

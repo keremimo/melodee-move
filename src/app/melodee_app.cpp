@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "app/melodee_app.h"
 #include "app/screen.h"
+#include "app/screens/common.h"
 #include "move/display.h"
 #include "move/font.h"
 #include "ui/track_style.h"
@@ -143,6 +144,20 @@ bool MelodeeApp::global(bindings::Job job, const bindings::Use& use) {
             touched_until = Clock::now() + turn_linger;
         }
         return false;
+    // Melodee's instruments on the Move's own keys (docs/UI.md, "Instruments").
+    case Job::FullVelocity:
+        studio.set_full_velocity(!studio.full_velocity());
+        studio.say(studio.full_velocity() ? "FULL VELOCITY ON" : "FULL VELOCITY OFF");
+        return true;
+    case Job::ScaleStep: {
+        auto kind = studio.kind();
+        if (kind != TrackKind::Synth && kind != TrackKind::Keys && kind != TrackKind::Midi && kind != TrackKind::Plugin) return false;
+        int shift = studio.key_shift(studio.track()) + (use.control == bindings::Control::Plus ? 1 : -1);
+        studio.set_key_shift(studio.track(), shift);
+        auto notes = pad_notes(studio.project(), studio.current(), 0, shift);
+        studio.say(notes.count ? "LOWEST " + screens::note_name(notes.keys[0]) : "KEY STEP");
+        return true;
+    }
     case Job::BackToPlay: studio.home(); return true;
     case Job::Quit: return true; // the runtime's (Shift + Back never arrives)
     case Job::ShiftSteps: return true; // lights() shows them
@@ -252,7 +267,8 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point now) {
             use.held = bindings::held::shift;
             const auto* row = bindings::find(at, use);
             bool works = row && row->status == bindings::Status::Done;
-            lights.step(step, !works ? colour::off : row->job == bindings::Job::Metronome && studio.click() ? colour::white : colour::light_grey);
+            bool on = (row && row->job == bindings::Job::Metronome && studio.click()) || (row && row->job == bindings::Job::FullVelocity && studio.full_velocity());
+            lights.step(step, !works ? colour::off : on ? colour::white : colour::light_grey);
         }
     }
 }

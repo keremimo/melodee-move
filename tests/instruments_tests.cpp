@@ -53,6 +53,7 @@ bool write_text(const std::string& path, const std::string& text) {
     file << text;
     return bool(file);
 }
+bool has_suffix(const std::string& text, const std::string& end) { return text.size() >= end.size() && text.compare(text.size() - end.size(), end.size(), end) == 0; }
 int32_t peak_of(const AudioBlock& block) {
     int32_t peak = 0;
     for (auto s : block) peak = std::max(peak, std::abs(int32_t(s)));
@@ -346,12 +347,86 @@ void test_keys() {
     CHECK(settings[4].first == 0 && settings[4].second == 1 && settings[0].second == 2 && settings[1].second == 6);
 }
 
+void test_instrument_keys() {
+    // The Move's keys this area answers (docs/MOVE_CONTROLS.md): Shift + Step 10 Full Velocity, Shift + Plus / Minus
+    // a note of the key on a note track; macros, wheel and bend kept on the track.
+    const std::string home = "build/test-home-instrument-keys";
+    fs::remove_all(home);
+    fs::create_directories(home + "/Projects");
+    app::MelodeeApp melodee("build/test-instruments", home, "build/test-no-modules");
+    Session session;
+    melodee.attach(session);
+    melodee.audio_opened(AudioFormat {});
+    CHECK(melodee.restore_now().empty());
+    auto& studio = melodee.studio();
+    auto button = [&](Button b, bool down) { melodee.surface(make_event(0xb0, button_cc(b), down ? 127 : 0)); };
+    auto step = [&](unsigned n) { melodee.surface(make_event(0x90, step_note(n), 127)); melodee.surface(make_event(0x80, step_note(n), 0)); };
+    button(Button::Shift, true);
+    step(9); // Step 10
+    button(Button::Shift, false);
+    {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        CHECK(studio.full_velocity());
+    }
+    button(Button::Shift, true);
+    step(9);
+    button(Button::Shift, false);
+    {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        CHECK(!studio.full_velocity());
+        CHECK(studio.new_track(4, app::TrackKind::Keys));
+        studio.select(4);
+    }
+    button(Button::Shift, true);
+    button(Button::Up, true); button(Button::Up, false); // Plus
+    button(Button::Shift, false);
+    {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        CHECK(studio.key_shift(4) == 1);
+        studio.set_key(2, 1); // D minor, the project's
+        CHECK(studio.project().root == 2 && studio.project().scale == 1);
+        studio.set_keys(4, app::KeysMode::Chromatic, true);
+        CHECK(studio.project().tracks[4].layout == melodee::PadLayout::Chromatic);
+        studio.set_transpose(4, 30);
+        CHECK(studio.project().tracks[4].transpose == 12);
+        // A module track's macros (a PLUGIN track, its engine parameters): FILTER clamps at -100..100.
+        CHECK(studio.new_track(5, app::TrackKind::Synth));
+        studio.set_macro(5, 0, -150);
+        studio.set_macro(5, 1, 40);
+        CHECK(studio.project().tracks[5].params[melodee::plugin_track::Macro1] == -100);
+        CHECK(studio.project().tracks[5].params[melodee::plugin_track::Macro2] == 40);
+        studio.set_wheel(5, 200);
+        studio.set_bend(5, -100);
+        CHECK(studio.project().tracks[5].wheel == 127 && studio.project().tracks[5].bend == -64);
+    }
+    // A chord stored into a progression: saved as Mine 1, the track on Prog.
+    {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        CHECK(studio.store_chord(4, 0, {60, 64, 67, 71}).empty());
+        const auto& track = studio.project().tracks[4];
+        CHECK(track.layout == melodee::PadLayout::Prog && track.prog.chords[0].count == 4 && std::string(track.prog.file) == "Mine 1");
+        CHECK(fs::exists(home + "/Progressions/Mine 1.progression"));
+        auto found = studio.progressions();
+        CHECK(!found.empty() && has_suffix(found.front(), "Mine 1.progression"));
+        CHECK(studio.store_chord(4, 1, {62, 65, 69}).empty()); // the same file again
+        CHECK(!fs::exists(home + "/Progressions/Mine 2.progression"));
+    }
+    {   // Read back into another track: both chords there.
+        std::lock_guard<std::mutex> guard(studio.lock);
+        CHECK(studio.new_track(6, app::TrackKind::Keys));
+        CHECK(studio.load_progression(6, home + "/Progressions/Mine 1.progression").empty());
+        const auto& track = studio.project().tracks[6];
+        CHECK(track.layout == melodee::PadLayout::Prog && track.prog.count == 2 && track.prog.chords[1].count == 3);
+    }
+}
+
 } // namespace
 
 int main() {
     test_readers();
     test_sample_note();
     test_keys();
+    test_instrument_keys();
     test_keygroup_track();
     std::cout << "instruments-tests: " << checks - failures << " of " << checks << " checks passed\n";
     return failures ? 1 : 0;
