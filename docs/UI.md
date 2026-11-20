@@ -190,16 +190,14 @@ Chop), Kerem decides with that map. `docs/ui/tracks.png` is the sheet
 
 Each screen is a file of its own in `src/app/screens/`, a `Screen`
 (`src/app/screen.h`) registered there with a `RegisterScreen`: its id, how
-it is made, the buttons that open it from a track's Play screen (a
-`Trigger`: Menu on a kit opens `load-samples`, Loop `chop`), or the track
-kinds whose Play screen it is. Keys that work everywhere (the track
-buttons, Play, Mute, Shift + Step 5-7, the Volume knob) are the app's, in
-`melodee_app.cpp`, until the central bindings table (docs/MOVE_CONTROLS.md)
-takes them all. A new screen is a new
-file; no other file changes. The app (`melodee_app.cpp`) keeps only what is
-the same everywhere: the track buttons, Play, the master knob, a touched
-knob shown large, typing for a module's page, and the sixteen tracks while
-a track button is held. What the screens share is the studio
+it is made, the jobs of the bindings table that open it (a `Trigger`:
+`Job::Tempo`, Shift + Step 5, opens `tempo`), or the track kinds whose Play
+screen it is. A screen answers jobs, never buttons; the app runs every
+control through the bindings table ([MOVE_CONTROLS.md](MOVE_CONTROLS.md),
+"How the app runs the map") and keeps the jobs that are the same
+everywhere: the track buttons and the sixteen tracks, transport, the
+Volume knob, mute and solo, a touched knob shown large, typing for a
+module's page. A new screen is a new file; no other file changes. What the screens share is the studio
 (`src/app/studio.h`): Melodee's project and engine host, samples, modules,
 transport, saving.
 
