@@ -53,7 +53,10 @@ for tool in systemctl service chrt taskset pgrep ps timeout python3 tar gzip rsy
     if have "$tool"; then printf '%-10s %s\n' "$tool" "$(command -v "$tool")"; else printf '%-10s missing\n' "$tool"; fi
 done
 show "ls -l /bin/sh"
-show "ls /usr/lib/openssh/sftp-server /usr/libexec/sftp-server /usr/libexec/openssh/sftp-server 2>/dev/null || echo 'no sftp-server (scp may need -O)'"
+show "for f in /usr/lib/openssh/sftp-server /usr/libexec/sftp-server /usr/libexec/openssh/sftp-server; do [ -e \"\$f\" ] && echo \"\$f\"; done; true"
+# No ldd on the stock firmware: the dynamic loader lists a binary's libraries itself.
+loader=$(ls /lib/ld-linux-aarch64.so.1 2>/dev/null)
+libraries_of() { [ -n "$loader" ] && show "'$loader' --list '$1' 2>&1 | grep -E 'not found|=> /(data|opt)' || echo '(all from the system)'"; }
 
 section "Realtime limits"
 show "ulimit -r; ulimit -l"
@@ -71,8 +74,8 @@ for process in /proc/[0-9]*; do
     done
 done
 
-section "Processes (realtime threads below)"
-LIMIT=120 show "ps -eo pid,ppid,cls,rtprio,nlwp,rss,args 2>/dev/null || ps w 2>/dev/null || ps"
+section "Processes, kernel threads left out (realtime threads below)"
+LIMIT=120 show "ps -eo pid,ppid,cls,rtprio,nlwp,rss,user,args 2>/dev/null | awk 'NR == 1 || \$2 != 2' || ps w 2>/dev/null || ps"
 LIMIT=80 show "ps -eLo pid,tid,cls,rtprio,comm 2>/dev/null | awk 'NR == 1 || (\$3 != \"TS\" && \$3 != \"-\")'"
 
 section "How Ableton's app starts"
@@ -82,6 +85,18 @@ show "ls /etc/rc*.d 2>/dev/null | grep -i move"
 show "cat /etc/inittab 2>/dev/null | grep -v '^#'"
 show "have() { command -v \"\$1\" >/dev/null 2>&1; }; have systemctl && systemctl list-units --type=service --no-pager --plain | grep -iE 'move|ableton|rnbo|jack' || true"
 show "grep -rlsiE 'takeover|shadow|rnbo|schwung' /etc 2>/dev/null"
+
+section "Ableton's app as it runs"
+for pid in $(pgrep -f '/opt/move/|MoveOriginal' 2>/dev/null); do
+    printf -- '-- pid %s (%s), user %s\n' "$pid" "$(cat "/proc/$pid/comm" 2>/dev/null)" "$(awk '/^Uid:/ {print $2}' "/proc/$pid/status" 2>/dev/null)"
+    printf 'command: %s\n' "$(tr '\000' ' ' < "/proc/$pid/cmdline" 2>/dev/null)"
+    # Only the loader's variables, which show a shim preloaded into the app.
+    printf 'LD_ variables: %s\n' "$(tr '\000' '\n' < "/proc/$pid/environ" 2>/dev/null | grep -E '^LD_' | tr '\n' ' ')"
+    printf 'libraries from outside /lib and /usr/lib:\n%s\n' "$(awk '$6 ~ /\.so/ {print $6}' "/proc/$pid/maps" 2>/dev/null | sort -u | grep -vE '^/(lib|usr/lib)/')"
+done
+show "ls -l /opt/move/Move /opt/move/MoveOriginal"
+show "head -c 2 /opt/move/Move | grep -q '#!' && cat /opt/move/Move || echo '/opt/move/Move is a binary'"
+LIMIT=40 show "ls -la /dev/shm"
 
 section "Ableton's software"
 LIMIT=40 show "ls -la /opt/move"
@@ -94,12 +109,30 @@ show "ls -la /data/UserData/rnbo"
 show "ls /data/UserData/move-anything /data/UserData/schwung 2>&1 | head -n 20"
 jack_files=$(find /data/UserData -maxdepth 6 \( -name 'jack_*.so' -o -name jackd -o -name 'libjack*.so*' -o -name 'libjackserver*.so*' \) 2>/dev/null)
 printf '$ JACK files under /data/UserData\n%s\n' "${jack_files:-none}"
-for driver in $(printf '%s\n' "$jack_files" | grep -E '/jack_move\.so$'); do
-    show "ls -l '$driver'; ldd '$driver'"
+for driver in $(printf '%s\n' "$jack_files" | grep -E '/jack_[a-z]+\.so$'); do
+    show "ls -l '$driver'"
+    libraries_of "$driver"
+    # The names a driver gives its ports and shared memory say what it carries.
+    LIMIT=80 show "tr -c '\\040-\\176' '\\n' < '$driver' | grep -iE 'system|capture|playback|display|midi|shm|shadow|ablspi|port' | grep -vE '^.{0,3}\$' | sort -u"
 done
-for script in $(find /data/UserData/rnbo -maxdepth 3 -name '*.sh' 2>/dev/null | head -n 6); do
-    LIMIT=80 show "cat '$script'"
+
+section "Schwung and RNBO"
+# Small text files are shown whole (they say how each starts and what it
+# runs); binaries and larger files only by name. Printable ASCII is spelled
+# out in octal: BusyBox's tr may lack the [:print:] class.
+text_file() { [ -f "$1" ] && [ "$(wc -c < "$1")" -lt 20000 ] && [ "$(tr -d '\040-\176\t\n\r' < "$1" | wc -c)" -eq 0 ]; }
+for folder in /data/UserData/schwung /data/UserData/rnbo; do
+    [ -d "$folder" ] || continue
+    LIMIT=150 show "cd '$folder' && find . -maxdepth 3 ! -path './cache*' ! -path './espeak-ng-data*' ! -path './Sentry*' | sort"
 done
+for file in /data/UserData/schwung/launch-standalone.sh /data/UserData/schwung/jack_state /data/UserData/schwung/host/*.sh \
+            /data/UserData/schwung/bin/*.sh /data/UserData/rnbo/scripts/* /data/UserData/rnbo/config/*; do
+    text_file "$file" && LIMIT=120 show "cat '$file'"
+done
+for program in /data/UserData/schwung/bin/* /data/UserData/schwung/display-server; do
+    [ -f "$program" ] && [ -x "$program" ] && libraries_of "$program"
+done
+LIMIT=30 show "tail -n 30 /data/UserData/schwung/heal-boot.log"
 
 section "JACK server"
 show "ps w 2>/dev/null | grep -E '[j]ackd' || echo 'no jackd running'"
