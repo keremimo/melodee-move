@@ -74,6 +74,17 @@ private:
     void draw_volume(juce::Graphics& g);
     Screen* tracks() const;            // the sixteen tracks, while a track button is held
 
+    // Undo steps (Studio::close_step()): a press closes one; a turn keeps
+    // its step open while the same control turns, until another control or
+    // two seconds still.
+    void close_gesture();
+    std::string step_name(bindings::Job job, const bindings::Use& use) const;
+    bool gesture_open = false;
+    bindings::Control gesture_control = bindings::Control::Count;
+    int gesture_index = 0;
+    std::string gesture_name;
+    Clock::time_point gesture_at {};
+
     std::unique_ptr<Studio> own;
     bindings::Gestures gestures;
     std::bitset<4> rows_down;           // the track buttons held

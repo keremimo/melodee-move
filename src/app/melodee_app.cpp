@@ -18,6 +18,33 @@ constexpr auto hold_shown = bindings::Gestures::hold_time; // a track button hel
 constexpr auto volume_linger = std::chrono::milliseconds(1200);
 
 constexpr auto turn_linger = std::chrono::milliseconds(1200);
+constexpr auto gesture_quiet = std::chrono::milliseconds(2000); // a control left this long: its next turn is a new undo step (Melodee's)
+
+// Jobs whose change to the project is no undo step, as Melodee leaves them
+// out (MELODEE.md, Undo): playing and picking pads, mutes and solos, the
+// octave and bank in view, the pattern launched, the transport.
+bool no_step(bindings::Job job) {
+    using bindings::Job;
+    switch (job) {
+    case Job::PlayPad: case Job::PlayNote: case Job::PlayPitch: case Job::Aftertouch: case Job::SelectPadQuietly: case Job::PlaySlice:
+    case Job::MuteSelected: case Job::MuteTrack: case Job::SoloTrack: case Job::MutePad: case Job::Octave: case Job::PadBank:
+    case Job::PitchesOctave: case Job::ScaleStep: case Job::TrackBank: case Job::LaunchPattern: case Job::SelectBar: case Job::Bar:
+    case Job::Bar16: case Job::PatternPage: case Job::PlayStop: case Job::Restart: case Job::SelectTrack: case Job::PickTrack:
+    case Job::Focus: case Job::Page: case Job::PreviewProject: case Job::SelectProject:
+        return true;
+    default: return false;
+    }
+}
+
+// A job's name as a step's: "ToPadsPlace" as "TO PADS PLACE".
+std::string spoken(const char* name) {
+    std::string text;
+    for (const char* c = name; *c; ++c) {
+        if (std::isupper(static_cast<unsigned char>(*c)) && !text.empty()) text += ' ';
+        text += char(std::toupper(static_cast<unsigned char>(*c)));
+    }
+    return text;
+}
 
 // Typing, for a module's page: the pads a keyboard, top row first ('\b'
 // backspace), the steps digits and marks.
@@ -144,6 +171,13 @@ bool MelodeeApp::global(bindings::Job job, const bindings::Use& use) {
         }
         return false;
     case Job::BackToPlay: studio.home(); return true;
+    // Undo, as on the Move; held, Melodee's undo list.
+    case Job::Undo: studio.say(studio.undo() ? "UNDO " + studio.last_step : "NOTHING TO UNDO"); return true;
+    case Job::Redo: studio.say(studio.redo() ? "REDO " + studio.last_step : "NOTHING TO REDO"); return true;
+    case Job::UndoList:
+        if (!studio.history.can_undo() && !studio.history.can_redo()) studio.say("NOTHING TO UNDO");
+        else if (!studio.top() || studio.top()->id() != "undo-list") studio.push("undo-list");
+        return true;
     case Job::Quit: return true; // the runtime's (Shift + Back never arrives)
     case Job::ShiftSteps: return true; // lights() shows them
     case Job::ShiftLock: studio.say(gestures.shift_locked() ? "SHIFT LOCKED" : "SHIFT"); return true;
@@ -158,17 +192,65 @@ bool MelodeeApp::global(bindings::Job job, const bindings::Use& use) {
     }
 }
 
+std::string MelodeeApp::step_name(bindings::Job job, const bindings::Use& use) const {
+    using bindings::Job;
+    const auto& studio = *own;
+    Screen* top = studio.top();
+    switch (job) {
+    case Job::TurnKnob: case Job::TurnKnobFine:
+        if (top) {
+            auto shown = top->knob(unsigned(use.index));
+            if (!shown.name.empty()) return shown.name + (top->knob_owner().empty() ? "" : " " + top->knob_owner());
+        }
+        return "KNOB " + std::to_string(use.index + 1);
+    case Job::TrackLevel: return "LEVEL T" + std::to_string(held_track() + 1);
+    case Job::BrowseTurn: return "PRESET";
+    case Job::BrowsePush: return "LOAD";
+    case Job::CopyTrack: return "COPY TRACK";
+    case Job::ClearTrack: return "DELETE TRACK";
+    case Job::ToPadsPlace: return "TO PADS";
+    case Job::ListTurn: case Job::ListTurnFine: case Job::ListPush: case Job::ChopAmount:
+        return top ? spoken(top->id().c_str()) : "EDIT";
+    default: return spoken(bindings::job_name(job));
+    }
+}
+
+void MelodeeApp::close_gesture() {
+    if (!gesture_open) return;
+    gesture_open = false;
+    own->close_step(gesture_name);
+}
+
 void MelodeeApp::act(const bindings::Use& use) {
+    using bindings::Control;
+    using bindings::Gesture;
     auto& studio = *own;
     const bindings::Binding* row = bindings::find(where(), use);
+    // Undo steps: a turn goes on while the same control turns; any other use
+    // of a control closes the open one first (a pad's pressure is no use).
+    bool turn = use.gesture == Gesture::Turn && use.control != Control::PadPressure;
+    if (use.control != Control::PadPressure && gesture_open && !(turn && gesture_control == use.control && gesture_index == use.index))
+        close_gesture();
     if (!row || row->job == bindings::Job::Nothing) return;
-    last_job = row->job;
-    if (global(row->job, use)) return;
-    Screen* top = studio.top();
-    if (top && top->job(row->job, use)) return;
-    // The track's Play screen under the one on top keeps what that one leaves.
-    if (auto* play = studio.screen(home_screen(studio.kind())); play && play != top && play->job(row->job, use)) return;
-    trigger(row->job);
+    auto job = row->job;
+    last_job = job;
+    std::string name = (turn && gesture_open) || job == bindings::Job::Undo || job == bindings::Job::Redo ? std::string() : step_name(job, use);
+    [&] {
+        if (global(job, use)) return;
+        Screen* top = studio.top();
+        if (top && top->job(job, use)) return;
+        // The track's Play screen under the one on top keeps what that one leaves.
+        if (auto* play = studio.screen(home_screen(studio.kind())); play && play != top && play->job(job, use)) return;
+        trigger(job);
+    }();
+    if (no_step(job)) studio.not_a_step();
+    if (use.control == Control::PadPressure) return;
+    if (turn) {
+        if (!gesture_open) { gesture_open = true; gesture_control = use.control; gesture_index = use.index; gesture_name = name; }
+        gesture_at = Clock::now();
+        return;
+    }
+    studio.close_step(name);
 }
 
 void MelodeeApp::settle() {
@@ -211,6 +293,7 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point now) {
     auto& studio = *own;
     // Holds that came due (a track button, Undo, Back held).
     for (const auto& use : gestures.tick(now)) act(use);
+    if (gesture_open && now - gesture_at >= gesture_quiet) close_gesture(); // a knob left still: its turns are one step
     settle();
     // The track buttons: the selected track's bank, each its colour, the selected one bright.
     // Soloed blue, as on the Move; muted grey.

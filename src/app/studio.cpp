@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <thread>
 
 namespace app {
 namespace {
@@ -158,6 +159,7 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
     }
     engine = std::make_unique<melodee::EngineHost>();
     engine->set_overload_guard(true); // as Melodee runs on the MPC
+    engine->set_parking(true);        // a project rebuilt while the audio thread waits, silent (rebuild())
     engine->load(*song, *bank);
     for (unsigned t = 0; t < melodee::track_count; ++t)
         if (modules[t] && modules[t]->entry != melodee::no_plugin) engine->offer_plugin(modules[t]->entry, &modules[t]->runner);
@@ -174,6 +176,7 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
         screens.push_back(std::move(made));
     }
     home();
+    history.reset(live());
 
     if (migrated) {
         // The first scope's side files folded in: saved whole, then kept aside.
@@ -199,6 +202,12 @@ Studio::~Studio() {
 void Studio::forward() {
     melodee::Command command;
     while (commands.pop(command)) engine->send(command); // a full host queue counts it lost (status: dropped)
+    // The service thread wants the engine parked (rebuild()): the Park goes
+    // behind every command sent before it, from the queue's one producer.
+    if (park_asked.load(std::memory_order_acquire) && !park_serial.load(std::memory_order_relaxed)) {
+        park_asked.store(false, std::memory_order_relaxed);
+        park_serial.store(engine->park(), std::memory_order_release);
+    }
 }
 
 void Studio::render(const move::AudioBlock& input, move::AudioBlock& output) {
@@ -489,6 +498,7 @@ void Studio::set_click(bool on, unsigned level) {
 void Studio::synth_set(ModuleTrack& track, const std::string& key, const std::string& value) {
     track.player.set(key, value);
     track.set_at[key] = track.player.last_serial();
+    if (std::find(track.edited.begin(), track.edited.end(), key) == track.edited.end()) track.edited.push_back(key); // undo compares it
 }
 
 std::string Studio::module_get(ModuleTrack& track, const std::string& key) {
@@ -548,6 +558,156 @@ void Studio::finish_typing(bool cancelled) {
     typing_canvas = typing_track = -1;
     if (module && index >= 0 && index < int(module->canvas_pages.size()) && module->canvas_pages[size_t(index)])
         module->canvas_pages[size_t(index)]->text_entered(typed, cancelled);
+}
+
+// ---------------------------------------------------------------- undo (history.h)
+
+Live Studio::live() {
+    Live now {*song, *bank, move_extras};
+    for (unsigned t = 0; t < melodee::track_count; ++t) {
+        const auto* module = modules[t].get();
+        if (!module) continue;
+        auto& state = now.modules[t];
+        state.present = true;
+        bool pending = module->loading || !module->job.empty();
+        if (pending && module->job_restores) { // loading as it was saved, copied or undone: that is its state
+            state.file = module->saved;
+        } else if (pending) {
+            state.settled = false; // a module picked: its own step closes once it is in (load_module_now())
+        } else if (module->module) {
+            state.file.module = module->module->info().id;
+            state.file.preset = module->module->preset_param.empty() ? -1 : module->module->preset;
+            for (const auto& param : module->module->params)
+                if (param.key != module->module->preset_param && !param.trigger()) state.file.values.emplace_back(param.key, param.text());
+        } else {
+            state.file = module->saved; // missing: named as saved
+        }
+        state.file.track = t;
+        state.file.octave = 0;
+        now.edited[t] = module->edited;
+    }
+    return now;
+}
+
+void Studio::name_step(std::string what, int track) {
+    step_name = std::move(what);
+    step_track = track;
+}
+
+void Studio::not_a_step() { step_kept = false; }
+
+void Studio::hold_step(std::string what, int track) {
+    close_step(); // what came before is a step of its own
+    holding_step = true;
+    name_step(std::move(what), track);
+}
+
+void Studio::release_step() {
+    holding_step = false;
+    close_step();
+}
+
+bool Studio::close_step(const std::string& fallback, bool keep) {
+    if (holding_step) return false;
+    std::string what = !step_name.empty() ? step_name : !fallback.empty() ? fallback : "EDIT";
+    bool kept = history.close(live(), what, step_track, Clock::now(), keep && step_kept);
+    for (auto& module : modules)
+        if (module) module->edited.clear();
+    step_name.clear();
+    step_track = -1;
+    step_kept = true;
+    return kept;
+}
+
+bool Studio::undo() {
+    close_step();
+    auto now = live();
+    const Step* step = history.undo(now);
+    if (!step) return false;
+    last_step = step->what;
+    apply_step(*step, false);
+    return true;
+}
+
+bool Studio::redo() {
+    close_step();
+    auto now = live();
+    const Step* step = history.redo(now);
+    if (!step) return false;
+    last_step = step->what;
+    apply_step(*step, true);
+    return true;
+}
+
+void Studio::apply_step(const Step& step, bool forward) {
+    auto module_of = [&](unsigned t) -> const Step::Module* {
+        for (const auto& change : step.modules)
+            if (change.track == t) return &change;
+        return nullptr;
+    };
+    // Each track as it was: its Schwung module track made or let go as its
+    // engine now says, then the engine's track made whole again.
+    for (unsigned t = 0; t < melodee::track_count; ++t) {
+        if (!step.tracks.test(t)) continue;
+        const auto& track = song->tracks[t];
+        const auto* change = module_of(t);
+        const ModuleState* state = change && change->whole ? (forward ? &change->after : &change->before) : nullptr;
+        bool synth = track.engine == EngineKind::Plugin && (track.plugin == melodee::no_plugin || !song->plugins[track.plugin].used() || modules[t] || (state && state->present));
+        if (!synth && modules[t]) drop_module_track(t);
+        if (synth && !modules[t]) make_module_track(t);
+        if (auto* module = modules[t].get(); module && module->entry == melodee::no_plugin && track.plugin != melodee::no_plugin) {
+            module->entry = track.plugin; // its entry as the project names it again
+            engine->offer_plugin(module->entry, &module->runner);
+        }
+        if (auto* module = modules[t].get(); module && state && state->present) {
+            const auto& file = state->file;
+            if (file.module.empty()) {
+                if (module->module) { drop_module_track(t); make_module_track(t); } // back to waiting for one
+            } else if (!module->module || module->module->info().id != file.module) {
+                module->saved = file; // that module again, as it was (the service thread loads it)
+                module->job = file.module;
+                module->job_restores = true;
+            } else {
+                auto& loaded = *module->module;
+                if (file.preset >= 0 && !loaded.preset_param.empty() && file.preset != loaded.preset) {
+                    loaded.preset = file.preset;
+                    if (auto* param = loaded.param(loaded.preset_param)) param->value = file.preset;
+                    synth_set(*module, loaded.preset_param, std::to_string(file.preset));
+                }
+                for (const auto& [key, value] : file.values)
+                    if (ModuleParam* param = loaded.param(key); param && param->text() != value) {
+                        synth_set(*module, key, value);
+                        param->take(value);
+                    }
+            }
+        } else if (auto* module = modules[t].get(); module && change && !change->whole && module->module) {
+            for (const auto& key : change->keys)
+                if (ModuleParam* param = module->module->param(key.key)) {
+                    const auto& value = forward ? key.after : key.before;
+                    synth_set(*module, key.key, value);
+                    param->take(value);
+                }
+        }
+        apply_track(t);
+    }
+    // The rest of the project: the tempo and swing by their commands; anything
+    // else (a bus, the master, the song) by rebuilding the engine, parked.
+    if (step.globals) {
+        send({Type::Tempo, 0, 0, 0, int16_t(song->tempo)});
+        send({Type::Swing, 0, 0, 0, int16_t(song->swing)});
+        set_module_tempo(song->tempo / 10.0f);
+        if (!step.tempo_only) rebuild_wanted = true;
+    }
+    // The selected track as the pads play it, and its Play screen if its kind changed.
+    auto was = TrackKind(audio_kind.load(std::memory_order_relaxed));
+    audio_kind.store(int(kind(selected)), std::memory_order_relaxed);
+    audio_octave.store(octave(selected), std::memory_order_relaxed);
+    if (kind(selected) != was) home();
+    // What the modules' remaking changed (an entry let go) is no step.
+    history.close(live(), {}, -1, Clock::now(), false);
+    for (auto& module : modules)
+        if (module) module->edited.clear();
+    changed();
 }
 
 // ---------------------------------------------------------------- the screens
@@ -684,6 +844,56 @@ std::string Studio::restore() {
     std::lock_guard<std::mutex> guard(lock);
     if (missing) say(std::to_string(missing) + " FILES MISSING");
     else if (!wanted.empty()) say("PROJECT LOADED");
+    history.reset(live()); // the project as opened: no step undoes the opening
+    return {};
+}
+
+// ---------------------------------------------------------------- the engine rebuilt, parked
+
+Studio::Parked Studio::park_engine() {
+    // The audio thread parks the engine at its next block, behind every
+    // command sent before (forward()); with no audio thread (a test, a tool)
+    // there is nothing to wait for.
+    uint64_t blocks = engine->blocks_rendered();
+    park_serial.store(0, std::memory_order_relaxed);
+    park_asked.store(true, std::memory_order_release);
+    auto began = Clock::now();
+    while (Clock::now() - began < std::chrono::seconds(2)) {
+        uint32_t serial = park_serial.load(std::memory_order_acquire);
+        if (serial && engine->parked(serial)) return {Parked::Yes, serial};
+        if (!serial && Clock::now() - began > std::chrono::milliseconds(60) && engine->blocks_rendered() == blocks) {
+            park_asked.store(false, std::memory_order_relaxed);
+            if (!park_serial.load(std::memory_order_acquire)) return {Parked::NoAudio, 0};
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    park_asked.store(false, std::memory_order_relaxed);
+    if (uint32_t serial = park_serial.load(std::memory_order_acquire)) engine->resume(serial); // called off
+    return {Parked::Failed, 0};
+}
+
+std::string Studio::rebuild() {
+    std::unique_ptr<melodee::ProjectPack> pack;
+    bool was_playing = false;
+    {
+        std::lock_guard<std::mutex> guard(lock);
+        rebuild_wanted = false;
+        pack = std::make_unique<melodee::ProjectPack>(*song, *bank); // allocates: here, never on the audio thread
+        was_playing = engine->playing();
+    }
+    auto parked = park_engine();
+    if (parked.result == Parked::Failed) {
+        std::lock_guard<std::mutex> guard(lock);
+        rebuild_wanted = true; // tried again on the next pass
+        return "busy";
+    }
+    engine->reload(*pack, false); // the audio thread waits, silent; Melodee's way of loading without a late block
+    if (parked.result == Parked::Yes) engine->resume(parked.serial);
+    ++rebuilds;
+    pack.reset(); // the patterns played before, freed here
+    std::lock_guard<std::mutex> guard(lock);
+    send({Type::Click, 0, 0, uint16_t(click_volume), int16_t(click_on)});
+    if (was_playing) play(); // reload stops the transport: it goes on from the top
     return {};
 }
 
@@ -812,8 +1022,18 @@ void Studio::service() {
         auto sample = read_sample(job.path, error);
         std::lock_guard<std::mutex> guard(lock);
         if (!sample) { say(upper(error).substr(0, 16)); continue; }
-        if (auto failed = install(std::move(sample), job.track, job.pad); !failed.empty()) say(failed);
+        if (auto failed = install(std::move(sample), job.track, job.pad); !failed.empty()) { say(failed); continue; }
+        char label[8];
+        std::snprintf(label, sizeof label, "%c%02u", 'A' + int(job.pad / 16), job.pad % 16 + 1);
+        name_step(std::string("LOAD ") + label, int(job.track)); // a sample loaded is a step of its own
+        close_step();
     }
+    bool rebuild_now = false;
+    {
+        std::lock_guard<std::mutex> guard(lock);
+        rebuild_now = rebuild_wanted;
+    }
+    if (rebuild_now) rebuild();
     std::unique_lock<std::mutex> guard(lock);
     loading = false;
     // Autosave: three seconds after the last change, as on the MPC.
@@ -929,6 +1149,10 @@ std::string Studio::load_module_now(unsigned t, const std::string& id, const Syn
         if (t == selected && stack.size() > 1) home(); // to play it
         say(upper(info.name).substr(0, 16));
         changed();
+        name_step("SYNTH " + upper(info.name), int(t)); // a module picked is a step of its own (one undo brings the old one back)
+        close_step();
+    } else {
+        history.settle(t, live().modules[t]); // back as a step left it: no step of its own
     }
     return {};
 }
@@ -950,6 +1174,12 @@ std::string Studio::status() const {
                   int(track.mix.solo), slow_calls, slowest_us / 1000.0,
                   module ? module->player.stream_late() : 0u, engine->dropped());
     std::string line = text;
+    line += " undo=" + std::to_string(history.size()) + " redo=" + std::to_string(history.redos()) + " rebuilds=" + std::to_string(rebuilds);
+    if (!last_step.empty()) {
+        std::string step = last_step;
+        std::replace(step.begin(), step.end(), ' ', '_');
+        line += " undo_last=" + step;
+    }
     for (const auto& screen : screens) line += screen->status();
     return line;
 }

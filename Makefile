@@ -79,6 +79,12 @@ $(TARGET): build/obj/main.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS)
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 $(TESTS): build/obj/tests/move_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS) $(MELODEE_LIBRARY)
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
+# Undo, projects and the system (tests/projects_tests.cpp), a binary of
+# their own.
+PROJECTS_TESTS := build/projects-tests
+all: $(PROJECTS_TESTS)
+$(PROJECTS_TESTS): build/obj/tests/projects_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS) $(MELODEE_LIBRARY)
+	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 $(CONTROLS_TESTS): build/obj/tests/controls_tests.o build/obj/app/bindings.o
 	$(CXX) -static-libstdc++ -static-libgcc $^ -pthread -o $@
 $(MELODEE_LIBRARY): $(MELODEE_OBJECTS)

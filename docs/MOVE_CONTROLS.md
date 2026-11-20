@@ -261,9 +261,9 @@ while Shift is held.
 | Loop | Loop Mode: the clip's bars on the steps | The pattern's Loop Mode | wave 2: sequencer |
 | Shift + Loop | No job | Left free (Chop is Shift + push) | free |
 | Mute | Mutes or unmutes the selected track | The same | done |
-| Undo | Undoes (a preset just loaded too) | Melodee's undo | wave 2: MIDI/sync/undo/projects |
-| Shift + Undo | Redoes | The same | wave 2: MIDI/sync/undo/projects |
-| Undo held | No job | The undo list | wave 2: MIDI/sync/undo/projects |
+| Undo | Undoes (a preset just loaded too) | Melodee's undo: the last step, named on the screen (`UNDO TUNE A05`) | done |
+| Shift + Undo | Redoes | The same | done |
+| Undo held | No job | The undo list: the steps with their track and age, back or forward to any one | done |
 | Copy | Duplicates the selected clip into the next slot; again clears the clipboard | Duplicates the pattern | wave 2: sequencer |
 | Shift + Copy | No job | None given | free |
 | Delete | Deletes the selected track's clip | Deletes the pattern | wave 2: sequencer |

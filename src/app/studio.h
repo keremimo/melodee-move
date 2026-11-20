@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #pragma once
 #include "app/canvas_page.h"
+#include "app/history.h"
 #include "app/module_host.h"
 #include "app/project_store.h"
 #include "move/app.h"
@@ -90,6 +91,7 @@ struct ModuleTrack {
     bool job_restores = false;  // set as `saved` has it (a project opened, a track copied)
     bool loading = false;
     std::map<std::string, uint64_t> set_at; // each key's last set (SynthPlayer's serial)
+    std::vector<std::string> edited;        // the keys set since the last undo step closed (history.h)
     // The screen's: the page, the menu, the module's own pages.
     unsigned page = 0;
     bool menu_open = false, menu_editing = false;
@@ -208,6 +210,30 @@ public:
     std::vector<std::unique_ptr<Screen>> screens; // every registered screen, made once
     std::vector<Screen*> stack;
 
+    // Undo (history.h): every change to the project between two closes is
+    // one step. The app closes one after each press of a control, after a
+    // knob's or the wheel's turns (another control, or two seconds still),
+    // and the service thread after a load; nothing has to say what changed.
+    // A screen names the step it makes (shown on undo: "UNDO TUNE A05"); a
+    // change that is no undo step (the last pad played, a mute, the octave)
+    // says not_a_step(), and the next close takes it in without one. A take
+    // that lasts holds its step open from hold_step() to release_step().
+    void name_step(std::string what, int track = -1);
+    void not_a_step();
+    void hold_step(std::string what, int track = -1);
+    void release_step();
+    bool step_held() const { return holding_step; }
+    // What changed since the last close, kept as a step (or taken in, with
+    // `keep` false, or when not_a_step() was said); the app's and the
+    // service thread's. `fallback`: the step's name when no screen gave one.
+    bool close_step(const std::string& fallback = {}, bool keep = true);
+    bool undo(); // the newest step taken back, the engine and modules told; false: none
+    bool redo();
+    History history;
+    MoveExtras& extras() { return move_extras; }
+    const MoveExtras& extras() const { return move_extras; }
+    std::string last_step; // the step undone or redone last, for the status line
+
     // Messages, saving.
     void say(std::string text);
     std::string message;
@@ -226,6 +252,11 @@ public:
     std::string load_module_now(unsigned track, const std::string& id, const SynthFile* saved = nullptr);
     const std::string& project_path() const { return path; }
     const std::string& home_folder() const { return home_path; }
+    // The engine made whole again from the project (an undo outside the
+    // tracks, a project opened): the audio thread parked, faded out and
+    // silent, while it is rebuilt, then faded back in. Never under `lock`.
+    std::string rebuild();
+    unsigned rebuilds = 0;
     std::string library;
     std::string status() const;
     // MIDI thread: whether a pad pressed now stays quiet, its job another
@@ -233,6 +264,10 @@ public:
     void quiet_pads(bool quiet) { pads_quiet.store(quiet, std::memory_order_relaxed); }
 
 private:
+    struct Parked { enum Result { Yes, NoAudio, Failed } result = Failed; uint32_t serial = 0; };
+    Parked park_engine(); // service thread
+    Live live();                           // the project as the history compares it
+    void apply_step(const Step& step, bool forward); // what an undo or redo changed, told to the engine and the modules
     void forward();                        // audio thread: the ring into the host
     void apply_track(unsigned track);      // the engine's track made whole again from the project's (TrackLoad)
     void setup_modules();                  // a ModuleTrack for each Schwung track of the project, offered
@@ -253,6 +288,11 @@ private:
     std::array<std::unique_ptr<ModuleTrack>, melodee::track_count> modules {};
     std::vector<std::unique_ptr<ModuleTrack>> modules_leaving; // their runners handed back first
     unsigned selected = 0;
+    MoveExtras move_extras;
+    std::string step_name;     // the open step's name (name_step())
+    int step_track = -1;
+    bool step_kept = true;     // false: the open step is no undo step (not_a_step())
+    bool holding_step = false; // hold_step(): closes wait for release_step()
     bool click_on = false;
     unsigned click_volume = 70;
     std::string home_path, path, settings_path;
@@ -268,6 +308,11 @@ private:
     // another job than its sound (Shift, Copy, Delete, Mute or a step held;
     // bindings::pad_sounds()), so it stays quiet.
     std::atomic<bool> pads_quiet {false};
+    // Parking (rebuild()): the service thread asks, the audio thread parks
+    // the engine behind the commands before and says which park it was.
+    std::atomic<bool> park_asked {false};
+    std::atomic<uint32_t> park_serial {0};
+    bool rebuild_wanted = false; // under `lock`: the engine rebuilt from the project, parked
     struct Went { int track = -1, key = -1; };
     std::array<Went, pad_count> pad_went {};
     // Last, so it goes first: it holds the samples and runners above.
