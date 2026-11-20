@@ -230,7 +230,7 @@ int write_mockups(const std::string& directory) {
     struct Set { const char* name; const char* title; const char* subtitle; std::vector<Screen> screens; std::vector<Panel> panels; };
     std::vector<Set> sets {
         {"rail", "MELODEE ON MOVE: RAIL", "SAMPLER, CHOP AND SCHWUNG MODULES. DOCS/UI.MD", rail_screens(), {}},
-        {"tracks", "MELODEE ON MOVE: TRACKS", "16 TRACKS, TRANSPORT AND TEMPO. DOCS/UI.MD", tracks_screens(), tracks_panels()},
+        {"tracks", "MELODEE ON MOVE: TRACKS", "16 TRACKS, TRANSPORT, TEMPO ON THE MOVE'S OWN KEYS. DOCS/UI.MD", tracks_screens(), tracks_panels()},
     };
     bool ok = true;
     for (const auto& set : sets) {

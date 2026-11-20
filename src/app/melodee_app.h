@@ -15,9 +15,13 @@
 //
 //   Track buttons  the four tracks of the selected track's bank; one held
 //                  shows the sixteen and makes the steps pick among them
-//                  (screens/tracks.cpp)
-//   Play           play / stop; Shift + Play the tempo
-//   Master knob    the volume; Shift + Back goes back to Move (the runtime's)
+//                  (screens/tracks.cpp); held with the Volume knob, that
+//                  track's volume, as on the Move
+//   Mute           with a track button: mute it; Shift + Mute + track
+//                  button: solo it; alone: mute the selected track (Move)
+//   Play           play / stop (Move)
+//   Shift + Step 5 / 6 / 7  tempo, metronome, groove (Move)
+//   Volume knob    the main volume; Shift + Back goes back to Move (the runtime's)
 //   A touched knob shows large, over any screen
 //   Typing         a module's page asked for text: the pads and steps type
 //
@@ -57,11 +61,14 @@ private:
     void draw_touched(juce::Graphics& g);
     bool trigger(move::Button button); // a screen that opens from this button, opened
     bool holding() const { return rows_down.any(); } // a track button is down
+    void draw_volume(juce::Graphics& g);
     Screen* tracks() const;            // the sixteen tracks, while a track button is held
 
     std::unique_ptr<Studio> own;
     std::bitset<4> rows_down;           // the track buttons held
     Clock::time_point held_at {};       // since when
+    bool mute_down = false, mute_used = false; // Mute held, and used with a track button
+    Clock::time_point volume_until {};  // a track's volume shown, for a moment
     int touched = -1; // a touched knob, for a moment
     Clock::time_point touched_until {};
 };
