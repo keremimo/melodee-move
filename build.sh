@@ -43,6 +43,12 @@ MELODEE_EXPECTED='page=play pad=A02 samples=1 slices=16 pads=17'
 # seconds after.
 RESTORE_SCRIPT='100:0xb0,71,2'
 RESTORE_EXPECTED='page=play pad=A02 samples=1 slices=0 pads=17 .* saves=1 unsaved=0'
+# The synth track: Row 2, Menu, the jogwheel's push loads the one module in
+# build/test-modules (the tests' stand-in), a pad plays it, knob 1 turns its
+# level up three, Up an octave. The next start has it back as it was.
+SYNTH_SCRIPT='50:0xb0,42,127;60:0xb0,50,127;80:0xb0,3,127;400:0x90,68,110;430:0x80,68,0;500:0xb0,71,3;520:0xb0,55,127'
+SYNTH_EXPECTED='track=synth synth=fake octave=1'
+SYNTH_FLAGS='--backend simulated --samples build/simulated-samples --home build/simulated-synth --modules build/test-modules'
 # shellcheck disable=SC2086
 docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE" && pwd):/melodee:ro" -e MELODEE=/melodee \
     $MOUNT melodee-move-builder sh -c "
@@ -64,6 +70,15 @@ docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE
     { build/melodee-move --backend simulated --samples build/simulated-samples --home build/simulated-home --seconds 5 --script '$RESTORE_SCRIPT' 2> build/simulated-restore.log || true; } &&
     tail -n 1 build/simulated-restore.log &&
     grep -qE '$RESTORE_EXPECTED' build/simulated-restore.log &&
-    build/melodee-move --melodee-previews build/melodee-previews > /dev/null &&
+    rm -rf build/simulated-synth &&
+    { build/melodee-move $SYNTH_FLAGS --seconds 5 --script '$SYNTH_SCRIPT' 2> build/simulated-synth.log || true; } &&
+    tail -n 1 build/simulated-synth.log &&
+    grep -q '$SYNTH_EXPECTED' build/simulated-synth.log &&
+    grep -q 'param level 0.53' build/simulated-synth/Projects/Move.mldp.synth &&
+    { build/melodee-move $SYNTH_FLAGS --seconds 3 2> build/simulated-synth-restore.log || true; } &&
+    tail -n 1 build/simulated-synth-restore.log &&
+    grep -q '$SYNTH_EXPECTED' build/simulated-synth-restore.log &&
+    build/melodee-move --melodee-previews build/melodee-previews --modules build/test-modules > /dev/null &&
+    build/melodee-move --probe-modules build/test-modules &&
     tools/bundle.sh &&
     $CRUSH"

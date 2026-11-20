@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #pragma once
 #include "app/kit_player.h"
+#include "app/module_host.h"
 #include "app/project_store.h"
 #include "move/app.h"
 #include "melodee/engine/auto_chop.h"
@@ -30,6 +31,13 @@
 //         jogwheel for To Pads: Poly, Mono or Thru, onto the first empty
 //         pads. Back leaves without changing the pads.
 //
+// Track 2 (Row 2) is a synth: one of Schwung's sound generators, loaded
+// from the Move's Schwung install (module_host.h). Its pads are notes in
+// rows of fourths, C2 (note 48) at the bottom left; Up and Down move an octave;
+// pressure is polyphonic aftertouch. Knobs 1-8 are the module's page,
+// Left/Right its pages, the jogwheel its presets. Menu lists the modules.
+// Row 1 is the kit again.
+//
 // The kit is saved as a Melodee project (project_store.h) in
 // `home`/Projects/Move.mldp three seconds after the last change, as Melodee
 // autosaves on the MPC, and when the app quits; it is loaded again at start.
@@ -44,7 +52,9 @@ public:
     // `library`: the folder Load opens (the Move's own sample library by
     // default). `home`: Melodee's folder, its projects in Projects
     // (/data/UserData/Melodee on the Move by default).
-    explicit MelodeeApp(std::string library = {}, std::string home = {});
+    // `modules`: Schwung's modules folder (/data/UserData/schwung/modules
+    // by default), its sound_generators the synths.
+    explicit MelodeeApp(std::string library = {}, std::string home = {}, std::string modules = {});
     ~MelodeeApp() override; // saves what is not saved yet
 
     void render(const move::AudioBlock& input, move::AudioBlock& output) override; // audio thread
@@ -62,10 +72,15 @@ public:
     std::string save_now();
     std::string restore_now();
     unsigned slice_count() const;
+    // Load one of Schwung's modules onto the synth track and wait for it;
+    // `saved` (a restore) sets it as it was. Empty on success.
+    std::string load_module_now(const std::string& id, const SynthFile* saved = nullptr);
+    std::string synth_value(const std::string& key) const; // as the screen has it
     const std::string& project_path() const { return project; }
 
 private:
     enum class Page : uint8_t { Play, Load, Chop, ToPads };
+    enum class Track : uint8_t { Kit, Synth };
     struct Sample {
         std::string name, path;
         std::unique_ptr<melodee::SampleData> data;
@@ -96,13 +111,26 @@ private:
     void changed();
     void remember_chop();
     KitFile snapshot() const;               // the kit as it stands, to save outside the lock
-    std::string write(const KitFile& kit);  // to `project`, the folders made first
+    SynthFile synth_snapshot() const;
+    std::string write(const KitFile& kit, const SynthFile& synth); // to `project`, the folders made first
+    // The synth track.
+    int synth_note(unsigned pad) const;     // the note a pad plays
+    void set_track(Track to);
+    void turn_synth_knob(unsigned knob, int delta, bool fine);
+    Knob synth_knob(unsigned knob) const;
+    void synth_page_by(int way);
+    void preset_by(int way);
+    void refresh_synth();                   // ask the module what its page's knobs and preset are now
+    void take_answers();
+    void destroy_retired();
 
     void draw_play(juce::Graphics& g);
     void draw_load(juce::Graphics& g);
     void draw_chop(juce::Graphics& g);
     void draw_to_pads(juce::Graphics& g);
     void draw_touched(juce::Graphics& g);
+    void draw_synth(juce::Graphics& g);
+    void draw_modules(juce::Graphics& g);
 
     mutable std::mutex lock;
     KitPlayer player;
@@ -139,6 +167,28 @@ private:
     bool dirty = false, restored = false;
     Clock::time_point changed_at {}, retry_at {};
     unsigned saves = 0;
+
+    // The synth track. `module` is what the screen and knobs show; the
+    // audio thread plays the same one through `synth`. A module replaced
+    // waits in `leaving` until the audio thread has let it go.
+    Track track = Track::Kit;
+    SynthPlayer synth;
+    std::string modules_root;
+    std::vector<ModuleInfo> catalog;
+    int module_cursor = 0;
+    std::unique_ptr<LoadedModule> module;
+    std::vector<std::unique_ptr<LoadedModule>> leaving;
+    std::string module_job;
+    bool module_loading = false;
+    unsigned synth_page = 0;
+    int octave = 0;
+    std::array<bool, pad_count> held {}; // pads down, for their lights
+    SynthFile saved_synth;                // read at start, for the module it names
+
+    // The audio thread's: where each pad's press went (a synth note, or -1:
+    // the kit), so its release and pressure go there too.
+    std::atomic<int> audio_track {0}, audio_octave {0};
+    std::array<int, pad_count> pad_went {};
 
     std::atomic<float> volume {0.8f};
 };

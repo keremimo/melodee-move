@@ -5,7 +5,9 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <algorithm>
 #include <cerrno>
+#include <cstdlib>
 #include <cstdio>
 #include <cstring>
 #include <fstream>
@@ -17,6 +19,7 @@ namespace app {
 namespace {
 
 constexpr const char* chops_header = "melodee-move chops 1";
+constexpr const char* synth_header = "melodee-move synth 1";
 
 template <size_t N> void copy_text(char (&to)[N], const std::string& from) {
     std::snprintf(to, N, "%s", from.c_str());
@@ -46,6 +49,7 @@ std::string write_whole(const std::string& path, const void* bytes, size_t size)
 }
 
 std::string chops_path(const std::string& project) { return project + ".chops"; }
+std::string synth_path(const std::string& project) { return project + ".synth"; }
 
 } // namespace
 
@@ -138,6 +142,49 @@ std::string load_kit(const std::string& path, KitFile& kit) {
     std::ifstream chops(chops_path(path));
     if (chops) read_chops(std::string((std::istreambuf_iterator<char>(chops)), std::istreambuf_iterator<char>()), kit);
     return {};
+}
+
+std::string synth_text(const SynthFile& synth) {
+    std::ostringstream out;
+    out << synth_header << '\n' << "track " << synth.track << '\n' << "octave " << synth.octave << '\n';
+    if (!synth.module.empty()) {
+        out << "module " << synth.module << '\n';
+        if (synth.preset >= 0) out << "preset " << synth.preset << '\n';
+        for (const auto& [key, value] : synth.values)
+            if (key.find_first_of(" \n") == std::string::npos && value.find('\n') == std::string::npos) out << "param " << key << ' ' << value << '\n';
+    }
+    return out.str();
+}
+
+void read_synth(const std::string& text, SynthFile& synth) {
+    synth = {};
+    std::istringstream in(text);
+    std::string line;
+    if (!std::getline(in, line) || line != synth_header) return;
+    while (std::getline(in, line)) {
+        auto space = line.find(' ');
+        if (space == std::string::npos) continue;
+        auto word = line.substr(0, space), rest = line.substr(space + 1);
+        if (word == "track") synth.track = unsigned(std::strtoul(rest.c_str(), nullptr, 10)) % 2;
+        else if (word == "octave") synth.octave = std::clamp(int(std::strtol(rest.c_str(), nullptr, 10)), -4, 4);
+        else if (word == "module") synth.module = rest;
+        else if (word == "preset") synth.preset = int(std::strtol(rest.c_str(), nullptr, 10));
+        else if (word == "param") {
+            auto gap = rest.find(' ');
+            if (gap != std::string::npos && gap) synth.values.emplace_back(rest.substr(0, gap), rest.substr(gap + 1));
+        }
+    }
+}
+
+std::string save_synth(const SynthFile& synth, const std::string& project) {
+    auto text = synth_text(synth);
+    return write_whole(synth_path(project), text.data(), text.size());
+}
+
+void load_synth(const std::string& project, SynthFile& synth) {
+    std::ifstream in(synth_path(project));
+    synth = {};
+    if (in) read_synth(std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>()), synth);
 }
 
 void give_to_owner_of(const std::string& path, const std::string& reference) {

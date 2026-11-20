@@ -7,6 +7,8 @@
 # to itself and realtime priority, and Ableton's app is started again
 # however it ends: Shift + Back, Ctrl-C, the SSH connection dropping, or a
 # crash. Nothing is installed or changed; a reboot is stock Move, always.
+# Files Schwung's modules write while Melodee plays them are given back to
+# the Move's user on the way out.
 # Arguments go to melodee-move.
 set -u
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -22,7 +24,21 @@ holders() {
         done
     done
 }
+# Schwung's modules, played on the synth track, may write in Schwung's
+# folder (logs, caches). Here they run as root; what this run made there
+# goes back to the owner of /data/UserData (ableton), so Schwung can write
+# it again. Older files are not touched.
+SCHWUNG=/data/UserData/schwung
+STARTED=$(mktemp /tmp/melodee-move.XXXXXX)
+give_back() {
+    owner=$(stat -c %u:%g /data/UserData 2>/dev/null) || return 0
+    # Never a setuid helper (Schwung's schwung-heal is one): chown would
+    # strip its setuid bit.
+    [ -d "$SCHWUNG" ] && find "$SCHWUNG" -newer "$STARTED" -user root ! -perm -4000 -exec chown "$owner" {} \; 2>/dev/null
+    rm -f "$STARTED"
+}
 restore() {
+    give_back
     pidof MoveLauncher >/dev/null 2>&1 || /etc/init.d/move start
 }
 

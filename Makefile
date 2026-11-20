@@ -21,7 +21,10 @@ WARNINGS := -Wall -Wextra -Werror
 # The C++ runtime is linked in: Ableton's firmware has an older libstdc++
 # (GLIBCXX_3.4.29) than any toolchain builds against, and glibc 2.35 is the
 # newest it has, which is why tools/Dockerfile is Ubuntu 22.04.
-LDFLAGS := -static-libstdc++ -static-libgcc
+#
+# schwung_move_info is exported for Schwung's modules, which look for it in
+# the process (src/app/module_host.cpp).
+LDFLAGS := -static-libstdc++ -static-libgcc -Wl,--export-dynamic-symbol=schwung_move_info
 LDLIBS := $(shell pkg-config --libs $(PACKAGES)) -ldl -pthread -lrt
 
 # Melodee's own engine and model, compiled unchanged from a melodee-sample
@@ -45,7 +48,15 @@ MODULE_C := $(wildcard $(JUCE)/juce_core/*.c $(JUCE)/juce_graphics/*.c) \
 JUCE_OBJECTS := $(addprefix build/obj/juce/,$(notdir $(MODULE_CPP:.cpp=.o) $(MODULE_C:.c=.o)))
 SHARED_OBJECTS := $(patsubst src/%.cpp,build/obj/%.o,$(wildcard src/move/*.cpp src/ui/*.cpp src/spike/*.cpp src/app/*.cpp))
 
-all: $(TARGET) $(TESTS)
+# A stand-in Schwung module for the tests, where Schwung keeps its synths.
+FAKE_MODULE := build/test-modules/sound_generators/fake
+all: $(TARGET) $(TESTS) $(FAKE_MODULE)/dsp.so $(FAKE_MODULE)/module.json
+$(FAKE_MODULE)/dsp.so: tests/fake_module/dsp.c
+	@mkdir -p $(@D)
+	$(CC) -O2 -fPIC -shared -Wall -Wextra -Werror $< -o $@
+$(FAKE_MODULE)/module.json: tests/fake_module/module.json
+	@mkdir -p $(@D)
+	cp $< $@
 $(TARGET): build/obj/main.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(MELODEE_LIBRARY)
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 $(TESTS): build/obj/tests/move_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(MELODEE_LIBRARY)

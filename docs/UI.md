@@ -86,7 +86,8 @@ reverse), **CLOUD** (position, size, density, scan, spread, on).
 
 A Schwung module's pages come from its `module.json`: `ui_hierarchy` where it
 has one, else its `chain_params` eight at a time. Names are cut to the cell
-(3 to 5 characters); the touched knob shows the full name.
+(3 to 5 characters); the touched knob shows the full name. A knob that is
+the module's preset list turns presets, as the jogwheel does.
 
 ## Controls
 
@@ -97,14 +98,14 @@ A first proposal, to settle while building.
 | Pads | play: a kit's pads; in Chop, its slices (32 at once); on a module track, notes |
 | Steps | in Chop, the sample in 16 parts, lit where a cut falls, pressed to hear from there; later the sequencer |
 | Knobs 1-8 | the screen's eight parameters; touch one to see it large |
-| Jogwheel | turn to choose (slice, list row, fine move of a cut); push to confirm; Shift + turn jumps a cut to the next hit |
+| Jogwheel | turn to choose (slice, list row, fine move of a cut; on a module track, its preset); push to confirm; Shift + turn jumps a cut to the next hit |
 | Track buttons | tracks 1-4, each a kit or a module |
 | Loop | Chop the last pad; again to leave |
 | Sample | Record: armed, hit a pad to record onto it; again to stop |
 | Capture | the last phrase of the always-on input onto the next empty pad |
 | Menu | Load samples, modules and effects |
 | Left / Right | the page before / after |
-| Up / Down | the pad bank (slices 33-64, kit banks) |
+| Up / Down | the pad bank (slices 33-64, kit banks); on a module track, the octave |
 | Delete | with a pad: empty it; in Chop: take the selected cut out; with Loop: every cut |
 | Copy | a pad, then another: copy it |
 | Undo | undo; Shift + Undo: redo |
@@ -116,8 +117,8 @@ A first proposal, to settle while building.
 
 - **Pads**: a kit in its pads' colours, the last hit white; in Chop the
   slices in alternating colours, the selected one white, and in a manual take
-  the pad that cuts next blinking red; on a module track the notes of the
-  scale.
+  the pad that cuts next blinking red; on a module track every C in the
+  track's colour, the other naturals dim, a held pad white.
 - **Steps**: in Chop, the parts where a cut falls; the playhead while playing.
 - **Track buttons**: each track's colour, the selected one bright.
 - **Knob lights**: lit for the knobs the screen uses, dark for the rest.
@@ -126,7 +127,8 @@ A first proposal, to settle while building.
 ## Open questions
 
 - The pad pages' exact contents.
-- A module track's note layout (rows of fourths, a scale, chromatic).
+- A module track's note layout: rows of fourths for now, C2 at the bottom
+  left (Ableton's names); a scale or chromatic later.
 - More than four tracks (Shift + a track button for 5-8?).
 - Realtime priority when Schwung launches melodee-move as `ableton`: a
   small root helper, as EvilGenius uses, or not.

@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
+#include <limits>
 
 namespace app {
 namespace {
@@ -28,6 +29,9 @@ constexpr MovePlace move_places[] {
     {"ALL USER DATA", "/data/UserData", "ALL"},
 };
 constexpr const char* move_home = "/data/UserData/Melodee";
+constexpr const char* move_modules = "/data/UserData/schwung/modules"; // Schwung's own install
+constexpr int synth_base_note = 48;                                  // the bottom-left pad at octave 0: C2
+constexpr int lowest_octave = -3, highest_octave = 4;
 constexpr auto autosave_idle = std::chrono::milliseconds(3000); // as Melodee's autosave on the MPC (shell/autosave.h)
 constexpr auto autosave_retry = std::chrono::seconds(10);
 constexpr auto touch_linger = std::chrono::milliseconds(600);
@@ -61,6 +65,21 @@ std::vector<float> peaks_of(const melodee::Overview& overview) {
     for (size_t n = 0; n < overview.size(); ++n) peaks[n] = overview[n] / 255.0f;
     return peaks;
 }
+// The synth track's pads: rows of fourths, as the Move lays out notes.
+int note_for(unsigned pad, int octave) {
+    return std::clamp(synth_base_note + 12 * octave + int(move::pad_column(pad)) + 5 * int(move::pad_row(pad)), 0, 127);
+}
+std::string note_name(int note) {
+    static const char* names[] {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+    return names[note % 12] + std::to_string(note / 12 - 2); // Ableton's names: 60 is C3
+}
+bool natural(int note) {
+    int in_octave = note % 12;
+    return in_octave != 1 && in_octave != 3 && in_octave != 6 && in_octave != 8 && in_octave != 10;
+}
+// What a cell has room for: a module's short name, or its name.
+std::string cell_name(const ModuleParam& param) { return upper(param.short_name.empty() ? param.name : param.short_name); }
+
 // The kinds Melodee's read_audio() reads (shell/sample_decode.h).
 bool is_sound_file(const fs::path& path) {
     auto extension = upper(path.extension().string());
@@ -70,8 +89,8 @@ bool is_sound_file(const fs::path& path) {
 
 } // namespace
 
-MelodeeApp::MelodeeApp(std::string library_folder, std::string home_folder)
-    : library(std::move(library_folder)), home(std::move(home_folder)) {
+MelodeeApp::MelodeeApp(std::string library_folder, std::string home_folder, std::string modules)
+    : library(std::move(library_folder)), home(std::move(home_folder)), modules_root(std::move(modules)) {
     std::error_code error;
     if (!library.empty()) places.push_back({"SAMPLES", library, "SMP"});
     else
@@ -83,21 +102,27 @@ MelodeeApp::MelodeeApp(std::string library_folder, std::string home_folder)
     if (home.empty()) home = fs::is_directory(move_user_data, error) ? move_home : (fs::current_path(error) / "Melodee").string();
     folder = library;
     project = (fs::path(home) / "Projects" / "Move.mldp").string();
+    if (modules_root.empty()) modules_root = move_modules;
+    catalog = scan_modules(modules_root);
+    pad_went.fill(-1);
 }
 
 MelodeeApp::~MelodeeApp() {
     std::unique_lock<std::mutex> guard(lock);
     if (!dirty) return;
     auto kit = snapshot();
+    auto synth_file = synth_snapshot();
     dirty = false;
     guard.unlock();
-    write(kit);
+    write(kit, synth_file);
 }
 
 // ---------------------------------------------------------------- audio thread
 
-void MelodeeApp::render(const move::AudioBlock&, move::AudioBlock& output) {
-    player.render(output, volume.load(std::memory_order_relaxed));
+void MelodeeApp::render(const move::AudioBlock& input, move::AudioBlock& output) {
+    float gain = volume.load(std::memory_order_relaxed);
+    player.render(output, gain);
+    synth.render(input, output, gain);
 }
 
 void MelodeeApp::audio_opened(const move::AudioFormat& format) {
@@ -105,10 +130,27 @@ void MelodeeApp::audio_opened(const move::AudioFormat& format) {
 }
 
 void MelodeeApp::audio_event(const move::SurfaceEvent& event) {
+    using Kind = move::Input::Kind;
     const auto& input = event.input;
-    if (input.kind != move::Input::Kind::Pad) return; // no pressure in Melodee's sampler
-    if (input.pressed) player.hit(input.index, input.value);
-    else player.release(input.index);
+    if (input.index >= pad_count) return;
+    int& went = pad_went[input.index];
+    if (input.kind == Kind::Pad) {
+        if (input.pressed) {
+            if (audio_track.load(std::memory_order_relaxed) == int(Track::Synth)) {
+                went = note_for(input.index, audio_octave.load(std::memory_order_relaxed));
+                synth.note_on(went, input.value);
+            } else {
+                went = -1;
+                player.hit(input.index, input.value);
+            }
+        } else {
+            if (went >= 0) synth.note_off(went);
+            else player.release(input.index);
+            went = -1;
+        }
+    } else if (input.kind == Kind::PadPressure && went >= 0) {
+        synth.pressure(went, input.value); // Melodee's sampler takes no pressure
+    }
 }
 
 // ---------------------------------------------------------------- the model, under `lock`
@@ -330,6 +372,7 @@ void MelodeeApp::turn_knob(unsigned which, int delta, bool fine) {
 }
 
 MelodeeApp::Knob MelodeeApp::knob(unsigned which) const {
+    if (track == Track::Synth) return synth_knob(which);
     const Sample* sample = sample_of(pad);
     uint32_t frames = sample ? std::max<uint32_t>(1, sample->data->model_frames()) : 1;
     char text[24];
@@ -374,6 +417,114 @@ MelodeeApp::Knob MelodeeApp::knob(unsigned which) const {
     }
 }
 
+// ---------------------------------------------------------------- the synth track, under `lock`
+
+int MelodeeApp::synth_note(unsigned at) const { return note_for(at, octave); }
+
+void MelodeeApp::set_track(Track to) {
+    if (page == Page::Chop || page == Page::ToPads) leave_chop();
+    page = Page::Play;
+    touched = -1;
+    held.fill(false);
+    if (track == to) return;
+    message_until = {}; // the other track's news
+    track = to;
+    audio_track.store(int(to), std::memory_order_relaxed);
+    if (to == Track::Synth) refresh_synth();
+    changed();
+}
+
+MelodeeApp::Knob MelodeeApp::synth_knob(unsigned which) const {
+    if (!module || synth_page >= module->pages.size()) return {"", "", 0};
+    const auto& keys = module->pages[synth_page].knobs;
+    if (which >= keys.size()) return {"", "", 0};
+    const ModuleParam* param = module->param(keys[which]);
+    if (!param) return {"", "", 0};
+    return {upper(param->name).substr(0, 16), upper(param->shown()).substr(0, 12), float(param->fraction())};
+}
+
+void MelodeeApp::turn_synth_knob(unsigned which, int delta, bool fine) {
+    if (!module || synth_page >= module->pages.size()) return;
+    const auto& keys = module->pages[synth_page].knobs;
+    if (which >= keys.size()) return;
+    if (keys[which] == module->preset_param) { preset_by(delta); return; }
+    ModuleParam* param = module->param(keys[which]);
+    if (!param || !delta) return;
+    param->turn(delta, fine);
+    synth.set(param->key, param->text());
+    changed();
+}
+
+void MelodeeApp::synth_page_by(int way) {
+    if (!module || module->pages.empty()) return;
+    synth_page = unsigned(std::clamp(int(synth_page) + way, 0, int(module->pages.size()) - 1));
+    refresh_synth();
+}
+
+void MelodeeApp::preset_by(int way) {
+    if (!module) return;
+    if (module->preset_param.empty()) { synth_page_by(way); return; }
+    int last = module->preset_count > 0 ? module->preset_count - 1 : std::numeric_limits<int>::max();
+    int to = std::clamp(module->preset + way, 0, last);
+    if (to == module->preset) return;
+    module->preset = to;
+    if (auto* param = module->param(module->preset_param)) param->value = to;
+    synth.set(module->preset_param, std::to_string(to));
+    // A preset sets every parameter: ask for each again, to show and save.
+    for (const auto& param : module->params)
+        if (param.key != module->preset_param) synth.ask(param.key);
+    if (!module->preset_name_param.empty()) synth.ask(module->preset_name_param);
+    changed();
+}
+
+void MelodeeApp::refresh_synth() {
+    if (!module || synth_page >= module->pages.size()) return;
+    for (const auto& key : module->pages[synth_page].knobs) synth.ask(key);
+}
+
+void MelodeeApp::take_answers() {
+    std::lock_guard<std::mutex> guard(lock);
+    SynthPlayer::Answer answer;
+    while (synth.answer(answer)) {
+        if (!module) continue;
+        std::string key = answer.key, value = answer.value;
+        if (key == module->preset_name_param) module->preset_name = value;
+        else if (auto* param = module->param(key)) param->take(value);
+    }
+}
+
+void MelodeeApp::destroy_retired() {
+    std::vector<std::unique_ptr<LoadedModule>> gone;
+    {
+        std::lock_guard<std::mutex> guard(lock);
+        while (LoadedModule* old = synth.retired()) {
+            auto at = std::find_if(leaving.begin(), leaving.end(), [old](const auto& held_module) { return held_module.get() == old; });
+            if (at == leaving.end()) continue;
+            gone.push_back(std::move(*at));
+            leaving.erase(at);
+        }
+    }
+    gone.clear(); // destroy_instance(), outside the lock
+}
+
+SynthFile MelodeeApp::synth_snapshot() const {
+    SynthFile file;
+    file.track = unsigned(track);
+    file.octave = octave;
+    if (!module) {
+        // A module that would not load this time stays named, for when it is back.
+        file.module = saved_synth.module;
+        file.preset = saved_synth.preset;
+        file.values = saved_synth.values;
+        return file;
+    }
+    file.module = module->info().id;
+    file.preset = module->preset_param.empty() ? -1 : module->preset;
+    for (const auto& param : module->params)
+        if (param.key != module->preset_param) file.values.emplace_back(param.key, param.text());
+    return file;
+}
+
 // ---------------------------------------------------------------- MIDI thread
 
 void MelodeeApp::surface(const move::SurfaceEvent& event) {
@@ -384,6 +535,7 @@ void MelodeeApp::surface(const move::SurfaceEvent& event) {
     bool fine = session().shift.load();
     switch (input.kind) {
     case Kind::Pad:
+        if (track == Track::Synth) { if (input.index < pad_count) held[input.index] = input.pressed; break; }
         if (!input.pressed) break;
         if (page == Page::Chop || page == Page::ToPads) { if (input.index < slices.count) selected = input.index; }
         else select_pad(input.index);
@@ -391,6 +543,33 @@ void MelodeeApp::surface(const move::SurfaceEvent& event) {
     case Kind::Button: {
         if (!input.pressed) break;
         auto button = Button(input.index);
+        if (button == Button::Row1 || button == Button::Row2) {
+            set_track(button == Button::Row1 ? Track::Kit : Track::Synth);
+            break;
+        }
+        if (track == Track::Synth) {
+            if (button == Button::Menu || (button == Button::Back && page == Page::Load)) {
+                page = page == Page::Load ? Page::Play : Page::Load;
+                if (page == Page::Load) {
+                    catalog = scan_modules(modules_root);
+                    module_cursor = std::clamp(module_cursor, 0, std::max(0, int(catalog.size()) - 1));
+                }
+            } else if (button == Button::MainPush && page == Page::Load && module_cursor < int(catalog.size())) {
+                const auto& choice = catalog[size_t(module_cursor)];
+                if (choice.api != 2) say("OLDER API: NOT YET");
+                else { module_job = choice.id; say("LOADING"); }
+            } else if (button == Button::Loop) {
+                say("CHOP: KIT ONLY");
+            } else if ((button == Button::Left || button == Button::Right) && page == Page::Play) {
+                synth_page_by(button == Button::Left ? -1 : 1);
+            } else if (button == Button::Up || button == Button::Down) {
+                octave = std::clamp(octave + (button == Button::Up ? 1 : -1), lowest_octave, highest_octave);
+                audio_octave.store(octave, std::memory_order_relaxed);
+                say("OCTAVE " + note_name(synth_note(0)));
+                changed();
+            }
+            break;
+        }
         if (button == Button::Menu) {
             if (page == Page::Chop || page == Page::ToPads) leave_chop();
             page = page == Page::Load ? Page::Play : Page::Load;
@@ -426,12 +605,20 @@ void MelodeeApp::surface(const move::SurfaceEvent& event) {
         break;
     }
     case Kind::MainKnob:
+        if (track == Track::Synth) {
+            if (page == Page::Load) module_cursor = std::clamp(module_cursor + input.delta, 0, std::max(0, int(catalog.size()) - 1));
+            else preset_by(input.delta);
+            break;
+        }
         if (page == Page::Load) cursor = std::clamp(cursor + input.delta, 0, std::max(0, int(entries.size()) - 1));
         else if (page == Page::Chop && slices.count) selected = unsigned(std::clamp(int(selected) + input.delta, 0, int(slices.count) - 1));
         else if (page == Page::ToPads) to_pads = std::clamp(to_pads + input.delta, 0, 2);
         break;
     case Kind::Knob:
-        turn_knob(input.index, input.delta, fine);
+        if (track == Track::Synth) {
+            if (page == Page::Load) break;
+            turn_synth_knob(input.index, input.delta, fine);
+        } else turn_knob(input.index, input.delta, fine);
         if (touched != int(input.index) || touched_until != Clock::time_point::max()) {
             touched = input.index;
             touched_until = Clock::now() + turn_linger;
@@ -452,6 +639,30 @@ void MelodeeApp::surface(const move::SurfaceEvent& event) {
 void MelodeeApp::lights(move::Lights& lights, Clock::time_point) {
     using namespace move;
     std::lock_guard<std::mutex> guard(lock);
+    lights.button(Button::Row1, track == Track::Kit ? colour::azure : colour::dark_blue);
+    lights.button(Button::Row2, track == Track::Synth ? colour::violet : module ? colour::deep_magenta : colour::dark_grey);
+    lights.button(Button::Shift, session().shift ? white_bright : white_dim);
+    if (track == Track::Synth) {
+        // Every C in the track's colour, the other naturals dim, a pad held white.
+        for (unsigned at = 0; at < pad_count; ++at) {
+            int note = synth_note(at);
+            lights.pad(at, held[at] ? colour::white : !module ? colour::off : note % 12 == 0 ? colour::violet : natural(note) ? colour::dark_grey : colour::off);
+        }
+        for (unsigned step = 0; step < step_count; ++step) lights.step(step, colour::off);
+        bool paged = module && module->pages.size() > 1;
+        lights.button(Button::Left, paged && synth_page > 0 ? white_dim : 0);
+        lights.button(Button::Right, paged && synth_page + 1 < module->pages.size() ? white_dim : 0);
+        lights.button(Button::Up, octave < highest_octave ? white_dim : 0);
+        lights.button(Button::Down, octave > lowest_octave ? white_dim : 0);
+        lights.button(Button::Loop, 0);
+        lights.button(Button::Menu, page == Page::Load ? white_bright : white_dim);
+        lights.button(Button::Back, page == Page::Play ? 0 : white_dim);
+        return;
+    }
+    lights.button(Button::Left, page == Page::Play || page == Page::Chop ? white_dim : 0);
+    lights.button(Button::Right, page == Page::Play || page == Page::Chop ? white_dim : 0);
+    lights.button(Button::Up, 0);
+    lights.button(Button::Down, 0);
     bool chop = page == Page::Chop || page == Page::ToPads;
     const Sample* sample = sample_of(pad);
     uint32_t frames = sample ? std::max<uint32_t>(1, sample->data->model_frames()) : 1;
@@ -475,8 +686,6 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point) {
     lights.button(Button::Loop, chop ? white_bright : sample ? white_dim : 0);
     lights.button(Button::Menu, page == Page::Load ? white_bright : white_dim);
     lights.button(Button::Back, page == Page::Play ? 0 : white_dim);
-    lights.button(Button::Shift, session().shift ? white_bright : white_dim);
-    lights.button(Button::Row1, colour::azure);
 }
 
 // ---------------------------------------------------------------- screen thread
@@ -485,6 +694,7 @@ void MelodeeApp::draw(juce::Graphics& g) {
     std::lock_guard<std::mutex> guard(lock);
     auto now = Clock::now();
     if (touched >= 0 && now < touched_until && !knob(unsigned(touched)).name.empty()) draw_touched(g);
+    else if (track == Track::Synth) page == Page::Load ? draw_modules(g) : draw_synth(g);
     else if (page == Page::Load) draw_load(g);
     else if (page == Page::Chop) draw_chop(g);
     else if (page == Page::ToPads) draw_to_pads(g);
@@ -557,8 +767,54 @@ void MelodeeApp::draw_to_pads(juce::Graphics& g) {
 void MelodeeApp::draw_touched(juce::Graphics& g) {
     auto shown = knob(unsigned(touched));
     bool chop = page == Page::Chop || page == Page::ToPads;
-    ui::rail(g, "KNOB", std::to_string(touched + 1), chop ? "SLC" : pad_label(pad));
+    std::string below = track == Track::Synth ? (module ? upper(module->info().abbrev).substr(0, 4) : "SYN") : chop ? "SLC" : pad_label(pad);
+    ui::rail(g, "KNOB", std::to_string(touched + 1), below);
     ui::big_parameter(g, ui::content(4, 44), shown.name, shown.value, shown.fraction);
+}
+
+void MelodeeApp::draw_synth(juce::Graphics& g) {
+    // The rail as docs/UI.md has a module's page: module, track, page.
+    if (!module) {
+        ui::rail(g, "SYN", "2", note_name(synth_note(0)));
+        move::draw_text_centred(g, ui::content_x, 18, ui::content_width, module_loading ? "LOADING" : "NO SYNTH", 2);
+        ui::detail(g, "MENU: MODULES");
+        return;
+    }
+    const ModulePage* shown = synth_page < module->pages.size() ? &module->pages[synth_page] : nullptr;
+    ui::rail(g, upper(module->info().abbrev).substr(0, 4), "2", std::to_string(synth_page + 1) + "/" + std::to_string(module->pages.size()));
+    std::string title = upper(shown ? shown->name : module->info().name).substr(0, 12), lowest = note_name(synth_note(0));
+    move::draw_text(g, ui::content_x + 1, 1, title);
+    move::draw_text(g, ui::width - int(lowest.size()) * move::glyph_advance, 1, lowest); // the bottom-left pad's note
+    std::array<std::string, 8> names;
+    std::array<float, 8> values {};
+    for (unsigned n = 0; shown && n < shown->knobs.size() && n < 8; ++n)
+        if (const ModuleParam* param = module->param(shown->knobs[n])) {
+            names[n] = cell_name(*param);
+            values[n] = float(param->fraction());
+        }
+    ui::knob_cells(g, ui::content(11, ui::subject_height - 11), names, values);
+    if (!module->preset_param.empty()) {
+        char number[16];
+        std::snprintf(number, sizeof number, "%03d", std::clamp(module->preset + 1, 0, 999));
+        ui::detail(g, upper(module->preset_name.empty() ? module->info().name : module->preset_name).substr(0, 12), number);
+    } else ui::detail(g, upper(module->info().name).substr(0, 16));
+}
+
+void MelodeeApp::draw_modules(juce::Graphics& g) {
+    ui::rail(g, "LOAD", "2", "SYN");
+    if (catalog.empty()) {
+        move::draw_text_centred(g, ui::content_x, 22, ui::content_width, "NO MODULES");
+        ui::detail(g, "INSTALL VIA SCHWUNG");
+        return;
+    }
+    std::vector<std::string> rows;
+    for (const auto& choice : catalog) {
+        std::string row = upper(choice.name);
+        if (choice.api != 2) row += " (OLD)";
+        else if (module && module->info().id == choice.id) row += " *";
+        rows.push_back(row);
+    }
+    ui::list(g, ui::content(0, ui::height), rows, module_cursor, 1);
 }
 
 // ---------------------------------------------------------------- service thread
@@ -615,26 +871,26 @@ KitFile MelodeeApp::snapshot() const {
     return kit;
 }
 
-std::string MelodeeApp::write(const KitFile& kit) {
+std::string MelodeeApp::write(const KitFile& kit, const SynthFile& synth_file) {
     std::error_code error;
     auto projects = fs::path(project).parent_path();
     fs::create_directories(projects, error);
     give_to_owner_of(home, move_user_data);
     give_to_owner_of(projects.string(), move_user_data);
     auto failed = save_kit(kit, project);
-    if (failed.empty()) {
-        give_to_owner_of(project, move_user_data);
-        give_to_owner_of(project + ".chops", move_user_data);
-    }
+    if (failed.empty()) failed = save_synth(synth_file, project);
+    if (failed.empty())
+        for (const char* beside : {"", ".chops", ".synth"}) give_to_owner_of(project + beside, move_user_data);
     return failed;
 }
 
 std::string MelodeeApp::save_now() {
     std::unique_lock<std::mutex> guard(lock);
     auto kit = snapshot();
+    auto synth_file = synth_snapshot();
     dirty = false;
     guard.unlock();
-    auto error = write(kit);
+    auto error = write(kit, synth_file);
     guard.lock();
     if (error.empty()) ++saves;
     else dirty = true;
@@ -642,12 +898,32 @@ std::string MelodeeApp::save_now() {
 }
 
 std::string MelodeeApp::restore_now() {
+    bool kit_first = false, synth_first = false;
     {
         std::lock_guard<std::mutex> guard(lock);
         if (restored) return {};
         restored = true;
-        if (!samples.empty()) return {}; // something was loaded first: that is the kit now
+        kit_first = !samples.empty(); // something was loaded first: that is the kit now
+        synth_first = module != nullptr;
     }
+    if (!synth_first) {
+        SynthFile saved;
+        load_synth(project, saved);
+        {
+            std::lock_guard<std::mutex> guard(lock);
+            saved_synth = saved;
+            octave = saved.octave;
+            audio_octave.store(octave, std::memory_order_relaxed);
+            track = Track(saved.track);
+            audio_track.store(int(track), std::memory_order_relaxed);
+        }
+        if (!saved.module.empty()) {
+            auto failed = load_module_now(saved.module, &saved);
+            std::lock_guard<std::mutex> guard(lock);
+            if (!failed.empty()) say(upper(saved.module + " MISSING").substr(0, 16));
+        }
+    }
+    if (kit_first) return {};
     KitFile kit;
     auto error = load_kit(project, kit);
     if (error == "missing") return {}; // a first start: a new project
@@ -683,6 +959,18 @@ std::string MelodeeApp::restore_now() {
 
 void MelodeeApp::service() {
     if (!restored) restore_now();
+    take_answers();
+    destroy_retired();
+    std::string wanted;
+    {
+        std::lock_guard<std::mutex> guard(lock);
+        wanted.swap(module_job);
+    }
+    if (!wanted.empty()) {
+        auto failed = load_module_now(wanted);
+        std::lock_guard<std::mutex> guard(lock);
+        if (!failed.empty()) say(upper(failed).substr(0, 16));
+    }
     std::vector<Job> todo;
     {
         std::lock_guard<std::mutex> guard(lock);
@@ -702,9 +990,10 @@ void MelodeeApp::service() {
     auto now = Clock::now();
     if (dirty && now - changed_at >= autosave_idle && now >= retry_at) {
         auto kit = snapshot();
+        auto synth_file = synth_snapshot();
         dirty = false;
         guard.unlock();
-        auto error = write(kit);
+        auto error = write(kit, synth_file);
         guard.lock();
         if (error.empty()) ++saves;
         else { dirty = true; retry_at = now + autosave_retry; say("NOT SAVED"); }
@@ -719,6 +1008,57 @@ std::string MelodeeApp::load_now(const std::string& path, unsigned at) {
     return install(std::move(sample), at);
 }
 
+std::string MelodeeApp::load_module_now(const std::string& id, const SynthFile* saved) {
+    ModuleInfo info;
+    {
+        std::lock_guard<std::mutex> guard(lock);
+        auto found = std::find_if(catalog.begin(), catalog.end(), [&](const ModuleInfo& choice) { return choice.id == id; });
+        if (found == catalog.end()) return "no module " + id;
+        info = *found;
+        module_loading = true;
+    }
+    // Opened, created and set before it plays, outside the lock: a module
+    // may take its time (Surge reads its patches).
+    std::string error;
+    auto loaded = LoadedModule::load(info, error);
+    if (loaded && saved && saved->module == id) {
+        if (saved->preset >= 0 && !loaded->preset_param.empty()) {
+            loaded->set_now(loaded->preset_param, std::to_string(saved->preset));
+            loaded->preset = saved->preset;
+            for (auto& param : loaded->params) param.take(loaded->get_now(param.key));
+        }
+        for (const auto& [key, value] : saved->values)
+            if (ModuleParam* param = loaded->param(key); param && key != loaded->preset_param) {
+                loaded->set_now(key, value);
+                param->take(value);
+            }
+        if (!loaded->preset_name_param.empty()) loaded->preset_name = loaded->get_now(loaded->preset_name_param);
+    }
+    std::unique_lock<std::mutex> guard(lock);
+    module_loading = false;
+    if (!loaded) return error.empty() ? "would not load" : error;
+    if (!synth.set_module(loaded.get())) {
+        guard.unlock();
+        return "busy, try again"; // `loaded` destroyed here, never played
+    }
+    if (module) leaving.push_back(std::move(module));
+    module = std::move(loaded);
+    synth_page = 0;
+    if (!saved) {
+        saved_synth = {};
+        if (track == Track::Synth && page == Page::Load) page = Page::Play; // to play it
+        say(upper(info.name).substr(0, 16));
+        changed();
+    }
+    return {};
+}
+
+std::string MelodeeApp::synth_value(const std::string& key) const {
+    std::lock_guard<std::mutex> guard(lock);
+    const ModuleParam* param = module ? module->param(key) : nullptr;
+    return param ? param->text() : std::string();
+}
+
 unsigned MelodeeApp::slice_count() const {
     std::lock_guard<std::mutex> guard(lock);
     return slices.count;
@@ -730,10 +1070,10 @@ std::string MelodeeApp::status() const {
     unsigned used = 0, loaded = 0;
     for (const auto& sound : pads) used += sound.used();
     for (const auto& sample : samples) loaded += sample && sample->data;
-    char text[200];
-    std::snprintf(text, sizeof text, "page=%s pad=%s samples=%u slices=%u pads=%u chop=%s loading=%d saves=%u unsaved=%d",
+    char text[320];
+    std::snprintf(text, sizeof text, "page=%s pad=%s samples=%u slices=%u pads=%u chop=%s loading=%d saves=%u unsaved=%d track=%s synth=%s octave=%d",
                   names[unsigned(page)], pad_label(pad).c_str(), loaded, slices.count, used, melodee::chop_mode_name(mode), int(loading),
-                  saves, int(dirty));
+                  saves, int(dirty), track == Track::Synth ? "synth" : "kit", module ? module->info().id.c_str() : "-", octave);
     return text;
 }
 

@@ -533,6 +533,194 @@ void test_saving() {
     CHECK(!damaged.samples[0].chop.used());
 }
 
+
+void test_schwung_modules() {
+    // Schwung's module API, against the tests' stand-in module
+    // (tests/fake_module, built into build/test-modules by the Makefile).
+    using Kind = app::ModuleParam::Kind;
+    const std::string root = "build/test-modules";
+    auto found = app::scan_modules(root);
+    CHECK(found.size() == 1);
+    if (found.empty()) return;
+    const auto& info = found[0];
+    CHECK(info.id == "fake" && info.name == "Fake Synth" && info.abbrev == "FAKE" && info.api == 2);
+    CHECK(info.dsp == root + "/sound_generators/fake/dsp.so");
+    std::string error;
+    auto loaded = app::LoadedModule::load(info, error);
+    CHECK(loaded && error.empty());
+    if (!loaded) { std::cerr << "fake module: " << error << '\n'; return; }
+    // Its knobs: chain_params' four (a file path is no knob) and attack,
+    // which only a page names; the pages, root first.
+    CHECK(loaded->params.size() == 5 && !loaded->param("sample"));
+    CHECK(loaded->pages.size() == 2 && loaded->pages[0].name == "Fake" && loaded->pages[1].name == "Envelope");
+    CHECK((loaded->pages[0].knobs == std::vector<std::string> {"level", "wave", "voices", "preset"}));
+    // Each value as the module reports it once created.
+    auto* attack = loaded->param("attack");
+    CHECK(attack && attack->short_name == "ATK" && std::abs(attack->value - 0.1) < 1e-6);
+    auto* wave = loaded->param("wave");
+    CHECK(wave && wave->kind == Kind::Enum && wave->value == 1 && wave->shown() == "Square" && wave->text() == "1");
+    if (wave) {
+        wave->turn(-1, false);
+        CHECK(wave->text() == "0" && wave->shown() == "Sine");
+        wave->turn(-5, false);
+        CHECK(wave->value == 0);
+        wave->take("Square"); // an answer by name
+        CHECK(wave->value == 1);
+    }
+    auto* level = loaded->param("level");
+    CHECK(level && std::abs(level->value - 0.5) < 1e-6);
+    if (level) {
+        level->turn(10, false);
+        CHECK(std::abs(level->value - 0.6) < 1e-9 && level->text() == "0.6" && level->shown() == "60%");
+        level->turn(1, true); // Shift: a tenth of a step
+        CHECK(std::abs(level->value - 0.601) < 1e-9);
+    }
+    auto* voices = loaded->param("voices");
+    CHECK(voices && voices->kind == Kind::Int && voices->value == 4);
+    if (voices) { voices->turn(10, false); CHECK(voices->value == 8); }
+    CHECK(loaded->preset_param == "preset" && loaded->preset_count == 10 && loaded->preset_name == "Fake 0");
+    auto* preset = loaded->param("preset");
+    CHECK(preset && preset->max == 9); // its max_param, preset_count, less one
+    // What the host tells it of the tempo, through get_bpm() and through
+    // schwung_move_info(), which it finds in the process.
+    app::set_module_tempo(97.0f);
+    CHECK(loaded->get_now("bpm") == "97" && loaded->get_now("tempo") == "97");
+    app::set_module_tempo(120.0f);
+
+    // Played as the audio thread plays it: notes, pressure, a parameter set
+    // and reads answered on the next block.
+    app::SynthPlayer player;
+    CHECK(player.set_module(loaded.get()));
+    AudioBlock in {}, out {};
+    out.fill(0);
+    player.render(in, out, 1.0f);
+    CHECK(player.live() && peak_of(out) == 0);
+    player.note_on(60, 127);
+    out.fill(0);
+    player.render(in, out, 1.0f);
+    int32_t loud = peak_of(out);
+    CHECK(loud > to_s32(0.1f));
+    player.pressure(60, 127);
+    CHECK(player.ask("pressure") && player.ask("note"));
+    out.fill(0);
+    player.render(in, out, 1.0f);
+    CHECK(peak_of(out) > loud);
+    app::SynthPlayer::Answer answer;
+    CHECK(player.answer(answer) && std::string(answer.key) == "pressure" && std::string(answer.value) == "127");
+    CHECK(player.answer(answer) && std::string(answer.key) == "note" && std::string(answer.value) == "60");
+    player.set("level", "0.25");
+    player.ask("level");
+    player.note_off(60);
+    out.fill(0);
+    player.render(in, out, 1.0f);
+    CHECK(peak_of(out) == 0);
+    CHECK(player.answer(answer) && std::string(answer.key) == "level" && std::string(answer.value) == "0.25");
+    // Let go: handed back, to be destroyed off the audio thread.
+    CHECK(!player.retired());
+    CHECK(player.set_module(nullptr));
+    player.render(in, out, 1.0f);
+    CHECK(!player.live() && player.retired() == loaded.get());
+}
+
+void test_synth_track() {
+    // The synth track in Melodee: Row 2; Menu lists the modules and the
+    // jogwheel's push loads one; pads play it; knobs and presets set it; it
+    // is saved beside the project and read back by the next start.
+    std::string folder = "build/test-samples", home = "build/test-home-synth", modules = "build/test-modules";
+    std::filesystem::create_directories(folder);
+    std::filesystem::remove_all(home);
+    auto press = [](app::MelodeeApp& melodee, Button button) { melodee.surface(make_event(0xb0, button_cc(button), 127)); };
+    auto loudest = [](app::MelodeeApp& melodee, int blocks) {
+        AudioBlock in {}, out {};
+        int32_t peak = 0;
+        for (int block = 0; block < blocks; ++block) { out.fill(0); melodee.render(in, out); peak = std::max(peak, peak_of(out)); }
+        return peak;
+    };
+    std::string project;
+    {
+        app::MelodeeApp melodee(folder, home, modules);
+        Session session;
+        melodee.attach(session);
+        melodee.audio_opened(AudioFormat {});
+        CHECK(melodee.restore_now().empty());
+        press(melodee, Button::Row2);
+        CHECK(has(melodee.status(), "track=synth synth=-"));
+        press(melodee, Button::Menu);
+        CHECK(has(melodee.status(), "page=load"));
+        press(melodee, Button::MainPush);
+        melodee.service(); // loads it
+        CHECK(has(melodee.status(), "page=play") && has(melodee.status(), "synth=fake"));
+        // A pad plays a note, in the cycle it was read; let go, it stops.
+        melodee.audio_event(make_event(0x90, pad_note(0), 100));
+        CHECK(loudest(melodee, 1) > to_s32(0.05f));
+        melodee.audio_event(make_event(0x80, pad_note(0), 0));
+        CHECK(loudest(melodee, 1) == 0);
+        // Loaded again: a new instance; the one before is let go and destroyed.
+        press(melodee, Button::Menu);
+        press(melodee, Button::MainPush);
+        melodee.service();
+        loudest(melodee, 1);
+        melodee.service();
+        CHECK(has(melodee.status(), "synth=fake"));
+        // The jogwheel: the next preset, which sets the level; the module's
+        // values asked for again and shown.
+        melodee.surface(make_event(0xb0, main_knob_cc, 1));
+        loudest(melodee, 3);
+        melodee.service();
+        CHECK(melodee.synth_value("preset") == "1" && melodee.synth_value("level") == "0.1");
+        melodee.surface(make_event(0xb0, knob_first_cc, 3)); // knob 1: level, up three
+        CHECK(melodee.synth_value("level") == "0.13");
+        press(melodee, Button::Up);
+        CHECK(has(melodee.status(), "octave=1"));
+        // Row 1: the kit again; its pads its own.
+        press(melodee, Button::Row1);
+        CHECK(has(melodee.status(), "track=kit"));
+        melodee.audio_event(make_event(0x90, pad_note(0), 100));
+        CHECK(loudest(melodee, 2) == 0); // an empty kit
+        melodee.audio_event(make_event(0x80, pad_note(0), 0));
+        press(melodee, Button::Row2);
+        CHECK(melodee.save_now().empty());
+        project = melodee.project_path();
+    }
+    app::SynthFile saved;
+    app::load_synth(project, saved);
+    CHECK(saved.module == "fake" && saved.preset == 1 && saved.octave == 1 && saved.track == 1);
+    bool level_saved = false;
+    for (const auto& [key, value] : saved.values) level_saved |= key == "level" && value == "0.13";
+    CHECK(level_saved);
+    {
+        app::MelodeeApp second(folder, home, modules);
+        Session session;
+        second.attach(session);
+        second.audio_opened(AudioFormat {});
+        CHECK(second.restore_now().empty());
+        CHECK(has(second.status(), "track=synth synth=fake octave=1"));
+        CHECK(second.synth_value("level") == "0.13" && second.synth_value("preset") == "1");
+        second.audio_event(make_event(0x90, pad_note(0), 100));
+        CHECK(loudest(second, 1) > 0);
+    }
+    {
+        // Its module gone: the track keeps naming it, and saves it so.
+        app::MelodeeApp third(folder, home, "build/test-no-modules");
+        Session session;
+        third.attach(session);
+        CHECK(third.restore_now().empty());
+        CHECK(has(third.status(), "synth=-"));
+        CHECK(third.save_now().empty());
+    }
+    app::load_synth(project, saved);
+    CHECK(saved.module == "fake" && saved.preset == 1);
+    // The file's own lines: a value with spaces; a damaged file is none.
+    app::SynthFile text;
+    text.module = "obxd";
+    text.values = {{"mode", "Saw Up"}};
+    app::SynthFile back;
+    app::read_synth(app::synth_text(text), back);
+    CHECK(back.module == "obxd" && back.values.size() == 1 && back.values[0].second == "Saw Up");
+    app::read_synth("something else\nmodule x\n", back);
+    CHECK(back.module.empty());
+}
+
 } // namespace
 
 int main() {
@@ -547,6 +735,8 @@ int main() {
     test_spi_host();
     test_melodee_app();
     test_saving();
+    test_schwung_modules();
+    test_synth_track();
     std::cout << "move-tests: " << checks - failures << " of " << checks << " checks passed\n";
     return failures ? 1 : 0;
 }

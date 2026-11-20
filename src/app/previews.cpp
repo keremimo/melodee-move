@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <chrono>
 #include <iostream>
+#include "app/module_host.h"
 #include <thread>
 
 namespace app {
@@ -30,7 +31,7 @@ bool save(MelodeeApp& melodee, const juce::File& folder, const char* name) {
 
 } // namespace
 
-int write_previews(const std::string& directory) {
+int write_previews(const std::string& directory, const std::string& modules) {
     auto folder = juce::File::getCurrentWorkingDirectory().getChildFile(juce::String(directory.c_str()));
     folder.createDirectory();
     auto samples = folder.getChildFile("samples");
@@ -38,7 +39,10 @@ int write_previews(const std::string& directory) {
     auto loop = samples.getChildFile("Break 120.wav").getFullPathName().toStdString();
     if (!move::write_test_loop(loop)) return 1;
 
-    MelodeeApp melodee(samples.getFullPathName().toStdString(), folder.getChildFile("home").getFullPathName().toStdString());
+    auto home = folder.getChildFile("home");
+    home.deleteRecursively(); // a fresh project each time
+    MelodeeApp melodee(samples.getFullPathName().toStdString(), home.getFullPathName().toStdString(),
+                       modules.empty() ? folder.getChildFile("no-modules").getFullPathName().toStdString() : modules);
     move::Session session;
     melodee.attach(session);
     melodee.audio_opened(move::AudioFormat {});
@@ -70,6 +74,25 @@ int write_previews(const std::string& directory) {
     ok = save(melodee, folder, "chop") && ok;
     press(move::Button::MainPush);
     ok = save(melodee, folder, "to-pads") && ok;
+    if (modules.empty()) return ok ? 0 : 1;
+
+    // The synth track: empty, its modules, the first one loaded, a knob.
+    press(move::Button::Back);
+    press(move::Button::Back);
+    press(move::Button::Row2);
+    ok = save(melodee, folder, "synth-empty") && ok;
+    press(move::Button::Menu);
+    ok = save(melodee, folder, "synth-modules") && ok;
+    press(move::Button::Menu);
+    std::string first;
+    for (const auto& info : scan_modules(modules))
+        if (info.api == 2) { first = info.id; break; }
+    if (first.empty() || !melodee.load_module_now(first).empty()) { std::cerr << "no module to preview in " << modules << '\n'; return 1; }
+    std::this_thread::sleep_for(std::chrono::milliseconds(1600)); // the module's name, said, is gone
+    ok = save(melodee, folder, "synth") && ok;
+    send(0x9f, 1, 127); // touch knob 2
+    ok = save(melodee, folder, "synth-touch") && ok;
+    send(0x9f, 1, 0);
     return ok ? 0 : 1;
 }
 

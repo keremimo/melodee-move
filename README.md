@@ -10,9 +10,9 @@ Three parts so far:
   [sample-base](../melodee-sample/base) hosts Melodee on the MPC Sample. It
   runs on a Move on Ableton's firmware (realtime, 1 late block in 98,000).
 - **Melodee** (`src/app/`), the first scope of the Rail design
-  ([docs/UI.md](docs/UI.md)): one kit track of 32 pads on Melodee's own
-  sampler and Chop, compiled unchanged from melodee-sample. It runs against
-  a simulated Move; **not yet on a Move**.
+  ([docs/UI.md](docs/UI.md)): a kit track of 32 pads on Melodee's own
+  sampler and Chop, compiled unchanged from melodee-sample, and a synth
+  track playing one of Schwung's sound generators. It runs on a Move.
 - The **spike** (`--app spike`), which exercises every path through the
   runtime, with a latency meter.
 
@@ -32,6 +32,15 @@ Three parts so far:
   Right picks a slice, knobs 1 and 2 move its start and end. Push the
   jogwheel for **To Pads** (Poly, Mono, Thru), onto the first empty pads.
   Back or Loop leaves Chop without changing the pads.
+- **Synth** (Row 2; Row 1 is the kit again): one of Schwung's sound
+  generators, the ones the Move's Schwung install has
+  (`/data/UserData/schwung/modules/sound_generators`, or `--modules DIR`).
+  Menu lists them, the jogwheel's push loads one. Pads are notes in rows of
+  fourths, C2 at the bottom left; Up and Down move an octave (a drum module
+  such as 9w9 wants notes from 36: one octave down); pressure is polyphonic
+  aftertouch. Knobs 1-8 are the module's page (from its `ui_hierarchy`, or
+  its parameters eight at a time), Left / Right its pages, the jogwheel its
+  presets.
 - The master knob is the volume; Shift + Back goes back to Move.
 - **Saving**: the kit is a Melodee project, `/data/UserData/Melodee/Projects/Move.mldp`
   (`--home` moves the folder), saved three seconds after the last change, as
@@ -40,10 +49,37 @@ Three parts so far:
   it is back. Melodee keeps a sample's chop in the WAV file itself; here the
   samples are the Move's own library, left untouched, so each chop goes
   beside the project in `Move.mldp.chops`. Each file is written whole or not
-  at all (a temporary file, flushed, renamed).
+  at all (a temporary file, flushed, renamed). The synth track goes beside
+  it too, in `Move.mldp.synth`: the module by id, its preset and each
+  parameter's value; a module that has gone stays named until it is back.
 
-Not yet: more than one project, formats other than WAV, samples over 60
-seconds, Record, Capture, Schwung's modules, more tracks.
+Not yet: more than one project, samples over 60 seconds, Record, Capture,
+Schwung's effects, more tracks, a sequencer.
+
+### How a Schwung module is hosted
+
+Each synth is its own `dsp.so`, loaded through Schwung's v2 plug-in API
+(`src/app/schwung_api.h`, declared from Schwung's `plugin_api_v1.h`), as
+Schwung's Signal Chain loads one; [Movy](https://github.com/DimaDake/schwung-movy),
+which hosts Schwung's modules in a standalone program too, was the guide
+for what a host outside Schwung must provide (`src/app/module_host.*`):
+
+- A complete host table: 44.1 kHz, 128 frames, the device page with each
+  block's input where a module reads it, the tempo through `get_bpm()`, and
+  no Move tracks to send MIDI to.
+- `schwung_move_info()`, exported from the binary: modules look it up in the
+  process for the tempo before falling back to what the last Schwung
+  session left in shared memory.
+- A module is opened, created and asked for its parameters on the service
+  thread, then handed to the audio thread, which alone calls it from then
+  on (notes in the cycle the pad was read, parameter sets and reads, the
+  render). One replaced is handed back and destroyed off the audio thread;
+  its library is never closed (modules start threads).
+- SIGPIPE is ignored: a streaming module's broken pipe must not end Melodee.
+
+`melodee-move --probe-modules /data/UserData/schwung/modules` loads each one
+beside Ableton's app (the device is not touched), lists its pages, plays a
+chord and times the renders.
 
 Melodee's engine and model are compiled from a melodee-sample checkout
 beside this one (`../melodee-sample`, or `MELODEE_SAMPLE`), unchanged.
@@ -97,10 +133,10 @@ the tap's click and the sound in the waveform is what you hear.
 | --- | --- |
 | `src/move/` | move-base. `app.h` the `App` interface (sample-base's hooks plus `audio_event`); `runtime.*` the threads; `host.*` what a host shares with them; `spi_host.cpp`, `spi_device.*`, `spi_protocol.*` the Move's device and a simulated one; `jack_host.cpp` the JACK host (libjack loaded at run time); `audio.h` blocks and the reblocker; `controls.*`, `lights.*`, `display.*`, `font.*`, `latency.h`, `tools.*` |
 | `src/ui/` | the interface kit for the Rail design (docs/UI.md), and its mockups (`--ui-mockups DIR`) |
-| `src/app/` | Melodee on the Move: `melodee_app.*` the app, `kit_player.*` Melodee's SamplerEngine on the audio thread, `previews.*` its screens offline |
+| `src/app/` | Melodee on the Move: `melodee_app.*` the app, `kit_player.*` Melodee's SamplerEngine on the audio thread, `project_store.*` saving, `schwung_api.h` and `module_host.*` Schwung's modules, `module_probe.*` trying them, `previews.*` its screens offline |
 | `src/spike/` | the spike app |
 | `module/` | the Schwung standalone tool: `module.json`, `standalone` |
-| `tests/` | unit tests, and the device host against the simulated Move |
+| `tests/` | unit tests, the device host against the simulated Move, and `fake_module/`, a stand-in Schwung module |
 | `tools/` | build image, packaging, deploy and probe scripts |
 
 ## Build
@@ -114,9 +150,10 @@ Needs Docker and Python 3.
 It builds `build/melodee-move` for linux/arm64 on Ubuntu 22.04: glibc 2.35 is
 the newest Ableton's firmware has, libstdc++ is linked in, and the code is
 tuned for the Move's Cortex-A72. Then: the unit tests, the sound self-test,
-the screen previews, a run against the simulated Move (pad, jogwheel to
-LATENCY, the meter timing clicks through a 300-frame cable, Shift + Back),
-and the packages:
+the screen previews, runs against the simulated Move (the spike: pad,
+jogwheel to LATENCY, the meter timing clicks through a 300-frame cable,
+Shift + Back; Melodee: load, chop, To Pads, saved and restored; the synth
+track with the stand-in module, saved and restored), and the packages:
 
 - `dist/melodee-move/`: the binary, the libraries Ableton's firmware lacks,
   a launcher and `run-stock.sh`;
@@ -151,6 +188,9 @@ terminal: Ableton's app is stopped as the Move's own shutdown stops it, the
 spike runs with realtime priority, and Ableton's app comes back however it
 ends (Shift + Back, Ctrl-C, the connection dropping, a crash; a reboot
 always comes back to stock). As with any quit of Move, save your Set first.
+Run this way, Melodee is root, and so are the Schwung modules it plays: what
+they write in `/data/UserData/schwung` during the run (logs, caches) is given
+back to the Move's user on the way out, so Schwung can write it again.
 
 **On poundhard-armbian**: `tools/deploy.sh move.local` (the JACK host; the
 launcher menu is stopped while it runs).
@@ -194,7 +234,22 @@ card. The report stays in `.local/probe/`.
 - The JACK host against a dummy JACK server, earlier; the scripts' signal
   handling in a pseudo-terminal.
 
-Not tested: anything on a Move.
+On a Move (Ableton's firmware 4.1, Schwung installed):
+
+- The spike: realtime, 1 late exchange in 98,000; a pad read to rendered
+  in 55 µs at most.
+- Melodee, kit track: 310,000 exchanges (15 minutes), 2 late; the cycle's
+  work 6 µs on average, 19 at most; pad to rendered 20 µs, 54 at most; 15
+  autosaves, and the next start restored the kit.
+- `--probe-modules`, beside Ableton's app: all 11 of Schwung's v2 synths
+  load (8w8, 9w9, aphex, chonk, clementine-xt, hush1, obxd, radiogarden,
+  surge, webstream, wurl; Surge in 0.3 s with 675 presets, OB-Xd with 128);
+  8 sound from a chord at C2 (9w9 wants its drum notes, from 36; radiogarden
+  and webstream are streams). Renders 3-320 µs a block on average, not
+  realtime and sharing the CPU with Ableton's app. Linein (the older v1
+  API) is not loaded yet.
+
+Not yet tested on a Move: the synth track played from the pads.
 
 ## What the crush shows
 
@@ -207,9 +262,7 @@ to be designed again for this screen.
 
 - The latency meter on a Move (LATENCY page, jogwheel push), against
   Ableton's firmware and Schwung.
-- Melodee's engine on move-base, the sampler and Chop first.
-- The interface: the Rail design ([docs/UI.md](docs/UI.md)), Chop first.
-- Loading Schwung's modules as instruments and effects.
+- The synth track played on a Move; Schwung's effects on a track.
 
 ## Licence
 

@@ -159,6 +159,7 @@ void knob_cells(juce::Graphics& g, juce::Rectangle<int> area, const std::array<s
                 const std::array<float, 8>& values, int touched) {
     int cell_width = area.getWidth() / 4, cell_height = area.getHeight() / 2;
     for (int knob = 0; knob < 8; ++knob) {
+        if (names[size_t(knob)].empty()) continue; // no knob there: an empty cell
         int x = area.getX() + (knob % 4) * cell_width, y = area.getY() + (knob / 4) * cell_height;
         bool chosen = knob == touched;
         g.setColour(on);
