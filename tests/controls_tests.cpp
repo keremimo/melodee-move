@@ -166,6 +166,8 @@ void test_decisions() {
     CHECK(resolve(kit, use_of(Control::TrackButton, Gesture::Hold, held::none, 2)) == Job::PeekTrack);
     CHECK(resolve(kit, use_of(Control::Step, Gesture::Press, held::track, 8)) == Job::PickTrack);
     CHECK(resolve({Screen::Chop, Track::Kit}, use_of(Control::Step, Gesture::Press, held::track, 8)) == Job::PickTrack);
+    CHECK(resolve(kit, use_of(Control::Step, Gesture::Press, held::track | held::copy, 4)) == Job::CopyTrack);
+    CHECK(resolve(kit, use_of(Control::Step, Gesture::Press, held::track | held::del, 4)) == Job::ClearTrack);
     CHECK(resolve(kit, use_of(Control::NoteSession, Gesture::Press, held::shift)) == Job::TracksOverview);
     CHECK(resolve(kit, use_of(Control::TrackButton, Gesture::Press, held::shift)) == Job::TrackOptions);
     CHECK(resolve({Screen::Session, Track::Kit}, use_of(Control::Plus)) == Job::TrackBank);

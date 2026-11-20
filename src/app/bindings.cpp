@@ -82,16 +82,16 @@ std::vector<Binding> make_table() {
         {"Delete held + Step (Loop)", S::Loop, T::Any, H::del, C::Step, G::Press, J::ClearBar, St::Wave2, sequencer},
         {"Step (Chop)", S::Chop, T::Any, H::none, C::Step, G::Press, J::PlayFromPart, St::Wave2, sampling},
         {"Step (Typing)", S::Typing, T::Any, H::none, C::Step, G::Press, J::TypeDigit, St::Done},
-        {"Track button held + Step", S::Any, T::Any, H::track, C::Step, G::Press, J::PickTrack, St::Core},
+        {"Track button held + Step", S::Any, T::Any, H::track, C::Step, G::Press, J::PickTrack, St::Done},
 
         // Shift + steps
         {"Shift + Step 1", S::Any, T::Any, H::shift, C::Step, G::Press, J::Projects, St::Wave2, projects, step(1)},
         {"Shift + Step 2", S::Any, T::Any, H::shift, C::Step, G::Press, J::Setup, St::Wave2, projects, step(2)},
         {"Shift + Step 3", S::Any, T::Any, H::shift, C::Step, G::Press, J::Workflow, St::Wave2, sequencer, step(3)},
         {"Shift + Step 4", S::Any, T::Any, H::shift, C::Step, G::Press, J::Mixer, St::Wave2, mixer, step(4)},
-        {"Shift + Step 5", S::Any, T::Any, H::shift, C::Step, G::Press, J::Tempo, St::Core, "", step(5)},
-        {"Shift + Step 6", S::Any, T::Any, H::shift, C::Step, G::Press, J::Metronome, St::Core, "", step(6)},
-        {"Shift + Step 7", S::Any, T::Any, H::shift, C::Step, G::Press, J::Groove, St::Core, "", step(7)},
+        {"Shift + Step 5", S::Any, T::Any, H::shift, C::Step, G::Press, J::Tempo, St::Next, "", step(5)},
+        {"Shift + Step 6", S::Any, T::Any, H::shift, C::Step, G::Press, J::Metronome, St::Next, "", step(6)},
+        {"Shift + Step 7", S::Any, T::Any, H::shift, C::Step, G::Press, J::Groove, St::Next, "", step(7)},
         {"Shift + Step 8", S::Any, T::Any, H::shift, C::Step, G::Press, J::SixteenPitches, St::Wave2, kit_depth, step(8)},
         {"Shift + Step 9", S::Any, T::Any, H::shift, C::Step, G::Press, J::KeysAndScales, St::Wave2, instruments, step(9)},
         {"Shift + Step 10", S::Any, T::Any, H::shift, C::Step, G::Press, J::FullVelocity, St::Wave2, instruments, step(10)},
@@ -103,14 +103,14 @@ std::vector<Binding> make_table() {
         {"Shift + Step 16", S::Any, T::Any, H::shift, C::Step, G::Press, J::Quantize, St::Wave2, sequencer, step(16)},
 
         // Track buttons
-        {"Track button", S::Any, T::Any, H::none, C::TrackButton, G::Tap, J::SelectTrack, St::Core},
-        {"Track button held", S::Any, T::Any, H::none, C::TrackButton, G::Hold, J::PeekTrack, St::Core},
+        {"Track button", S::Any, T::Any, H::none, C::TrackButton, G::Tap, J::SelectTrack, St::Next},
+        {"Track button held", S::Any, T::Any, H::none, C::TrackButton, G::Hold, J::PeekTrack, St::Next},
         {"Track button held + Volume knob", S::Any, T::Any, H::track, C::Volume, G::Turn, J::TrackLevel, St::Wave2, mixer},
         {"Shift + Track button", S::Any, T::Any, H::shift, C::TrackButton, G::Press, J::TrackOptions, St::Wave2, projects},
         {"Mute held + Track button", S::Any, T::Any, H::mute, C::TrackButton, G::Press, J::MuteTrack, St::Wave2, mixer},
         {"Shift + Mute held + Track button", S::Any, T::Any, H::shift | H::mute, C::TrackButton, G::Press, J::SoloTrack, St::Wave2, mixer},
-        {"Copy held + Track button", S::Any, T::Any, H::copy, C::TrackButton, G::Press, J::CopyTrack, St::Core},
-        {"Delete held + Track button", S::Any, T::Any, H::del, C::TrackButton, G::Press, J::ClearTrack, St::Core},
+        {"Track button held + Copy held + Step", S::Any, T::Any, H::track | H::copy, C::Step, G::Press, J::CopyTrack, St::Done},
+        {"Track button held + Delete held + Step", S::Any, T::Any, H::track | H::del, C::Step, G::Press, J::ClearTrack, St::Done},
 
         // Knobs
         {"Knob", S::Any, T::Any, H::none, C::Knob, G::Turn, J::TurnKnob, St::Done},
@@ -153,7 +153,7 @@ std::vector<Binding> make_table() {
         {"Shift + Loop held + Wheel turn", S::Play, T::Any, H::shift | H::loop, C::WheelTurn, G::Turn, J::LoopLengthFine, St::Wave2, sequencer},
 
         // Transport
-        {"Play", S::Any, T::Any, H::none, C::Play, G::Press, J::PlayStop, St::Core},
+        {"Play", S::Any, T::Any, H::none, C::Play, G::Press, J::PlayStop, St::Done},
         {"Shift + Play", S::Any, T::Any, H::shift, C::Play, G::Press, J::Restart, St::Core},
         {"Play (Overview)", S::Overview, T::Any, H::none, C::Play, G::Press, J::PreviewProject, St::Wave2, projects},
         {"Rec", S::Any, T::Any, H::none, C::Rec, G::Press, J::Record, St::Core},
@@ -181,7 +181,7 @@ std::vector<Binding> make_table() {
         // Note/Session, Back, Shift
         {"Note/Session", S::Any, T::Any, H::none, C::NoteSession, G::Tap, J::ToggleSession, St::Wave2, sequencer},
         {"Note/Session held", S::Any, T::Any, H::none, C::NoteSession, G::Hold, J::PeekSession, St::Wave2, sequencer},
-        {"Shift + Note/Session", S::Any, T::Any, H::shift, C::NoteSession, G::Press, J::TracksOverview, St::Core},
+        {"Shift + Note/Session", S::Any, T::Any, H::shift, C::NoteSession, G::Press, J::TracksOverview, St::Next},
         {"Back", S::Any, T::Any, H::none, C::Back, G::Press, J::Back, St::Done},
         {"Back held", S::Any, T::Any, H::none, C::Back, G::Hold, J::BackToPlay, St::Next},
         {"Back (Chop)", S::Chop, T::Any, H::none, C::Back, G::Press, J::LeaveChop, St::Done},
@@ -202,8 +202,8 @@ std::vector<Binding> make_table() {
         {"Plus or Minus (16 Pitches)", S::Play, T::Pitches, H::none, C::Minus, G::Press, J::PitchesOctave, St::Wave2, kit_depth},
         {"Shift + Plus or Minus", S::Play, T::Any, H::shift, C::Plus, G::Press, J::ScaleStep, St::Wave2, instruments},
         {"Shift + Plus or Minus", S::Play, T::Any, H::shift, C::Minus, G::Press, J::ScaleStep, St::Wave2, instruments},
-        {"Plus or Minus (Session)", S::Session, T::Any, H::none, C::Plus, G::Press, J::TrackBank, St::Core},
-        {"Plus or Minus (Session)", S::Session, T::Any, H::none, C::Minus, G::Press, J::TrackBank, St::Core},
+        {"Plus or Minus (Session)", S::Session, T::Any, H::none, C::Plus, G::Press, J::TrackBank, St::Wave2, sequencer},
+        {"Plus or Minus (Session)", S::Session, T::Any, H::none, C::Minus, G::Press, J::TrackBank, St::Wave2, sequencer},
         {"Plus or Minus (Chop)", S::Chop, T::Any, H::none, C::Plus, G::Press, J::SlicePage, St::Wave2, sampling},
         {"Plus or Minus (Chop)", S::Chop, T::Any, H::none, C::Minus, G::Press, J::SlicePage, St::Wave2, sampling},
         {"Left or Right (Play)", S::Play, T::Any, H::none, C::Left, G::Press, J::Bar, St::Wave2, sequencer},

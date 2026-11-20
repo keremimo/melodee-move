@@ -144,7 +144,7 @@ the amount, as the Move's wheel sets the number of slices.
 | Delete held + Step (Loop) | Clears the bar's notes | The same | wave 2: sequencer |
 | Step (Chop) | No job | Plays the sample from that sixteenth (the steps are the sample in 16 parts, lit where a cut falls) | wave 2: sampling |
 | Step (Typing) | (Text is typed with the wheel) | A digit, steps 1-10 | done |
-| Track button held + Step | No job | Picks track 1-16 | core |
+| Track button held + Step | No job | Picks track 1-16; an empty one opens the new-track sheet | done |
 
 ### Shift + steps
 
@@ -157,9 +157,9 @@ while Shift is held.
 | Shift + Step 2 | Setup: battery, Wi-Fi, update, Cloud, Control Live, Link, MIDI and MIDI Sync, USB-C audio, Move Manager, brightness | Setup: Melodee's settings, MIDI and sync, LED brightness, the web page's address and code, Back to Move | wave 2: MIDI/sync/undo/projects |
 | Shift + Step 3 | Workflow Settings: quantize amount, step grid, count-in, autoload, time signature, maximum recording length | The same for Melodee's patterns | wave 2: sequencer |
 | Shift + Step 4 | No job | The Mixer: 16 tracks, their effects | wave 2: mixer & effects |
-| Shift + Step 5 | Tempo (the wheel; Shift for fine; push confirms) | Tempo | core |
-| Shift + Step 6 | Metronome on or off | The same | core |
-| Shift + Step 7 | Groove: triplet sixteenth swing, 0-100 % and beyond | Swing | core |
+| Shift + Step 5 | Tempo (the wheel; Shift for fine; push confirms) | The Tempo screen (today on Shift + Play) | next |
+| Shift + Step 6 | Metronome on or off | The same (today a push on the Tempo screen) | next |
+| Shift + Step 7 | Groove: triplet sixteenth swing, 0-100 % and beyond | Swing (today knob 2 on the Tempo screen) | next |
 | Shift + Step 8 | Layout: 16 Pitches on or off (drums) | 16 Pitches on the right 16 pads | wave 2: kit depth |
 | Shift + Step 9 | Keys & Scales: In-Key or Chromatic, octaves or 4ths, key, scale | The project's key and scale, a synth's layout | wave 2: instruments |
 | Shift + Step 10 | Full Velocity on or off | Full Level | wave 2: instruments |
@@ -174,14 +174,14 @@ while Shift is held.
 
 | Control | On the Move | In Melodee | Status |
 | --- | --- | --- | --- |
-| Track button | Selects the track (and Note Mode, from the Overview or Session) | Selects that track of the bank in view (today Track 1 is the kit, Track 2 the synth) | core |
-| Track button held | Shows that track while held, without selecting it | The same | core |
+| Track button | Selects the track (and Note Mode, from the Overview or Session) | Selects that track of the bank in view, as it is let go (today on the press) | next |
+| Track button held | Shows that track while held, without selecting it | The sixteen tracks on the screen, the steps picking (core's design A; it selects the track on the press today) | next |
 | Track button held + Volume knob | The track's volume, in dB on the screen | The track's level | wave 2: mixer & effects |
 | Shift + Track button | The track's options: colour, MIDI In and Out channel | The same | wave 2: MIDI/sync/undo/projects |
 | Mute held + Track button | Mutes or unmutes the track (its LED dims) | The same | wave 2: mixer & effects |
 | Shift + Mute held + Track button | Solos or unsolos the track (its LED blue) | The same | wave 2: mixer & effects |
-| Copy held + Track button | No job (Control Live: duplicates the track) | Copies the track onto the next one picked | core |
-| Delete held + Track button | No job (Control Live: deletes the track) | Clears the track, asked first | core |
+| Track button held + Copy held + Step | No job (Control Live: Copy + a track button duplicates the track) | Copies that track onto the next step's, asking before replacing | done |
+| Track button held + Delete held + Step | No job (Control Live: Delete + a track button deletes the track) | Deletes that track, asked first | done |
 
 ### Knobs
 
@@ -237,7 +237,7 @@ while Shift is held.
 
 | Control | On the Move | In Melodee | Status |
 | --- | --- | --- | --- |
-| Play | Starts or stops; stops a recording too | The same | core |
+| Play | Starts or stops; stops a recording too | The same | done |
 | Shift + Play | Restarts every playing clip | Restarts every pattern from its top | core |
 | Play (Overview) | Previews the selected Set | Previews the project | wave 2: MIDI/sync/undo/projects |
 | Rec | Records into the selected track (count-in first); again stops, playback goes on | Melodee's Seq Record | core |
@@ -274,7 +274,7 @@ while Shift is held.
 | --- | --- | --- | --- |
 | Note/Session | Switches Note and Session Mode; from the Overview, Session | Switches Play and the Patterns grid (today it opens Load, which moves to the wheel's push) | wave 2: sequencer |
 | Note/Session held | Shows the other mode while held | The same | wave 2: sequencer |
-| Shift + Note/Session | No job (Control Live: the Session Overview) | The 16-track overview | core |
+| Shift + Note/Session | No job (Control Live: the Session Overview) | The sixteen tracks (today a track button held) | next |
 | Back | Leaves a menu, the browser or Sampling Mode; up a folder; from the Overview, the mode before | The same | done |
 | Back held | Leaves the menu or view altogether | Back to Play from any depth | next |
 | Back (Chop) | Confirms and leaves Slicing Mode, the slices on the pads | Leaves Chop keeping the chop; the pads change only by To Pads | done |
@@ -294,7 +294,7 @@ while Shift is held.
 | Plus or Minus (Play, kit) | No job without 16 Pitches (Control Live's Drum mode: the next or previous 16 pads) | The next or previous 16 pads of the kit's 8 banks | wave 2: kit depth |
 | Plus or Minus (16 Pitches) | The pitches' octave | The same | wave 2: kit depth |
 | Shift + Plus or Minus | No job (Control Live: a scale degree; four pads) | A synth a scale degree, a kit four pads | wave 2: instruments |
-| Plus or Minus (Session) | No job (Control Live: the session ring a scene) | The bank of four tracks | core |
+| Plus or Minus (Session) | No job (Control Live: the session ring a scene) | The bank of four tracks | wave 2: sequencer |
 | Plus or Minus (Chop) | No job | Slices 33-64 | wave 2: sampling |
 | Left or Right (Play) | The clip's previous or next bar (or page of steps) | The pattern's bar (today the page, which moves to Shift + turn) | wave 2: sequencer |
 | Shift + Left or Right | No job (Control Live: 16 bars) | 16 bars | wave 2: sequencer |
@@ -333,6 +333,32 @@ Not checked by the tests: they follow from the screens.
 | Capture | Lit while there is something to keep, dark once cleared | The same | wave 2: sequencer |
 | Knob LEDs | Red with automation; with Mute held, red active, white off, dark none; green for a macro; all pulse while browsing effects | Lit for the knobs the screen uses; motion's colours with the sequencer | done |
 | White buttons | Lit where they do something | The same | done |
+
+## Where the code stands
+
+`src/app/bindings.*` holds the whole map, tested; the screens do not read
+it yet. Core's code (`src/app/melodee_app.cpp`, `src/app/screens/`, from
+`move-core-tracks`) was written before Kerem's rule and differs from the
+map here, all to move over when the table is wired:
+
+| Where | Core's code | The map |
+| --- | --- | --- |
+| `screens/chop.cpp` (its Trigger) | Loop opens Chop on a kit; Loop again leaves | Loop is Loop Mode; Chop from Sample Options (Shift + push) |
+| `screens/load_samples.cpp`, `load_modules.cpp` | Note/Session (Menu) opens Load, again closes it | The wheel's push on the Device View's item |
+| `screens/tempo.cpp` | Shift + Play opens Tempo, again leaves | Shift + Step 5; Shift + Play restarts the patterns |
+| `melodee_app.cpp`, track buttons | Select on the press, and the sixteen show at once | Select as let go; held, the sixteen (design A) |
+| `melodee_app.cpp`, typing | Back and Menu cancel | Back deletes a character, held cancels |
+| `screens/synth_play.cpp`, `kit_play.cpp` | Left / Right the pages (kit: the pad); the wheel the presets; push the module's menu | Left / Right the bar; Shift + turn the pages; the wheel walks the Device View; Shift + push the menu |
+| `docs/PARITY.md`, Move controls column | Proposals from before the rule: Shift + Step n as the MPC's Shift + Pad n, Menu (load), Shift + Capture for Recall, Left / Right pages, Shift held for patterns, Shift + Loop for the Looper | This map wins where they differ |
+
+Wiring, in that code: `MelodeeApp::surface()` feeds each input to a
+`bindings::Gestures` and runs the job `bindings::find()` names for each use
+(`Where` from the screen on top and the track's kind); a screen answers
+jobs, not raw inputs; a `Trigger` names a job (`Job::SampleOptions` opens
+Sample Options) in place of a button; `audio_event()` reads one atomic the
+MIDI thread sets from `pad_sounds()` whenever what is held or shown
+changes. `build.sh`'s simulated runs press Menu to load and Loop to chop,
+and change with it.
 
 ## The tests
 

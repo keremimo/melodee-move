@@ -29,6 +29,13 @@ user guide (`guide/*.md`).
 - `n/a`: no place on the Move. The Move controls cell says why, and what
   stands in where something does.
 
+**The Move's controls keep Ableton's meaning** (Kerem, 2026-11-20):
+[MOVE_CONTROLS.md](MOVE_CONTROLS.md) maps every Move control and shortcut,
+with his decisions, and `src/app/bindings.*` holds it as a tested table.
+Where a Move controls cell below differs from it (Shift + Step n as the
+MPC's Shift + Pad n, Menu to load, Shift + Play for tempo, Shift + Capture
+for Recall, Left / Right for pages, Shift held for patterns), the map wins.
+
 **Move controls** are proposals, to settle while building, in line with
 [UI.md](UI.md)'s control table and the core session's track design (pending
 Kerem's approval):
