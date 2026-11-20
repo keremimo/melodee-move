@@ -1018,6 +1018,14 @@ void test_tracks() {
     }
     loudest(melodee, 1);
     CHECK(before > 10 && melodee.studio().host().ticks() < 3 && has(melodee.status(), "playing=1"));
+    loudest(melodee, 40);
+    {   // The same from the Move's keys: Shift + Play.
+        std::lock_guard<std::mutex> guard(melodee.studio().lock);
+        before = melodee.studio().host().ticks();
+    }
+    with_shift(melodee, [&] { press(melodee, Button::Play); });
+    loudest(melodee, 1);
+    CHECK(before > 10 && melodee.studio().host().ticks() < 3 && has(melodee.status(), "playing=1 ") && has(melodee.status(), "job=Restart"));
     press(melodee, Button::Play);
     loudest(melodee, 2);
     CHECK(has(melodee.status(), "playing=0"));

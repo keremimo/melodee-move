@@ -132,9 +132,7 @@ bool MelodeeApp::global(bindings::Job job, const bindings::Use& use) {
         if (studio.playing()) studio.stop();
         else studio.play();
         return true;
-    case Job::Restart: // the Move's retrigger: every playing pattern from its top; stopped, nothing
-        if (studio.playing()) { studio.stop(); studio.play(); }
-        return true;
+    case Job::Restart: studio.restart(); return true; // the Move's retrigger: every playing pattern from its top
     case Job::MainVolume: studio.volume = std::clamp(studio.volume.load() + use.delta * 0.01f, 0.0f, 1.0f); return true;
     case Job::Metronome: studio.set_click(!studio.click(), studio.click_level()); return false; // and its screen opens
     // Knobs: a touch or a turn shows the knob large; the turn is the screen's.
