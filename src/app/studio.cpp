@@ -571,6 +571,16 @@ CanvasPage::Host Studio::canvas_host(unsigned t) {
     return host;
 }
 
+void Studio::start_typing(std::string title, std::string initial, std::function<void(const std::string&, bool)> done) {
+    if (typing) finish_typing(true);
+    typing = true;
+    typed = std::move(initial);
+    typing_title = std::move(title);
+    typing_track = typing_canvas = -1;
+    typing_done = std::move(done);
+    pads_typing.store(true);
+}
+
 void Studio::finish_typing(bool cancelled) {
     typing = false;
     pads_typing.store(false);
@@ -734,7 +744,7 @@ void Studio::take_back() {
     melodee::Pattern* pattern = nullptr;
     while (engine->take_retired_pattern(pattern)) delete pattern;
     const melodee::SampleData* sample = nullptr;
-    while (engine->take_retired(sample)) {} // the samples are the studio's, kept for the run
+    while (engine->take_retired(sample)) sampler_shell->retired(sample); // the samples are the studio's, kept for the run; a preview's goes
     melodee::MidiOutEvent out;
     while (engine->take_midi(out)) {} // MIDI out: not yet on the Move
     // A Schwung track's runner, handed back: its track can go now.

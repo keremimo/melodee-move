@@ -34,10 +34,10 @@ public:
         case Job::ListPush: {
             unsigned track = studio.track();
             auto kind = choices[cursor].kind;
+            if (kind == TrackKind::Kit) { studio.push("kit-sources"); return true; } // where its first sound comes from
             if (!studio.new_track(track, kind)) return true;
             studio.select(track); // its own Play screen
             if (kind == TrackKind::Synth) studio.open("load-modules");
-            else if (kind == TrackKind::Kit) studio.open("load-samples");
             return true;
         }
         case Job::Back: studio.close(); return true;

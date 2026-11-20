@@ -245,6 +245,8 @@ public:
     void quiet_speaker(bool quiet) { speaker_quiet.store(quiet, std::memory_order_relaxed); }
     // What finishes typing that no module page asked for (a sample's name), else nothing.
     std::function<void(const std::string& text, bool cancelled)> typing_done;
+    // Typing for Melodee's own (Save Sample's name): the pads and steps a keyboard until done.
+    void start_typing(std::string title, std::string initial, std::function<void(const std::string& text, bool cancelled)> done);
     // MIDI thread: whether a pad pressed now stays quiet, its job another
     // than its sound (bindings::pad_sounds()); the audio thread reads it.
     void quiet_pads(bool quiet) { pads_quiet.store(quiet, std::memory_order_relaxed); }

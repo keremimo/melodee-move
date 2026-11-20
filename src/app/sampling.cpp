@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "app/sampling.h"
+#include "app/sampling_jobs.h"
 #include "app/studio.h"
 #include "melodee/engine/engine_host.h"
 #include "melodee/engine/recall_ring.h"
@@ -40,29 +41,10 @@ bool hardware(InputSource s) { return s == InputSource::Mic || melodee::from_rea
 
 } // namespace
 
-// A file being made: a take drained from the recorder as it comes, or Audio
-// Recall's copy of the ring. The MIDI thread fills in what it is; the
-// service thread does the rest.
-struct Sampling::Job {
-    enum class Kind { Take, Recall } kind = Kind::Take;
-    std::string path;  // the file it becomes
-    std::string label; // "TAKE 3"
-    unsigned track = 0;
-    Clock::time_point armed_at {};
-    // A take, the service thread's while it records.
-    melodee::WavStream file;
-    bool open = false;
-    uint32_t drained = 0; // device frames written
-    std::vector<float> left, right; // the take as it came, while it fits a pad (60 s)
-    bool too_long = false;
-    // Audio Recall's.
-    int pad = -1;
-    melodee::RecallOptions options;
-};
-
 Sampling::Sampling(Studio& owner) : studio(owner) {
     input.threshold = int8_t(melodee::InputConfig::threshold_min); // the Move records the moment a pad is pressed
     input.source = InputSource::Rear;                               // the input, whatever the jack has (until it says)
+    read_lists();
 }
 
 Sampling::~Sampling() = default;
@@ -503,6 +485,7 @@ void Sampling::service() {
         todo.swap(recalls);
     }
     for (auto& recall : todo) land_recall(*recall);
+    service_files();
 }
 
 // The take ended: its file made whole (24-bit, or 32-bit float where it went

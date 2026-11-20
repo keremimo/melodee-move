@@ -120,6 +120,42 @@ public:
     std::string settings_text() const;
     std::string status() const; // " rec=... source=..."
 
+    // ------------------------------------------------- the browser's (sampling_files.cpp)
+    // Starred files and the last 16 loaded, newest first, kept as Starred.txt
+    // and Recent.txt in Melodee's folder, a path a line (Melodee's
+    // shell/sample_lists.h); a file that has gone is left out.
+    std::vector<std::string> starred, recent;
+    bool star(const std::string& path); // starred or not; true: starred now
+    bool is_starred(const std::string& path) const;
+    void loaded(const std::string& path); // into RECENT
+    // The preview: `path` plays on `track` (a kit) once it is read; "" stops it.
+    void preview_file(const std::string& path, unsigned track);
+    std::string previewing;          // the file playing, once read
+    uint32_t preview_frames = 0;     // its length (44.1 kHz frames)
+    Clock::time_point preview_at {}; // when it began
+    // Deleting from storage (Delete on the browser): empty when `path` may
+    // go, else why not. Kerem: in Melodee's folder and the Move's User
+    // Library, never the Core Library, a place's top or what the project plays.
+    std::string may_delete(const std::string& path) const;
+    void delete_path(const std::string& path);
+    unsigned deletes = 0; // done so far (the browser lists its folder again)
+    // Trim Sample (the pad's region into Edits/<NAME>-Trimmed.wav, the pad onto
+    // all of it), Save Sample (its region as Samples/<name>.wav, the pad as it
+    // is), Extract (a slice into Edits/<NAME>-Slice n.wav, onto the next
+    // empty pad): written on the service thread.
+    void trim(unsigned track, unsigned pad);
+    void save(unsigned track, unsigned pad, const std::string& name);
+    void extract(unsigned track, unsigned pad, uint32_t start, uint32_t end, unsigned slice);
+    // An MPC expansion (.xpn, a zip) installed into Samples/Expansions/<its
+    // title>, a file a pass; a file already there at its size is kept.
+    void install(const std::string& xpn);
+    std::string installing;              // its name while it installs
+    unsigned install_done = 0, install_total = 0;
+    std::string installed;               // the folder it went into, once done
+    unsigned installs = 0;               // done so far
+    // The audio thread let go of a sample (EngineHost::take_retired): a preview's is freed.
+    void retired(const melodee::SampleData* sample);
+
     // ------------------------------------------------- service thread
     void service();
 
@@ -131,6 +167,16 @@ private:
     std::string folder() const;
     void land_take(Job& job);
     void land_recall(Job& job);
+    void service_files(); // sampling_files.cpp
+    void read_lists();
+    struct Edit;
+    std::vector<std::unique_ptr<Edit>> edits;
+    std::string preview_wanted;
+    unsigned preview_track = 0;
+    bool preview_asked = false;
+    std::vector<std::unique_ptr<melodee::SampleData>> previews; // offered to the engine's preview slot, until handed back
+    std::vector<std::string> deleting, to_install;
+    bool lists_dirty = false;
 
     Studio& studio;
     bool input_known = false, line = false, to_speaker = true;

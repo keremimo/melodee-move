@@ -14,6 +14,7 @@
 #include "move/tools.h"
 #include "spike/spike_app.h"
 #include "app/canvas_page.h"
+#include <juce_core/juce_core.h>
 #include "app/melodee_app.h"
 #include "app/project_store.h"
 #include "melodee/model/project_file.h"
@@ -1080,9 +1081,11 @@ void test_tracks() {
     // The track buttons: the four of track 5's bank; Row 1 is track 5, Row 2 track 6 (empty).
     press(melodee, Button::Row2);
     CHECK(has(melodee.status(), "track=6 kind=empty") && has(melodee.status(), "page=empty-play"));
-    // Its push: the new-track sheet; its push again: a kit, and Load opens for it.
+    // Its push: the new-track sheet; its push again: a kit's sources (Melodee's Drum sources); LIBRARY: a kit, and Load opens for it.
     press(melodee, Button::MainPush);
     CHECK(has(melodee.status(), "page=new-track"));
+    press(melodee, Button::MainPush);
+    CHECK(has(melodee.status(), "page=kit-sources") && has(melodee.status(), "kit_source=library"));
     press(melodee, Button::MainPush);
     CHECK(has(melodee.status(), "track=6 kind=kit tracks=3") && has(melodee.status(), "page=load-samples"));
     press(melodee, Button::Back);
@@ -1321,6 +1324,126 @@ void test_sampling() {
     CHECK(has(text, "in_source 4") && has(text, "in_threshold 0"));
 }
 
+void test_sample_files() {
+    // The browser's starred and recent files, its preview, Delete (asked;
+    // what the project plays kept); Trim and Save Sample; a kit's sources on
+    // the new-track sheet; an MPC expansion installed.
+    std::string folder = "build/test-samples-files", home = "build/test-home-files", loop = folder + "/loop.wav";
+    std::filesystem::remove_all(folder);
+    std::filesystem::remove_all(home);
+    std::filesystem::create_directories(folder);
+    CHECK(write_test_loop(loop) && write_test_loop(folder + "/spare.wav") && write_test_loop(folder + "/unused.wav"));
+    {   // An expansion: a zip with its Expansion.xml, a program and its preview, a sample.
+        juce::ZipFile::Builder zip;
+        auto add = [&](const char* name, const std::string& text) {
+            zip.addEntry(std::make_unique<juce::MemoryInputStream>(text.data(), text.size(), true), 0, name, juce::Time::getCurrentTime());
+        };
+        add("Expansion.xml", "<?xml version=\"1.0\"?><expansion><title>Test Drums</title></expansion>");
+        add("Kit.xpm", "<MPCVObject/>");
+        std::ifstream wav(loop, std::ios::binary);
+        std::string bytes((std::istreambuf_iterator<char>(wav)), std::istreambuf_iterator<char>());
+        add("Samples/Kick.wav", bytes);
+        add("[Previews]/Kit.xpm.wav", bytes);
+        juce::FileOutputStream out(juce::File::getCurrentWorkingDirectory().getChildFile(juce::String(folder + "/Test.xpn")));
+        double progress = 0;
+        CHECK(out.openedOk() && zip.writeToStream(out, &progress));
+    }
+    app::MelodeeApp melodee(folder, home, "build/test-no-modules");
+    Session session;
+    melodee.attach(session);
+    melodee.audio_opened(AudioFormat {});
+    CHECK(melodee.restore_now().empty());
+    CHECK(melodee.load_now(loop, 0).empty());
+    Lights lights;
+    AudioBlock in {}, out {};
+    auto settle = [&] {
+        for (int n = 0; n < 20; ++n) {
+            melodee.service();
+            out.fill(0);
+            melodee.render(in, out);
+            melodee.lights(lights, App::Clock::now());
+        }
+    };
+    // Load: the wheel's push on the pad. One place: straight in, its files by name (loop, spare, Test.xpn, unused).
+    press_button(melodee, Button::MainPush);
+    CHECK(has(melodee.status(), "page=load-samples") && has(melodee.status(), "browse=folder"));
+    settle();
+    CHECK(has(melodee.status(), "preview=loop.wav")); // it plays as the wheel lands
+    with_shift(melodee, [&] { press_button(melodee, Button::MainPush); }); // starred
+    CHECK(has(melodee.status(), "starred=1"));
+    turn_wheel(melodee, 1);
+    settle();
+    CHECK(has(melodee.status(), "preview=spare.wav"));
+    press_button(melodee, Button::MainPush); // spare.wav onto A01: into RECENT
+    settle();
+    CHECK(has(melodee.status(), "recent=1"));
+    CHECK(std::filesystem::exists(home + "/Starred.txt") && std::filesystem::exists(home + "/Recent.txt"));
+    // Delete: spare.wav is A01's now, so kept; loop.wav is in the project still (Melodee's rule), kept; unused.wav: asked, then gone.
+    press_button(melodee, Button::Delete);
+    CHECK(has(melodee.status(), "page=delete-file"));
+    press_button(melodee, Button::MainPush);
+    settle();
+    CHECK(std::filesystem::exists(folder + "/spare.wav"));
+    press_button(melodee, Button::Back); // out, and in again: STARRED and RECENT lead the top
+    press_button(melodee, Button::MainPush);
+    CHECK(has(melodee.status(), "page=load-samples"));
+    turn_wheel(melodee, -10);
+    turn_wheel(melodee, 2); // STARRED, RECENT, loop.wav
+    press_button(melodee, Button::Delete);
+    press_button(melodee, Button::MainPush);
+    settle();
+    CHECK(std::filesystem::exists(loop));
+    turn_wheel(melodee, 10); // unused.wav
+    press_button(melodee, Button::Delete);
+    press_button(melodee, Button::Back); // no
+    settle();
+    CHECK(std::filesystem::exists(folder + "/unused.wav"));
+    press_button(melodee, Button::Delete);
+    press_button(melodee, Button::MainPush); // yes
+    settle();
+    CHECK(!std::filesystem::exists(folder + "/unused.wav") && has(melodee.status(), "starred=1"));
+    // The expansion (the last row): installed into Samples/Expansions/<its title>, then opened there.
+    turn_wheel(melodee, 10);
+    press_button(melodee, Button::MainPush);
+    settle();
+    CHECK(std::filesystem::exists(home + "/Samples/Expansions/Test Drums/Samples/Kick.wav"));
+    CHECK(has(melodee.status(), "browse=folder"));
+    turn_wheel(melodee, -10); // Kit.xpm, first: its own preview plays
+    settle();
+    CHECK(has(melodee.status(), "preview=Kit.xpm"));
+    press_button(melodee, Button::Back);
+    CHECK(has(melodee.status(), "page=kit-play"));
+    // Trim: Sample Options, TRIM: the region a file of its own, A01 onto it.
+    auto options = [&](int row) {
+        with_shift(melodee, [&] { press_button(melodee, Button::MainPush); });
+        turn_wheel(melodee, row);
+        press_button(melodee, Button::MainPush);
+    };
+    melodee.surface(make_event(0xb0, uint8_t(knob_first_cc + 3), 20)); // knob 4: A01 starts later
+    options(2);
+    settle();
+    CHECK(std::filesystem::exists(home + "/Samples/Edits/SPARE-Trimmed.wav"));
+    CHECK(has(melodee.status(), "samples=3"));
+    // Save Sample: the name typed (the sample's own given), push: done.
+    options(4);
+    CHECK(has(melodee.status(), "typing=1"));
+    tap_pad(melodee, 7); // the keyboard's backspace, bottom right
+    press_button(melodee, Button::MainPush);
+    settle();
+    CHECK(std::filesystem::exists(home + "/Samples/SPARE-Trimme.wav"));
+    // A kit's sources: EMPTY makes a kit with nothing on it.
+    melodee.surface(make_event(0xb0, button_cc(Button::Row1), 127));
+    tap_step(melodee, 2);
+    melodee.surface(make_event(0xb0, button_cc(Button::Row1), 0));
+    melodee.lights(lights, App::Clock::now());
+    CHECK(has(melodee.status(), "track=3 kind=empty") && has(melodee.status(), "page=new-track"));
+    press_button(melodee, Button::MainPush);
+    turn_wheel(melodee, 1);
+    CHECK(has(melodee.status(), "kit_source=empty"));
+    press_button(melodee, Button::MainPush);
+    CHECK(has(melodee.status(), "track=3 kind=kit") && has(melodee.status(), "page=kit-play") && has(melodee.status(), "pads=0"));
+}
+
 } // namespace
 
 int main() {
@@ -1341,6 +1464,7 @@ int main() {
     test_tracks();
     test_migration();
     test_sampling();
+    test_sample_files();
     std::cout << "move-tests: " << checks - failures << " of " << checks << " checks passed\n";
     return failures ? 1 : 0;
 }
