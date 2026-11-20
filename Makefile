@@ -75,8 +75,7 @@ SHARED_OBJECTS := $(patsubst src/%.cpp,build/obj/%.o,$(wildcard src/move/*.cpp s
 
 # A stand-in Schwung module for the tests, where Schwung keeps its synths.
 FAKE_MODULE := build/test-modules/sound_generators/fake
-all: $(TARGET) $(TESTS) $(CONTROLS_TESTS) $(INSTRUMENTS_TESTS) $(FAKE_MODULE)/dsp.so $(FAKE_MODULE)/module.json $(FAKE_MODULE)/page.js
-all: $(TARGET) $(TESTS) $(CONTROLS_TESTS) $(PAD_TESTS) $(FAKE_MODULE)/dsp.so $(FAKE_MODULE)/module.json $(FAKE_MODULE)/page.js
+all: $(TARGET) $(TESTS) $(CONTROLS_TESTS) $(INSTRUMENTS_TESTS) $(PAD_TESTS) $(FAKE_MODULE)/dsp.so $(FAKE_MODULE)/module.json $(FAKE_MODULE)/page.js
 $(FAKE_MODULE)/dsp.so: tests/fake_module/dsp.c
 	@mkdir -p $(@D)
 	$(CC) -O2 -fPIC -shared -Wall -Wextra -Werror $< -o $@
@@ -123,6 +122,5 @@ $(foreach m,$(MODULE_C),$(eval $(call c_module_rule,$(m))))
 juce: $(JUCE_OBJECTS)
 .PHONY: all clean juce
 clean:
-	rm -rf build/obj $(TARGET) $(TESTS) $(CONTROLS_TESTS) $(INSTRUMENTS_TESTS)
-	rm -rf build/obj $(TARGET) $(TESTS) $(CONTROLS_TESTS) $(PAD_TESTS)
+	rm -rf build/obj $(TARGET) $(TESTS) $(CONTROLS_TESTS) $(INSTRUMENTS_TESTS) $(PAD_TESTS)
 -include $(shell find build/obj -name '*.d' 2>/dev/null)
