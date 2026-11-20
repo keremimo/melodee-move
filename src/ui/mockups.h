@@ -46,6 +46,10 @@ bool write_png(const juce::Image& image, const juce::File& file);
 std::vector<Screen> rail_screens();
 std::vector<Screen> tracks_screens();
 std::vector<Panel> tracks_panels();
+// The sequencer's screens and lights (mockups_sequencer.cpp): sequencer.png
+// and sequencer/.
+std::vector<Screen> sequencer_screens();
+bool write_sequencer_mockups(const std::string& directory);
 
 } // namespace mockup
 } // namespace ui
