@@ -96,7 +96,7 @@ the amount, as the Move's wheel sets the number of slices.
 | --- | --- | --- | --- |
 | Pad (Play, kit) | Plays the Drum Rack's pad (the left 16), by velocity | Plays the kit pad and makes it the last pad; 32 pads, two banks of 16 | done |
 | Pad (Play, synth) | Plays notes, In-Key or Chromatic, in octaves or 4ths (Shift + Step 9) | Plays the module's notes in rows of fourths, C2 bottom left; the other layouts with Keys & Scales | done |
-| Pad, right 16 (16 Pitches) | The selected drum pad's sample at 16 pitches of the key and scale | The last pad at 16 pitches (Melodee's 16 Levels, Tune) | wave 2: kit depth |
+| Pad, right 16 (16 Pitches) | The selected drum pad's sample at 16 pitches of the key and scale | The last pad up the project's key from its own note (Melodee's 16 Levels Scale), from the audio thread in the cycle it was read | done |
 | Pad pressure | Polyphonic aftertouch (Drift, Wavetable) | Polyphonic aftertouch to the Schwung module; a kit pad's pressure waits for its job | done |
 | Shift + Pad (Play, kit) | No job (Control Live's Drum mode: selects a pad without playing it) | Makes the pad the last pad without sounding it (the MPC's Sample held + pad) | done |
 | Pad (Browser) | Picks the drum pad the browser loads onto; the browser stays where it is | Plays the pad and makes it the one a sample loads onto | done |
@@ -109,10 +109,10 @@ the amount, as the Move's wheel sets the number of slices.
 | Shift + Pad (Overview) | The Set's options: colour, Ableton Cloud | The project's options: colour | wave 2: MIDI/sync/undo/projects |
 | Pad held + Volume knob | The sample's gain | The pad's level | done |
 | Pad held + Volume knob (Overview) | The Set's volume, all four tracks at once | The project's volume | wave 2: MIDI/sync/undo/projects |
-| Copy held + Pad (Play, kit) | No job (Control Live's Drum mode: copies the pad's devices onto the next pad pressed) | Copies the pad's sound onto the next pad pressed | wave 2: kit depth |
+| Copy held + Pad (Play, kit) | No job (Control Live's Drum mode: copies the pad's devices onto the next pad pressed) | Copies the pad's sound onto the next pad pressed (its sample and values, chain, mute); onto a pad that holds a sample it asks first | done |
 | Copy held + Pad (Session) | Copies the clip, then pastes it on the next pad pressed (asks before replacing) | Copies the pattern | wave 2: sequencer |
 | Copy held + Pad (Overview) | Copies the Set onto the next pad (asks before replacing) | Copies the project | wave 2: MIDI/sync/undo/projects |
-| Delete held + Pad (Play, kit) | Deletes the pad's notes in the clip | Deletes its notes; a pad with none is emptied (as Control Live's Drum mode and the MPC's Erase + pad) | wave 2: sequencer |
+| Delete held + Pad (Play, kit) | Deletes the pad's notes in the clip | Deletes its notes; a pad with none is emptied (as Control Live's Drum mode and the MPC's Erase + pad); an empty pad closes the gap, the pads after it down one with their notes (Melodee's Close a gap) | done |
 | Delete held + Pad (Session) | Deletes the clip at once | Deletes the pattern | wave 2: sequencer |
 | Delete held + Pad (Overview) | Deletes the Set, the pad again to confirm | Deletes the project, asked first | wave 2: MIDI/sync/undo/projects |
 | Delete held + Pad (Chop) | No job (Control Live's Slicing mode: deletes the slice) | Takes the slice's cut out | wave 2: sampling |
@@ -163,7 +163,7 @@ while Shift is held.
 | Shift + Step 5 | Tempo (the wheel; Shift for fine; push confirms) | The Tempo screen (today on Shift + Play) | done |
 | Shift + Step 6 | Metronome on or off | The same (today a push on the Tempo screen) | done |
 | Shift + Step 7 | Groove: triplet sixteenth swing, 0-100 % and beyond | Swing (today knob 2 on the Tempo screen) | done |
-| Shift + Step 8 | Layout: 16 Pitches on or off (drums) | 16 Pitches on the right 16 pads | wave 2: kit depth |
+| Shift + Step 8 | Layout: 16 Pitches on or off (drums) | 16 Pitches on the right 16 pads, the left 16 one bank of the kit as the MPC lays it | done |
 | Shift + Step 9 | Keys & Scales: In-Key or Chromatic, octaves or 4ths, key, scale | The project's key and scale, a synth's layout | wave 2: instruments |
 | Shift + Step 10 | Full Velocity on or off | Full Level | wave 2: instruments |
 | Shift + Step 11 | Repeat and the Arpeggiator (rate; Repeat, Up, Down, Random) | Note Repeat and Arp | wave 2: sequencer |
@@ -196,7 +196,7 @@ while Shift is held.
 | Knob | The item in focus's parameters; while recording, written as automation (its LED red) | The screen's eight: a pad page, a module's page; motion with the sequencer | done |
 | Knob touch | Shows the parameter | The knob large | done |
 | Shift + Knob | Fine (Transpose detunes, Sample Start zooms) | Fine | done |
-| Shift + Knob touch | The knob's second parameter (Length, Velocity > Vol, LFO Rate) | The cell's second parameter, as the MPC's Shift + K cards | wave 2: kit depth |
+| Shift + Knob touch | The knob's second parameter (Length, Velocity > Vol, LFO Rate) | On a kit, the knob's fine view: TUNE's cents, START and END close up (the Move's Sample Start zoom), a page's value in full; Shift + turn moves it finely | done |
 | Delete held + Knob touch | Deletes the parameter's automation | Deletes its motion | wave 2: sequencer |
 | Mute held + Knob touch | Turns the parameter's automation off or on | The same for its motion | wave 2: sequencer |
 | Knob (Chop) | Slicing Mode: knob 1 and 2 the region's start and end, knob 3 the pressed slice's start | Knob 1 and 2 the selected slice's start and end, 3 the chop type, 4 the amount | done |
@@ -221,7 +221,7 @@ while Shift is held.
 | Wheel touch (Play) | Highlights the sample (audio track) | Names the item in focus | done |
 | Wheel turn (Browser) | Moves through the list, loading each preset (Autoload) | Moves through the list; a module's presets load as it turns | done |
 | Wheel push (Browser) | Opens a folder; loads (Autoload off); leaves with the preset chosen | Opens a folder, loads onto the pad or the track | done |
-| Shift held (Browser) | Options: Save Preset (Shift held) | Options: save the sample or the module's preset | wave 2: kit depth |
+| Shift held (Browser) | Options: Save Preset (Shift held) | Options: Save Sample, Save Bank (the two banks in view, as `.mldb`); a module's preset waits for the instruments | done |
 | Wheel turn (list) | Moves through a menu; turns a value | The same | done |
 | Shift + Wheel turn (list) | Fine (tempo, groove) | Fine | done |
 | Wheel push (list) | Opens an entry, switches it, confirms | The same | done |
@@ -297,8 +297,8 @@ while Shift is held.
 | Control | On the Move | In Melodee | Status |
 | --- | --- | --- | --- |
 | Plus or Minus (Play, synth) | The octave | The same | done |
-| Plus or Minus (Play, kit) | No job without 16 Pitches (Control Live's Drum mode: the next or previous 16 pads) | The next or previous 16 pads of the kit's 8 banks | wave 2: kit depth |
-| Plus or Minus (16 Pitches) | The pitches' octave | The same | wave 2: kit depth |
+| Plus or Minus (Play, kit) | No job without 16 Pitches (Control Live's Drum mode: the next or previous 16 pads) | The next or previous 16 pads of the kit's 8 banks | done |
+| Plus or Minus (16 Pitches) | The pitches' octave | The same | done |
 | Shift + Plus or Minus | No job (Control Live: a scale degree; four pads) | A synth a scale degree, a kit four pads | wave 2: instruments |
 | Plus or Minus (Session) | No job (Control Live: the session ring a scene) | The bank of four tracks | wave 2: sequencer |
 | Plus or Minus (Chop) | No job | Slices 33-64 | wave 2: sampling |
@@ -320,12 +320,12 @@ Not checked by the tests: they follow from the screens.
 
 | Light | On the Move | In Melodee | Status |
 | --- | --- | --- | --- |
-| Pads, a kit | The Drum Rack's pads in their colours; a muted pad dim white | The kit's pads, the last one white; muted dim white | done |
+| Pads, a kit | The Drum Rack's pads in their colours; a muted pad dim white | The two banks in view: each pad dim in its colour (COLOUR, or the track's), bright while it sounds; the last one white; muted dark grey; empty off | done |
 | Pads, a synth | Roots in the track's colour, the scale's notes light grey, the rest dark | Every C in the track's colour, the other naturals dim; scales with Keys & Scales | done |
-| Pads, 16 Pitches | The right 16: roots in the track's colour, the scale light grey | The same | wave 2: kit depth |
+| Pads, 16 Pitches | The right 16: roots in the track's colour, the scale light grey | The same | done |
 | Pads, Session | Clips in the track's colour; the selected one pulsing white; one waiting to start pulsing green, one about to stop pulsing in its colour | The same for patterns | wave 2: sequencer |
 | Pads, Overview | Sets in their colours, the selected one pulsing; an empty slot dark, white when selected | The same for projects | wave 2: MIDI/sync/undo/projects |
-| Pads, Browser | All pulse while browsing presets; the target pad pulses while browsing samples | The same | next |
+| Pads, Browser | All pulse while browsing presets; the target pad pulses while browsing samples | The target pad blinks while browsing samples; presets wait for the instruments | next |
 | Pads, Sampling | The pads that can take a sample pink; the one recording pulsing red | The same | wave 2: sampling |
 | Steps, Play | White with notes; the track's colour dim where empty; grey dim past the loop; the playhead green; brighter under a long note; red over a step's automation | The same | wave 2: sequencer |
 | Steps, Loop | The selected bar white; bars in the loop the track's colour; the rest dim | The same | wave 2: sequencer |

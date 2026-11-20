@@ -18,6 +18,8 @@
 #include "app/project_store.h"
 #include "melodee/model/project_file.h"
 #include "melodee/engine/engine_info.h"
+#include "melodee/engine/sampler.h"
+#include "melodee/model/scales.h"
 #include <chrono>
 #include <filesystem>
 #include <cmath>
@@ -1190,6 +1192,175 @@ void test_migration() {
 
 } // namespace
 
+void test_kit_depth() {
+    // Kit depth (docs/UI.md "Kits"): 128 pads in eight banks, Plus and Minus
+    // moving the 32 by 16; 16 Pitches; copying and clearing pads; the pad
+    // pages on Shift + turn; Sample Options; a long sample read from storage
+    // as it plays; bank files.
+    std::string folder = "build/test-samples", home = "build/test-home-kit", loop = folder + "/loop.wav";
+    std::filesystem::create_directories(folder);
+    std::filesystem::remove_all(home);
+    CHECK(write_test_loop(loop));
+    app::MelodeeApp melodee(folder, home, "build/test-no-modules");
+    Session session;
+    melodee.attach(session);
+    melodee.audio_opened(AudioFormat {});
+    auto& studio = melodee.studio();
+    AudioBlock in {}, out {};
+    auto play = [&](unsigned pad, int blocks) {
+        melodee.audio_event(make_event(0x90, pad_note(pad), 110));
+        int32_t peak = 0;
+        for (int block = 0; block < blocks; ++block) { out.fill(0); melodee.render(in, out); peak = std::max(peak, peak_of(out)); }
+        melodee.audio_event(make_event(0x80, pad_note(pad), 0));
+        // Played out: a third of a second of silence (the loop has quiet between its hits).
+        for (int block = 0, silent = 0; block < 8000 && silent < 120; ++block) { out.fill(0); melodee.render(in, out); silent = peak_of(out) ? 0 : silent + 1; }
+        return peak;
+    };
+    auto status = [&] { return melodee.status(); };
+    auto hold = [&](Button button, auto&& what) {
+        melodee.surface(make_event(0xb0, button_cc(button), 127));
+        what();
+        melodee.surface(make_event(0xb0, button_cc(button), 0));
+    };
+    auto used = [&](unsigned pad) { std::lock_guard<std::mutex> guard(studio.lock); return studio.current().pads[pad].used(); };
+    CHECK(melodee.load_now(loop, 0).empty());  // A01
+    CHECK(melodee.load_now(loop, 40).empty()); // C09
+    // Plus and Minus: the 32 pads move 16 at a time through the eight banks.
+    CHECK(has(status(), " bank=0 "));
+    CHECK(play(0, 20) > to_s32(0.1f));     // A01
+    CHECK(play(24, 20) == 0);              // B09: empty
+    press_button(melodee, Button::Up);
+    CHECK(has(status(), " bank=1 "));
+    CHECK(play(24, 20) > to_s32(0.1f));    // C09 is now the pad A09 was
+    CHECK(play(0, 20) == 0);               // B01
+    for (int n = 0; n < 9; ++n) press_button(melodee, Button::Up);
+    CHECK(has(status(), " bank=6 "));      // G-H, the last two
+    for (int n = 0; n < 9; ++n) press_button(melodee, Button::Down);
+    CHECK(has(status(), " bank=0 "));
+    tap_pad(melodee, 0);
+    CHECK(has(status(), "pad=A01 "));
+    // Copy held: A01 then A06 (empty) copies; then onto A06 again asks first.
+    hold(Button::Copy, [&] { tap_pad(melodee, 0); tap_pad(melodee, 5); });
+    CHECK(used(5));
+    CHECK(play(5, 20) > to_s32(0.1f));
+    hold(Button::Copy, [&] { tap_pad(melodee, 0); tap_pad(melodee, 5); });
+    CHECK(has(status(), "page=copy-pad"));
+    press_button(melodee, Button::MainPush);
+    CHECK(has(status(), "page=kit-play"));
+    // Delete held: a pad with no notes is emptied; an empty pad closes the gap.
+    hold(Button::Delete, [&] { tap_pad(melodee, 5); });
+    CHECK(!used(5));
+    CHECK(play(5, 20) == 0);
+    CHECK(melodee.load_now(loop, 3).empty()); // A04
+    hold(Button::Delete, [&] { tap_pad(melodee, 2); }); // A03, empty: A04 moves down onto it
+    CHECK(used(2) && !used(3));
+    CHECK(play(2, 20) > to_s32(0.1f));
+    // Delete with notes: the notes go first, the sound stays.
+    {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        melodee::Event note;
+        note.key = uint8_t(melodee::sampler_first_note + 2);
+        studio.patterns().at[studio.track()][studio.current().pattern].events.push_back(note);
+    }
+    hold(Button::Delete, [&] { tap_pad(melodee, 2); });
+    CHECK(used(2));
+    {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        CHECK(studio.patterns().at[studio.track()][studio.current().pattern].events.empty());
+    }
+    // 16 Pitches: Shift + Step 8; the left 16 bank A as the MPC lays it, the right 16 A01's pitches.
+    tap_pad(melodee, 0);
+    with_shift(melodee, [&] { tap_step(melodee, 7); });
+    CHECK(has(status(), " pitches=1 "));
+    CHECK(play(4, 20) > to_s32(0.05f));    // a pitch of A01
+    CHECK(play(28, 20) > to_s32(0.05f));   // the top right one too
+    CHECK(play(8, 20) == 0);               // left, second row: A05, empty
+    {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        CHECK(studio.kit_pad_at(8) == 4 && studio.kit_pad_at(4) < 0);
+        int low = studio.pitch_semitones(0), high = studio.pitch_semitones(15);
+        CHECK(high > low);
+    }
+    press_button(melodee, Button::Up);     // the pitches' octave
+    {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        CHECK(studio.current().octave == melodee::kit_level_octave + 1);
+    }
+    press_button(melodee, Button::Down);
+    with_shift(melodee, [&] { tap_step(melodee, 7); });
+    CHECK(has(status(), " pitches=0 "));
+    // The pad pages: Shift + turn walks them, past either end back to Play.
+    // (One Shift held for the three turns: two presses close together would lock it, as on the Move.)
+    with_shift(melodee, [&] {
+        turn_wheel(melodee, 1);
+        CHECK(has(status(), "page=kit-pages") && has(status(), "kit_page=TRIM"));
+        turn_wheel(melodee, 1); // LAYERS
+        turn_wheel(melodee, 1); // TUNE
+    });
+    CHECK(has(status(), "kit_page=TUNE"));
+    melodee.surface(make_event(0xb0, knob_first_cc + 2, 1)); // WARP: Seq
+    {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        CHECK(studio.current().pads[0].warp == melodee::warp_seq);
+    }
+    melodee.surface(make_event(0xb0, knob_first_cc + 4, 1)); // FOLLOW, the kit's
+    {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        CHECK(studio.current().params[melodee::sampler::Follow] == 1);
+    }
+    melodee.surface(make_event(0xb0, knob_first_cc + 2, 127)); // WARP back off
+    press_button(melodee, Button::Back);
+    CHECK(has(status(), "page=kit-play"));
+    with_shift(melodee, [&] {
+        turn_wheel(melodee, -1); // the last page
+        CHECK(has(status(), "kit_page=KIT FILT"));
+        turn_wheel(melodee, 1); // past the end: Play
+    });
+    CHECK(has(status(), "page=kit-play"));
+    press_button(melodee, Button::Back); // between two Shift presses: no lock
+    // Sample Options: Reverse, Normalize, Trim.
+    with_shift(melodee, [&] { press_button(melodee, Button::MainPush); });
+    CHECK(has(status(), "page=sample-options"));
+    turn_wheel(melodee, 1);
+    press_button(melodee, Button::MainPush); // REVERSE
+    CHECK(has(status(), " reverse=1 "));
+    press_button(melodee, Button::MainPush); // and back
+    turn_wheel(melodee, 2);
+    press_button(melodee, Button::MainPush); // NORMALIZE
+    CHECK(!has(status(), " gain=0"));
+    turn_wheel(melodee, -1);
+    press_button(melodee, Button::MainPush); // TRIM SAMPLE: the region as a file, the pad onto it
+    melodee.service();
+    CHECK(std::filesystem::exists(home + "/Samples/Edits/LOOP-Trimmed.wav"));
+    // A long sample (12 s) is read from storage as it plays.
+    std::string long_file = folder + "/long.wav";
+    {
+        melodee::SampleData tone;
+        tone.rate = 44100;
+        tone.frames = 12 * 44100;
+        tone.left.resize(tone.frames);
+        for (uint32_t n = 0; n < tone.frames; ++n) tone.left[n] = 0.5f * std::sin(6.2831853f * 220.0f * float(n) / 44100.0f);
+        tone.right = tone.left;
+        CHECK(melodee::write_wav(long_file, tone).empty());
+    }
+    CHECK(melodee.load_now(long_file, 6).empty()); // A07
+    CHECK(has(status(), " streamed=1 "));
+    melodee.service(); // its start held in memory
+    CHECK(play(6, 40) > to_s32(0.1f));
+    // A bank saved and loaded into another bank.
+    {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        CHECK(studio.save_bank_file(0, "TEST BANK").empty());
+        CHECK(studio.load_bank_file(home + "/Samples/Banks/TEST BANK.mldb", 3).empty()); // into D
+        CHECK(studio.current().pads[48].used() && studio.current().pads[48 + 6].used());
+    }
+    melodee.service(); // its files: the same slots, nothing read again
+    press_button(melodee, Button::Up);
+    press_button(melodee, Button::Up);
+    CHECK(has(status(), " bank=2 "));
+    CHECK(play(16, 20) > to_s32(0.1f)); // D01, as A01
+}
+
 int main() {
     test_controls();
     test_lights();
@@ -1207,6 +1378,7 @@ int main() {
     test_synth_track();
     test_tracks();
     test_migration();
+    test_kit_depth();
     std::cout << "move-tests: " << checks - failures << " of " << checks << " checks passed\n";
     return failures ? 1 : 0;
 }

@@ -52,7 +52,9 @@ melodee::Track fresh_track(TrackKind kind, unsigned number) {
     melodee::load_sound(track, engine, 0);
     const char* names[] {"", "KIT", "SYNTH", "KEYS", "MIDI", "AUDIO", "PLUG-IN"};
     copy_text(track.name, std::string(names[unsigned(kind)]) + " " + std::to_string(number + 1));
-    track.octave = 3; // the bottom-left pad C2 (48), as the first scope's synth track
+    // A note track's bottom-left pad C2 (48), as the first scope's synth
+    // track; a kit's 16 Pitches as the sample was recorded (Melodee's kit octave).
+    track.octave = int8_t(kind == TrackKind::Kit ? melodee::kit_level_octave : 3);
     if (kind == TrackKind::Midi) {
         track.params[melodee::midi_track::Channel] = int16_t(std::clamp<unsigned>(number + 1, 1, 16));
         track.midi_channel = 0;
