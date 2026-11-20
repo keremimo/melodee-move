@@ -61,6 +61,7 @@ docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE
     $MOUNT melodee-move-builder sh -c "
     make -j4 &&
     build/move-tests &&
+    build/controls-tests &&
     build/melodee-move --self-test build/self-test.wav &&
     build/melodee-move --preview build/preview &&
     { build/melodee-move --app spike --backend simulated --loopback 300 --seconds 8 --script '$SCRIPT' 2> build/simulated.log || true; } &&
