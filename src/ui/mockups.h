@@ -19,6 +19,9 @@ int write_mockups(const std::string& directory);
 // The screens and lights docs/MOVE_CONTROLS.md moves or adds: controls.png
 // and controls/ (mockups_controls.cpp).
 bool write_controls_mockups(const std::string& directory);
+// Kit depth: 128 pads, the pad pages, 16 Pitches, Sample Options: kit.png
+// and kit/ (mockups_kit.cpp).
+bool write_kit_mockups(const std::string& directory);
 
 namespace mockup {
 
