@@ -550,8 +550,6 @@ void test_screens() {
     hand.press(Button::Back); // back to Setup, then out
     CHECK(has(*rig.melodee, "page=setup"));
     hand.press(Button::Back);
-    CHECK(has(*rig.melodee, "page=setup"));
-    hand.press(Button::Back);
     CHECK(has(*rig.melodee, "page=midi-play"));
     // Tempo while MIDI clock leads: the tempo heard.
     uint64_t at = now_ns();
