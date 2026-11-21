@@ -201,7 +201,6 @@ bool MelodeeApp::global(bindings::Job job, const bindings::Use& use) {
     }
     case Job::UnmuteAll: mixing::unmute_all(studio); studio.say("UNMUTED ALL"); return true;
     case Job::ShowMeter: meter_until = Clock::time_point::max(); return true;
-    case Job::TrackOptions: studio.select(bank + unsigned(use.index)); return false; // and its options open (track_options.cpp)
     // Transport and volume.
     case Job::PlayStop:
         if (studio.playing()) studio.stop();
