@@ -74,8 +74,11 @@ cp -R "$OUT/bin" "$OUT/lib" "$OUT/licenses" "$OUT/SOURCE.txt" "$TOOL/"
 cp module/module.json module/help.json module/standalone module/boot-entry.sh "$TOOL/"
 # Power-on's entry (module/boot-entry.sh) starts again through it.
 cp build/unblock-signals "$TOOL/bin/"
+# The privileged helper (src/boot/heal.c), which module/standalone stages
+# for Schwung's heal to install as bin/heal.
+cp build/realtime-helper "$TOOL/bin/"
 chmod 755 "$OUT/melodee-move" "$OUT/run-stock.sh" "$TOOL/standalone" "$TOOL/boot-entry.sh" \
-    "$OUT/bin/melodee-move" "$TOOL/bin/melodee-move" "$TOOL/bin/unblock-signals"
+    "$OUT/bin/melodee-move" "$TOOL/bin/melodee-move" "$TOOL/bin/unblock-signals" "$TOOL/bin/realtime-helper"
 
 # The catalog's asset (Schwung's docs/MODULES.md, "Publishing to the Module
 # Catalog"): <id>-module.tar.gz, the tool's folder under the module's id,
@@ -87,7 +90,7 @@ STAGE=build/package
 rm -rf "$STAGE"
 mkdir -p "$STAGE"
 cp -R "$TOOL" "$STAGE/$ID"
-strip "$STAGE/$ID/bin/melodee-move" "$STAGE/$ID/bin/unblock-signals"
+strip "$STAGE/$ID/bin/melodee-move" "$STAGE/$ID/bin/unblock-signals" "$STAGE/$ID/bin/realtime-helper"
 nm -D --defined-only "$STAGE/$ID/bin/melodee-move" | grep -q ' schwung_move_info$' \
     || { echo "bundle: the stripped melodee-move lost schwung_move_info" >&2; exit 1; }
 tar --sort=name --owner=0 --group=0 --numeric-owner --mode='u+rwX,go+rX,go-w' \

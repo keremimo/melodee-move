@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #pragma once
 #include "app/bindings.h"
+#include "app/screen_reader.h"
 #include "app/studio.h"
 #include "move/app.h"
+#include "move/speech.h"
 #include <bitset>
 #include <chrono>
 #include <memory>
@@ -118,6 +120,15 @@ private:
     // and a moment after it is turned or let go.
     Clock::time_point meter_until {};
     void draw_meter(juce::Graphics& g);
+
+    // The screen reader (screen_reader.h): Schwung's speech, started on the
+    // first service tick where the Move has it, speaking while its user has
+    // it on; mixed into the output after the studio's.
+    void speak();                                         // service thread
+    ScreenReader::View on_screen(Clock::time_point now) const; // under `lock`
+    move::Speech speech;
+    ScreenReader reader;
+    bool speech_started = false;
 };
 
 } // namespace app

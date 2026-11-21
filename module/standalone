@@ -3,10 +3,27 @@
 # Schwung's Tools menu runs this after stopping Move (launch-standalone.sh),
 # and starts Move again when it exits: Shift + Back on the Move. It runs as
 # the `ableton` user, which Ableton's firmware does not let take realtime
-# priority, so the status line in melodee-move.log says realtime=no.
+# priority itself.
 HERE=$(cd "$(dirname "$0")" && pwd)
 LOG="$HERE/melodee-move.log"
 [ -f "$LOG" ] && [ "$(wc -c < "$LOG")" -gt 1000000 ] && mv "$LOG" "$LOG.old"
+
+# Realtime: Melodee's own helper (src/boot/heal.c), installed the way Schwung
+# lets a standalone tool have one (its docs/MODULES.md, "a privileged helper
+# of their own"): staged as bin/heal.new, which Schwung's schwung-heal
+# installs as bin/heal, root-owned and setuid. melodee-move then asks it for
+# SCHED_FIFO on its audio thread. Staged again whenever bin/heal is not that
+# helper, root's and setuid: the first start, an update, or an install that
+# gave the folder back to ableton.
+HEAL=/data/UserData/schwung/bin/schwung-heal
+HELPER="$HERE/bin/realtime-helper"
+if [ -f "$HELPER" ] && [ -x "$HEAL" ] && ! { [ -u "$HERE/bin/heal" ] &&
+    [ "$(stat -c %u "$HERE/bin/heal" 2> /dev/null)" = 0 ] && cmp -s "$HELPER" "$HERE/bin/heal"; }; then
+    rm -f "$HERE/bin/heal.new"
+    cp "$HELPER" "$HERE/bin/heal.new" && "$HEAL" >> "$LOG" 2>&1
+    echo "standalone: $(date '+%F %T') staged the realtime helper for schwung-heal ($?)" >> "$LOG"
+fi
+
 set --
 [ -d "$HERE/previews" ] && set -- --previews "$HERE/previews"
 export LD_LIBRARY_PATH="$HERE/lib"

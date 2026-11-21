@@ -20,6 +20,12 @@
 #include "app/pad_layout.h"
 #include "app/project_store.h"
 #include "app/sequencer.h"
+#include "app/screen_reader.h"
+#include "move/schwung_tts.h"
+#include "move/speech.h"
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <unistd.h>
 #include "melodee/model/project_file.h"
 #include "melodee/engine/engine_info.h"
 #include "melodee/engine/macros.h"
@@ -2498,6 +2504,95 @@ void test_looper() {
     }
 }
 
+
+// The screen reader's words (src/app/screen_reader.*): said once still for
+// the debounce, the start with how to quit, a view with its track, a knob's
+// last value only.
+void test_screen_reader() {
+    using Reader = app::ScreenReader;
+    using namespace std::chrono_literals;
+    Reader reader;
+    auto start = Reader::Clock::time_point {} + 10s;
+    Reader::View view {"Play", "Track 1, kit", "", ""};
+    CHECK(reader.next(view, start).empty());
+    CHECK(reader.next(view, start + 200ms).empty());
+    CHECK(reader.next(view, start + 300ms) == "Melodee. Play. Track 1, kit. Shift and Back goes back to Move.");
+    CHECK(reader.next(view, start + 1s).empty());
+    view.knob = "TUNE, +1 ST";
+    CHECK(reader.next(view, start + 1100ms).empty());
+    view.knob = "TUNE, +2 ST";
+    CHECK(reader.next(view, start + 1200ms).empty());
+    CHECK(reader.next(view, start + 1400ms).empty());
+    CHECK(reader.next(view, start + 1500ms) == "tune, +2 ST.");
+    view.knob.clear();
+    view.view = "Tempo";
+    CHECK(reader.next(view, start + 2s).empty());
+    CHECK(reader.next(view, start + 2300ms) == "Tempo. Track 1, kit.");
+    view.track = "Track 2, synth";
+    reader.next(view, start + 3s);
+    CHECK(reader.next(view, start + 3300ms) == "Track 2, synth.");
+    view.message = "SAVED";
+    reader.next(view, start + 4s);
+    CHECK(reader.next(view, start + 4300ms) == "saved.");
+    CHECK(Reader::view_name("tempo", false) == "Tempo");
+    CHECK(Reader::view_name("load-samples", false) == "Load sample");
+    CHECK(Reader::view_name("kit-play", true) == "Play");
+    CHECK(Reader::view_name("song-export", false) == "Song export");
+    CHECK(Reader::speakable("  CUTOFF   -6.0 DB ") == "cutoff -6.0 DB");
+}
+
+// The speech client (src/move/speech.*) against Schwung's contract
+// (move/schwung_tts.h), the sidecar's part played here: nothing before the
+// user's settings, the request seqlocked, the old utterance's audio dropped
+// until the sidecar acts on the new one, then mixed in, saturating.
+void test_speech() {
+    namespace tts = move::schwung_tts;
+    std::string segment = "/melodee-tests-tts-" + std::to_string(getpid());
+    {
+        move::Speech none;
+        CHECK(!none.start("/nonexistent/schwung-tts", segment));
+        CHECK(std::string(none.state()) == "none");
+    }
+    move::Speech speech;
+    CHECK(speech.start("/bin/true", segment)); // a sidecar that ends at once: its part is played below
+    int fd = shm_open(segment.c_str(), O_RDWR, 0);
+    CHECK(fd >= 0);
+    if (fd < 0) return;
+    auto* s = static_cast<tts::Shared*>(mmap(nullptr, sizeof(tts::Shared), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
+    close(fd);
+    CHECK(s->magic == tts::magic && s->version == tts::version);
+    CHECK(!speech.ready() && !speech.say("early"));
+    // The sidecar's state: the user's settings, screen reader on.
+    s->state = tts::Settings {1, 70, tts::engine_espeak, 1.0f, 110.0f};
+    __atomic_store_n(&s->state_seq, 1u, __ATOMIC_RELEASE);
+    CHECK(speech.enabled() && std::string(speech.state()) == "on");
+    // Audio of an utterance before: in the ring when the new one is asked for.
+    for (uint32_t n = 0; n < 256; ++n) s->ring[n] = 500;
+    __atomic_store_n(&s->audio_write, 256u, __ATOMIC_RELEASE);
+    CHECK(speech.say("Tempo."));
+    CHECK(s->speak_count == 1 && std::string(s->text) == "Tempo." && s->req_seq % 2 == 0 && s->want.volume == 70);
+    move::AudioBlock out {};
+    speech.mix(out);
+    CHECK(std::all_of(out.begin(), out.end(), [](int32_t v) { return v == 0; }));
+    // The sidecar acts on it: the new audio from where the ring stands.
+    s->discard_until = s->audio_write;
+    for (uint32_t n = 0; n < 256; ++n) s->ring[(256 + n) & (tts::ring_samples - 1)] = 1000;
+    __atomic_store_n(&s->audio_write, 512u, __ATOMIC_RELEASE);
+    __atomic_store_n(&s->speak_ack, 1u, __ATOMIC_RELEASE);
+    out.fill(0);
+    out[0] = INT32_MAX - 10;
+    speech.mix(out);
+    CHECK(out[0] == INT32_MAX && out[1] == (1000 << 16) && out[255] == (1000 << 16));
+    CHECK(speech.mixed() == 128 && s->audio_read == 512);
+    // Off in Schwung's settings: nothing said.
+    s->state.enabled = 0;
+    __atomic_store_n(&s->state_seq, 2u, __ATOMIC_RELEASE);
+    CHECK(!speech.enabled() && !speech.say("nothing"));
+    speech.stop();
+    munmap(s, sizeof(tts::Shared));
+    shm_unlink(segment.c_str());
+}
+
 int main() {
     test_controls();
     test_lights();
@@ -2527,6 +2622,8 @@ int main() {
     test_chop_depth();
     test_audio_track();
     test_sampling_pad_layout();
+    test_screen_reader();
+    test_speech();
     std::cout << "move-tests: " << checks - failures << " of " << checks << " checks passed\n";
     return failures ? 1 : 0;
 }

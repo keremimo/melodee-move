@@ -69,6 +69,20 @@
       ]
     },
     {
+      "title": "Screen Reader",
+      "lines": [
+        "With Schwung's",
+        "screen reader on,",
+        "Melodee says the",
+        "view, the track and",
+        "the knob you touch,",
+        "in your voice from",
+        "Schwung's settings.",
+        "",
+        "Quit: Shift + Back."
+      ]
+    },
+    {
       "title": "Web Page",
       "lines": [
         "Open move.local:8080",

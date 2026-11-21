@@ -19,6 +19,9 @@ file by file, and registers module.json's boot target.
 - Nothing the user owns (config.json, secrets/), no log, no macOS sidecar.
 - Every library in lib/ beside its licence, licenses/lib/<library>.txt, and
   SOURCE.txt naming the source of this build.
+- The privileged helper as bin/realtime-helper alone, never setuid: bin/heal
+  and bin/heal.new are Schwung's heal's to make on the Move (module/standalone
+  stages it).
 - Nothing personal: home folders, keys, tokens.
 
   tools/check_package.py ASSET VERSION
@@ -127,7 +130,13 @@ def check(asset, version):
         if relative.startswith("lib/") and ".so" in relative and f"licenses/{relative}.txt" not in files:
             problems.append(f"{relative}: no licenses/{relative}.txt beside it")
 
-    for required in EXECUTABLES + ("bin/melodee-move", "help.json", "SOURCE.txt",
+    for relative in ("bin/heal", "bin/heal.new"):
+        if relative in files:
+            problems.append(f"{relative}: Schwung's heal makes it on the Move, from bin/realtime-helper")
+    for relative, (member, _) in files.items():
+        if member.mode & 0o7000:
+            problems.append(f"{relative}: setuid, setgid or sticky")
+    for required in EXECUTABLES + ("bin/melodee-move", "bin/realtime-helper", "help.json", "SOURCE.txt",
                                     "licenses/LICENSE-AGPL-3.0.txt", "licenses/THIRD_PARTY.md"):
         if required not in files:
             problems.append(f"no {required}")

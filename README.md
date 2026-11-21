@@ -422,12 +422,12 @@ the tap's click and the sound in the waveform is what you hear.
 
 | Folder | What it holds |
 | --- | --- |
-| `src/move/` | move-base. `app.h` the `App` interface (sample-base's hooks plus `audio_event`); `runtime.*` the threads; `host.*` what a host shares with them; `spi_host.cpp`, `spi_device.*`, `spi_protocol.*` the Move's device and a simulated one; `jack_host.cpp` the JACK host (libjack loaded at run time); `audio.h` blocks and the reblocker; `controls.*`, `lights.*`, `display.*`, `font.*`, `latency.h`, `tools.*` |
+| `src/move/` | move-base. `app.h` the `App` interface (sample-base's hooks plus `audio_event`); `runtime.*` the threads; `host.*` what a host shares with them; `spi_host.cpp`, `spi_device.*`, `spi_protocol.*` the Move's device and a simulated one; `jack_host.cpp` the JACK host (libjack loaded at run time); `audio.h` blocks and the reblocker; `controls.*`, `lights.*`, `display.*`, `font.*`, `latency.h`, `tools.*`; `realtime.*` the helper asked for realtime, `speech.*` and `schwung_tts.h` Schwung's speech |
 | `src/ui/` | the interface kit for the Rail design (docs/UI.md), and its mockups (`--ui-mockups DIR`) |
 | `src/web/` | Melodee's web page: `http.*` the server, `pairing.*` who may use it (the USB cable, or a code), `web_page.*` its answers and Melodee's folder, `web_layer.*` the page around the app (the screen's frames, its screens on the Move, Shift + Capture), `screens.*` those screens, `web_bundle.*` and `static/` the page itself |
 | `src/app/` | Melodee on the Move: `melodee_app.*` the app (thin: what every screen shares), `studio.*` Melodee's `Project` and `EngineHost` and what the screens share, `sequencer.*` and `seq_edit.*` the sequencer, `screen.*` a screen and the registry, `screens/` one file a screen, `project_store.*` the project file, `schwung_api.h` and `module_host.*` Schwung's modules (behind Melodee's `PluginRunner`), `canvas_page.*` their own pages' scripts in QuickJS, `module_probe.*` trying them, `previews.*` its screens offline |
 | `src/spike/` | the spike app |
-| `src/boot/` | `unblock_signals.c`: `module/boot-entry.sh` starts again through it, since MoveLauncher hands its children INT, USR1 and TERM blocked |
+| `src/boot/` | `unblock_signals.c`: `module/boot-entry.sh` starts again through it, since MoveLauncher hands its children INT, USR1 and TERM blocked; `heal.c`: the tool's privileged helper, SCHED_FIFO for melodee-move's audio thread ("Realtime there too") |
 | `module/` | the Schwung standalone tool: `module.json`, `standalone`, `boot-entry.sh` (Melodee as a boot target of Schwung's boot selector), and `help.json`, its topics in Schwung's Help viewer |
 | `tests/` | unit tests, the device host against the simulated Move, the sequencer (`sequencer_tests.cpp`), `song_tests.cpp` (Song, exports, print and freeze, against the whole app), and `fake_module/`, a stand-in Schwung module |
 | `tools/` | build image, packaging, deploy and probe scripts |
@@ -514,9 +514,34 @@ tools/install-schwung-tool.sh move.local
 
 Then Tools > Melodee (Shift + Volume + Step 13). Schwung stops Move, runs Melodee
 and starts Move again when Shift + Back ends it. Output goes to
-`melodee-move.log` in the tool's folder. Schwung runs tools as the `ableton`
-user, which may not take realtime priority (`realtime=no` in the log); run
-over SSH for realtime. `--remove` takes the tool out again.
+`melodee-move.log` in the tool's folder. `--remove` takes the tool out again.
+
+**Realtime there too.** Schwung runs tools as the `ableton` user, which may
+not take realtime priority itself. Melodee has its own privileged helper,
+the one Schwung lets a standalone tool have (Schwung's `docs/MODULES.md`,
+"a privileged helper of their own"): `src/boot/heal.c`, shipped as
+`bin/realtime-helper`. `module/standalone` stages it as `bin/heal.new` and
+runs Schwung's `schwung-heal`, which installs it as `bin/heal`, root-owned
+04755; it does so again whenever `bin/heal` is not that helper, root's and
+setuid (an update, or an install that gave the folder back to `ableton`).
+When SCHED_FIFO is refused, the audio thread runs `bin/heal` with its own
+thread id (`src/move/realtime.cpp`), and the helper does one thing: SCHED_FIFO
+70, Move's own audio priority, for that thread, after checking that its
+parent is the `bin/melodee-move` beside it and that the thread is that
+parent's. The log says `realtime by the tool's helper: ...` and the status
+line `realtime=yes`.
+
+**The screen reader.** With Schwung's screen reader on (Global Settings,
+Screen Reader), Melodee speaks through Schwung's own speech, in the user's
+voice, speed and volume: it starts Schwung's `schwung-tts` sidecar as its
+child (the shim, which starts it under Move, is not running while a
+standalone tool has the Move), writes requests into the segment Schwung's
+`src/host/tts_shm.h` describes, and mixes the speech into its output on the
+audio thread (`src/move/speech.*`). What it says (`src/app/screen_reader.*`),
+once things have been still for 300 ms: at the start "Melodee", the view,
+the track and how to quit (Shift and Back); a new view with its track; a new
+track; a touched or turned knob's name and value; the message line. With
+the screen reader off it says nothing.
 
 **At power-on** (Schwung 1.9 or later, which has a boot selector): the
 install registers Melodee as a boot target (`/data/UserData/boot-targets/melodee-move`),
@@ -526,7 +551,7 @@ power-on Schwung shows `Loading <name> - press Back to change` for 2 s;
 Back opens its picker, and the row chosen there is what the Move starts in
 from then on. Schwung Manager's Boot page (http://move.local:7700/boot)
 sets the same. Started this way Melodee is the `ableton` user, as from the
-Tools menu (`realtime=no`). Shift + Back, or a crash, goes to Schwung, and
+Tools menu, and realtime by the same helper. Shift + Back, or a crash, goes to Schwung, and
 a Move restarted before the next power-on (after a Tools menu run,
 Melodee's too) stays Schwung: `module/boot-entry.sh` starts Melodee only
 as a power-on's first start of Move (its own mark and Schwung's control

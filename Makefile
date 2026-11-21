@@ -125,6 +125,20 @@ all: $(UNBLOCK_SIGNALS)
 $(UNBLOCK_SIGNALS): src/boot/unblock_signals.c
 	@mkdir -p $(@D)
 	$(CC) -O2 -Wall -Wextra -Werror $< -o $@
+# The tool's privileged helper (src/boot/heal.c): shipped as
+# bin/realtime-helper, installed by Schwung's heal as bin/heal.
+REALTIME_HELPER := build/realtime-helper
+all: $(REALTIME_HELPER)
+# A stand-in for Schwung's schwung-tts, for the simulated Move's screen
+# reader run (tests/fake_tts).
+FAKE_TTS := build/fake-tts
+all: $(FAKE_TTS)
+$(FAKE_TTS): tests/fake_tts/fake-tts.cpp src/move/schwung_tts.h
+	@mkdir -p $(@D)
+	$(CXX) -std=c++17 -O2 -Isrc -Wall -Wextra -Werror $< -o $@
+$(REALTIME_HELPER): src/boot/heal.c
+	@mkdir -p $(@D)
+	$(CC) -O2 -Wall -Wextra -Werror -D_FORTIFY_SOURCE=2 $< -o $@
 $(FAKE_FX)/fake-fx.so: tests/fake_fx/fake-fx.c
 	@mkdir -p $(@D)
 	$(CC) -O2 -fPIC -shared -Wall -Wextra -Werror $< -o $@
@@ -210,5 +224,5 @@ $(foreach m,$(MODULE_C),$(eval $(call c_module_rule,$(m))))
 juce: $(JUCE_OBJECTS)
 .PHONY: all clean juce
 clean:
-	rm -rf build/obj build/pch $(TARGET) $(UNBLOCK_SIGNALS) $(TESTS) $(PROJECTS_TESTS) $(WEB_TESTS) $(SEQUENCER_TESTS) $(CONTROLS_TESTS) $(MIDI_TESTS) $(MIXER_TESTS) $(PAD_TESTS) $(PADS_APP_TESTS) $(SONG_TESTS) $(INSTRUMENTS_TESTS)
+	rm -rf build/obj build/pch $(TARGET) $(UNBLOCK_SIGNALS) $(REALTIME_HELPER) $(FAKE_TTS) $(TESTS) $(PROJECTS_TESTS) $(WEB_TESTS) $(SEQUENCER_TESTS) $(CONTROLS_TESTS) $(MIDI_TESTS) $(MIXER_TESTS) $(PAD_TESTS) $(PADS_APP_TESTS) $(SONG_TESTS) $(INSTRUMENTS_TESTS)
 -include $(shell find build/obj -name '*.d' 2>/dev/null)

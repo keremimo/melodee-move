@@ -4,6 +4,22 @@ Melodee for Ableton Move as Schwung's module catalog installs it
 (`melodee-move-module.tar.gz`). A version is `module/module.json`'s;
 `tools/release.sh` builds it and takes its release notes from here.
 
+## 0.2.0 (2026-11-21)
+
+What Schwung asked for before listing Melodee in its catalog.
+
+- The screen reader: with Schwung's screen reader on, Melodee speaks
+  through Schwung's own speech (its `schwung-tts`, the user's voice, speed
+  and volume): at the start "Melodee", the view, the track and how to quit
+  (Shift and Back); then a new view with its track, a new track, a touched
+  or turned knob's name and value, and the message line, each once things
+  have been still for 300 ms. With it off, Melodee says nothing.
+- Realtime from Schwung's Tools menu and at power-on: Melodee's own
+  privileged helper (`src/boot/heal.c`), installed by Schwung's
+  `schwung-heal` as `bin/heal`, gives its audio thread SCHED_FIFO 70, Move's
+  own audio priority, and nothing else. The log says `realtime=yes`.
+- Help: a Screen Reader topic.
+
 ## 0.1.0 (2026-11-21)
 
 The first release: Melodee, the groovebox by Kerem Kiliç (Ellic Studio), on

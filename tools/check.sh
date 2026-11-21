@@ -92,6 +92,7 @@ lane pad_layout build/pad-layout-tests
 lane web_tests build/web-tests
 lane instruments build/instruments-tests
 lane boot_entry sh tests/boot_entry_test.sh
+lane heal sh tests/heal_test.sh
 lanes
 if [ "$MODE" = quick ]; then
     phase "quick: done"
@@ -307,6 +308,23 @@ sim_projects() {
 }
 # A run driven over the control channel: melodee-press shift+step1 opens the
 # projects, and status says so.
+# The screen reader through a stand-in for Schwung's schwung-tts
+# (tests/fake_tts), which Melodee starts: the start says how to quit, knob 1
+# turned says its value, Shift + Step 5 says Tempo, and the stand-in's tone
+# is mixed into the output.
+SPEECH_SCRIPT='600:0xb0,71,2;900:0xb0,49,127;901:0x90,20,127;902:0x80,20,0;903:0xb0,49,0'
+sim_speech() {
+    rm -rf build/simulated-speech
+    mkdir -p build/simulated-speech
+    (
+        export MELODEE_TTS_SIDECAR=build/fake-tts MELODEE_TTS_SEGMENT=/melodee-check-tts FAKE_TTS_LOG=build/simulated-speech/said.txt
+        run_check build/simulated-speech.log 'speech=on said=[3-9][0-9]* spoken_frames=[1-9]' \
+            --backend simulated --samples build/simulated-samples --home build/simulated-speech --seconds 5 --script "$SPEECH_SCRIPT"
+    )
+    cat build/simulated-speech/said.txt
+    grep -qx 'Melodee. Play. Track 1, kit. Shift and Back goes back to Move.' build/simulated-speech/said.txt
+    grep -q '^Tempo\. Track 1, kit\.' build/simulated-speech/said.txt
+}
 sim_remote() {
     rm -rf build/simulated-remote
     { build/melodee-move --backend simulated --samples build/simulated-samples --home build/simulated-remote --seconds 4 2> build/simulated-remote.log & }
@@ -342,6 +360,7 @@ lane looper sim_looper
 lane web sim_web
 lane projects sim_projects
 lane remote sim_remote
+lane speech sim_speech
 lane previews previews
 lane packages packages
 lanes

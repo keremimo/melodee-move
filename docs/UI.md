@@ -1135,5 +1135,7 @@ Menu (a track list) and Shift + Play (tempo); it can move once those settle.
 - A module track's note layout: settled, the Move's Keys & Scale
   ("Instruments"); in the pads' two MPC Banks, In-Key and Chromatic run up
   in pad order, 1-16 then 17-32 (Kerem's reading (a), `pad_layout.h`).
-- Realtime priority when Schwung launches melodee-move as `ableton`: a
-  small root helper, as EvilGenius uses, or not.
+- ~~Realtime priority when Schwung launches melodee-move as `ableton`: a
+  small root helper, as EvilGenius uses, or not.~~ Settled 2026-11-21 at
+  Schwung's request: a helper of Melodee's own, installed by Schwung's heal
+  (README.md, "Realtime there too").

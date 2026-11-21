@@ -19,6 +19,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
+#include <iostream>
 #include <filesystem>
 
 namespace app {
@@ -101,7 +102,10 @@ MelodeeApp::~MelodeeApp() = default; // the studio saves what is not saved yet
 
 // ---------------------------------------------------------------- audio thread
 
-void MelodeeApp::render(const move::AudioBlock& input, move::AudioBlock& output) { own->render(input, output); }
+void MelodeeApp::render(const move::AudioBlock& input, move::AudioBlock& output) {
+    own->render(input, output);
+    speech.mix(output);
+}
 void MelodeeApp::audio_opened(const move::AudioFormat& format) { own->audio_opened(format); }
 void MelodeeApp::audio_event(const move::SurfaceEvent& event) { own->audio_event(event); }
 
@@ -680,6 +684,7 @@ void MelodeeApp::stopping() { own->stopping(); }
 
 void MelodeeApp::service() {
     own->service();
+    speak();
     // The usage log: a file each start, written whole every ten seconds while there is more.
     std::string text;
     {
@@ -696,6 +701,39 @@ void MelodeeApp::service() {
     auto file = (folder / ("usage-" + std::to_string(started_unix) + ".txt")).string();
     write_whole(file, text.data(), text.size());
     give_to_owner_of(file, own->home_folder());
+}
+
+// What the screen shows, as the screen reader says it.
+ScreenReader::View MelodeeApp::on_screen(Clock::time_point now) const {
+    auto& studio = *own;
+    ScreenReader::View view;
+    if (studio.opening) {
+        view.view = "Opening " + studio.opening_name;
+        return view;
+    }
+    Screen* top = studio.top();
+    if (studio.typing) view.view = "Text entry, " + (studio.typing_title.empty() ? std::string("text") : studio.typing_title);
+    else if (top) view.view = ScreenReader::view_name(top->id(), top == studio.screen(home_screen(studio.kind())));
+    view.track = "Track " + std::to_string(studio.track() + 1) + ", " + kind_name(studio.kind());
+    if (top && touched >= 0 && now < touched_until)
+        if (auto knob = top->knob(unsigned(touched)); !knob.name.empty()) view.knob = knob.name + ", " + knob.value;
+    if (now < studio.message_until) view.message = studio.message;
+    return view;
+}
+
+void MelodeeApp::speak() {
+    if (!speech_started) {
+        speech_started = true;
+        if (speech.start()) std::cerr << "melodee-move: speech through Schwung's screen reader (schwung-tts)\n";
+    }
+    if (!speech.enabled()) return;
+    auto now = Clock::now();
+    ScreenReader::View view;
+    {
+        std::lock_guard<std::mutex> guard(own->lock);
+        view = on_screen(now);
+    }
+    if (auto text = reader.next(view, now); !text.empty()) speech.say(text);
 }
 
 std::string control_path(const std::string& home) {
@@ -751,7 +789,8 @@ std::string MelodeeApp::command(const std::string& line) {
 
 std::string MelodeeApp::status() const {
     std::lock_guard<std::mutex> guard(own->lock);
-    return own->status() + " job=" + bindings::job_name(last_job);
+    return own->status() + " job=" + bindings::job_name(last_job) + " speech=" + speech.state() + " said=" + std::to_string(speech.said()) +
+           " spoken_frames=" + std::to_string(speech.mixed());
 }
 
 unsigned MelodeeApp::slice_count() const {

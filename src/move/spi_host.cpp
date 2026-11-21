@@ -9,6 +9,7 @@
 //
 // so a pad read in one exchange sounds in the audio sent with the next.
 #include "move/host.h"
+#include "move/realtime.h"
 #include "move/spi_device.h"
 #include "move/spi_protocol.h"
 #include <pthread.h>
@@ -62,17 +63,24 @@ public:
 
 private:
     // Move's own audio priority, on the core its SPI interrupts are pinned
-    // to. Refused for the `ableton` user Schwung runs tools as: the session
-    // says so, and the status line shows it.
+    // to. The `ableton` user Schwung runs tools as may not take it, so then
+    // the tool's own helper gives it (src/boot/heal.c, bin/heal once
+    // Schwung's heal has installed it). Without either the session says so,
+    // and the status line shows it.
     void become_realtime() {
         cpu_set_t cores;
         CPU_ZERO(&cores);
         CPU_SET(3, &cores);
         if (sysconf(_SC_NPROCESSORS_ONLN) > 3) pthread_setaffinity_np(pthread_self(), sizeof cores, &cores);
         sched_param priority {};
-        priority.sched_priority = 70;
+        priority.sched_priority = 70; // src/boot/heal.c gives the same
         session.realtime = pthread_setschedparam(pthread_self(), SCHED_FIFO, &priority) == 0;
         pthread_setname_np(pthread_self(), "melodee-spi");
+        if (!session.realtime) {
+            std::string why;
+            session.realtime = realtime_by_helper(why);
+            std::cerr << "melodee-move: realtime by the tool's helper: " << why << '\n';
+        }
         if (!session.realtime)
             std::cerr << "melodee-move: the audio thread is not realtime (SCHED_FIFO refused); expect an occasional late block\n";
     }
