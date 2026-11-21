@@ -8,11 +8,13 @@
 #include "app/sequencer.h"
 #include "app/seq_edit.h"
 #include "app/song_desk.h"
+#include "move/memory.h"
 #include "melodee/engine/audio_player.h"
 #include "app/auto_sampler.h"
 #include "app/instruments.h"
 #include "melodee/engine/engine_info.h"
 #include "melodee/engine/macros.h"
+#include "melodee/engine/render_pool.h"
 #include "melodee/model/scales.h"
 #include "melodee/shell/pad_gap.h"
 #include "melodee/shell/project_kits.h"
@@ -298,6 +300,8 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
     // audio thread, at its priority, once a block takes more than 150 us.
     // Off unless asked: the Move's numbers with and without are to be
     // measured on the Move (docs/PARITY.md, mixer & effects).
+    // Each worker's stack touched before its first job, as the audio thread's (move/memory.h).
+    melodee::set_worker_setup(move::prefault_stack);
     if (const char* workers = std::getenv("MELODEE_RENDER_THREADS"))
         engine->set_render_threads(unsigned(std::clamp(std::atoi(workers), 0, 3)));
     landings = std::make_unique<Landings>(*engine);
