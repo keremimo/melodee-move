@@ -213,6 +213,7 @@ lit and labelled, Rows on the left and Banks on the right.
 | 16 Pitches (Shift + Step 8) | the left 4x4 one bank of the kit as the MPC lays it, the right 4x4 the pitches (as approved in controls.png) | the same: exactly the two banks |
 | Notes | rows of fourths, C2 bottom left (as before) | 1-32 up the scale, reading (a) below |
 | Typing | the keys in reading order across the eight columns | through the left bank, then the right; Delete bottom right in both |
+| Session, the Overview | the Move's grids, where the pads lie | the same: they stay physical (Kerem: "Both stay physical") |
 
 Notes in Banks, two readings were drawn; **Kerem chose (a)**:
 
