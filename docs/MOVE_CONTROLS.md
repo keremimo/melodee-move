@@ -384,6 +384,42 @@ rule (Shift + Step n as the MPC's Shift + Pad n, Menu to load, Shift +
 Capture for Recall, Left / Right for pages): this map wins where they
 differ.
 
+## Undo steps
+
+Undo needs nothing from a job but its name. The studio keeps a copy of the
+project as the last step left it (`src/app/history.*`): Melodee's
+`Project` (its bytes, the parts that changed), the sample and chop slots,
+the patterns, the Move's own part (`MoveExtras`: colours) and each Schwung
+module's values set through `Studio::synth_set()`. The app closes a step
+(`Studio::close_step()`) after every press's job, and after a turn's: the
+same knob or wheel turning on is the same step, until another control is
+used or it rests two seconds (Melodee's rule); the service thread closes
+its own after a sample or a module is loaded. Whatever changed since the
+last close is the step.
+
+A screen marks a step by changing the project as it does today (and
+calling `Studio::changed()` for the autosave). It may:
+
+- name it, for the screen and the undo list: `studio.name_step("CLEAR
+  P3", track)` in its `job()`; else a knob's turns are its name and owner
+  (`TUNE A05`, from `Screen::knob()` and `knob_owner()`), the rest the
+  job's name spelled out (`DUPLICATE PATTERN`);
+- say a change is no step (performance, as Melodee leaves out mutes,
+  solos, the octave, the pad played, the pattern launched):
+  `studio.not_a_step()`, or add the job to `no_step()` in
+  `melodee_app.cpp`; the next close takes the change in without a step, and
+  no undo touches it later;
+- hold a step open past its press (a take): `studio.hold_step("TAKE",
+  track)`, then `studio.release_step()`.
+
+An undo puts the changed parts back and tells the engine: a `TrackLoad`
+for each track it touched, the tempo and swing by their commands, and
+anything else of the project (a bus, the master, the song) by rebuilding
+the engine with the audio thread parked (`Studio::rebuild()`, the
+transport going on from the top). A module comes back with its values, or
+the module replaced is loaded again as it was. A project opened or made
+forgets the steps, as in Melodee.
+
 ## The tests
 
 `build/controls-tests` (`tests/controls_tests.cpp`, run by `./build.sh`)
