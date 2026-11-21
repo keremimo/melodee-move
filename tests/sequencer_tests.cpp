@@ -787,11 +787,30 @@ void test_more(app::MelodeeApp& melodee) {
         h.button(Button::Play);
         h.render(2);
     }
-    // To Pads PATTERN (for Chop's sheet): a note a slice, where it falls.
-    seqr.slices_to_pattern(4, {0, 1000, 3000}, 4000);
-    auto at = seq::notes_in(p, {0, p.length}, 40);
-    CHECK(at.size() == 1 && seq::notes_in(p, {0, p.length}, 41).size() == 1 && seq::notes_in(p, {0, p.length}, 42).size() == 1);
-    CHECK(p.events[seq::notes_in(p, {0, p.length}, 42)[0]].tick == p.length * 3 / 4);
+    // To Pads PATTERN (Chop's sheet): the slices' notes into the playing pattern when it holds nothing, else the first
+    // that holds nothing, which then plays.
+    {
+        melodee::Pattern made;
+        made.length = melodee.studio().project().bar_ticks();
+        for (unsigned k = 0; k < 3; ++k) {
+            melodee::Event e;
+            e.tick = k * made.length / 4;
+            e.length = 12;
+            e.key = uint8_t(40 + k);
+            made.add(e);
+        }
+        unsigned playing = seqr.number(0);
+        int target = seqr.slices_target();
+        const auto& now = seqr.pattern(0, playing);
+        bool blank = now.empty() && now.motion.empty() && now.punches.empty() && now.euclids.empty();
+        CHECK(target >= 0 && (unsigned(target) == playing) == blank);
+        seqr.slices_to_pattern(unsigned(target), made);
+        CHECK(seqr.number(0) == unsigned(target));
+        const auto& q = seqr.pattern(0, unsigned(target));
+        CHECK(q.events.size() == 3 && !q.free && q.length == made.length && q.events[2].tick == made.length / 2);
+        CHECK(seqr.slices_target() != target); // it holds notes now
+        seqr.clear_pattern(0, unsigned(target));
+    }
     seqr.launch(0, 0);
 }
 

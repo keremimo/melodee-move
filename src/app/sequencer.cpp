@@ -937,20 +937,30 @@ void Sequencer::entry_erase() {
     sync(studio.track(), number(studio.track()));
 }
 
-void Sequencer::slices_to_pattern(unsigned first_pad, const std::vector<uint32_t>& starts, uint32_t frames) {
-    auto& p = pattern();
-    if (!frames || starts.empty()) return;
-    for (size_t k = 0; k < starts.size(); ++k) seq::clear_lane(p, uint8_t(melodee::sampler_first_note + first_pad + k));
-    for (size_t k = 0; k < starts.size(); ++k) {
-        uint32_t next = k + 1 < starts.size() ? starts[k + 1] : frames;
-        melodee::Event e;
-        e.tick = uint32_t(uint64_t(starts[k]) * p.length / frames);
-        e.length = uint16_t(std::clamp<uint64_t>(uint64_t(next - std::min(next, starts[k])) * p.length / frames, 1, 65535));
-        e.key = uint8_t(melodee::sampler_first_note + first_pad + k);
-        p.add(e);
-    }
+int Sequencer::slices_target() const {
+    const unsigned track = studio.track();
+    const auto& patterns = studio.patterns().at[track % melodee::track_count];
+    auto blank = [&](unsigned n) {
+        const auto& x = patterns[n];
+        return x.empty() && x.motion.empty() && x.punches.empty() && x.euclids.empty();
+    };
+    unsigned target = number(track) % melodee::pattern_count;
+    if (blank(target)) return int(target);
+    for (target = 0; target < melodee::pattern_count; ++target)
+        if (blank(target)) return int(target);
+    return -1;
+}
+
+void Sequencer::slices_to_pattern(unsigned target, const melodee::Pattern& made) {
+    record(false); // a take ends first (as Melodee's: Undo would otherwise take the slices' pattern with the take)
+    const unsigned track = studio.track();
+    target %= melodee::pattern_count;
+    auto& p = pattern(track, target);
+    p.length = made.length;
+    p.events = made.events;
     p.free = false;
-    sync(studio.track(), number(studio.track()));
+    sync(track, target);
+    if (target != number(track)) launch(track, target);
 }
 
 void Sequencer::move_playhead(int steps) {

@@ -13,6 +13,7 @@
 // options (Extract, Split, Merge, Remove all cuts). Back leaves Chop without
 // changing the pads.
 #include "app/sampling.h"
+#include "app/sequencer.h"
 #include "app/pad_layout.h"
 #include "app/screens/common.h"
 #include "melodee/shell/chop.h"
@@ -28,6 +29,7 @@ using melodee::SlicePlay;
 constexpr unsigned default_tempo_tenths = 1200; // Beats' fallback where a sample has no steady beat
 constexpr std::array<ChopMode, 5> chop_types {ChopMode::Auto, ChopMode::Beats, ChopMode::Regions, ChopMode::Threshold, ChopMode::Manual};
 constexpr const char* to_pads_names[] {"POLY", "MONO", "THRU", "KIT"};
+constexpr int to_pads_pattern = 4; // the sheet's last row: PATTERN on or off (a push flips it)
 constexpr unsigned bank_size = pad_count; // 32 slices on the pads at a time
 constexpr auto close_linger = std::chrono::milliseconds(1200); // the cut close up, after the last turn
 constexpr auto still_before_play = std::chrono::milliseconds(150); // a moved cut plays its slice once still this long
@@ -183,8 +185,10 @@ public:
                " bank=" + std::to_string(bank + 1) + " manual_next=" + std::to_string(manual_next + 1);
     }
 
-    // To Pads: the slices onto the first empty pads, as Poly, Mono, Thru, or Kit (a pad a sound).
-    void to_pads(int how) {
+    // To Pads: the slices onto the first empty pads, as Poly, Mono, Thru, or Kit (a pad a sound); with `pattern`, a
+    // note a slice where it falls into a pattern too (Melodee's PATTERN), so Play gives the loop back on the pads.
+    // One undo step: the pads, the pattern and which plays.
+    void to_pads(int how, bool pattern = false) {
         const Sample* sample = studio.sample_of(track, pad);
         if (!sample || !slices.count) return;
         uint32_t frames = sample->data->model_frames();
@@ -192,22 +196,51 @@ public:
         uint8_t group = melodee::slice_group(kit.pads[pad], kit.pads);
         PadSound parent = kit.pads[pad];
         std::vector<unsigned> chosen;
-        if (how == 3) for (const auto& sound : melodee::kit_sounds(slices, frames, sample->hits, sample->hit_count, sample->autos)) chosen.push_back(sound.slice);
+        std::array<int, melodee::max_slices> sound_of; // KIT: each slice's sound, so its note plays that sound's pad
+        sound_of.fill(-1);
+        if (how == 3)
+            for (const auto& sound : melodee::kit_sounds(slices, frames, sample->hits, sample->hit_count, sample->autos, &sound_of))
+                chosen.push_back(sound.slice);
         else for (unsigned n = 0; n < slices.count; ++n) chosen.push_back(n);
         auto play = how == 3 ? SlicePlay::Poly : SlicePlay(std::clamp(how, 0, 2));
         unsigned placed = 0, first = pad_count;
         std::vector<std::pair<unsigned, PadSound>> made;
+        std::vector<int> note(chosen.size(), -1); // the note each placed one plays
         for (unsigned at = 0; at < pad_count && placed < chosen.size(); ++at) {
             if (kit.pads[at].used()) continue;
             if (first == pad_count) first = at;
+            note[placed] = int(melodee::sampler_first_note + at);
             made.emplace_back(at, melodee::slice_pad(parent, slices, chosen[placed++], frames, play, group));
         }
         if (!placed) { studio.say("NO EMPTY PADS"); return; }
         for (const auto& [at, sound] : made) studio.project().tracks[track].pads[at] = sound;
+        std::string said = std::to_string(placed) + (how == 3 ? " SOUNDS FROM " : " SLICES FROM ") + pad_label(first);
+        if (pattern) {
+            std::array<int, melodee::max_slices> keys;
+            keys.fill(-1);
+            for (unsigned n = 0; n < slices.count && n < melodee::max_slices; ++n) {
+                int k = how == 3 ? sound_of[n] : int(n);
+                if (k >= 0 && size_t(k) < note.size()) keys[n] = note[size_t(k)];
+            }
+            auto& seq = studio.sequencer();
+            int target = seq.slices_target();
+            if (target < 0) said = "NO EMPTY PATTERN";
+            else {
+                const auto& project = studio.project();
+                uint32_t region = slices.end(slices.count - 1, frames) - slices.start[0];
+                double per_frame = melodee::slice_ticks_per_frame(parent, kit.params[melodee::sampler::Follow] != 0, region,
+                                                                  project.tempo_of(unsigned(target)));
+                auto notes = melodee::slice_pattern(slices, frames, keys, per_frame, project.bar_ticks(), project.max_length());
+                if (!notes.events.empty()) {
+                    seq.slices_to_pattern(unsigned(target), notes);
+                    said = "P" + std::to_string(target + 1) + ": " + std::to_string(notes.events.size()) + " NOTES";
+                }
+            }
+        }
         studio.home(); // Chop left: the pads sound as the kit has them now
         studio.select_pad(first);
         studio.changed();
-        studio.say(std::to_string(placed) + (how == 3 ? " SOUNDS FROM " : " SLICES FROM ") + pad_label(first));
+        studio.say(said);
     }
     unsigned slice_count() const { return slices.count; }
     unsigned kit_count() const {
@@ -563,8 +596,11 @@ public:
     bool job(bindings::Job job, const bindings::Use& use) override {
         using bindings::Job;
         switch (job) {
-        case Job::ToPadsChoose: how = std::clamp(how + use.delta, 0, 3); return true;
-        case Job::ToPadsPlace: chop().to_pads(how); return true;
+        case Job::ToPadsChoose: how = std::clamp(how + use.delta, 0, to_pads_pattern); return true;
+        case Job::ToPadsPlace:
+            if (how == to_pads_pattern) { pattern = !pattern; return true; } // PATTERN flips; the pick above it stays
+            chop().to_pads(how, pattern);
+            return true;
         case Job::Back: studio.close(); return true;
         case Job::PlaySlice: case Job::TurnKnob: case Job::TurnKnobFine: return true; // the slices sound; nothing changes
         default: return false;
@@ -575,15 +611,19 @@ public:
         unsigned count = how == 3 ? chop().kit_count() : chop().slice_count();
         ui::rail(g, "SLC", two_digits(count), "PADS");
         move::draw_text(g, ui::content_x + 1, 1, std::to_string(count) + (how == 3 ? " SOUNDS TO PADS" : " SLICES TO PADS"));
-        ui::list(g, ui::content(11, 36), {to_pads_names[0], to_pads_names[1], to_pads_names[2], to_pads_names[3]}, how, 1);
+        ui::list(g, ui::content(11, 36),
+                 {to_pads_names[0], to_pads_names[1], to_pads_names[2], to_pads_names[3], pattern ? "PATTERN ON" : "PATTERN OFF"}, how, 1);
         unsigned first = chop().first_empty();
-        ui::detail(g, first < pad_count ? "FROM " + pad_label(first) : "NO EMPTY PADS", "PUSH");
+        ui::detail(g, how == to_pads_pattern ? (pattern ? "A NOTE A SLICE" : "PADS ONLY") : first < pad_count ? "FROM " + pad_label(first) : "NO EMPTY PADS",
+                   how == to_pads_pattern ? "FLIP" : "PUSH");
     }
+    std::string status() const override { return " to_pads=" + std::to_string(how) + " to_pads_pattern=" + std::to_string(int(pattern)); }
     Knob knob(unsigned which) const override { return chop().knob(which); }
     std::string knob_owner() const override { return "SLC"; }
 
 private:
     int how = 0;
+    bool pattern = false; // PATTERN: kept for the next time, as Melodee keeps the last pick
 };
 
 // The slice options (Shift + push in Chop): Extract, Split, Merge, Remove all cuts.

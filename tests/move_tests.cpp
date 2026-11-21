@@ -18,6 +18,7 @@
 #include "app/melodee_app.h"
 #include "app/pad_layout.h"
 #include "app/project_store.h"
+#include "app/sequencer.h"
 #include "melodee/model/project_file.h"
 #include "melodee/engine/engine_info.h"
 #include "melodee/engine/sampler.h"
@@ -1577,13 +1578,27 @@ void test_chop_depth() {
     CHECK(has(melodee.status(), "slices=2") && has(melodee.status(), "manual_next=3"));
     knob(0, 1); // another control: the take stops short, the red stays
     CHECK(has(melodee.status(), "manual_next=3"));
-    // To Pads KIT: a pad a sound.
+    // To Pads KIT: a pad a sound; PATTERN on, a note a slice too, each on its sound's pad.
     knob(2, -1); // Threshold
     press_button(melodee, Button::MainPush);
     CHECK(has(melodee.status(), "page=to-pads"));
-    turn_wheel(melodee, 3);
+    turn_wheel(melodee, 4);
+    CHECK(has(melodee.status(), "to_pads=4 to_pads_pattern=0"));
+    press_button(melodee, Button::MainPush); // PATTERN flips on; the sheet stays
+    CHECK(has(melodee.status(), "page=to-pads") && has(melodee.status(), "to_pads_pattern=1"));
+    turn_wheel(melodee, -1);
+    auto& seq = melodee.studio().sequencer();
+    CHECK(seq.slices_target() >= 0);
     press_button(melodee, Button::MainPush);
     CHECK(has(melodee.status(), "page=kit-play"));
+    const auto& sliced = seq.pattern();
+    const auto& kit = melodee.studio().project().tracks[melodee.studio().track()];
+    CHECK(sliced.events.size() >= 2 && sliced.events.size() <= melodee.slice_count()); // a note a slice (one of its sound's)
+    CHECK(!sliced.free && sliced.length >= melodee.studio().project().bar_ticks());
+    for (const auto& e : sliced.events) CHECK(e.key >= melodee::sampler_first_note && kit.pads[e.key - melodee::sampler_first_note].used());
+    CHECK(sliced.events[0].tick == 0 && sliced.events[1].tick > 0);
+    press_button(melodee, Button::Undo); // one step: the pads and the pattern
+    CHECK(seq.pattern().events.empty());
 }
 
 void test_audio_track() {
