@@ -13,6 +13,8 @@
 // Pads   notes 68-99, bottom left to top right in rows of eight; velocity,
 //        then polyphonic pressure on the same note.
 // Steps  notes 16-31, step 1 to 16.
+// Icons  CC 16-31: the white lights under steps 1-16 that show their
+//        printed Shift icons; lights only, nothing comes in on them.
 // Touch  notes 0-9: knobs 1-8, the master knob, the main knob. 127 is
 //        touched; 0-63 is let go.
 // Knobs  CC 71-78, the master knob CC 79 and the main knob (jogwheel) CC 14
@@ -25,6 +27,7 @@ namespace move {
 constexpr uint8_t surface_channel = 15; // MIDI channel 16, as a status nibble
 constexpr uint8_t pad_first_note = 68, step_first_note = 16, touch_first_note = 0;
 constexpr unsigned pad_count = 32, pad_columns = 8, pad_rows = 4, step_count = 16, touch_count = 10;
+constexpr uint8_t step_icon_first_cc = 16;
 constexpr uint8_t knob_first_cc = 71, master_knob_cc = 79, main_knob_cc = 14;
 constexpr unsigned knob_count = 8;
 constexpr uint8_t audio_in_sense_cc = 114, audio_out_sense_cc = 115;
@@ -65,6 +68,7 @@ constexpr unsigned pad_row(unsigned pad) { return pad / pad_columns; }
 constexpr unsigned pad_column(unsigned pad) { return pad % pad_columns; }
 constexpr uint8_t pad_note(unsigned pad) { return uint8_t(pad_first_note + pad); }
 constexpr uint8_t step_note(unsigned step) { return uint8_t(step_first_note + step); }
+constexpr uint8_t step_icon_cc(unsigned step) { return uint8_t(step_icon_first_cc + step); }
 constexpr uint8_t button_cc(Button button) { return buttons[size_t(button)].cc; }
 constexpr int relative_steps(uint8_t value) { return value == 0 ? 0 : value < 64 ? int(value) : int(value) - 128; }
 

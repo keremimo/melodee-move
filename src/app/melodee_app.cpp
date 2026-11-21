@@ -80,6 +80,9 @@ std::string upper(std::string text) {
 }
 
 constexpr move::Button track_buttons[4] {move::Button::Row1, move::Button::Row2, move::Button::Row3, move::Button::Row4};
+// The Move's icons under the steps that stay lit while on: Step 6's
+// metronome, Step 7's groove.
+constexpr unsigned metronome_icon = 5, groove_icon = 6;
 int track_button(move::Button button) {
     for (int n = 0; n < 4; ++n)
         if (track_buttons[n] == button) return n;
@@ -462,6 +465,11 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point now) {
     // Sampling: Monitor, the speaker, the pads on a source (src/app/sampling.h); its light where it records.
     studio.sampling().tick(studio.top() && studio.top()->id() == "sampling");
     lights.button(Button::Sample, studio.kind() == TrackKind::Kit || studio.kind() == TrackKind::Audio ? colour::dark_grey : colour::off);
+    // The icons under the steps: the metronome's and the groove's while on, as
+    // on the Move; a screen may light its own (Setup flashes Step 2's), Shift
+    // held lights every one with a job (below).
+    for (unsigned step = 0; step < step_count; ++step)
+        lights.step_icon(step, (step == metronome_icon && studio.click()) || (step == groove_icon && studio.project().swing > 50) ? white_bright : 0);
     if (studio.typing) { // the keyboard
         for (unsigned at = 0; at < pad_count; ++at) {
             char c = key_for_pad(at);
@@ -479,7 +487,7 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point now) {
     settings_lights(lights, now); // Setup's pad lights, brightness and the light show
     if (holding()) {
         if (auto* sixteen = tracks()) sixteen->lights(lights); // the steps as the tracks, over the screen's
-    } else if (studio.shift) { // the steps with a Shift job that works (docs/MOVE_CONTROLS.md); the metronome bright when on
+    } else if (studio.shift) { // the steps with a Shift job that works and their icons (docs/MOVE_CONTROLS.md); the metronome bright when on
         auto at = where();
         for (unsigned step = 0; step < step_count; ++step) {
             bindings::Use use;
@@ -491,6 +499,7 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point now) {
             bool works = row && row->status == bindings::Status::Done;
             bool on = (row && row->job == bindings::Job::Metronome && studio.click()) || (row && row->job == bindings::Job::FullVelocity && studio.full_velocity());
             lights.step(step, !works ? colour::off : on ? colour::white : colour::light_grey);
+            lights.step_icon(step, works ? white_bright : 0);
         }
     }
 }

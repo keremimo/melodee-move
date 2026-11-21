@@ -57,9 +57,10 @@ public:
     void lights(move::Lights& lights) override {
         if (auto* play = studio.screen(home_screen(studio.kind())); play && play != this) play->lights(lights);
         lights.button(move::Button::Back, move::white_dim);
-        // Setup's icon under Step 2 flashes while it is open, as on the Move.
+        // Setup's icon under Step 2 flashes while it is open, as on the Move, and its step with it.
         bool on = std::chrono::duration_cast<std::chrono::milliseconds>(Studio::Clock::now().time_since_epoch()).count() / 400 % 2;
         lights.step(1, on ? move::colour::white : move::colour::dark_grey);
+        lights.step_icon(1, on ? move::white_bright : 0);
     }
 
     void draw(juce::Graphics& g) override {

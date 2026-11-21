@@ -11,6 +11,7 @@
 // Row 1-4, Play, Rec and Sample: CC, the value a palette index.
 // White buttons: CC, the value a brightness 0-127 (16 dim, 64 medium, 124
 //   bright).
+// Step icons: CC 16-31, under steps 1-16, a brightness as a white button.
 // The palette is the Move's fixed 128 colours; nearest_colour() picks the
 // closest documented one for an RGB colour, as Melodee's lights ask for.
 namespace move {
@@ -40,6 +41,8 @@ public:
     void pad(unsigned index, uint8_t palette_index);
     void pad(unsigned index, Rgb rgb) { pad(index, nearest_colour(rgb)); }
     void step(unsigned index, uint8_t palette_index);
+    // The icon under step `index`, a brightness (0 off).
+    void step_icon(unsigned index, uint8_t brightness);
     // A palette index for an RGB button, a brightness for a white one.
     void button(Button button, uint8_t value);
     // Every note and CC light off, the ones never set too.

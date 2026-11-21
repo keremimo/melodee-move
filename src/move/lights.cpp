@@ -139,6 +139,10 @@ void Lights::step(unsigned index, uint8_t palette_index) {
     if (index < step_count) note_want[step_note(index)] = palette_index & 0x7f;
 }
 
+void Lights::step_icon(unsigned index, uint8_t brightness) {
+    if (index < step_count) cc_want[step_icon_cc(index)] = brightness & 0x7f;
+}
+
 void Lights::button(Button button, uint8_t value) {
     if (button >= Button::Count || buttons[size_t(button)].led == LedKind::None) return;
     cc_want[button_cc(button)] = value & 0x7f;

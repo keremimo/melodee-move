@@ -112,14 +112,17 @@ void test_lights() {
     lights.step(0, colour::orange);
     lights.button(Button::Play, colour::bright_green);
     lights.button(Button::MainPush, 127); // no light: ignored
-    CHECK(lights.update(collect) == 3);
-    bool pad_sent = false, step_sent = false, play_sent = false;
+    lights.step_icon(1, white_bright);    // Setup's icon, under Step 2
+    lights.step_icon(16, white_bright);   // no step 17: ignored
+    CHECK(lights.update(collect) == 4);
+    bool pad_sent = false, step_sent = false, play_sent = false, icon_sent = false;
     for (const auto& message : sent) {
         pad_sent |= message == std::array<uint8_t, 3> {0x9f, 71, colour::white};
         step_sent |= message == std::array<uint8_t, 3> {0x9f, 16, colour::orange};
         play_sent |= message == std::array<uint8_t, 3> {0xbf, 85, colour::bright_green};
+        icon_sent |= message == std::array<uint8_t, 3> {0xbf, 17, white_bright};
     }
-    CHECK(pad_sent && step_sent && play_sent);
+    CHECK(pad_sent && step_sent && play_sent && icon_sent);
     sent.clear();
     CHECK(lights.update(collect) == 0 && !lights.pending()); // unchanged
     lights.clear_all();
@@ -1240,6 +1243,58 @@ void test_tracks() {
     CHECK(patterns->at[0][0].events.size() == 4);
 }
 
+// The steps (palette indices) and the icons under them (brightnesses) after
+// one pass of the app's lights.
+struct StepLights { std::array<uint8_t, step_count> steps {}, icons {}; };
+StepLights step_lights(App& app) {
+    Lights lights;
+    app.lights(lights, App::Clock::now());
+    StepLights shown;
+    lights.update([&](const uint8_t* bytes) {
+        if (bytes[0] == 0x9f && bytes[1] >= step_note(0) && bytes[1] < step_note(step_count)) shown.steps[bytes[1] - step_note(0)] = bytes[2];
+        if (bytes[0] == 0xbf && bytes[1] >= step_icon_cc(0) && bytes[1] < step_icon_cc(step_count)) shown.icons[bytes[1] - step_icon_cc(0)] = bytes[2];
+        return true;
+    }, 256);
+    return shown;
+}
+
+void test_step_icons() {
+    // The icons under the steps (docs/MOVE_CONTROLS.md, "Lights"): Shift held
+    // lights the icon of every step with a job; the metronome's and the
+    // groove's stay lit while on; Setup's flashes while it is open.
+    std::filesystem::create_directories("build/test-samples");
+    std::filesystem::remove_all("build/test-home-icons");
+    app::MelodeeApp melodee("build/test-samples", "build/test-home-icons");
+    Session session;
+    melodee.attach(session);
+    melodee.audio_opened(AudioFormat {});
+    auto lit = [](const std::array<uint8_t, step_count>& icons) { unsigned n = 0; for (uint8_t v : icons) n += v != 0; return n; };
+    CHECK(lit(step_lights(melodee).icons) == 0);
+    melodee.surface(make_event(0xb0, button_cc(Button::Shift), 127));
+    auto held = step_lights(melodee);
+    CHECK(lit(held.icons) >= 10);
+    for (unsigned step = 0; step < step_count; ++step) CHECK((held.icons[step] != 0) == (held.steps[step] != 0)); // under the lit steps
+    melodee.surface(make_event(0xb0, button_cc(Button::Shift), 0));
+    CHECK(lit(step_lights(melodee).icons) == 0);
+    {
+        std::lock_guard<std::mutex> guard(melodee.studio().lock);
+        melodee.studio().set_click(true, melodee.studio().click_level());
+        melodee.studio().set_swing(53);
+    }
+    auto on = step_lights(melodee).icons;
+    CHECK(lit(on) == 2 && on[5] && on[6]); // Step 6's metronome, Step 7's groove
+    {
+        std::lock_guard<std::mutex> guard(melodee.studio().lock);
+        melodee.studio().push("setup");
+    }
+    bool seen_lit = false, seen_dark = false; // it flashes every 400 ms
+    for (int n = 0; n < 60 && !(seen_lit && seen_dark); ++n) {
+        (step_lights(melodee).icons[1] ? seen_lit : seen_dark) = true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(25));
+    }
+    CHECK(seen_lit && seen_dark);
+}
+
 void test_migration() {
     // The first scope's project: the kit alone in Move.mldp, each sample's chop
     // in Move.mldp.chops, the synth track in Move.mldp.synth. The first start
@@ -2263,6 +2318,7 @@ int main() {
     test_canvas_page();
     test_synth_track();
     test_tracks();
+    test_step_icons();
     test_migration();
     test_kit_depth();
     test_looper_pads();

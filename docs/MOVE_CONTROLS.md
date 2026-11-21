@@ -374,7 +374,7 @@ while Shift is held.
 | Back (Typing) | Deletes a character | The same | done |
 | Back held (Typing) | Leaves the text entry | Cancels the typing | done |
 | Shift + Back | No job | Back to Ableton's Move app (the runtime takes it) | done |
-| Shift held | Lights the icons under the steps with a Shift job; fine turns | The steps with a Shift job light, 4, 12 and 13 too; the screen stays as it is | done |
+| Shift held | Lights the icons under the steps with a Shift job; fine turns | The steps with a Shift job and their icons light, 4, 12 and 13 too; the screen stays as it is | done |
 | Shift double press | Locks Shift on until pressed again (Shift + Play then does not retrigger) | The same | done |
 | Shift held (Typing) | Uppercase while held | The same | done |
 
@@ -486,7 +486,7 @@ Not checked by the tests: they follow from the screens.
 | Steps, Loop | The selected bar white; bars in the loop the track's colour; the rest dim | The same | done |
 | Steps, Shift held | The icons under the steps with a job | Those steps white dim; one that is on (metronome, 16 Pitches, Full Velocity, Repeat) bright | next |
 | Steps, Chop | No job | The sixteenths where a cut falls; the selected slice's white | done |
-| Step icons | Setup's flashes while open; groove's and the metronome's stay lit while on | The same, if the icon LEDs answer as Schwung lists them (CC 16-31, LED only): to check on the device | next |
+| Step icons | Setup's flashes while open; groove's and the metronome's stay lit while on | The same, on the icon lights as Schwung lists them (CC 16-31, lights only); Shift held lights every icon under a step with a job | done |
 | Track buttons | Each track's colour; while playing, its level (white when loud); a solo blue; a mute dim | The same for the bank in view | core |
 | Play | Lit while playing | The same | core |
 | Rec | Dim when it can record, flashing in the count-in, solid red recording, dark when it cannot | The same | done |
