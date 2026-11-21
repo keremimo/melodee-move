@@ -723,6 +723,96 @@ void test_screens() {
 
 } // namespace
 
+void test_kit_instrument() {
+    // An instrument on a kit pad (Melodee's SFZ on a pad): loaded as a sample is, its files landing, a hit playing key 60
+    // plus the pad's Semi (here the SFZ's second zone); the pad's TRIM page is ZONES there, a zone walked and trimmed on
+    // that pad without touching the file; a layer refuses it; saved and opened again, the instrument and its trims back.
+    const std::string folder = "build/test-instruments", home = "build/test-home-kit-instrument";
+    fs::remove_all(home);
+    fs::create_directories(home + "/Projects");
+    AudioBlock in {}, out {};
+    auto loudest = [&](app::MelodeeApp& melodee, int blocks) {
+        int32_t peak = 0;
+        for (int block = 0; block < blocks; ++block) { out.fill(0); melodee.render(in, out); peak = std::max(peak, peak_of(out)); }
+        return peak;
+    };
+    auto landed = [](app::MelodeeApp& melodee) {
+        for (int n = 0; n < 200; ++n) {
+            melodee.service();
+            {
+                std::lock_guard<std::mutex> guard(melodee.studio().lock);
+                const auto* sample = melodee.studio().sample_of(0, 0);
+                if (sample && sample->instrument && sample->instrument->done()) return true;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        return false;
+    };
+    {
+        app::MelodeeApp melodee(folder, home, "build/test-no-modules");
+        Session session;
+        melodee.attach(session);
+        melodee.audio_opened(AudioFormat {});
+        CHECK(melodee.restore_now().empty());
+        auto& studio = melodee.studio();
+        auto cc = [&](uint8_t number, uint8_t value) { melodee.surface(make_event(0xb0, number, value)); };
+        auto knob = [&](unsigned n, int detents) { cc(uint8_t(knob_first_cc + n), uint8_t(detents > 0 ? detents : 128 + detents)); };
+        {
+            std::lock_guard<std::mutex> guard(studio.lock);
+            CHECK(studio.kind(0) == app::TrackKind::Kit);
+            studio.select(0);
+            studio.jobs.push_back({folder + "/piano.sfz", 0, 0});
+        }
+        CHECK(landed(melodee));
+        {
+            std::lock_guard<std::mutex> guard(studio.lock);
+            const auto* sample = studio.sample_of(0, 0);
+            CHECK(sample && sample->instrument && sample->instrument->landed.load() == 2 && sample->data->multi->zones.size() == 2);
+            CHECK(studio.project().tracks[0].pads[0].used());
+        }
+        loudest(melodee, 4);
+        melodee.audio_event(make_event(0x90, pad_note(0), 110));
+        CHECK(loudest(melodee, 20) > to_s32(0.02f));
+        melodee.audio_event(make_event(0x80, pad_note(0), 0));
+        // Shift + the wheel: the pad pages, TRIM's place is ZONES.
+        cc(button_cc(Button::Shift), 127);
+        cc(main_knob_cc, 1);
+        cc(button_cc(Button::Shift), 0);
+        CHECK(has(melodee.status(), "kit_page=ZONES") && has(melodee.status(), "kit_zone=1"));
+        knob(0, 1); // the second zone in hand
+        CHECK(has(melodee.status(), "kit_zone=2"));
+        knob(1, 7);  // ZONE TUNE +7 cents
+        knob(2, -2); // ZONE LEVEL -1 dB
+        {
+            std::lock_guard<std::mutex> guard(studio.lock);
+            const auto& kit = studio.project().tracks[0];
+            const auto* trim = melodee::find_trim(kit.zone_trims, 0, 1, kit.pads[0].sample);
+            CHECK(trim && trim->tune == 7 && trim->level == -10);
+            CHECK(!melodee::find_trim(kit.zone_trims, 0, 0, kit.pads[0].sample));
+            // Onto a layer: refused.
+            studio.layer_target = {0, 0, 1};
+            std::string error;
+            auto again = app::read_any_sample(folder + "/piano.sfz", error);
+            CHECK(again && studio.install(std::move(again), 0, 0) == "NOT ON A LAYER");
+            studio.layer_target = {};
+        }
+        CHECK(melodee.save_now().empty());
+    }
+    {   // Opened again: the pad plays the instrument, its trim kept.
+        app::MelodeeApp melodee(folder, home, "build/test-no-modules");
+        Session session;
+        melodee.attach(session);
+        melodee.audio_opened(AudioFormat {});
+        CHECK(melodee.restore_now().empty());
+        CHECK(landed(melodee));
+        auto& studio = melodee.studio();
+        std::lock_guard<std::mutex> guard(studio.lock);
+        const auto& kit = studio.project().tracks[0];
+        const auto* trim = melodee::find_trim(kit.zone_trims, 0, 1, kit.pads[0].sample);
+        CHECK(trim && trim->tune == 7 && trim->level == -10);
+    }
+}
+
 int main() {
     test_readers();
     test_sample_note();
@@ -732,6 +822,7 @@ int main() {
     test_auto_sampler();
     test_screens();
     test_keygroup_track();
+    test_kit_instrument();
     std::cout << "instruments-tests: " << checks - failures << " of " << checks << " checks passed\n";
     return failures ? 1 : 0;
 }

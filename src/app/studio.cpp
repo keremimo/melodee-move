@@ -844,9 +844,12 @@ void Studio::pads_play(int t) {
 
 std::string Studio::install(std::unique_ptr<Sample> sample, unsigned t, unsigned at, bool keep) {
     if (song->tracks[t].engine != EngineKind::Sampler) return "NOT A KIT";
+    const bool layered = layer_target.layer > 0 && layer_target.track == int(t) && layer_target.pad == int(at);
+    if (sample->instrument && layered) return "NOT ON A LAYER"; // an instrument is the pad's whole sound
     std::string error;
     int slot = add_sample(std::move(sample), error);
     if (slot < 0) return error;
+    if (samples[size_t(slot)]->instrument) landings->start(*samples[size_t(slot)]); // its files land, each zone silent till then
     if (layer_target.layer > 0 && layer_target.track == int(t) && layer_target.pad == int(at) && song->tracks[t].pads[at].used()) {
         // Onto a layer of the pad (LAYERS): it keeps its tune, level and velocities.
         melodee::PadSound sound = song->tracks[t].pads[at];
@@ -1684,7 +1687,8 @@ void Studio::service() {
             keys = song->tracks[job.track % melodee::track_count].engine == EngineKind::Keygroup;
         }
         std::string error;
-        auto sample = keys ? read_any_sample(job.path, error, &cache) : read_sample(job.path, error, &cache);
+        // A keygroup's sound, or an instrument onto a kit pad (its zones: ZONES, TRIM's place): Melodee's readers.
+        auto sample = keys || instrument_file(job.path) ? read_any_sample(job.path, error, &cache) : read_sample(job.path, error, &cache);
         std::lock_guard<std::mutex> guard(lock);
         if (!sample) { say(upper(error).substr(0, 16)); continue; }
         auto failed = keys ? install_keys(std::move(sample), job.track) : install(std::move(sample), job.track, job.pad, job.keep);

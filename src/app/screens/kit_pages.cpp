@@ -9,6 +9,7 @@
 // hand (knob 1) and Shift + push's Sample Options can remove it. TRIM,
 // LAYERS and CLOUD draw their picture, the rest their eight knobs as cells.
 #include "app/screens/kit_common.h"
+#include "app/screens/zones.h"
 #include "melodee/engine/sampler.h"
 
 namespace app::screens {
@@ -247,10 +248,12 @@ public:
 
     void draw(juce::Graphics& g) override {
         std::string number = std::to_string(page + 1) + "/" + std::to_string(int(PageCount));
-        ui::rail(g, "PAD", pad_label(studio.pad()), number);
+        const Sample* zoned = page == Trim ? instrument() : nullptr;
+        ui::rail(g, "PAD", pad_label(studio.pad()), zoned ? "ZONE" : number);
         if (fine >= 0) { draw_fine(g); return; }
         auto& sound = studio.current().pads[studio.pad()];
         const Sample* sample = studio.sample_of_pad();
+        if (zoned) { draw_zones(g, studio, *zoned, studio.pad(), zone, 1); return; } // TRIM's place on an instrument pad
         switch (page) {
         case Trim: draw_trim(g, sound, sample); return;
         case Layers: draw_layers(g, sound); return;
@@ -271,6 +274,8 @@ public:
 
     Knob knob(unsigned which) const override {
         if (which >= 8) return {};
+        if (page == Trim)
+            if (const Sample* zoned = instrument()) return zone_knob(studio, *zoned, studio.pad(), zone, which);
         const Value& value = pages()[size_t(page)][which];
         if (!value.name) return {};
         const melodee::Track& kit = studio.current();
@@ -288,7 +293,9 @@ public:
     }
     std::string knob_owner() const override { return pad_label(studio.pad()); }
     std::string status() const override {
-        return studio.top() == this ? " kit_page=" + std::string(page_names[size_t(page)]) + " layer=" + std::to_string(layer + 1) : std::string();
+        if (studio.top() != this) return {};
+        const char* name = page == Trim && instrument() ? "ZONES" : page_names[size_t(page)];
+        return " kit_page=" + std::string(name) + " layer=" + std::to_string(layer + 1) + " kit_zone=" + std::to_string(zone + 1);
     }
 
 private:
@@ -296,6 +303,10 @@ private:
     int layer = 0; // LAYERS' layer in hand, 0-3
     int fine = -1;
     bool fresh = true; // opened: the first Shift + turn picks the first or last page
+    unsigned zone = 0; // ZONES' zone in hand (an instrument pad's TRIM)
+
+    // The pad's instrument (an SFZ, EXS or DecentSampler preset loaded onto it): its TRIM page is ZONES.
+    const Sample* instrument() const { return zones_of(studio.sample_of_pad()); }
 
     uint32_t frames() const {
         const Sample* sample = studio.sample_of_pad();
@@ -304,6 +315,8 @@ private:
 
     void turn(unsigned which, int delta, bool fine_turn) {
         if (which >= 8) return;
+        if (page == Trim)
+            if (const Sample* zoned = instrument()) { zone_turn(studio, *zoned, studio.pad(), zone, which, delta, fine_turn); return; }
         const Value& value = pages()[size_t(page)][which];
         if (!value.name) return;
         if (page == Layers && which == 0) { layer = std::clamp(layer + (delta > 0 ? 1 : -1), 0, 3); return; }
@@ -330,7 +343,7 @@ private:
         auto shown = knob(unsigned(fine));
         if (shown.name.empty()) return;
         const Sample* sample = studio.sample_of_pad();
-        if (page == Trim && fine <= 2 && sample) {
+        if (page == Trim && fine <= 2 && sample && !instrument()) {
             const auto& sound = studio.current().pads[studio.pad()];
             uint32_t frames = std::max<uint32_t>(1, sample->data->model_frames());
             uint32_t at = fine == 0 ? sound.start : fine == 1 ? (sound.end ? sound.end : frames) : sound.loop_point();

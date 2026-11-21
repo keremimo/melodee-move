@@ -13,6 +13,7 @@
 // .xty) opens the LOAD KIT sheet (load_kit.cpp), Shift held the browser's
 // options (Save Sample, Save Bank). A Standard MIDI File's notes load onto
 // the track's pattern playing (song_desk.h, as Melodee's browser loads one).
+#include "app/instruments.h"
 #include "app/sampling.h"
 #include "app/pad_layout.h"
 #include "app/screens/kit_common.h"
@@ -216,7 +217,7 @@ private:
     // The cursor landed: a file plays (PREVIEW), anything else stops one.
     void landed() {
         const Entry* entry = at_cursor();
-        bool plays = entry && (entry->kind == Kind::File || entry->kind == Kind::Program);
+        bool plays = entry && ((entry->kind == Kind::File && entry->tag.empty()) || entry->kind == Kind::Program); // an instrument: no preview
         sampling().preview_file(plays ? entry->path : std::string(), studio.track());
     }
 
@@ -305,6 +306,8 @@ private:
                     found.push_back({name, item.path().string(), Kind::Program, List::None, -1, melodee::is_drum_program(item.path().string()) ? "KIT" : "PROG"});
                 else if (is_bank_file(item.path())) found.push_back({name, item.path().string(), Kind::Bank, List::None, -1, "BANK"});
                 else if (is_midi_file(item.path())) found.push_back({name, item.path().string(), Kind::Midi});
+                else if (instrument_file(item.path().string()) && !soundfont_file(item.path().string())) // an SFZ, EXS, DecentSampler
+                    found.push_back({name, item.path().string(), Kind::File, List::None, -1, instrument_format(item.path().string())});
             }
             std::sort(found.begin(), found.end(), [](const Entry& a, const Entry& b) {
                 auto rank = [](Kind k) { return k == Kind::Program ? 0 : k == Kind::Folder ? 1 : 2; }; // programs, folders, files
