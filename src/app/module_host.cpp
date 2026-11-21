@@ -694,7 +694,7 @@ bool SynthPlayer::get(const std::string& key, std::string& out, std::chrono::mil
     if (!settle(2)) return false;       // answered later, and dropped by the next caller
     out.assign(sync_buffer.data(), size_t(std::clamp(sync_length, 0, int(sync_buffer.size()) - 1)));
     sync_state.store(0, std::memory_order_release);
-    return sync_length >= 0;
+    return true; // answered: nothing (the module's -1) is an empty answer, as Schwung's chain host gives it
 }
 
 bool SynthPlayer::long_answer(std::string& out) {

@@ -968,6 +968,14 @@ std::string Studio::module_get(ModuleTrack& track, const std::string& key) {
     return value;
 }
 
+std::optional<std::string> Studio::module_read(ModuleTrack& track, const std::string& key) {
+    if (!track.module) return std::string();
+    if (!track.player.rendering()) return track.module->get_now(key);
+    std::string value;
+    if (!track.player.get(key, value, std::chrono::milliseconds(20))) return std::nullopt;
+    return value;
+}
+
 void Studio::rescan_modules() { catalog = scan_modules(modules_root); }
 
 CanvasPage::Host Studio::canvas_host(unsigned t) {
@@ -977,6 +985,13 @@ CanvasPage::Host Studio::canvas_host(unsigned t) {
         if (!module) return std::string();
         auto answer = module_get(*module, key);
         if (ModuleParam* param = module->module && !answer.empty() ? module->module->param(key) : nullptr) param->take(answer); // what a page read, Melodee's too
+        return answer;
+    };
+    host.read = [this, t](const std::string& key) -> std::optional<std::string> {
+        auto* module = module_track(t);
+        if (!module) return std::string();
+        auto answer = module_read(*module, key);
+        if (ModuleParam* param = answer && !answer->empty() && module->module ? module->module->param(key) : nullptr) param->take(*answer);
         return answer;
     };
     host.set = [this, t](const std::string& key, const std::string& value) {
@@ -1030,12 +1045,13 @@ CanvasPage::Host Studio::canvas_host(unsigned t) {
 std::unique_ptr<SchwungPages> Studio::start_pages(CanvasPage::Host host, const LoadedModule& module, const std::string& dir,
                                                   const std::vector<std::pair<std::string, std::string>>& kept, PagesTarget target) {
     if (SchwungPages::shared_folder().empty()) return nullptr;
-    auto asked = host.get;
     std::map<std::string, std::string> contract {{"ui_hierarchy", module.declared("ui_hierarchy")}, {"chain_params", module.declared("chain_params")}};
-    host.get = [asked, contract](const std::string& key) {
+    auto asked = host.read ? host.read : [get = host.get](const std::string& key) { return std::optional<std::string>(get(key)); };
+    host.read = [asked, contract](const std::string& key) -> std::optional<std::string> {
         auto answer = asked(key);
         auto declared = contract.find(key);
-        return answer.empty() && declared != contract.end() ? declared->second : answer;
+        if (answer && answer->empty() && declared != contract.end()) return declared->second;
+        return answer;
     };
     auto typed = host.text_entry;
     host.text_entry = [this, typed, target](const std::string& title, const std::string& initial) {

@@ -310,6 +310,9 @@ public:
     // A Schwung module's values (as the screen and the save see them).
     void synth_set(ModuleTrack& track, const std::string& key, const std::string& value);
     std::string module_get(ModuleTrack& track, const std::string& key); // now, as a page script asks
+    // The same with Schwung's three answers: text, "" (the module answered
+    // nothing), none (the audio thread did not answer in time).
+    std::optional<std::string> module_read(ModuleTrack& track, const std::string& key);
     CanvasPage::Host canvas_host(unsigned track);
     CanvasPage::Host fx_host(uint8_t entry); // a Schwung effect's (studio_fx.cpp)
     static constexpr int typing_schwung_pages = -2; // typing_canvas: the text is Schwung's pages' (typing_pages)

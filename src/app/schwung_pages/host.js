@@ -84,8 +84,11 @@ function setParam(key, value) {
     return true;
 }
 
-// visible_if, as shadow_ui.js's evaluateVisibilityCondition: against the
-// module's value now, failing open when there is none.
+// visible_if, as shadow_ui.js's evaluateVisibilityCondition on the grid:
+// against the value the controller holds first (it writes a turned knob's
+// value there at once, while the write itself waits its throttle; Schwung's
+// host reads cache-first for the same reason), else the module's, failing
+// open when there is none.
 function same(actual, expected) {
     if (typeof expected === "boolean") return ["1", "true", "on", "yes"].includes(String(actual).toLowerCase()) === expected;
     if (typeof expected === "number") { const n = Number(actual); return Number.isFinite(n) && n === expected; }
@@ -95,7 +98,8 @@ function visible(cond) {
     if (!cond || typeof cond !== "object") return true;
     const param = cond.param || cond.key || cond.param_key;
     if (!param) return true;
-    const raw = getParam(PREFIX + ":" + param);
+    const cached = controller && controller.state && controller.state.values ? controller.state.values[param] : undefined;
+    const raw = cached !== undefined && cached !== null ? String(cached) : getParam(PREFIX + ":" + param);
     if (raw === null || raw === undefined || raw === "") return true;
     if (cond.equals !== undefined) return same(raw, cond.equals);
     if (cond.not_equals !== undefined) return !same(raw, cond.not_equals);

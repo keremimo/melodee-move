@@ -6,6 +6,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -47,6 +48,11 @@ class CanvasPage {
 public:
     struct Host { // called from inside the hooks, under the app's lock
         std::function<std::string(const std::string& key)> get;
+        // Where it is given, reads go here instead, three answers as
+        // Schwung's param channel gives them: text, "" (the module answered
+        // nothing), none (no answer: a read that timed out). Without it an
+        // empty answer reaches the script as null, as before.
+        std::function<std::optional<std::string>(const std::string& key)> read;
         std::function<void(const std::string& key, const std::string& value)> set;
         std::function<void(const std::string& title, const std::string& initial)> text_entry;
         std::function<void(const std::string& path)> open_file;

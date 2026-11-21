@@ -55,13 +55,13 @@ std::unique_ptr<SchwungPages> SchwungPages::load(CanvasPage::Host host, Hooks ho
     std::unique_ptr<SchwungPages> pages(new SchwungPages());
     auto* self = pages.get();
     self->states = hooks.page_states;
-    auto get = std::move(host.get);
+    auto read = host.read ? std::move(host.read) : [get = host.get](const std::string& key) { return std::optional<std::string>(get(key)); };
     auto set = std::move(host.set);
-    host.get = [get, self, hooks](const std::string& key) {
+    host.read = [read, self, hooks](const std::string& key) -> std::optional<std::string> { // Schwung's three answers
         if (key == "melodee:module_dir") return hooks.module_dir;
         if (key == "melodee:trailing") return hooks.trailing ? hooks.trailing() : std::string("[]");
         if (key == "melodee:page_states") return self->states;
-        return get(key);
+        return read(key);
     };
     host.set = [set, self, hooks](const std::string& key, const std::string& value) {
         if (key == "melodee:view") self->take(value);

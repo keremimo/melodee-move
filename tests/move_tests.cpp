@@ -1543,6 +1543,26 @@ void test_synth_track() {
         int first_value = chain.slots[0].params[0];
         second.surface(make_event(0xb0, knob_first_cc, 3)); // knob 1: the effect's, not the module's
         CHECK(chain.slots[0].params[0] != first_value && second.synth_value("level") == "0.9");
+        // A Schwung effect after it: its pages entered with the push, as a
+        // synth's, Back out to its item.
+        {
+            auto& studio = second.studio();
+            std::lock_guard<std::mutex> guard(studio.lock);
+            studio.rescan_fx();
+            CHECK(studio.load_fx(1, 1, "fake-fx"));
+        }
+        second.service(); // loads it
+        frames(second, 2);
+        turn_wheel(second, 1);
+        CHECK(has(second.status(), "item=fx2"));
+        press(second, Button::MainPush);
+        CHECK(has(second.status(), "page=module-pages"));
+        frames(second, 8);
+        CHECK(has(second.status(), "pages=") && !has(second.status(), "pages=-") && has(second.status(), ",knobs"));
+        press(second, Button::Back);
+        frames(second, 1);
+        CHECK(has(second.status(), "page=synth-play") && has(second.status(), "item=fx2"));
+        turn_wheel(second, -1);
         turn_wheel(second, -1); // back to the module
         CHECK(has(second.status(), "item=sound"));
         // Delete + push on the module: gone, the track stays, empty.

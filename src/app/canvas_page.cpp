@@ -222,6 +222,10 @@ struct CanvasBindings {
     static JSValue get_param(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
         if (argc < 1) return JS_NULL;
         auto& on = page(context);
+        if (on.host.read) {
+            auto answer = on.host.read(string_of(context, argv[0]));
+            return answer ? JS_NewStringLen(context, answer->data(), answer->size()) : JS_NULL;
+        }
         auto value = on.host.get ? on.host.get(string_of(context, argv[0])) : std::string();
         return value.empty() ? JS_NULL : JS_NewStringLen(context, value.data(), value.size());
     }
