@@ -5,7 +5,7 @@
 # whole runtime against a simulated Move (the spike: a pad, the jogwheel to
 # LATENCY, the meter timing clicks through a 300-frame cable, Shift + Back to
 # quit; Melodee: load, chop, To Pads, saved and restored, transport and
-# tempo, the synth track saved and restored),
+# tempo, Song and its mixdown, the synth track saved and restored),
 # and the packages in dist/. When Melodee's own page previews are at hand
 # (MELODEE_PREVIEWS, by default ../melodee-sample/build/melodee-preview),
 # also crush them to the Move's 128 x 64 screen in build/crushed.
@@ -53,6 +53,14 @@ RESTORE_EXPECTED='page=kit-play .*pad=A02 samples=1 pads=17 loading=0 saves=1 un
 # at 380. Still playing at the end.
 TRANSPORT_SCRIPT='100:0xb0,85,127;101:0xb0,85,0;300:0xb0,49,127;301:0x90,20,127;302:0x80,20,0;303:0xb0,49,0;320:0xb0,14,2;340:0xb0,3,127;341:0xb0,3,0;360:0xb0,49,127;361:0x90,21,127;362:0x80,21,0;363:0xb0,49,0;380:0xb0,51,127;381:0xb0,51,0'
 TRANSPORT_EXPECTED='page=kit-play .*playing=1 tick=[1-9][0-9]* tempo=122.0 click=1'
+# Song, on that project (docs/MOVE_CONTROLS.md, Song): Shift + Step 13 at
+# 100 opens it; knob 2 three down at 130 (the next clip one bar); the top
+# row's first pad at 150 (track 1, bar 1); the wheel's push at 200 places A1
+# there; Play at 250 plays the song, at 600 stops it; Sampling at 700 opens
+# EXPORT, its push at 750 mixes the song down, once through, into
+# Mixdowns/Move.wav.
+SONG_SCRIPT='100:0xb0,49,127;101:0x90,28,127;102:0x80,28,0;103:0xb0,49,0;130:0xb0,72,125;150:0x90,92,100;160:0x80,92,0;200:0xb0,3,127;201:0xb0,3,0;250:0xb0,85,127;251:0xb0,85,0;600:0xb0,85,127;601:0xb0,85,0;700:0xb0,118,127;701:0xb0,118,0;750:0xb0,3,127;751:0xb0,3,0'
+SONG_EXPECTED='page=song-export .*song_clips=1 .*export=Mixdowns/Move.wav export_busy=0 export_done=1'
 # The synth track: Track 2 tapped at 50, the wheel's push at 60 lists the
 # modules (none loaded yet), its push at 80 loads the one in
 # build/test-modules (the tests' stand-in), a pad plays it, knob 1 turns its
@@ -86,6 +94,10 @@ docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE
     { build/melodee-move --backend simulated --samples build/simulated-samples --home build/simulated-home --seconds 3 --script '$TRANSPORT_SCRIPT' 2> build/simulated-transport.log || true; } &&
     tail -n 1 build/simulated-transport.log &&
     grep -qE '$TRANSPORT_EXPECTED' build/simulated-transport.log &&
+    { build/melodee-move --backend simulated --samples build/simulated-samples --home build/simulated-home --seconds 8 --script '$SONG_SCRIPT' 2> build/simulated-song.log || true; } &&
+    tail -n 1 build/simulated-song.log &&
+    grep -qE '$SONG_EXPECTED' build/simulated-song.log &&
+    test -s build/simulated-home/Mixdowns/Move.wav &&
     rm -rf build/simulated-synth &&
     { build/melodee-move $SYNTH_FLAGS --seconds 5 --script '$SYNTH_SCRIPT' 2> build/simulated-synth.log || true; } &&
     tail -n 1 build/simulated-synth.log &&
