@@ -319,6 +319,13 @@ public:
     std::string project_message;                 // what the last job said ("" fine)
     Settings settings;
     void settings_changed();                     // Setup changed a setting: kept, and the audio thread told
+    // Move.settings' lines this file does not read (another area's: MIDI
+    // Config, the pad layout), by their first word (up to a space or '='),
+    // the whole line kept and written back unless settings_text() already
+    // wrote that word. An area may set its own here too.
+    std::map<std::string, std::string> settings_more;
+    // Called under `lock` once another project is in (opened or new), its path given: an area's reset (the Looper's loops).
+    std::vector<std::function<void(const std::string& path)>> opened;
     // Opening a project: the Loading sheet's counts.
     bool opening = false;
     std::string opening_name, opening_file;
@@ -369,6 +376,7 @@ private:
     void take_answers();
     void destroy_retired();
     std::string write(std::vector<uint8_t> bytes, std::string settings_text);
+    SynthFile module_state(unsigned track) const; // a Schwung track's module as it is now: values, preset, its pages' state
     std::vector<uint8_t> project_bytes() const;
     std::string settings_text() const;
     void read_settings();

@@ -8,6 +8,7 @@
 #include "move/tools.h"
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -241,6 +242,9 @@ void test_projects() {
     melodee.service();
     CHECK(has(status(), " project=Move ") && has(status(), "track=1 "));
 
+    // A project's loops (the Looper's) beside it follow it.
+    std::filesystem::create_directories(home + "/Projects/Move Loops");
+    { std::ofstream loop_file(home + "/Projects/Move Loops/Loop 1.wav"); loop_file << "x"; }
     // Its options (the wheel's push): Rename, typed the Move's way.
     shift_step(melodee, 0);
     melodee.service();
@@ -256,6 +260,7 @@ void test_projects() {
     melodee.service();
     CHECK(has(status(), " project=Movea "));
     CHECK(std::filesystem::exists(home + "/Projects/Movea.mldp") && !std::filesystem::exists(home + "/Projects/Move.mldp"));
+    CHECK(std::filesystem::exists(home + "/Projects/Movea Loops/Loop 1.wav") && !std::filesystem::exists(home + "/Projects/Move Loops"));
 
     // Delete + Project 1's pad asks; the pad again deletes it.
     with(melodee, Button::Delete, [&] { tap_pad(melodee, overview_pad(1)); });
@@ -336,10 +341,14 @@ void test_setup_and_tracks() {
     turn_wheel(melodee, 2);           // FEATURES (PADS, LIGHTS, FEATURES): Basic
     press(melodee, Button::MainPush);
     CHECK(!studio.settings.full);
+    // Another area's lines (MIDI Config's key=value, the pad layout's word) kept as they were.
+    melodee.studio().settings_more["midi_port"] = "midi_port=2";
+    melodee.studio().settings_more["pads"] = "pads 1";
     CHECK(melodee.save_now().empty());
     {   // Kept in Move.settings.
         app::MelodeeApp again(folder, home);
         CHECK(again.studio().settings.response == 2 && !again.studio().settings.pressure && !again.studio().settings.full);
+        CHECK(again.studio().settings_more.count("midi_port") && again.studio().settings_more.at("pads") == "pads 1");
     }
     turn_wheel(melodee, 2);           // ABOUT
     press(melodee, Button::MainPush);

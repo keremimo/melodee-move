@@ -4,8 +4,9 @@
 // opening a door or editing a value (the wheel turns it, a push keeps it,
 // Back leaves it as it was; a value of two flips at once). PADS: the pads'
 // response and pressure. LIGHTS: pad lights, pad fade, brightness, the light
-// show and its style. MIDI and SYNC (move-midi's) and WEB PAGE (move-web's)
-// where those screens are here. FEATURES Full or Basic, the usage log,
+// show and its style; LAYOUT (move-pad-layout's). MIDI and MIDI SYNC
+// (move-midi's MIDI Config) and WEB PAGE (move-web's) where those screens
+// are here. FEATURES Full or Basic, the usage log,
 // ABOUT, and BACK TO MOVE (Ableton's app again, as Shift + Back). Every
 // setting is the same for every project, kept in Move.settings.
 #include "app/screens/common.h"
@@ -84,15 +85,23 @@ private:
     bool editing = false;
 
     std::vector<Row> rows() const {
-        if (level == 1) return {{"RESPONSE", {"SOFT", "MED", "HARD", "FULL"}}, {"PRESSURE", {"OFF", "ON"}}};
+        if (level == 1) {
+            std::vector<Row> pads {{"RESPONSE", {"SOFT", "MED", "HARD", "FULL"}}, {"PRESSURE", {"OFF", "ON"}}};
+            if (studio.screen("setup-pads")) pads.push_back({"LAYOUT", {}, "setup-pads"}); // move-pad-layout's: Move rows or two MPC banks
+            return pads;
+        }
         if (level == 2)
             return {{"PAD LIGHTS", {"COLOUR", "WHITE", "OFF"}}, {"PAD FADE", {"60 MS", "100 MS", "150 MS", "250 MS"}},
                     {"BRIGHTNESS", {"LOW", "MID", "HIGH", "MAX"}}, {"LIGHT SHOW", {"OFF", "ON"}},
                     {"SHOW STYLE", {"PULSE", "SWEEP", "CHASE", "RIPPLE", "LEVELS"}}};
         std::vector<Row> top {{"PADS", {}}, {"LIGHTS", {}}};
-        // The other areas' doors, where their screens are here.
-        if (studio.screen("setup-midi")) top.push_back({"MIDI", {}, "setup-midi"});
-        if (studio.screen("setup-sync")) top.push_back({"SYNC", {}, "setup-sync"});
+        // The other areas' doors, where their screens are here: move-midi's
+        // MIDI Config (MIDI, and MIDI SYNC as Ableton's Setup has both),
+        // move-web's page.
+        if (studio.screen("midi-config")) {
+            top.push_back({"MIDI", {}, "midi-config"});
+            top.push_back({"MIDI SYNC", {}, studio.screen("midi-sync") ? "midi-sync" : "midi-config"});
+        }
         if (studio.screen("web-page")) top.push_back({"WEB PAGE", {}, "web-page"});
         top.push_back({"FEATURES", {"BASIC", "FULL"}});
         top.push_back({"USAGE LOG", {"OFF", "ON"}});

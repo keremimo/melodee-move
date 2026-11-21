@@ -48,8 +48,16 @@ bool listed(const fs::directory_entry& entry) {
     auto name = entry.path().filename().string();
     if (name.empty() || name[0] == '.') return false;
     std::error_code error;
-    if (entry.is_directory(error)) return true;
+    if (entry.is_directory(error)) { // a project's loops are its own, not a folder of projects
+        if (ends_with(name, " Loops") && fs::exists(entry.path().parent_path() / (name.substr(0, name.size() - 6) + extension), error)) return false;
+        return true;
+    }
     return ends_with(name, extension) || ends_with(lower(name), ".xpj");
+}
+
+// A project's own folder beside it: its loops (the Looper's "<name> Loops").
+std::string loops_of(const std::string& path, const std::string& name) {
+    return (fs::path(path).parent_path() / (name + " Loops")).string();
 }
 
 } // namespace
@@ -175,6 +183,8 @@ std::string duplicate(const std::string& path, std::string& made) {
     std::error_code error;
     if (!fs::copy_file(path, made, error)) return "NOT COPIED";
     give_to_owner_of(made, folder);
+    auto loops = loops_of(path, name_of(path)); // its loops come along
+    if (fs::is_directory(loops, error)) fs::copy(loops, loops_of(made, name_of(made)), fs::copy_options::recursive, error);
     return {};
 }
 
@@ -190,6 +200,7 @@ std::string rename(const std::string& path, const std::string& name, std::string
     int pad = pads.count(fs::path(path).filename().string()) ? pads[fs::path(path).filename().string()] : -1;
     fs::rename(path, made, error);
     if (error) return "NOT RENAMED";
+    if (!is_folder && fs::is_directory(loops_of(path, name_of(path)), error)) fs::rename(loops_of(path, name_of(path)), loops_of(made, name), error);
     keep_pad(folder, fs::path(path).filename().string(), -1);
     if (pad >= 0) keep_pad(folder, fs::path(made).filename().string(), pad);
     return {};
@@ -204,6 +215,7 @@ std::string remove(const std::string& path) {
     }
     if (!fs::remove(path, error)) return "NOT DELETED";
     keep_pad(fs::path(path).parent_path().string(), fs::path(path).filename().string(), -1);
+    if (auto loops = loops_of(path, name_of(path)); fs::is_directory(loops, error)) fs::remove_all(loops, error); // its loops go with it
     return {};
 }
 
@@ -213,6 +225,7 @@ std::string move_to(const std::string& path, const std::string& folder, std::str
     made = path_for(folder, free_name(folder, name_of(path)));
     fs::rename(path, made, error);
     if (error) return "NOT MOVED";
+    if (auto loops = loops_of(path, name_of(path)); fs::is_directory(loops, error)) fs::rename(loops, loops_of(made, name_of(made)), error);
     keep_pad(fs::path(path).parent_path().string(), fs::path(path).filename().string(), -1);
     give_to_owner_of(made, folder);
     return {};

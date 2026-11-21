@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "app/melodee_app.h"
+#include "app/pad_layout.h"
 #include "app/screen.h"
 #include "move/display.h"
 #include "move/font.h"
@@ -204,7 +205,7 @@ bool MelodeeApp::global(bindings::Job job, const bindings::Use& use) {
     case Job::ShiftSteps: return true; // lights() shows them
     case Job::ShiftLock: studio.say(gestures.shift_locked() ? "SHIFT LOCKED" : "SHIFT"); return true;
     // Typing, for a module's page that asked: the pads and steps a keyboard.
-    case Job::TypeKey: type(key_for_pad(unsigned(use.index))); return true;
+    case Job::TypeKey: type(key_for_pad(logical_pad(uint8_t(use.index), pad_layout()))); return true; // the pad map's: letters in its order
     case Job::TypeDigit: type(step_keys[use.index]); return true;
     case Job::TypeBackspace: type('\b'); return true;
     case Job::TypeTurn: studio.typing_strip = std::clamp(studio.typing_strip + use.delta, 0, int(strip().size()) - 1); return true;
@@ -369,9 +370,10 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point now) {
     lights.button(Button::Delete, studio.typing ? white_dim : 0);
     lights.button(Button::Copy, 0);
     if (studio.typing) { // the keyboard
-        for (unsigned at = 0; at < pad_count; ++at) {
+        for (unsigned at = 0; at < pad_count; ++at) { // `at` the logical pad, lit where it lies
             char c = key_for_pad(at);
-            lights.pad(at, c == '\b' ? colour::red : c == ' ' ? colour::azure : std::isalpha(static_cast<unsigned char>(c)) ? colour::light_grey : colour::dark_grey);
+            lights.pad(physical_pad(uint8_t(at), pad_layout()),
+                       c == '\b' ? colour::red : c == ' ' ? colour::azure : std::isalpha(static_cast<unsigned char>(c)) ? colour::light_grey : colour::dark_grey);
         }
         for (unsigned step = 0; step < step_count; ++step) lights.step(step, step < 10 ? colour::light_grey : colour::dark_grey);
         lights.button(Button::Back, white_dim);
@@ -437,10 +439,10 @@ void MelodeeApp::settings_lights(move::Lights& lights, Clock::time_point now) {
             shown = off < 0.6 ? lit : off < 1.6 ? soft : colour::off;
             break;
         }
-        case 2: { // Chase: a pad a sixteenth, through the 32 in two bars, the top row first
+        case 2: { // Chase: a pad a sixteenth, pad 1 to 32 in the pad map's order, in two bars
             unsigned sixteenth = unsigned(beats * 4) % pad_count;
-            unsigned slot = (3 - row) * 8 + column;
-            shown = slot == sixteenth ? lit : (slot + 1) % pad_count == sixteenth ? soft : colour::off;
+            unsigned number = logical_pad(uint8_t(at), pad_layout());
+            shown = number == sixteenth ? lit : (number + 1) % pad_count == sixteenth ? soft : colour::off;
             break;
         }
         case 3: { // Ripple: a ring from the middle on beat 1
