@@ -2,8 +2,11 @@
 #include "app/melodee_app.h"
 #include <cmath>
 #include "app/pad_layout.h"
+#include "app/prints.h"
 #include "app/screen.h"
 #include "app/sequencer.h"
+#include "app/song_desk.h"
+#include "ui/song_view.h"
 #include "move/display.h"
 #include "move/font.h"
 #include "ui/track_style.h"
@@ -201,6 +204,7 @@ bool MelodeeApp::global(bindings::Job job, const bindings::Use& use) {
     }
     case Job::UnmuteAll: mixing::unmute_all(studio); studio.say("UNMUTED ALL"); return true;
     case Job::ShowMeter: meter_until = Clock::time_point::max(); return true;
+    case Job::Print: if (holding()) studio.select(held_track()); return false; // a track button held + Sampling: its PRINT opens
     // Transport and volume.
     case Job::PlayStop:
         if (studio.playing()) studio.stop();
@@ -296,6 +300,12 @@ void MelodeeApp::act(const bindings::Use& use) {
     if (studio.opening && job != bindings::Job::MainVolume) return; // a project opening: presses wait (the Loading sheet)
     // Basic (Setup's FEATURES): the Move's own pages, tracks, modules, the mixer and Song; Melodee's Looper waits for Full.
     if (!studio.settings.full && job == bindings::Job::Looper) { studio.say("FULL ONLY: SETUP"); return; }
+    // A frozen track's sound, notes or menus: "Unfreeze track N?" first (prints.h).
+    if (Screen* top = studio.top(); top && top == studio.screen(home_screen(studio.kind())) && changes_print(job) &&
+                                    studio.song_desk().printer().asks(studio.track())) {
+        studio.push("unfreeze");
+        return;
+    }
     [&] {
         if (global(job, use)) return;
         Screen* top = studio.top();
@@ -539,7 +549,15 @@ void MelodeeApp::draw(juce::Graphics& g) {
     else if (holding() && now - held_at >= hold_shown && tracks()) tracks()->draw(g);
     else if (top && top->screen_kind() == bindings::Screen::Play && studio.sequencer().draw(g)) {} // a step held: its card, TRIG, a lock
     else if (top && touched >= 0 && now < touched_until && !top->knob(unsigned(touched)).name.empty()) draw_touched(g);
-    else if (top) top->draw(g);
+    else if (top) {
+        top->draw(g);
+        // A frozen track's Play screen: its snowflake in the rail.
+        if (top == studio.screen(home_screen(studio.kind())) && studio.song_desk().printer().frozen(studio.track())) {
+            g.setColour(juce::Colours::black);
+            ui::snowflake(g, 8, 43);
+            g.setColour(juce::Colours::white);
+        }
+    }
     if (studio.dirty && !studio.typing) ui::system::unsaved_mark(g); // Melodee's UNSAVED: changes not saved yet
     if (now < studio.message_until) {
         ui::sheet(g, {ui::content_x, ui::detail_y - 2, ui::content_width, 10});

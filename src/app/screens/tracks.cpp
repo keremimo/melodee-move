@@ -8,6 +8,9 @@
 // asks to delete it. The app shows this screen while a track button is held
 // (MelodeeApp), over whatever screen is on top.
 #include "app/screens/common.h"
+#include "app/prints.h"
+#include "app/song_desk.h"
+#include "ui/song_view.h"
 #include "ui/system_draw.h"
 
 namespace app::screens {
@@ -72,6 +75,7 @@ public:
         using namespace move;
         for (unsigned t = 0; t < melodee::track_count; ++t) {
             uint8_t colour = studio.kind(t) == TrackKind::Empty ? colour::dark_grey : studio.colour_of(t).bright;
+            if (studio.song_desk().printer().frozen(t)) colour = move::nearest_colour({150, 215, 255}); // frozen: ice
             if (int(t) == copy_from) colour = colour::white;
             else if (t == studio.track() && copy_from < 0) colour = colour::white;
             lights.step(t, colour);
@@ -92,7 +96,8 @@ public:
             if (marked) g.fillRect(x, y, cell_w - 1, cell_h - 1);
             else if (used) g.drawRect(x, y, cell_w - 1, cell_h - 1);
             g.setColour(marked ? juce::Colours::black : juce::Colours::white);
-            move::draw_text_centred(g, x, y + (cell_h - 7) / 2, cell_w - 1, used ? tag(t) : std::to_string(t + 1));
+            if (studio.song_desk().printer().frozen(t)) ui::snowflake(g, x + (cell_w - 8) / 2, y + (cell_h - 8) / 2); // frozen: its snowflake
+            else move::draw_text_centred(g, x, y + (cell_h - 7) / 2, cell_w - 1, used ? tag(t) : std::to_string(t + 1));
         }
         g.setColour(juce::Colours::white);
         if (delete_down) ui::detail(g, "DELETE: A STEP");

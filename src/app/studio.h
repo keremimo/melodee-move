@@ -147,6 +147,7 @@ struct Settings {
 };
 constexpr unsigned pad_fade_ms[4] {60, 100, 150, 250};
 constexpr const char* show_styles[5] {"PULSE", "SWEEP", "CHASE", "RIPPLE", "LEVELS"};
+class SongDesk;
 
 class Studio {
 public:
@@ -505,6 +506,15 @@ public:
         audio_unit.store(unit, std::memory_order_relaxed);
     }
 
+    // Song, its exports, print and freeze (song_desk.h, exports.h, prints.h):
+    // made with the studio, its threads stopped first as it goes. (`desk`
+    // is the mix's, mixing.h.)
+    SongDesk& song_desk() { return *arranger; }
+    const SongDesk& song_desk() const { return *arranger; }
+    // Each Schwung module (a track's, an effect's) as its PLUG entry keeps it (under `lock`).
+    PluginStates plugin_states() const;
+    SynthFile module_state(unsigned track) const; // a Schwung track's module as it is now: values, preset, its pages' state
+
 private:
     struct Parked { enum Result { Yes, NoAudio, Failed } result = Failed; uint32_t serial = 0; };
     Parked park_engine(); // service thread
@@ -530,14 +540,14 @@ private:
     void release_chain_fx(const melodee::Chain& chain); // its Schwung effects let go (a track deleted)
     void copy_chain_fx(melodee::Chain& chain);          // each its own instance (a track copied)
     std::string write(std::vector<uint8_t> bytes, std::string settings_text);
-    SynthFile module_state(unsigned track) const; // a Schwung track's module as it is now: values, preset, its pages' state
     std::vector<uint8_t> project_bytes() const;
     std::vector<uint8_t> bytes_to_save(); // the `saving` hooks, then project_bytes()
     std::string settings_text() const;
     void read_settings();
     void run_project_job(const ProjectJob& job); // service thread
     unsigned read_missing_samples();             // service thread: the project's samples not in memory yet; how many are missing
-    void setup_modules_from(const PluginStates& states); // under `lock`: a ModuleTrack for each Schwung track of the project
+    // Under `lock`: a ModuleTrack for each Schwung track of the project (a deep-frozen one's module left unloaded).
+    void setup_modules_from(const PluginStates& states, const melodee::PrintTable& prints);
     void free_unused_slots();                    // under `lock`
     std::vector<ProjectJob> project_jobs;
     std::vector<std::unique_ptr<Sample>> samples_leaving; // another project's, until the audio thread lets them go
@@ -600,6 +610,7 @@ private:
     std::vector<std::unique_ptr<FxModule>> fx_leaving;
     std::unique_ptr<LoopDesk> loop_desk; // made with the engine host, after the project is read
     int loop_latency_setting = LoopDesk::default_latency; // Move.settings' loop_latency, for the Looper made after
+    std::unique_ptr<SongDesk> arranger; // song_desk()
     // Last, so it goes first: it holds the samples and runners above.
     std::unique_ptr<melodee::EngineHost> engine;
 };

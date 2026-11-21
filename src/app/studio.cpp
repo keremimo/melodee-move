@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "app/studio.h"
 #include "app/pad_layout.h"
+#include "app/prints.h"
 #include "app/screen.h"
 #include "app/sequencer.h"
 #include "app/seq_edit.h"
+#include "app/song_desk.h"
 #include "melodee/engine/engine_info.h"
 #include "melodee/model/scales.h"
 #include "melodee/shell/pad_gap.h"
@@ -215,7 +217,8 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
 
     // The project, read before the audio thread starts.
     PluginStates states;
-    auto failed = read_project_file(path, *song, *bank, states, &move_extras);
+    melodee::PrintTable prints;
+    auto failed = read_project_file(path, *song, *bank, states, &move_extras, &prints);
     bool fresh = failed == "missing", migrated = false;
     if (!failed.empty() && !fresh) {
         // Unreadable: kept aside, never written over.
@@ -225,6 +228,7 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
         bank = std::make_unique<melodee::PatternBank>();
         states = {};
         move_extras = {};
+        prints = {};
         fresh = true;
         say("PROJECT UNREADABLE");
     }
@@ -244,7 +248,7 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
     static Studio* running = nullptr; // the one studio a process runs: its modules' MIDI out goes to its port
     running = this;
     set_external_midi([](const uint8_t* packets, int length) { return running ? running->midi.module_send(packets, length) : 0; });
-    setup_modules_from(states);
+    setup_modules_from(states, prints);
     setup_fx(states); // Schwung's effects in the chains: loaded by the service thread
     engine = std::make_unique<melodee::EngineHost>();
     engine->set_overload_guard(true); // as Melodee runs on the MPC
@@ -279,6 +283,11 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
     refresh_pads();
     engine->watch_taps(kind(selected) == TrackKind::Kit ? int(selected) : -1); // the pads' flare
 
+    // Song, its exports and prints; the song to the engine, as the file has it.
+    arranger = std::make_unique<SongDesk>(*this);
+    arranger->printer().table() = prints;
+    arranger->send_song(false);
+
     // The screens, one of each, and the track's Play screen shown.
     for (const auto& entry : registered_screens()) {
         auto made = entry.make(*this);
@@ -296,6 +305,7 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
 }
 
 Studio::~Studio() {
+    if (arranger) arranger->stop(); // the print host and the exports' thread, before the engine host goes
     for (auto& module : modules) if (module) module->player.stop();
     for (auto& module : modules_leaving) if (module) module->player.stop();
     set_external_midi(nullptr); // the modules' MIDI out had this studio's port
@@ -445,6 +455,7 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
 // ---------------------------------------------------------------- the model, under `lock`
 
 bool Studio::send(const melodee::Command& command) {
+    if (command.type == Type::Pattern && arranger) arranger->launched(command.track, unsigned(command.value)); // Rec into the song
     if (commands.push(command)) return true;
     say("BUSY, TRY AGAIN");
     return false;
@@ -1260,7 +1271,7 @@ std::vector<uint8_t> Studio::bytes_to_save() {
     return project_bytes();
 }
 
-std::vector<uint8_t> Studio::project_bytes() const {
+PluginStates Studio::plugin_states() const {
     // Each Schwung track's module, as its PLUG entry's state.
     PluginStates states;
     for (unsigned t = 0; t < melodee::track_count; ++t) {
@@ -1268,8 +1279,13 @@ std::vector<uint8_t> Studio::project_bytes() const {
         if (!module || module->entry == melodee::no_plugin) continue;
         states[module->entry] = synth_state(module_state(t));
     }
-    fx_states(states);
-    auto bytes = project_file_bytes(*song, *bank, states, &move_extras);
+    fx_states(states); // and each Schwung effect's in the chains
+    return states;
+}
+
+std::vector<uint8_t> Studio::project_bytes() const {
+    const auto* prints = arranger ? &arranger->printer().table() : nullptr;
+    auto bytes = project_file_bytes(*song, *bank, plugin_states(), &move_extras, prints);
     midi.append_section(bytes); // each track's MIDI OUT
     return bytes;
 }
@@ -1425,6 +1441,7 @@ std::string Studio::rebuild() {
     if (parked.result == Parked::Yes) engine->resume(parked.serial);
     ++rebuilds;
     pack.reset(); // the patterns played before, freed here
+    arranger->printer().opened(); // reload let the frozen tracks' prints go: read and sent again
     std::lock_guard<std::mutex> guard(lock);
     send({Type::Click, 0, 0, uint16_t(click_volume), int16_t(click_on)});
     if (was_playing) play(); // reload stops the transport: it goes on from the top
@@ -1536,12 +1553,20 @@ void Studio::destroy_retired() {
 
 void Studio::service() {
     if (!cache_tidied) { cache_tidied = true; cache.tidy(); } // before any copy of this run: Melodee's 4 GB, 30 days
-    if (!restored) restore();
+    if (!restored) {
+        restore();
+        arranger->printer().opened(); // the frozen tracks' prints read and sent (also each project opened)
+    }
     hold_streams();
     take_back();
     loop_desk->service(); // the Looper's memory and fits, its files, commits
     take_answers();
     destroy_retired();
+    {
+        std::lock_guard<std::mutex> guard(lock);
+        arranger->tick();             // Rec into the song: the clips written grow with the bar
+        arranger->printer().tick();   // prints in, freezes sent, packs freed, deep freezes and thaws
+    }
     // A module asked for (a track's job).
     for (unsigned t = 0; t < melodee::track_count; ++t) {
         std::string wanted;
@@ -1941,7 +1966,7 @@ std::string Studio::project_name() const { return projects::name_of(path); }
 
 void Studio::ask_projects(ProjectJob job) { project_jobs.push_back(std::move(job)); }
 
-void Studio::setup_modules_from(const PluginStates& states) {
+void Studio::setup_modules_from(const PluginStates& states, const melodee::PrintTable& prints) {
     // Schwung's modules: each PLUGIN track whose entry holds a module's
     // state, and each PLUGIN track with none yet (a synth track waiting for
     // one). Any other plug-in is another host's to play.
@@ -1955,8 +1980,9 @@ void Studio::setup_modules_from(const PluginStates& states) {
         if (ours) {
             module.entry = track.plugin;
             module.saved = saved;
-            module.job = saved.module;
-            module.job_restores = true;
+            // A deep-frozen track's module stays unloaded, its state kept, until it thaws.
+            module.job = prints.freeze[t].state == melodee::FreezeState::Deep ? std::string() : saved.module;
+            module.job_restores = !module.job.empty();
         }
     }
 }
@@ -2026,6 +2052,7 @@ std::string Studio::open_project(const std::string& file, bool fresh) {
     auto next_bank = std::make_unique<melodee::PatternBank>();
     PluginStates states;
     MoveExtras next_extras;
+    melodee::PrintTable next_prints; // its prints and frozen tracks (PRNT, FRZN)
     std::string next_path = file;
     bool copy = false;
     if (fresh) {
@@ -2043,7 +2070,7 @@ std::string Studio::open_project(const std::string& file, bool fresh) {
         next_path = projects::path_for(folder, projects::free_name(folder, projects::name_of(file)));
         copy_text(next->name, projects::name_of(next_path));
         copy = true;
-    } else if (auto failed = read_project_file(file, *next, *next_bank, states, &next_extras); !failed.empty()) {
+    } else if (auto failed = read_project_file(file, *next, *next_bank, states, &next_extras, &next_prints); !failed.empty()) {
         return failed;
     }
     auto pack = std::make_unique<melodee::ProjectPack>(*next, *next_bank); // allocates: here, never on the audio thread
@@ -2077,8 +2104,9 @@ std::string Studio::open_project(const std::string& file, bool fresh) {
         song.swap(next);
         bank.swap(next_bank);
         move_extras = next_extras;
-        engine->reload(*pack, false); // parked: this thread's to do
-        setup_modules_from(states);
+        engine->reload(*pack, false); // parked: this thread's to do (the last one's prints let go)
+        arranger->printer().table() = next_prints; // its frozen tracks' prints read and sent after restore()
+        setup_modules_from(states, next_prints);
         setup_fx(states); // its Schwung effects, loaded by the service thread
         for (unsigned t = 0; t < melodee::track_count; ++t)
             if (modules[t] && modules[t]->entry != melodee::no_plugin) engine->offer_plugin(modules[t]->entry, &modules[t]->runner);
@@ -2346,6 +2374,7 @@ std::string Studio::status() const {
         std::replace(step.begin(), step.end(), ' ', '_');
         line += " undo_last=" + step;
     }
+    line += arranger->status();
     for (const auto& screen : screens) line += screen->status();
     line += seq->status();
     line += midi.status();

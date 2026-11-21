@@ -36,6 +36,8 @@ bool write_looper_mockups(const std::string& directory);
 // Projects, Setup, undo, naming and track options: projects.png and
 // projects/ (mockups_projects.cpp).
 bool write_projects_mockups(const std::string& directory);
+// Song, exports, print and freeze: song.png and song/ (mockups_song.cpp).
+bool write_song_mockups(const std::string& directory);
 
 namespace mockup {
 

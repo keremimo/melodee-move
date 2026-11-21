@@ -101,6 +101,9 @@ after Schwung) differ for some buttons:
 | Typing | **The Move's own** (its Wi-Fi password): the wheel walks a strip of characters and its push types the one in the box; the strip ends with SPACE, DEL and OK, and OK finishes. The pads still type letters at once and the steps digits; Back deletes, held cancels; Shift is upper case. Every text: names and a module's page. |
 | The Menu | **No Menu on the Move**: Melodee's HERE, GO and its lessons are left out; Shift + the steps are the places. |
 | Light show | **Setup > Lights only** (LIGHT SHOW, SHOW STYLE): no key. |
+| Song's keys | The Move has no song view (its manual: Session's scenes are launched by hand). On Song the pads are the bank's four lanes over eight bars, laid out as Session lays clips (a row a track), the steps sixteen bars as in Loop Mode. **Plus and Minus move the bank of four lanes**, as in Session; **Shift + Left / Right jump to the previous or next marker**; Left / Right page the pads' eight bars. Copy, Delete and Loop act on the clip under the cursor, as Session's Copy and Delete act on a clip. |
+| Export | The Move exports audio only from Move Manager's web page ("Export as Audio"), no key. **Sampling on Song opens EXPORT** (mixdown 32-bit float, 24 or 16-bit, stems, MIDI file, MPC 3 project, song to pattern): the Move's Sampling with Resampling records its whole output, and a mixdown is the song's whole output to a file. Exports go where Melodee puts them on the MPC's card: `/data/UserData/Melodee/Mixdowns`, `Stems/<name>/`, `MIDI`, `MPC 3`, named after the project. |
+| Print and freeze | The Move has no freeze. **Track button held + Sampling opens PRINT** for that track, on Melodee's own sixteen-track screen (where Copy and Delete already act on tracks), so no Move key changes meaning. |
 
 Followed from the rule without a choice: Left and Right become the
 pattern's bars, so pages move to Shift + turn; in Typing, Back deletes a
@@ -216,7 +219,7 @@ while Shift is held.
 | Shift + Step 10 | Full Velocity on or off | Full Level | wave 2: instruments |
 | Shift + Step 11 | Repeat and the Arpeggiator (rate; Repeat, Up, Down, Random) | Note Repeat and Arp | done |
 | Shift + Step 12 | No job | The Looper; on it, back to Play | done |
-| Shift + Step 13 | No job | Song | wave 2: song & export |
+| Shift + Step 13 | No job | Song; again on Song, back | done |
 | Shift + Step 14 | A new clip for the selected track, selected | The track's next empty pattern | done |
 | Shift + Step 15 | Doubles the loop with its notes and automation | Double Seq | done |
 | Shift + Step 16 | Quantizes the clip by Workflow's amount | Time Correct | done |
@@ -418,6 +421,44 @@ their touch, Plus and Minus, Back, a track button held and a step).
 | Shift + Wheel push (Looper) | Options for the item in focus | Nothing yet: the loop's sheet is the push | free |
 | Step (Looper) | (Step Edit) | Nothing: the steps show the selected loop's place | free |
 
+### Song
+
+Melodee's own screen (Shift + Step 13): the Move has no song view, so its
+controls take Session's and Loop Mode's meanings where they have one.
+
+| Control | On the Move | In Melodee | Status |
+| --- | --- | --- | --- |
+| Pad (Song) | (Session: launches the clip, a row a track) | The cursor to that lane (the bank's four, a row each, Track 1 of the bank on top) and bar (the eight bars in view), where the pad lies in both pad layouts, as Session's grid | done |
+| Copy held + Pad (Song) | (Session: copies the clip, then pastes it on the next pad pressed) | The clip there, then a copy of it where the next pad is pressed | done |
+| Delete held + Pad (Song) | (Session: deletes the clip at once) | Deletes the clip there | done |
+| Mute held + Pad (Song) | (Note Mode: mutes the drum pad) | Mutes or unmutes the clip there | done |
+| Step (Song) | (Loop Mode: selects the bar) | The cursor to that bar of the sixteen in view | done |
+| Step held + Step (Song) | (Loop Mode: the loop from the first bar to the second) | The song's loop brace from the first bar to the second | done |
+| Wheel turn (Song) | (No song view) | The cursor a bar | done |
+| Wheel push (Song) | (No song view) | On a clip: its jobs (open its notes, duplicate, split, own pattern, repeat to the next marker, loop its bars, mute, delete); on empty time: places the pattern and length on knobs 1 and 2 | done |
+| Shift + Wheel push (Song) | (No song view) | A marker at the cursor; on one, its next name (INTRO, VERSE, CHORUS ...), past the last it goes | done |
+| Copy (Song) | (Session: duplicates the clip into the next slot) | Duplicates the clip under the cursor after itself | done |
+| Delete (Song) | (Deletes the selected clip) | Deletes the clip under the cursor | done |
+| Loop (Song) | (Loop Mode) | The loop brace on the clip's bars; again, or on empty time, off | done |
+| Mute (Song) | Mutes or unmutes the selected track | The same | done |
+| Plus or Minus (Song) | (Session in Control Live: the ring) | The bank of four lanes | done |
+| Left or Right (Song) | (The clip's previous or next bar) | The pads' eight bars, a page | done |
+| Shift + Left or Right (Song) | (Control Live: 16 bars) | The previous or next marker (clip edges with none) | done |
+| Play (Song) | Starts or stops | The song from the cursor; again stops | done |
+| Shift + Play (Song) | Restarts the playing clips | The song from the cursor again | done |
+| Rec (Song) | Records into the selected track | Patterns launched while the song plays written as clips (stopped: the song starts from the cursor) | done |
+| Sampling (Song) | Sampling Mode; its Resampling source records the Move's whole output | EXPORT: a mixdown (32-bit float, 24 or 16-bit), stems, a MIDI file, an MPC 3 project, the song to a pattern | done |
+
+### Print and freeze
+
+| Control | On the Move | In Melodee | Status |
+| --- | --- | --- | --- |
+| Track button held + Sampling | No job (the Move has no freeze) | PRINT for that track | done |
+| Pad (Print) | (No PRINT on the Move) | The pattern of the pad's number in the pad layout (Rows or Banks), printed or left out | done |
+| Plus or Minus (Print) | (As above) | The patterns' bank of 32 | done |
+| Wheel turn (Print) | (As above) | FREEZE, DEEP FREEZE, ALL, NONE, UNFREEZE | done |
+| Wheel push (Print) | (As above) | Does it; while printing, Back calls it off | done |
+
 ## Lights
 
 Not checked by the tests: they follow from the screens.
@@ -451,6 +492,11 @@ Not checked by the tests: they follow from the screens.
 | Looper, Rec | (Recording) | Red while a loop records or overdubs, blinking while one is armed | done |
 | Knob LEDs | Red with automation; with Mute held, red active, white off, dark none; green for a macro; all pulse while browsing effects | Lit for the knobs the screen uses; motion's colours with the sequencer | done |
 | White buttons | Lit where they do something | The same | done |
+| Pads, Song | (No song view) | The bank's four lanes over eight bars: a clip's first bar bright in its track's colour, the rest dim, a muted clip grey, the cursor white, the playhead's bar green | done |
+| Steps, Song | (No song view) | Sixteen bars: the loop's bright, the lane's clips dim, the cursor white, the playhead green | done |
+| Buttons, Song | (No song view) | Copy, Delete and Loop lit on a clip; Sampling lit (EXPORT), red while exporting; Rec red while recording into the song | done |
+| Pads, Print | (No PRINT) | The track's patterns of the bank: with notes dim in its colour, to print ice, the one playing pulsing; while printing done ice, printing pulsing | done |
+| Steps, a track button held | (No job) | A frozen track's step ice | done |
 
 ## How the app runs the map
 
@@ -536,4 +582,5 @@ long, double, used as a modifier) has tests of its own.
 
 `build/melodee-move --ui-mockups DIR` draws the screens this map moves or
 adds (`src/ui/mockups_controls.cpp`): `docs/ui/controls.png`; the
-sequencer's (`src/ui/mockups_sequencer.cpp`): `docs/ui/sequencer.png`.
+sequencer's (`src/ui/mockups_sequencer.cpp`): `docs/ui/sequencer.png`; Song,
+its exports and PRINT (`src/ui/mockups_song.cpp`): `docs/ui/song.png`.

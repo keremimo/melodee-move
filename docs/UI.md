@@ -786,6 +786,82 @@ flashing; a track's colour on its button as it is turned. Setup's
 brightness dims every light as it is sent (`move::Lights::set_brightness`);
 its pad lights and the light show draw over a Play screen's pads.
 
+## Song
+
+Melodee's arrange view (Shift + Step 13; the Move has no song view, so its
+controls take Session's and Loop Mode's meanings where they have one), its
+exports, and print and freeze, picked as drawn on 2026-11-20 with Kerem's
+doors (docs/MOVE_CONTROLS.md, Decisions). `docs/ui/song.png` is the sheet
+(`src/ui/mockups_song.cpp`); the screens are built to it, drawn by the same
+`ui::song_view()` (`src/ui/song_view.*`).
+
+![Song, exports, print and freeze](ui/song.png)
+
+- **Song** (`SONG` / the cursor's bar / the lane's track): a row of
+  markers, the loop brace under it, then four lanes, the tracks of the bank
+  in view (the track buttons' four), time left to right. A clip is a box
+  with its pattern's name (A1 .. H16), the one under the cursor filled, a
+  muted one dotted; an empty track's lane a dotted line; the selected lane
+  marked at its left. The cursor is a line down the lanes, the playhead a
+  dotted one; tempo points are notches over the brace. Knob 3 zooms (4 to 64
+  bars across). The detail line: the clip under the cursor (`A2 4 BARS`),
+  or what a push places (`PLACE A1 X4`), a marker's name on its bar, the bar
+  and beat while playing; on the right the clock at the cursor, or with a
+  tempo lane its tempo there.
+- **The pads** are the four lanes over eight bars (as Session lays clips
+  out, a row a track): a clip's first bar bright in its track's colour, the
+  rest dim, a muted clip grey, the cursor white, the playhead's bar green. A
+  pad moves the cursor there (and selects that lane's track); Copy held, a
+  clip's pad then another copies it there; Delete held deletes it; Mute held
+  mutes it. **The steps** are sixteen bars (as Loop Mode has them): the
+  loop's bright, the lane's clips dim, the cursor white; a step moves the
+  cursor, a step held and another sets the loop brace. Song's pads are a
+  grid of where they lie, as Session's, in both pad layouts; PRINT's
+  patterns are numbered pads and follow Rows or Banks.
+- **The wheel** moves the cursor a bar; its push on a clip opens its jobs
+  (`CLIP`: open notes, duplicate, split at the cursor, own pattern, repeat to
+  the next marker, loop its bars, mute, delete), on empty time places the
+  pattern and length on knobs 1 and 2. Shift + push adds a marker, or on one
+  steps its name. **Copy** duplicates the clip after itself, **Delete**
+  deletes it, **Loop** puts the brace on its bars (again: off).
+  **Plus / Minus** move the bank of lanes, **Left / Right** the pads' page
+  of eight bars, **Shift + Left / Right** jump to the markers.
+- **Play** plays the song from the cursor (Shift + Play: again from it);
+  **Rec** writes launches into it as clips, a bar at a time. Knob 5 sets the
+  cursor's bar's tempo (under 30 BPM: none there), knob 6 its shape (Step,
+  Ramp). A track button leaves for Play, as on the Move.
+- **EXPORT** (Sampling on Song; the Move's Resampling records its whole
+  output): MIXDOWN 32 FLOAT, 24 BIT, 16 BIT, STEMS, MIDI FILE, MPC 3
+  PROJECT, SONG TO PATTERN; the wheel picks, push exports, named after the
+  project. A mixdown or stems play the song once through: the screen shows
+  how far (`37 %`, the clock, the tail), Sampling red; Back or Play stops it
+  and drops the files. Then where it went (`MIXDOWNS/`, `MOVE 3.WAV`, its
+  length and size); push goes back. Under `/data/UserData/Melodee`:
+  `Mixdowns/`, `Stems/<name>/`, `MIDI/`, `MPC 3/`, as on the MPC's card.
+- **PRINT** (a track button held + Sampling): the track's patterns on the
+  pads (Plus / Minus: 32 a bank), with notes dim in its colour, to print
+  ice, the one playing blinking; a pad takes one out or back. TAP (knob 1),
+  TAIL (knob 2), the room the prints take and the share of a block the track
+  takes now; the wheel picks FREEZE, DEEP FREEZE, ALL, NONE or UNFREEZE (on
+  a frozen track), push does it. While printing: the pattern large, how
+  far, its speed against real time, `THEN ON A BAR`; the pads done ice, the
+  one printing blinking; Back calls it off.
+- **A frozen track**: a snowflake in its Play screen's rail and in its cell
+  of the sixteen (its step ice); its pads still play live. A knob, a step,
+  its browser or menu asks first: `UNFREEZE TRACK 2?`, push yes, Back no.
+
+| Screen | Rail | Subject | Detail |
+| --- | --- | --- | --- |
+| Song | `SONG` / cursor bar / `T5` | markers, brace, four lanes, cursor | clip or `PLACE A1 X4`, clock or tempo |
+| A clip's jobs | `CLIP` / pattern / track | the list | `PUSH: DO`, `BACK` |
+| A knob on Song | `KNOB` / knob / `SONG` | `PATTERN`, `BARS`, `ZOOM`, `BAR 9 TEMPO`, `SHAPE` | |
+| EXPORT | `EXPT` / / `SONG` | the kinds | `AS MOVE 3`, the song's length |
+| Exporting | `EXPT` / percent / `%` | kind, file, progress, clock | `BACK: STOP` |
+| Exported | `EXPT` / `OK` | folder, file, length and size, tail | `PUSH: OK` |
+| PRINT | `PRNT` / track / module | TAP, TAIL, ROOM, CPU, the action | `PATTERNS`, chosen / with notes |
+| Printing | `PRNT` / track / n of m | the pattern, progress, speed | `BACK: CALL OFF`, time left |
+| Unfreeze | `FRZN` / track / module | `UNFREEZE TRACK N?` | `PUSH YES`, `BACK NO` |
+
 ## Screens in code
 
 Each screen is a file of its own in `src/app/screens/`, a `Screen`
@@ -820,7 +896,7 @@ hold the code to it. In short:
 | Play / Shift + Play | start and stop / restart every pattern |
 | Rec | Seq Record |
 | Capture / Shift + Capture | Recall the notes just played / clear them |
-| Sampling / Shift + Sampling | Record onto a pad / Audio Recall onto the next empty pad |
+| Sampling / Shift + Sampling | Record onto a pad / Audio Recall onto the next empty pad; on Song, EXPORT; a track button held + Sampling, PRINT |
 | Loop | Loop Mode; held with the wheel, the pattern's length |
 | Mute | the selected track; held with a track or a pad, mutes it; Shift + Mute + track solos |
 | Undo / Shift + Undo / held | undo / redo / the undo list |

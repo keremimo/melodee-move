@@ -111,7 +111,7 @@ std::vector<Binding> make_table() {
         {"Shift + Step 10", S::Any, T::Any, H::shift, C::Step, G::Press, J::FullVelocity, St::Wave2, instruments, step(10)},
         {"Shift + Step 11", S::Any, T::Any, H::shift, C::Step, G::Press, J::Repeat, St::Done, "", step(11)},
         {"Shift + Step 12", S::Any, T::Any, H::shift, C::Step, G::Press, J::Looper, St::Done, "", step(12)},
-        {"Shift + Step 13", S::Any, T::Any, H::shift, C::Step, G::Press, J::Song, St::Wave2, song, step(13)},
+        {"Shift + Step 13", S::Any, T::Any, H::shift, C::Step, G::Press, J::Song, St::Done, song, step(13)},
         {"Shift + Step 14", S::Any, T::Any, H::shift, C::Step, G::Press, J::NewPattern, St::Done, "", step(14)},
         {"Shift + Step 15", S::Any, T::Any, H::shift, C::Step, G::Press, J::DoubleLoop, St::Done, "", step(15)},
         {"Shift + Step 16", S::Any, T::Any, H::shift, C::Step, G::Tap, J::Quantize, St::Done, "", step(16)}, // a tap: held, a pad picks one lane
@@ -242,19 +242,12 @@ std::vector<Binding> make_table() {
         {"Plus or Minus (Play, kit)", S::Play, T::Kit, H::none, C::Minus, G::Press, J::PadBank, St::Done},
         {"Plus or Minus (16 Pitches)", S::Play, T::Pitches, H::none, C::Plus, G::Press, J::PitchesOctave, St::Done},
         {"Plus or Minus (16 Pitches)", S::Play, T::Pitches, H::none, C::Minus, G::Press, J::PitchesOctave, St::Done},
-<<<<<<< HEAD
-        {"Shift + Plus or Minus", S::Play, T::Any, H::shift, C::Plus, G::Press, J::ScaleStep, St::Wave2, instruments},
-        {"Shift + Plus or Minus", S::Play, T::Any, H::shift, C::Minus, G::Press, J::ScaleStep, St::Wave2, instruments},
-        {"Plus or Minus (Session)", S::Session, T::Any, H::none, C::Plus, G::Press, J::TrackBank, St::Done},
-        {"Plus or Minus (Session)", S::Session, T::Any, H::none, C::Minus, G::Press, J::TrackBank, St::Done},
-=======
         {"Shift + Plus or Minus (Play, synth)", S::Play, T::Synth, H::shift, C::Plus, G::Press, J::ScaleStep, St::Wave2, instruments},
         {"Shift + Plus or Minus (Play, synth)", S::Play, T::Synth, H::shift, C::Minus, G::Press, J::ScaleStep, St::Wave2, instruments},
         {"Shift + Plus or Minus (Play, kit)", S::Play, T::Kit, H::shift, C::Plus, G::Press, J::ScaleStep, St::Done},
         {"Shift + Plus or Minus (Play, kit)", S::Play, T::Kit, H::shift, C::Minus, G::Press, J::ScaleStep, St::Done},
-        {"Plus or Minus (Session)", S::Session, T::Any, H::none, C::Plus, G::Press, J::TrackBank, St::Wave2, sequencer},
-        {"Plus or Minus (Session)", S::Session, T::Any, H::none, C::Minus, G::Press, J::TrackBank, St::Wave2, sequencer},
->>>>>>> move-kit-f47a0c
+        {"Plus or Minus (Session)", S::Session, T::Any, H::none, C::Plus, G::Press, J::TrackBank, St::Done},
+        {"Plus or Minus (Session)", S::Session, T::Any, H::none, C::Minus, G::Press, J::TrackBank, St::Done},
         {"Plus or Minus (Chop)", S::Chop, T::Any, H::none, C::Plus, G::Press, J::SlicePage, St::Wave2, sampling},
         {"Plus or Minus (Chop)", S::Chop, T::Any, H::none, C::Minus, G::Press, J::SlicePage, St::Wave2, sampling},
         {"Left or Right (Play)", S::Play, T::Any, H::none, C::Left, G::Press, J::Bar, St::Done},
@@ -288,6 +281,39 @@ std::vector<Binding> make_table() {
         {"Step (Looper)", S::Looper, T::Any, H::none, C::Step, G::Tap, J::Nothing, St::Free},
         {"Plus or Minus (Overview)", S::Overview, T::Any, H::none, C::Plus, G::Press, J::ProjectPage, St::Done},
         {"Plus or Minus (Overview)", S::Overview, T::Any, H::none, C::Minus, G::Press, J::ProjectPage, St::Done},
+
+        // Song (Shift + Step 13): the pads four lanes of eight bars, the steps sixteen bars
+        {"Pad (Song)", S::Song, T::Any, H::none, C::Pad, G::Press, J::SongPick, St::Done},
+        {"Copy held + Pad (Song)", S::Song, T::Any, H::copy, C::Pad, G::Press, J::SongCopyClip, St::Done},
+        {"Delete held + Pad (Song)", S::Song, T::Any, H::del, C::Pad, G::Press, J::SongDeleteClip, St::Done},
+        {"Mute held + Pad (Song)", S::Song, T::Any, H::mute, C::Pad, G::Press, J::SongMuteClip, St::Done},
+        {"Step (Song)", S::Song, T::Any, H::none, C::Step, G::Press, J::SongBar, St::Done},
+        {"Step held + Step (Song)", S::Song, T::Any, H::step, C::Step, G::Press, J::SongLoopRange, St::Done},
+        {"Wheel turn (Song)", S::Song, T::Any, H::none, C::WheelTurn, G::Turn, J::SongCursor, St::Done},
+        {"Wheel push (Song)", S::Song, T::Any, H::none, C::WheelPush, G::Press, J::SongPush, St::Done},
+        {"Shift + Wheel push (Song)", S::Song, T::Any, H::shift, C::WheelPush, G::Press, J::SongMarker, St::Done},
+        {"Copy (Song)", S::Song, T::Any, H::none, C::Copy, G::Tap, J::SongDuplicate, St::Done},
+        {"Delete (Song)", S::Song, T::Any, H::none, C::Delete, G::Tap, J::SongDelete, St::Done},
+        {"Loop (Song)", S::Song, T::Any, H::none, C::Loop, G::Tap, J::SongLoopClip, St::Done},
+        {"Mute (Song)", S::Song, T::Any, H::none, C::Mute, G::Tap, J::MuteSelected, St::Done},
+        {"Plus or Minus (Song)", S::Song, T::Any, H::none, C::Plus, G::Press, J::TrackBank, St::Done},
+        {"Plus or Minus (Song)", S::Song, T::Any, H::none, C::Minus, G::Press, J::TrackBank, St::Done},
+        {"Left or Right (Song)", S::Song, T::Any, H::none, C::Left, G::Press, J::SongPage, St::Done},
+        {"Left or Right (Song)", S::Song, T::Any, H::none, C::Right, G::Press, J::SongPage, St::Done},
+        {"Shift + Left or Right (Song)", S::Song, T::Any, H::shift, C::Left, G::Press, J::SongMarkerJump, St::Done},
+        {"Shift + Left or Right (Song)", S::Song, T::Any, H::shift, C::Right, G::Press, J::SongMarkerJump, St::Done},
+        {"Play (Song)", S::Song, T::Any, H::none, C::Play, G::Press, J::PlaySong, St::Done},
+        {"Shift + Play (Song)", S::Song, T::Any, H::shift, C::Play, G::Press, J::RestartSong, St::Done},
+        {"Rec (Song)", S::Song, T::Any, H::none, C::Rec, G::Press, J::RecordSong, St::Done},
+        {"Sampling (Song)", S::Song, T::Any, H::none, C::Sampling, G::Press, J::SongExport, St::Done},
+
+        // Print and freeze: the PRINT sheet
+        {"Track button held + Sampling", S::Any, T::Any, H::track, C::Sampling, G::Press, J::Print, St::Done},
+        {"Pad (Print)", S::Print, T::Any, H::none, C::Pad, G::Press, J::PrintPattern, St::Done},
+        {"Plus or Minus (Print)", S::Print, T::Any, H::none, C::Plus, G::Press, J::PrintBank, St::Done},
+        {"Plus or Minus (Print)", S::Print, T::Any, H::none, C::Minus, G::Press, J::PrintBank, St::Done},
+        {"Wheel turn (Print)", S::Print, T::Any, H::none, C::WheelTurn, G::Turn, J::PrintTurn, St::Done},
+        {"Wheel push (Print)", S::Print, T::Any, H::none, C::WheelPush, G::Press, J::PrintPush, St::Done},
     };
 }
 

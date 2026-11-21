@@ -5,10 +5,10 @@
 # whole runtime against a simulated Move (the spike: a pad, the jogwheel to
 # LATENCY, the meter timing clicks through a 300-frame cable, Shift + Back to
 # quit; Melodee: load, chop, To Pads, saved and restored, transport and
-# tempo, MIDI in and out on the USB port, the sequencer's steps, Play and
-# Rec, the pad layout set to MPC banks and kept, the synth track saved and
-# restored, the busy mix playing, the web page, a new project from the
-# projects, Setup, and a press over the control channel),
+# tempo, Song and its mixdown, MIDI in and out on the USB port, the
+# sequencer's steps, Play and Rec, the pad layout set to MPC banks and kept,
+# the synth track saved and restored, the busy mix playing, the web page, a
+# new project from the projects, Setup, and a press over the control channel),
 # and the packages in dist/. When Melodee's own page previews are at hand
 # (MELODEE_PREVIEWS, by default ../melodee-sample/build/melodee-preview),
 # also crush them to the Move's 128 x 64 screen in build/crushed.
@@ -74,6 +74,14 @@ PADS_EXPECTED='page=kit-play .*pad=B01 .*layout=banks'
 # A01 then B16 at 900 copies A01 onto the empty B16 (18 pads).
 KIT_SCRIPT='100:0xb0,55,127;101:0xb0,55,0;160:0xb0,54,127;161:0xb0,54,0;240:0xb0,49,127;241:0x90,23,127;242:0x80,23,0;243:0xb0,49,0;300:0x90,72,100;330:0x80,72,0;480:0xb0,49,127;481:0x90,23,127;482:0x80,23,0;483:0xb0,49,0;700:0xb0,49,127;701:0xb0,14,1;702:0xb0,49,0;720:0xb0,71,2;780:0xb0,51,127;781:0xb0,51,0;900:0xb0,60,127;901:0x90,68,100;902:0x80,68,0;903:0x90,99,100;904:0x80,99,0;905:0xb0,60,0'
 KIT_EXPECTED='page=kit-play .*pads=18 .* bank=0 first=A01 pitches=0 copy_from=-1'
+# Song, on a copy of that project (docs/MOVE_CONTROLS.md, Song): Shift + Step 13 at
+# 100 opens it; knob 2 three down at 130 (the next clip one bar); the top
+# row's first pad at 150 (track 1, bar 1); the wheel's push at 200 places A1
+# there; Play at 250 plays the song, at 600 stops it; Sampling at 700 opens
+# EXPORT, its push at 750 mixes the song down, once through, into
+# Mixdowns/Move.wav.
+SONG_SCRIPT='100:0xb0,49,127;101:0x90,28,127;102:0x80,28,0;103:0xb0,49,0;130:0xb0,72,125;150:0x90,92,100;160:0x80,92,0;200:0xb0,3,127;201:0xb0,3,0;250:0xb0,85,127;251:0xb0,85,0;600:0xb0,85,127;601:0xb0,85,0;700:0xb0,118,127;701:0xb0,118,0;750:0xb0,3,127;751:0xb0,3,0'
+SONG_EXPECTED='page=song-export .*song_clips=1 .*export=Mixdowns/Move.wav export_busy=0 export_done=1'
 # The synth track: Track 2 tapped at 50, the wheel's push at 60 lists the
 # modules (none loaded yet), its push at 80 loads the one in
 # build/test-modules (the tests' stand-in), a pad plays it, knob 1 turns its
@@ -129,6 +137,7 @@ docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE
     build/pad-layout-tests &&
     build/pads-app-tests &&
     build/web-tests &&
+    build/song-tests &&
     build/melodee-move --self-test build/self-test.wav &&
     build/melodee-move --preview build/preview &&
     { build/melodee-move --app spike --backend simulated --loopback 300 --seconds 8 --script '$SCRIPT' 2> build/simulated.log || true; } &&
@@ -148,6 +157,11 @@ docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE
     { build/melodee-move --backend simulated --samples build/simulated-samples --home build/simulated-home --seconds 3 --script '$TRANSPORT_SCRIPT' 2> build/simulated-transport.log || true; } &&
     tail -n 1 build/simulated-transport.log &&
     grep -qE '$TRANSPORT_EXPECTED' build/simulated-transport.log &&
+    rm -rf build/simulated-song && cp -R build/simulated-home build/simulated-song &&
+    { build/melodee-move --backend simulated --samples build/simulated-samples --home build/simulated-song --seconds 8 --script '$SONG_SCRIPT' 2> build/simulated-song.log || true; } &&
+    tail -n 1 build/simulated-song.log &&
+    grep -qE '$SONG_EXPECTED' build/simulated-song.log &&
+    test -s build/simulated-song/Mixdowns/Move.wav &&
     rm -rf build/simulated-midi && cp -R build/simulated-home build/simulated-midi &&
     printf 'midi_sync_out 1\npad_midi_out 1\n' >> build/simulated-midi/Move.settings &&
     { build/melodee-move --backend simulated --samples build/simulated-samples --home build/simulated-midi --seconds 3 --script '$MIDI_SCRIPT' 2> build/simulated-midi.log || true; } &&

@@ -61,6 +61,12 @@ MELODEE_SOURCES := $(wildcard $(MELODEE)/src/melodee/engine/*.cpp $(MELODEE)/src
 # the MPC (JSON text, safe names, paths kept in a folder, file types), plain
 # C++, for the page on the Move (src/web/).
 MELODEE_SOURCES += $(MELODEE)/src/melodee/web/web_server.cpp $(MELODEE)/src/melodee/web/card_files.cpp
+# Song's MPC 3 export (src/app/exports.*): Melodee's exporter and the MPC
+# file pieces it writes with (mpc_program, mpc_project and mpc_wav_slices are
+# listed above). Its template JSON is assembled in from Melodee's checkout
+# (.incbin, found through -Wa,-I). What it asks of the sample library about
+# instrument files is the Move's: src/app/mpc3_shell.cpp.
+MELODEE_SOURCES += $(addprefix $(MELODEE)/src/melodee/shell/,mpc3_export.cpp xpm_write.cpp)
 MELODEE_OBJECTS := $(patsubst $(MELODEE)/src/%.cpp,build/obj/melodee-sample/%.o,$(MELODEE_SOURCES))
 MELODEE_LIBRARY := build/melodee.a
 CPPFLAGS += $(MELODEE_INCLUDES)
@@ -135,6 +141,11 @@ PROJECTS_TESTS := build/projects-tests
 all: $(PROJECTS_TESTS)
 $(PROJECTS_TESTS): build/obj/tests/projects_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS) $(MELODEE_LIBRARY)
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
+# Song, its exports, print and freeze, against the whole app (tests/song_tests.cpp).
+SONG_TESTS := build/song-tests
+all: $(SONG_TESTS)
+$(SONG_TESTS): build/obj/tests/song_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS) $(MELODEE_LIBRARY)
+	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 $(CONTROLS_TESTS): build/obj/tests/controls_tests.o build/obj/app/bindings.o
 	$(CXX) -static-libstdc++ -static-libgcc $^ -pthread -o $@
 $(PAD_TESTS): build/obj/tests/pad_layout_tests.o build/obj/app/pad_layout.o
@@ -145,7 +156,7 @@ $(MELODEE_LIBRARY): $(MELODEE_OBJECTS)
 	rm -f $@ && $(AR) rcs $@ $^
 build/obj/melodee-sample/%.o: $(MELODEE)/src/%.cpp
 	@mkdir -p $(@D)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -w -c $< -o $@
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Wa,-I$(MELODEE) -w -c $< -o $@
 build/obj/tests/%.o: tests/%.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(WARNINGS) -c $< -o $@
@@ -168,5 +179,5 @@ $(foreach m,$(MODULE_C),$(eval $(call c_module_rule,$(m))))
 juce: $(JUCE_OBJECTS)
 .PHONY: all clean juce
 clean:
-	rm -rf build/obj $(TARGET) $(TESTS) $(PROJECTS_TESTS) $(WEB_TESTS) $(SEQUENCER_TESTS) $(CONTROLS_TESTS) $(MIDI_TESTS) $(MIXER_TESTS) $(PAD_TESTS) $(PADS_APP_TESTS)
+	rm -rf build/obj $(TARGET) $(TESTS) $(PROJECTS_TESTS) $(WEB_TESTS) $(SEQUENCER_TESTS) $(CONTROLS_TESTS) $(MIDI_TESTS) $(MIXER_TESTS) $(PAD_TESTS) $(PADS_APP_TESTS) $(SONG_TESTS)
 -include $(shell find build/obj -name '*.d' 2>/dev/null)

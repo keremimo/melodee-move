@@ -2,6 +2,7 @@
 #pragma once
 #include "melodee/model/chop_slices.h"
 #include "melodee/model/limits.h"
+#include "melodee/model/print.h"
 #include "melodee/model/project.h"
 #include "melodee/model/sampler.h"
 #include <array>
@@ -36,14 +37,15 @@ struct MoveExtras {
 // Each file whole or not at all: a temporary file beside it, flushed,
 // renamed over it. Empty on success.
 std::string write_whole(const std::string& path, const void* bytes, size_t size);
+// `prints`: the project's prints and frozen tracks (PRNT, FRZN; model/print.h), when it has any.
 std::vector<uint8_t> project_file_bytes(const melodee::Project& project, const melodee::PatternBank& patterns, const PluginStates& states,
-                                        const MoveExtras* extras = nullptr);
+                                        const MoveExtras* extras = nullptr, const melodee::PrintTable* prints = nullptr);
 // Empty on success; "missing" when there is no file.
 std::string read_project_file(const std::string& path, melodee::Project& project, melodee::PatternBank& patterns, PluginStates& states,
-                              MoveExtras* extras = nullptr);
+                              MoveExtras* extras = nullptr, melodee::PrintTable* prints = nullptr);
 // The same from bytes (an MPC project imported, a test).
 std::string read_project_bytes(const std::vector<uint8_t>& bytes, melodee::Project& project, melodee::PatternBank& patterns, PluginStates& states,
-                               MoveExtras* extras = nullptr);
+                               MoveExtras* extras = nullptr, melodee::PrintTable* prints = nullptr);
 
 // A Schwung module's state, as its PLUG entry keeps it. Text, a line a
 // setting (and, from the first scope, the whole of "<project>.synth"):

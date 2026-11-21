@@ -137,6 +137,33 @@ Three parts so far:
   chain); again Knob FX, Pad FX (the pads as punches, from the audio
   thread), Flex Beat. Mute held + a kit pad mutes it, Shift + Mute alone
   lets every mute go; touching the Volume knob shows the main meter.
+- **Song** (Shift + Step 13; Melodee's Song, MELODEE.md › Sequencing,
+  Song): a lane per track of the bank in view, clips of patterns, markers,
+  the loop brace and the tempo lane, kept in the project. The pads are the
+  four lanes over eight bars, the steps sixteen bars (a step held and
+  another: the loop); the wheel moves the cursor, its push places a clip or
+  opens a clip's jobs (open notes, duplicate, split, own pattern, repeat to
+  the marker, loop, mute, delete), Shift + push a marker; Copy, Delete and
+  Loop act on the clip; Plus / Minus the bank, Shift + Left / Right the
+  markers; knobs the pattern, length, zoom, the bar's tempo and its shape.
+  Play plays the song from the cursor, Rec writes the patterns launched into
+  it. **Sampling on Song exports** (the Move's Resampling records its whole
+  output): a mixdown (32-bit float, or 24 or 16-bit dithered) or stems, the
+  song played once through in real time; a MIDI file; an MPC 3 project
+  (synth tracks as their prints, made first); the song into a new pattern.
+  They go under `/data/UserData/Melodee`: `Mixdowns/`, `Stems/<name>/`,
+  `MIDI/`, `MPC 3/`, as Melodee writes them on the MPC's card. A `.mid` in
+  the samples browser loads its notes onto the track's pattern.
+- **Print and freeze** (a track button held + Sampling: PRINT): a kit or
+  synth track's patterns printed by a print host of Melodee's (its lean
+  engine host and a second instance of the Schwung module) on a thread at
+  the lowest priority on the last core, faster than real time, into
+  `<project> Prints/`; frozen, the track plays its prints instead of its
+  engine (pads still live, level, pan and mute live), switching on a bar
+  line. Deep freeze lets the module go too; unfreezing is at once, the
+  prints kept, a deep-frozen track thawing first. A frozen track shows a
+  snowflake; an edit on it asks first. The prints and freezes are kept in
+  the project (Melodee's PRNT, FRZN), so it opens frozen, on the MPC too.
 - The master knob is the volume; Shift + Back goes back to Move.
 - **The web page** (`src/web/`), while Melodee runs:
   **http://move.local:8080** (Ableton's own page keeps port 80, Schwung's
@@ -219,6 +246,9 @@ Three parts so far:
 
 
 Not yet: Record, locks and Motion on a Schwung module's own parameters; docs/PARITY.md has the rest.
+Song's own: typed marker names, punches written into the song (with Pad
+FX), `melodee-print` over SSH (with the remote channel), freezing from the
+patterns grid (with Session).
 
 ### How a Schwung module is hosted
 
@@ -336,7 +366,7 @@ the tap's click and the sound in the waveform is what you hear.
 | `src/app/` | Melodee on the Move: `melodee_app.*` the app (thin: what every screen shares), `studio.*` Melodee's `Project` and `EngineHost` and what the screens share, `sequencer.*` and `seq_edit.*` the sequencer, `screen.*` a screen and the registry, `screens/` one file a screen, `project_store.*` the project file, `schwung_api.h` and `module_host.*` Schwung's modules (behind Melodee's `PluginRunner`), `canvas_page.*` their own pages' scripts in QuickJS, `module_probe.*` trying them, `previews.*` its screens offline |
 | `src/spike/` | the spike app |
 | `module/` | the Schwung standalone tool: `module.json`, `standalone` |
-| `tests/` | unit tests, the device host against the simulated Move, the sequencer (`sequencer_tests.cpp`), and `fake_module/`, a stand-in Schwung module |
+| `tests/` | unit tests, the device host against the simulated Move, the sequencer (`sequencer_tests.cpp`), `song_tests.cpp` (Song, exports, print and freeze, against the whole app), and `fake_module/`, a stand-in Schwung module |
 | `tools/` | build image, packaging, deploy and probe scripts |
 
 ## Build
@@ -542,6 +572,17 @@ the screen let in, and the cookie refused from another address.
 5. Files: upload a WAV into Melodee's folder, then Menu > MELODEE loads it
    onto a pad. Run from Schwung's Tools menu after a run over SSH: files the
    page made as root belong to the Move's user, so they can be renamed.
+
+- Song, its exports, print and freeze (`build/song-tests`, 163 checks):
+  the clip jobs, markers and tempo lane; the song played from a bar; Rec
+  writing launches; a MIDI file out and back in; the song into a pattern;
+  a 16-bit mixdown, stems with the same frames, a stopped export dropped,
+  an MPC 3 project with its samples; a kit and a synth track printed by the
+  print host, frozen, playing their prints, opened frozen again, unchanged
+  prints never made twice, a deep freeze letting the module go and a thaw
+  bringing it back; every Song, EXPORT and PRINT control through the
+  bindings table. In the simulated Move: Song opened, a clip placed, the
+  song played and mixed down into `Mixdowns/Move.wav`. Not yet on a Move.
 
 ## What the crush shows
 

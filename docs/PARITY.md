@@ -160,30 +160,30 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Time Correct**: heard live, no commit; ALL lays the feel on the other patterns (MELODEE.md › Sequencing) | done | SEQ pages' FEEL (heard live), push: ALL; Shift + Step 16 is the Move's Quantize (it rewrites the notes, Workflow's amount) | [ ] |
 | **Half Seq, Double Seq, Half Speed, Double Speed** (MELODEE.md › Sequencing) | done | Shift + Step 15 doubles (the Move's); SEQ pages' PATTERN push: Half Seq, Double Seq, Half Speed, Double Speed | [ ] |
 | **Recall**: every note played is kept; the last phrase into empty patterns, one undo (MELODEE.md › Sequencing, Recall) | done | Capture (14.3): every track's last phrase into its next empty pattern, playing; from stopped three tempos on the wheel; Shift + Capture clears | [ ] |
-| **Song**: a lane per track, clips of patterns, markers, loop brace, cursor; play from the cursor (MELODEE.md › Sequencing, Song) | song & export | Shift + Step 12; jogwheel by the bar; knobs zoom, pattern, length | [ ] |
-| **Song clip jobs**: place, duplicate, mute, own pattern, open notes, split, delete, repeat to a marker, loop its bars (MELODEE.md › Sequencing, Song) | song & export | push sheet; Copy, Delete, Loop | [ ] |
-| **Markers**: add, name, jump (MELODEE.md › Sequencing, Song) | song & export | push sheet; Up / Down jump | [ ] |
-| **Tempo lane**: tempo points by the bar, step or ramp, 64 points (TMPL) (MELODEE.md › Sequencing, Song) | song & export | knobs on Song | [ ] |
-| **Record into the song**: launches written as clips, punches too (guide/song.md) | song & export | Rec while the song plays | [ ] |
-| **Mixdown export**: 32-bit float, or 24 or 16-bit dithered; tails up to 10 s (MELODEE.md › Sequencing, Song) | song & export | Song: HERE > Export | [ ] |
-| **Stems export**: `Mix.wav`, each track and each bus after its chain (MELODEE.md › Sequencing, Song) | song & export | Song: HERE > Export | [ ] |
-| **MIDI file export**: format 1, 96 ticks, tempo and time signature (MELODEE.md › Sequencing, Song) | song & export | Song: HERE > Export | [ ] |
-| **MPC 3 project export**: drum, keygroup, audio and MIDI tracks; plug-in tracks as their prints (guide/song.md) | song & export | Song: HERE > Export | [ ] |
-| **Song into a new pattern**, laid end to end (MELODEE.md › Sequencing, Song) | song & export | Song: HERE > Export | [ ] |
-| **A `.mid` file loaded** onto the selected track's pattern (MELODEE.md › Sequencing, Song) | song & export | Menu (load) | [ ] |
+| **Song**: a lane per track, clips of patterns, markers, loop brace, cursor; play from the cursor (MELODEE.md › Sequencing, Song) | done | Shift + Step 13 (again: back); the pads the bank's four lanes over eight bars, the steps sixteen bars; the wheel by the bar; knobs 1-3 pattern, length, zoom; Play from the cursor | [ ] |
+| **Song clip jobs**: place, duplicate, mute, own pattern, open notes, split, delete, repeat to a marker, loop its bars (MELODEE.md › Sequencing, Song) | done | the wheel's push on a clip: its list (open notes, duplicate, split, own pattern, repeat to the marker, loop its bars, mute, delete); Copy, Delete, Loop; Copy, Delete or Mute held + a pad | [ ] |
+| **Markers**: add, name, jump (MELODEE.md › Sequencing, Song) | done | Shift + push (on one: the next of Melodee's ready names, INTRO to OUTRO, then gone); Shift + Left / Right jump; typed names wait for a naming sheet | [ ] |
+| **Tempo lane**: tempo points by the bar, step or ramp, 64 points (TMPL) (MELODEE.md › Sequencing, Song) | done | knob 5 the cursor's bar's tempo (under 30 BPM: none), knob 6 Step or Ramp; notches on Song, the tempo in its detail | [ ] |
+| **Record into the song**: launches written as clips, punches too (guide/song.md) | done | Rec on Song: launches written as clips, a bar at a time; punches wait for Pad FX (mixer & effects) | [ ] |
+| **Mixdown export**: 32-bit float, or 24 or 16-bit dithered; tails up to 10 s (MELODEE.md › Sequencing, Song) | done | Sampling on Song: EXPORT, MIXDOWN 32 FLOAT, 24 or 16 BIT; Mixdowns/<project>.wav | [ ] |
+| **Stems export**: `Mix.wav`, each track and each bus after its chain (MELODEE.md › Sequencing, Song) | done | EXPORT: STEMS; Stems/<project>/Mix.wav, NN <track>.wav, Bus X.wav | [ ] |
+| **MIDI file export**: format 1, 96 ticks, tempo and time signature (MELODEE.md › Sequencing, Song) | done | EXPORT: MIDI FILE; MIDI/<project>.mid | [ ] |
+| **MPC 3 project export**: drum, keygroup, audio and MIDI tracks; plug-in tracks as their prints (guide/song.md) | done | EXPORT: MPC 3 PROJECT (synth tracks printed first); MPC 3/<project>.xpj | [ ] |
+| **Song into a new pattern**, laid end to end (MELODEE.md › Sequencing, Song) | done | EXPORT: SONG TO PATTERN | [ ] |
+| **A `.mid` file loaded** onto the selected track's pattern (MELODEE.md › Sequencing, Song) | done | a `.mid` in the samples browser (a kit's pad), push; a synth track's browser is the instruments area's | [ ] |
 
 ## Print and freeze
 
 | Feature | Status | Move controls | ✓ |
 | --- | --- | --- | --- |
-| **Freeze**: each pattern printed; the track plays its prints; pads still live; level, pan, sends, mute live; a kit's bus sends printed too (MELODEE.md › Print and freeze) | song & export | Sample on a module track: the PRINT sheet | [ ] |
-| **PRINT sheet**: patterns on the pads, ALL, TAP Post / Pre FX, TAIL Loop / Ring / Cut, room needed, CPU saved (MELODEE.md › Print and freeze) | song & export | pads; knobs 1-2; push freezes | [ ] |
-| **Printing**: progress a pattern, the switch on a bar line, called off (MELODEE.md › Print and freeze) | song & export | Back calls it off | [ ] |
-| **Freeze patterns from the pattern layer** (Seq held + Sample Record) (MELODEE.md › Print and freeze) | song & export | pattern layer + Sample | [ ] |
-| **A frozen track shown**: a snowflake on the overview and pages; values a print holds dim (MELODEE.md › Print and freeze) | song & export | screen; step lights | [ ] |
-| **Deep freeze**: the track's plug-ins unloaded too; thawing restores their state (MELODEE.md › Print and freeze) | song & export | PRINT sheet: Shift + push | [ ] |
-| **Unfreeze and edit**: at once, prints kept; an edit asks first; unchanged patterns keep their prints (MELODEE.md › Print and freeze) | song & export | PRINT sheet; question sheet | [ ] |
-| **Print host**: faster than real time on a spare core, lowest priority, into `<project> Prints` (MELODEE.md › Print and freeze) | song & export | automatic | [ ] |
+| **Freeze**: each pattern printed; the track plays its prints; pads still live; level, pan, sends, mute live; a kit's bus sends printed too (MELODEE.md › Print and freeze) | done | a track button held + Sampling: PRINT (Kerem, 2026-11-20); kit and synth tracks | [ ] |
+| **PRINT sheet**: patterns on the pads, ALL, TAP Post / Pre FX, TAIL Loop / Ring / Cut, room needed, CPU saved (MELODEE.md › Print and freeze) | done | pads the patterns (Plus / Minus: 32 a bank); knob 1 TAP, knob 2 TAIL; the wheel FREEZE, DEEP FREEZE, ALL, NONE, UNFREEZE; push | [ ] |
+| **Printing**: progress a pattern, the switch on a bar line, called off (MELODEE.md › Print and freeze) | done | the PRINT sheet shows the pattern, how far, the speed; Back calls it off | [ ] |
+| **Freeze patterns from the pattern layer** (Seq held + Sample Record) (MELODEE.md › Print and freeze) | song & export | PRINT's pads are the patterns already; Session (the patterns grid) is the sequencer's: Note/Session held + Sampling once it is built | [ ] |
+| **A frozen track shown**: a snowflake on the overview and pages; values a print holds dim (MELODEE.md › Print and freeze) | done | a snowflake in its Play screen's rail and on the sixteen tracks, its step ice; a knob or step asks first (one bit: no dim values) | [ ] |
+| **Deep freeze**: the track's plug-ins unloaded too; thawing restores their state (MELODEE.md › Print and freeze) | done | PRINT: DEEP FREEZE (the wheel); the module let go once the print plays, thawed as it was | [ ] |
+| **Unfreeze and edit**: at once, prints kept; an edit asks first; unchanged patterns keep their prints (MELODEE.md › Print and freeze) | done | PRINT: UNFREEZE; an edit on a frozen track asks UNFREEZE TRACK N?; unchanged patterns keep their prints | [ ] |
+| **Print host**: faster than real time on a spare core, lowest priority, into `<project> Prints` (MELODEE.md › Print and freeze) | done | automatic: SCHED_IDLE on the last core, a second instance of the module, into `<project> Prints` | [ ] |
 | **Auto sample a plug-in** into an MPC keygroup program (`.xpm`, `.xty`) on a new keygroup track (MELODEE.md › Print and freeze, Auto sample) | instruments | Shift + Step 11 on a module track | [ ] |
 | **Auto sample check**: drums, mono and glide, accent, velocity layers, takes, splits, sustain and loops, release fit (MELODEE.md › Print and freeze) | instruments | automatic | [ ] |
 | **AUTO SAMPLE sheet**: KEYS (low, high, step), NOTE (layers, hold, tail), SOUND (tap, loop, level) (MELODEE.md › Print and freeze) | instruments | knobs 1-8 and a second page | [ ] |
@@ -411,7 +411,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Settings file**: settings, MIDI and Input Config, the project to open at start, the last one (MELODEE.md › Files on the card) | done | Move.settings: Setup's settings, the metronome, the track played last, start= and last= (MIDI and Input Config: move-midi's, sampling's) | [ ] |
 | **Samples folders**: Recorded, Edits, Banks, Looper, Expansions, Keygroups, Stems (MELODEE.md › Files on the card) | sampling | /data/UserData/Melodee/Samples | [ ] |
 | **Cache**: decoded long samples and instrument files, 4 GB, aged out after 30 days (MELODEE.md › Files on the card) | done | /data/UserData/Melodee/Cache (Melodee's shell/sample_cache.h: tidied at start, 4 GB, 30 days) | [ ] |
-| **Export folders**: Mixdowns, Stems, MIDI, MPC 3 (MELODEE.md › Files on the card; guide/song.md) | song & export | /data/UserData/Melodee | [ ] |
+| **Export folders**: Mixdowns, Stems, MIDI, MPC 3 (MELODEE.md › Files on the card; guide/song.md) | done | /data/UserData/Melodee/Mixdowns, Stems, MIDI, MPC 3 (Kerem, 2026-11-20) | [ ] |
 | **SysEx folder** (MELODEE.md › Files on the card) | done | /data/UserData/Melodee/SysEx | [ ] |
 | **Plugins folder**, read only (MELODEE.md › Files on the card) | schwung | covered by Schwung's modules, the Move's plug-ins | — |
 
@@ -424,7 +424,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **`melodee-render`**: render workers off or on (MELODEE.md › Remote) | done | `melodee-move --ctl 'melodee-render serial|parallel'` | [ ] |
 | **`melodee-looper`** (MELODEE.md › Remote) | looper | a command over SSH | [ ] |
 | **`melodee-midi`**: a message into the input; panic (MELODEE.md › Remote) | done | `melodee-move --ctl 'melodee-midi HEX...'` and `--ctl 'melodee-midi panic'`, the runtime's control socket, over SSH | [ ] |
-| **`melodee-print`, `melodee-freeze`, `melodee-unfreeze`** (MELODEE.md › Print and freeze) | song & export | a command over SSH | [ ] |
+| **`melodee-print`, `melodee-freeze`, `melodee-unfreeze`** (MELODEE.md › Print and freeze) | song & export | Printer::command() answers them (tested); waits for the Move's remote channel (melodee-press, MIDI & sync & undo & projects) | [ ] |
 | **`melodee-autosample`** (MELODEE.md › Print and freeze) | instruments | a command over SSH | [ ] |
 | **`melodee-usb-input`** (MELODEE.md › Remote) | n/a | no USB audio | — |
 | **`card-share`** (MELODEE.md › Remote) | n/a | no card | — |
@@ -489,13 +489,13 @@ sections, each on Shift + Step n.
 
 | Status | Rows |
 | --- | --- |
-| `done` | 201 |
+| `done` | 220 |
 | `sequencer` | 4 |
 | `sampling` | 22 |
 | `kit depth` | 2 |
 | `instruments` | 25 |
 | `mixer & effects` | 2 |
-| `song & export` | 21 |
+| `song & export` | 2 |
 | `looper` | 1 |
 | `MIDI & sync & undo & projects` | 2 |
 | `web page` | 11 |

@@ -119,8 +119,8 @@ KitFile chops_of(const melodee::Project& project) {
 } // namespace
 
 std::vector<uint8_t> project_file_bytes(const melodee::Project& project, const melodee::PatternBank& patterns, const PluginStates& states,
-                                        const MoveExtras* extras) {
-    auto bytes = melodee::save_project(project, patterns, &states);
+                                        const MoveExtras* extras, const melodee::PrintTable* prints) {
+    auto bytes = melodee::save_project(project, patterns, &states, prints);
     auto section = [&](const char (&tag)[4], const std::string& text) {
         bytes.insert(bytes.end(), tag, tag + 4);
         auto size = uint32_t(text.size());
@@ -140,17 +140,17 @@ std::vector<uint8_t> project_file_bytes(const melodee::Project& project, const m
 }
 
 std::string read_project_file(const std::string& path, melodee::Project& project, melodee::PatternBank& patterns, PluginStates& states,
-                              MoveExtras* extras) {
+                              MoveExtras* extras, melodee::PrintTable* prints) {
     std::ifstream in(path, std::ios::binary);
     if (!in) return "missing";
     std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-    return read_project_bytes(bytes, project, patterns, states, extras);
+    return read_project_bytes(bytes, project, patterns, states, extras, prints);
 }
 
 std::string read_project_bytes(const std::vector<uint8_t>& bytes, melodee::Project& project, melodee::PatternBank& patterns, PluginStates& states,
-                               MoveExtras* extras) {
+                               MoveExtras* extras, melodee::PrintTable* prints) {
     if (extras) *extras = {};
-    if (auto error = melodee::load_project(bytes, project, patterns, nullptr, &states); !error.empty()) return error;
+    if (auto error = melodee::load_project(bytes, project, patterns, nullptr, &states, prints); !error.empty()) return error;
     // The Move's chops, where the file has them.
     if (bytes.size() < 8 || std::memcmp(bytes.data(), project_magic, 8)) return {};
     for (size_t at = 8; at + 8 <= bytes.size();) {

@@ -46,6 +46,8 @@ enum class Screen : uint8_t {
     PadFx,      // and again: Pad FX, the pads as punches
     Flex,       // and again: Flex Beat
     Looper,     // the Looper (Shift + Step 12) and its sheets: four loops, L1-L4
+    Song,       // Song (Shift + Step 13): lanes of clips over bars
+    Print,      // the PRINT sheet: a track's patterns on the pads
     Count
 };
 
@@ -109,7 +111,10 @@ constexpr uint16_t none = 0, shift = 1 << 0, track = 1 << 1, step = 1 << 2, pad 
     X(ClearKept) X(FlexPad) X(SoloPad) \
     X(StepTrig) X(Fill) X(LaunchScene) X(SeqPages) X(Playhead) X(ChainPattern) \
     X(LoopPad) X(LoopPadNow) X(SelectLoop) X(LoopLevel) X(MuteLoop) X(SoloLoop) X(LoopRecord) X(PickLoop) X(LoopSheet) \
-    X(PickProject) X(ProjectPage) X(DeleteSelection) X(MoveTrack) X(TypeTurn)
+    X(PickProject) X(ProjectPage) X(DeleteSelection) X(MoveTrack) X(TypeTurn) \
+    X(SongPick) X(SongCopyClip) X(SongDeleteClip) X(SongMuteClip) X(SongBar) X(SongLoopRange) X(SongCursor) X(SongPush) \
+    X(SongMarker) X(SongDuplicate) X(SongDelete) X(SongLoopClip) X(SongPage) X(SongMarkerJump) X(PlaySong) X(RestartSong) \
+    X(RecordSong) X(SongExport) X(Print) X(PrintPattern) X(PrintBank) X(PrintTurn) X(PrintPush)
 
 enum class Job : uint8_t {
 #define MELODEE_JOB_ENUM(name) name,

@@ -5,8 +5,11 @@
 // /data/UserData (or only --samples DIR). The jogwheel picks, its push opens
 // a place or folder or loads, Back goes up, then back to the places.
 #include "app/screens/kit_common.h"
+#include "app/song_desk.h"
 #include "melodee/shell/mpc_program.h"
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 
 namespace app::screens {
 namespace {
@@ -30,6 +33,12 @@ bool is_sound_file(const fs::path& path) {
 // Kit depth: a bank file (.mldb) loads into the bank of the pad in view, an
 // MPC drum program (.xpm, .xty) opens the LOAD KIT sheet (load_kit.cpp).
 bool is_bank_file(const fs::path& path) { return upper(path.extension().string()) == ".MLDB"; }
+
+// A Standard MIDI File: its notes load onto the track's pattern playing (song_desk.h, as Melodee's browser loads one).
+bool is_midi_file(const fs::path& path) {
+    auto extension = upper(path.extension().string());
+    return extension == ".MID" || extension == ".MIDI" || extension == ".SMF";
+}
 
 class LoadSamples final : public Screen {
 public:
@@ -65,6 +74,12 @@ public:
                 if (entry.folder) { folder = path; cursor = 0; list_folder(); }
                 else if (entry.tag == "BANK") { if (auto failed = studio.load_bank_file(path, studio.pad() / 16); !failed.empty()) studio.say(failed); }
                 else if (entry.tag == "KIT") { studio.program_path = path; studio.push("load-kit"); }
+                else if (is_midi_file(path)) { // its notes onto the pattern playing
+                    std::ifstream in(path, std::ios::binary);
+                    std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+                    auto failed = studio.song_desk().load_midi(bytes, studio.track());
+                    studio.say(failed.empty() ? "NOTES ONTO " + pattern_name(studio.current().pattern) : failed.substr(0, 16));
+                }
                 else { studio.jobs.push_back({path, studio.track(), studio.pad()}); studio.say("LOADING"); }
             }
             return true;
@@ -95,7 +110,9 @@ public:
             auto name = fs::path(entry.name).stem().string().substr(0, 11);
             rows.push_back(name + std::string(12 - name.size(), ' ') + entry.tag);
         }
-        ui::list(g, ui::content(0, ui::height), rows, cursor, 1);
+        bool midi = cursor < int(entries.size()) && is_midi_file(entries[size_t(cursor)].name);
+        ui::list(g, ui::content(0, midi ? 52 : ui::height), rows, cursor, 1);
+        if (midi) ui::detail(g, "PUSH: ONTO " + pattern_name(studio.current().pattern));
     }
 
 private:
@@ -122,7 +139,7 @@ private:
             auto name = item.path().filename().string();
             if (name.empty() || name[0] == '.') continue;
             if (item.is_directory(error)) entries.push_back({name, true});
-            else if (is_sound_file(item.path())) entries.push_back({name, false});
+            else if (is_sound_file(item.path()) || is_midi_file(item.path())) entries.push_back({name, false});
             else if (is_bank_file(item.path())) entries.push_back({name, false, "BANK"});
             else if (melodee::is_drum_program(item.path().string())) entries.push_back({name, false, "KIT"});
         }
