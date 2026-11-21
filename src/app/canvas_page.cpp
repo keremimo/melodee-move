@@ -189,6 +189,31 @@ struct CanvasBindings {
         return JS_UNDEFINED;
     }
 
+    // shadow_load_ui_module(path): a module script loaded as Schwung's
+    // shadow_ui.c loads one, under its path and a count ("canvas.js#3") so
+    // QuickJS's module cache never hands back an earlier load; true when it
+    // ran (its top-level awaits awaited).
+    static JSValue load_ui_module(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
+        if (argc < 1) return JS_FALSE;
+        std::string path = string_of(context, argv[0]);
+        std::ifstream in(path, std::ios::binary);
+        if (!in) { std::perror(path.c_str()); return JS_FALSE; }
+        std::string source((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        static int loads = 0;
+        std::string name = path + "#" + std::to_string(++loads);
+        JSValue value = JS_Eval(context, source.c_str(), source.size(), name.c_str(),
+                                JS_EVAL_FLAG_STRICT | JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY);
+        if (!JS_IsException(value)) {
+            js_module_set_import_meta(context, value, 1, 1);
+            value = JS_EvalFunction(context, value);
+        }
+        value = js_std_await(context, value);
+        bool ran = !JS_IsException(value);
+        if (!ran) std::fprintf(stderr, "melodee-move: %s: %s\n", path.c_str(), exception_text(context).c_str());
+        JS_FreeValue(context, value);
+        return JS_NewBool(context, ran);
+    }
+
     static int interrupt(JSRuntime*, void* opaque) {
         auto* engine = static_cast<CanvasPage::Engine*>(opaque);
         return std::chrono::steady_clock::now() > engine->deadline; // a hook stuck in a loop
@@ -225,6 +250,11 @@ std::unique_ptr<CanvasPage> CanvasPage::load_source(const std::string& source, c
     js_init_module_os(context, "os");
     js_std_add_helpers(context, 0, nullptr);
     page->display.install(context); // after the helpers: print is the screen's, as in Schwung's shadow UI
+    {
+        JSValue global = JS_GetGlobalObject(context);
+        JS_SetPropertyStr(context, global, "shadow_load_ui_module", JS_NewCFunction(context, CanvasBindings::load_ui_module, "shadow_load_ui_module", 1));
+        JS_FreeValue(context, global);
+    }
 
     // The script, as a module (it imports std and os).
     engine.deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);

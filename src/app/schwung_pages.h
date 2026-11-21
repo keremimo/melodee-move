@@ -2,6 +2,7 @@
 #pragma once
 #include "app/canvas_page.h"
 #include <juce_graphics/juce_graphics.h>
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -9,54 +10,18 @@
 #include <utility>
 #include <vector>
 
-// A Schwung module's pages and menus as Schwung's own knob-page code decides
-// them (the Schwung installed beside Melodee: its shared/param_pages), for
-// Melodee to draw in its own look. Schwung's page controller is the model:
-// the level walk, visible_if, doors, the Sections picker, presets, Back one
-// layer at a time, the enum peek, the footer's verbs; this is its view model
-// (ModuleView) and the way the Move's controls reach it. The seam is
-// src/app/schwung_pages/host.js, carried in the binary and run as a
-// CanvasPage. Melodee's own look draws it: screens/module_pages.cpp.
+// A Schwung module's pages, shown by Schwung's own screen code (Kerem,
+// 2026-11-21): from the push into a module until Back out, every screen is
+// what Schwung's shadow UI draws, its code run from the Schwung on the Move
+// (shadow/shadow_ui_param_pages.mjs, shared/...). Melodee gives that code
+// what Schwung's shadow UI gives it: its screen (schwung_display.h), the
+// glue shadow_ui.js provides (src/app/schwung_pages/host.js, carried in the
+// binary and run as a CanvasPage), and the Move's controls as the shim
+// forwards them. screens/module_pages.cpp shows the screen and nothing else.
 //
 // Called as a CanvasPage is: under the app's lock, from the screen or MIDI
 // thread, never the audio thread.
 namespace app {
-
-// The page as data (host.js view()).
-struct ModuleView {
-    bool ready = false;       // a page has been published
-    bool unsupported = false; // the Move's Schwung is older than describePage()
-    bool unresolved = false;  // the module's contract could not be read: hold the last frame
-    std::string kind;         // "knobs", "preset", "items", "menu"
-    std::string page;         // the page's name
-    int index = 0, count = 0;
-    struct Header { std::string left, right; bool inverted = false; } header;
-    struct Cell {
-        bool empty = true; // a hole
-        std::string key, name, short_name, value, header_value, widget;
-        double normalized = -1; // 0-1 where it has a position, else -1
-        int enum_index = -1, options = 0;
-        bool read_only = false, turnable = false, divable = false, touched = false;
-    };
-    std::vector<Cell> cells; // the page's knobs, in knob order (eight at most)
-    struct Row { std::string label, value; };
-    struct List {
-        bool shown = false, entered = false;
-        int cursor = 0, current = -1;
-        std::string title;
-        std::vector<Row> rows;
-    };
-    List menu, items, picker, peek, enum_picker;
-    struct Preset { bool shown = false, entered = false; std::string name; int index = 0, count = 0; } preset;
-    struct Canvas { bool shown = false, enterable = false, entered = false, opened = false; std::string key; } canvas;
-    std::vector<std::pair<std::string, std::string>> footer; // Schwung's footer: ("JOG", "PAGE"), ("CLK", "MENU") ...
-    std::string notice;
-    std::string hint_title;
-    std::vector<std::string> hint;
-    bool wheel = false;      // its menu, a list, a picker or an entered page: the wheel and Back are its
-    bool exit = false;       // Back at its top: Melodee's to take
-    bool live_press = false; // the module wants to know a pad was hit
-};
 
 class SchwungPages {
 public:
@@ -65,45 +30,77 @@ public:
     static std::string shared_folder();
 
     struct Hooks {
-        std::string module_dir;                           // its canvas scripts
-        std::function<std::string()> trailing;            // the pages Melodee adds after the module's (JSON, Schwung's trailingMenus shape)
-        std::function<void(const std::string&)> action;   // one of their entries pushed
-        std::function<void(const std::string&)> say;      // a word for Melodee's message line
-        std::string page_states;                          // the drawn pages' kept state (JSON), from the project
+        int slot = 0;                    // Melodee's track, Schwung's slot: its pages say "S2 > ..."
+        std::string component = "synth"; // Schwung's component: "synth", "fx1" ...
+        std::string module_id, module_name, module_abbrev, module_dir;
+        std::function<bool()> shift;     // Shift held or locked
+        std::function<bool()> reader;    // the screen reader on (Schwung's list layout then)
+        std::function<void(const std::string&)> say; // Schwung's screen reader's words
+        std::function<std::string()> trailing;          // the pages after the module's (JSON, Schwung's trailingMenus shape)
+        std::function<void(const std::string&)> action; // one of their rows pushed
+        // Schwung's keyboard took the pads (its pad typing) or gave them
+        // back: while they are its keys none reaches the module (Melodee's
+        // audio thread plays none).
+        std::function<void(bool)> pad_block;
+        std::string page_states;         // the drawn pages' kept state (JSON), from the project
     };
     // `host` reaches the module (CanvasPage's). Null with `error` set when
     // it cannot start.
     static std::unique_ptr<SchwungPages> load(CanvasPage::Host host, Hooks hooks, std::string& error);
 
-    // A frame: Schwung's ticks, the page published (view()), and a drawn
-    // page painted into `band` when the page is one (the rest of `g` black).
-    void frame(juce::Graphics& g, juce::Rectangle<int> band);
-    void midi(uint8_t status, uint8_t number, uint8_t value); // a Move control, raw (Schwung's numbers)
-    void text_entered(const std::string& text, bool cancelled);
-    // Entered from the Device View, or back from a sheet that changed the
-    // module (a user preset loaded): Schwung's controller starts over on the
-    // next frame, as Schwung's host makes a new one on every entry, landing
-    // on `page` by name when given (its door open when `open`).
+    // Entered from the Device View (or back from a sheet that changed the
+    // module): Schwung's pages start over on the next frame, as Schwung's
+    // host makes a new controller on every entry, landing on `page` by name
+    // when given (its door open when `open`).
     void enter(const std::string& page = {}, bool open = false);
+    // A frame: Schwung's ticks since the last, then its screen, all of it.
+    void frame(juce::Graphics& g);
+    // A Move control, raw, in Schwung's numbers, as the shim forwards it.
+    void midi(uint8_t status, uint8_t number, uint8_t value);
 
-    const ModuleView& view() const { return model; }
+    // Back at the top of the pages: out to the Device View. Cleared by enter().
+    bool left() const { return exited; }
+    // What is shown, for the status line and the tests.
+    struct Status {
+        std::string view, page, kind; // Schwung's view ("parampages" ...), the page's name and kind
+        bool canvas = false, picker = false;
+        bool typing = false;          // Schwung's keyboard up (over the view)
+        bool warning = false;         // its warning card up
+        std::string text;             // what the keyboard holds
+        std::string title;            // a list screen's (option list, file browser, file list)
+        int index = -1;               // and the row it is on
+        std::vector<std::pair<std::string, std::string>> footer; // ("JOG", "PAGE"), ("CLK", "MENU") ...
+        // A menu page's rows: label, value; a list screen's: label, "*" on
+        // the one set (the browser: the row's kind).
+        std::vector<std::pair<std::string, std::string>> rows;
+    };
+    const Status& status() const { return shown; }
+    // The knob rings Schwung's pages lit: its colour each, -1 where it left
+    // the ring to Melodee.
+    const std::array<int, 8>& knob_rings() const { return rings; }
+    // While Schwung's keyboard has the pads: the pads go to it alone (their
+    // notes and pressure, raw), lit in its colours, -1 where it lit none;
+    // pad n is note 68 + n, as Schwung numbers them.
+    bool pad_blocked() const { return blocked; }
+    const std::array<int, 32>& pad_colours() const { return pads; }
+    // The screen gone with the pads still the keyboard's: given back.
+    void release_pads();
     // The drawn pages' state, to keep with the project (JSON; empty: none).
     const std::string& page_states() const { return states; }
-
-    // Short forms of view(), for the screens' routing.
-    bool wants_wheel() const { return model.wheel; }
-    bool left() const { return model.exit; }
-    int page_index() const { return model.index; }
-    int page_count() const { return model.count; }
-    const std::string& page_name() const { return model.page; }
+    const SchwungDisplay& screen() const { return page->screen(); }
 
 private:
     SchwungPages() = default;
-    void take(const std::string& view);
+    void take_status(const std::string& json);
     std::unique_ptr<CanvasPage> page;
-    ModuleView model;
+    Hooks hooks;
+    std::string entry; // host.js reads it once as "melodee:entry"
     std::string states;
-    std::string fresh; // what host.js reads once as "melodee:fresh": {} or {"page", "enter"}
+    Status shown;
+    std::array<int, 8> rings {-1, -1, -1, -1, -1, -1, -1, -1};
+    std::array<int, 32> pads {};
+    bool blocked = false;
+    bool exited = false;
 };
 
 } // namespace app

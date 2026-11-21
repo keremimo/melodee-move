@@ -56,6 +56,8 @@ public:
     void step_icon(unsigned index, uint8_t brightness);
     // A palette index for an RGB button, a brightness for a white one.
     void button(Button button, uint8_t value);
+    // Knob `index`'s light (CC 71-78), a palette index (0 off).
+    void knob(unsigned index, uint8_t palette_index);
     // Every note and CC light off, the ones never set too.
     void clear_all();
 

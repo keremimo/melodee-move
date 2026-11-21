@@ -35,6 +35,7 @@
 #include "melodee/model/scales.h"
 #include <algorithm>
 #include <iterator>
+#include <map>
 #include <atomic>
 #include <chrono>
 #include <filesystem>
@@ -847,13 +848,13 @@ void test_module_pages_shown() {
 }
 
 void test_schwung_pages() {
-    // A module's pages as Schwung's own page code has them (schwung_pages.h),
-    // published as data for Melodee to draw: the fake module's contract from
-    // its module.json, its pages and their kinds, Schwung's controls (the jog
-    // pages, Shift + jog a section, the click: Sections, a door, a held
-    // knob's parameter; Back one layer at a time, then out), and a trailing
-    // page's action back to Melodee. Runs against the pinned Schwung
-    // (tools/dependencies.py, MELODEE_SCHWUNG_ROOT from tools/check.sh).
+    // A module's pages shown by Schwung's own screen code (schwung_pages.h),
+    // run from the pinned Schwung (tools/dependencies.py, MELODEE_SCHWUNG_ROOT
+    // from tools/check.sh): the fake module's pages walked with the Move's
+    // controls as raw MIDI, Schwung's whole screen drawn (its header band
+    // and footer pills where Schwung puts them), Back one layer at a time and
+    // out, a trailing page's row back to Melodee, and a page a value outside
+    // the pages gates shown on the next entry.
     if (app::SchwungPages::shared_folder().empty()) {
         std::cerr << "schwung pages: no Schwung shared code (MELODEE_SCHWUNG_ROOT), skipped\n";
         return;
@@ -861,27 +862,38 @@ void test_schwung_pages() {
     struct Run {
         std::unique_ptr<app::LoadedModule> module;
         std::unique_ptr<app::SchwungPages> pages;
-        std::vector<std::string> actions, keyboards;
+        std::vector<std::string> actions;
+        std::map<std::string, std::string> answers; // what the module is made to answer, before its own
+        bool shift = false;
         juce::Image screen {juce::Image::ARGB, 128, 64, true};
         void frames(int n) {
             for (int k = 0; k < n; ++k) {
                 juce::Graphics g(screen);
-                pages->frame(g, {26, 10, 102, 45});
-                std::this_thread::sleep_for(std::chrono::milliseconds(25));
+                pages->frame(g);
+                std::this_thread::sleep_for(std::chrono::milliseconds(20));
             }
         }
+        const app::SchwungPages::Status& s() const { return pages->status(); }
         void cc(int number, int value) { pages->midi(0xb0, uint8_t(number), uint8_t(value)); frames(1); }
-        void press(int number) { pages->midi(0xb0, uint8_t(number), 127); pages->midi(0xb0, uint8_t(number), 0); frames(1); }
+        void press(int number) { pages->midi(0xb0, uint8_t(number), 127); pages->midi(0xb0, uint8_t(number), 0); frames(2); }
         void touch(int knob, bool on) { pages->midi(on ? 0x90 : 0x80, uint8_t(knob), on ? 127 : 0); frames(1); }
-        bool to(const std::string& kind, const std::string& name = {}) { // out of any door, back to the first page, then forward to it
-            for (int n = 0; n < 3 && pages->view().wheel; ++n) press(51);
-            for (int n = 0; n < pages->view().count + 1; ++n) cc(14, 127);
-            for (int n = 0; n < 2 * pages->view().count + 2; ++n) {
-                const auto& v = pages->view();
-                if (v.kind == kind && (name.empty() || v.page == name)) return true;
+        bool wheel() const { return !s().footer.empty() && s().footer[0].second != "PAGE"; }
+        // Out of any door, to the first page, then on to the one asked for
+        // (by name, or by kind with no name).
+        bool to(const std::string& name, const std::string& kind = {}) {
+            for (int n = 0; n < 3 && wheel(); ++n) press(51);
+            for (int n = 0; n < 24; ++n) cc(14, 127);
+            for (int n = 0; n < 24; ++n) {
+                if (name.empty() ? s().kind == kind : s().page == name) return true;
                 cc(14, 1);
             }
             return false;
+        }
+        int lit(int x0, int y0, int x1, int y1) const { // Schwung's pixels in a box, both ends in
+            int n = 0;
+            for (int y = y0; y <= y1; ++y)
+                for (int x = x0; x <= x1; ++x) n += pages->screen().pixel(x, y);
+            return n;
         }
     };
     auto start = [&](const app::ModuleInfo& info, Run& run) {
@@ -891,21 +903,27 @@ void test_schwung_pages() {
         if (!run.module) return false;
         auto* m = run.module.get();
         app::CanvasPage::Host host;
-        host.get = [m](const std::string& key) {
+        host.get = [m, &run](const std::string& key) {
+            if (auto made = run.answers.find(key); made != run.answers.end()) return made->second;
             auto answer = m->get_now(key);
             return answer.empty() && (key == "ui_hierarchy" || key == "chain_params") ? m->declared(key) : answer;
         };
         host.set = [m](const std::string& key, const std::string& value) { m->set_now(key, value); };
-        host.text_entry = [&run](const std::string& title, const std::string&) { run.keyboards.push_back(title); };
         host.open_file = [](const std::string&) {};
         app::SchwungPages::Hooks hooks;
+        hooks.slot = 1;
+        hooks.module_id = info.id;
+        hooks.module_name = info.name;
+        hooks.module_abbrev = info.abbrev;
         hooks.module_dir = info.dir;
+        hooks.shift = [&run] { return run.shift; };
         hooks.trailing = [] { return std::string(R"([{"name": "Module", "entries": [{"label": "Auto Sample", "action": "melodee:auto_sample"}]}])"); };
         hooks.action = [&run](const std::string& action) { run.actions.push_back(action); };
         run.pages = app::SchwungPages::load(host, hooks, error);
         CHECK(run.pages != nullptr);
         if (!run.pages) { std::cerr << "schwung pages: " << error << '\n'; return false; }
-        run.frames(12);
+        run.pages->enter();
+        run.frames(15);
         return true;
     };
 
@@ -915,116 +933,62 @@ void test_schwung_pages() {
     {
         Run run;
         if (!start(found[0], run)) return;
-        const auto& v = run.pages->view();
-        CHECK(v.ready && !v.unsupported && v.count >= 4);
-        // Its root's knobs (Schwung calls a walk's root "Main"): the hole kept,
-        // the preset list no knob; Schwung's labels and value text.
-        CHECK(run.to("knobs", "Main"));
-        CHECK(v.cells.size() >= 4 && !v.cells[0].empty && v.cells[0].key == "level" && v.cells[2].empty && v.cells[3].key == "voices");
-        CHECK(v.cells[1].short_name == "Waveform" && v.cells[1].value == "Square");
-        CHECK(!v.footer.empty() && v.footer[0] == std::make_pair(std::string("JOG"), std::string("PAGE")) && v.footer[1].second == "MENU");
-        // Knob 1 held and turned: written; the header is the held knob's.
+        // Schwung's grid, on its first page of knobs: the whole screen its
+        // own, its header band and footer pills where Schwung draws them.
+        CHECK(run.s().view == "parampages" && run.s().kind == "knobs" && !run.pages->left());
+        CHECK(run.lit(0, 0, 127, 6) > 20 && run.lit(0, 57, 127, 63) > 20);
+        CHECK(run.s().footer.size() >= 2 && run.s().footer[0] == std::make_pair(std::string("JOG"), std::string("PAGE"))
+              && run.s().footer[1].second == "MENU");
+        // Knob 1 held and turned: written.
+        double before = std::atof(run.module->get_now("level").c_str());
         run.touch(0, true);
         for (int n = 0; n < 4; ++n) run.cc(71, 1);
         run.frames(3);
-        CHECK(v.header.inverted && v.cells[0].touched);
         run.touch(0, false);
         run.frames(2);
-        CHECK(std::atof(run.module->get_now("level").c_str()) > 0.0);
+        CHECK(std::atof(run.module->get_now("level").c_str()) > before);
         // The click with no knob held: the Sections picker, the wheel its;
-        // Back closes it, and Back again is Melodee's (out to the Device View).
+        // Back closes it, and Back again leaves the pages.
         run.press(3);
-        CHECK(v.picker.shown && v.wheel && v.picker.rows.size() >= 3 && v.footer[0].second == "SECT");
-        int opened_at = v.picker.cursor; // on the section it was opened from
-        run.cc(14, 1);
-        CHECK(v.picker.cursor == opened_at + 1);
+        CHECK(run.s().picker && run.s().footer[0].second == "SECT");
         run.press(51);
-        CHECK(!v.picker.shown && !v.exit);
+        CHECK(!run.s().picker && !run.pages->left());
         run.press(51);
-        CHECK(v.exit);
+        CHECK(run.pages->left() && run.s().view == "chainedit");
+        // In again: a fresh start, Back's answer cleared.
+        run.pages->enter();
+        run.frames(10);
+        CHECK(!run.pages->left() && run.s().view == "parampages");
         // Its presets: a door; in, the wheel loads them; Back out of the door.
-        CHECK(run.to("preset"));
-        CHECK(v.preset.shown && !v.preset.entered && v.preset.count == 10 && v.footer[1].second == "ENTER");
+        CHECK(run.to("", "preset"));
+        CHECK(run.s().footer[1].second == "ENTER");
         run.press(3);
-        CHECK(v.preset.entered && v.wheel && v.footer[0].second == "PRST");
+        CHECK(run.s().footer[0].second == "PRST");
         run.cc(14, 1);
         run.frames(3);
-        CHECK(run.module->get_now("preset") == "1" && v.preset.name == "Fake 1");
+        CHECK(run.module->get_now("preset") == "1");
         run.press(51);
-        CHECK(!v.preset.entered && !v.exit);
-        // Its tables: a list to choose from; in, a row, pushed: chosen.
-        CHECK(run.to("items"));
-        run.press(3);
-        run.frames(3);
-        CHECK(v.items.entered && v.items.rows.size() == 3 && v.items.rows[2].label == "Organ");
-        run.cc(14, 1);
-        run.cc(14, 1);
-        run.press(3);
-        run.frames(2);
-        CHECK(run.module->get_now("table") == "2");
-        CHECK(v.kind == "preset" && v.preset.entered); // sent to root (navigate_to): its presets, a door sent to, open
-        // Melodee's page after the module's: its entry pushed, its action back.
-        CHECK(run.to("menu", "Module"));
+        CHECK(run.s().footer[0].second == "PAGE" && !run.pages->left());
+        // Melodee's page after the module's: its row pushed, its action back.
+        CHECK(run.to("Module"));
+        CHECK(run.s().kind == "menu" && !run.s().rows.empty() && run.s().rows[0].first == "Auto Sample");
         run.press(3);
         run.press(3);
         CHECK((run.actions == std::vector<std::string> {"melodee:auto_sample"}));
         // Shift + the wheel: a section, not a page (Envelope is one).
-        CHECK(run.to("knobs", "Main"));
-        int main_at = v.index;
-        run.cc(49, 127);
+        CHECK(run.to("", "knobs"));
+        std::string first = run.s().page;
+        run.shift = true;
         run.cc(14, 1);
-        run.cc(49, 0);
-        CHECK(v.index != main_at && v.page == "Envelope");
+        run.shift = false;
+        run.frames(2);
+        CHECK(run.s().page == "Envelope" && run.s().page != first);
     }
 
-    // An enum of three opens Schwung's enum picker on the click; a text
-    // parameter, the keyboard; what is typed reaches the module.
-    const std::string root = "build/test-modules-pages";
-    const std::string dir = root + "/sound_generators/pages";
-    std::filesystem::create_directories(dir);
-    std::filesystem::copy_file("build/test-modules/sound_generators/fake/dsp.so", dir + "/dsp.so", std::filesystem::copy_options::overwrite_existing);
-    std::ofstream(dir + "/module.json") << R"({"id": "pages", "name": "Pages", "abbrev": "PGS", "api_version": 2,
-      "component_type": "sound_generator", "dsp": "dsp.so", "capabilities": {"midi_in": true,
-      "chain_params": [
-        {"key": "level", "name": "Level", "type": "float", "min": 0, "max": 1},
-        {"key": "table", "name": "Table", "type": "enum", "options": ["Sine", "Saw", "Organ"]},
-        {"key": "searched", "name": "Words", "type": "string"}],
-      "ui_hierarchy": {"levels": {"root": {"name": "Pages", "knobs": ["level", "table", "searched"], "params": ["level", "table", "searched"]}}}}})";
-    auto own = app::scan_modules(root);
-    CHECK(own.size() == 1);
-    if (own.empty()) return;
-    Run run;
-    if (!start(own[0], run)) return;
-    const auto& v = run.pages->view();
-    CHECK(run.to("knobs"));
-    run.touch(1, true);
-    run.press(3);
-    CHECK(v.enum_picker.shown && v.enum_picker.rows.size() == 3 && v.wheel);
-    run.cc(14, 1);
-    run.cc(14, 1);
-    run.press(3);
-    run.touch(1, false);
-    run.frames(3);
-    CHECK(!v.enum_picker.shown && run.module->get_now("table") == "2");
-    run.touch(2, true);
-    run.press(3);
-    run.touch(2, false);
-    CHECK((run.keyboards == std::vector<std::string> {"Words"}));
-    run.pages->text_entered("hello", false);
-    run.frames(2);
-    CHECK(run.module->get_now("searched") == "hello");
-    // Turning a text parameter's knob opens its keyboard too (Kerem,
-    // 2026-11-21), once for the whole turn.
-    for (int n = 0; n < 3; ++n) run.cc(73, 1);
-    CHECK((run.keyboards == std::vector<std::string> {"Words", "Words"}));
-    run.pages->text_entered("again", false);
-    run.frames(2);
-    CHECK(run.module->get_now("searched") == "again");
-
-    // A gate moved from outside the pages (Schimera's Mode, turned on the
-    // Device View's knobs): while the pages are up Schwung's controller keeps
-    // its plan; entered again, it starts over, as Schwung's host makes a new
-    // one on every entry, and the level the gate opens is there.
+    // A gate moved from outside the pages (Schimera's Mode, from a preset):
+    // while the pages are up Schwung's controller keeps its plan; entered
+    // again it starts over, as Schwung's host makes a new one on every
+    // entry, and the level the gate opens is there.
     const std::string gated_dir = "build/test-modules-gated/sound_generators/gated";
     std::filesystem::create_directories(gated_dir);
     std::filesystem::copy_file("build/test-modules/sound_generators/fake/dsp.so", gated_dir + "/dsp.so", std::filesystem::copy_options::overwrite_existing);
@@ -1043,20 +1007,192 @@ void test_schwung_pages() {
     if (gated.empty()) return;
     Run g;
     if (!start(gated[0], g)) return;
-    const auto& gv = g.pages->view();
-    CHECK(!g.to("knobs", "B")); // Square: B is hidden
-    int before = gv.count;
+    CHECK(!g.to("B")); // Square: B is hidden
     g.module->set_now("wave", "0");
     g.frames(8);
-    CHECK(gv.count == before);
+    CHECK(!g.to("B"));
     g.pages->enter();
     g.frames(8);
-    CHECK(gv.count == before + 1 && g.to("knobs", "B"));
+    CHECK(g.to("B"));
     // Starting over on a page by name (back from My Presets after a Load).
-    CHECK(g.to("knobs", "A"));
+    CHECK(g.to("A"));
     g.pages->enter("B", false);
     g.frames(4);
-    CHECK(gv.page == "B" && !gv.wheel);
+    CHECK(g.s().page == "B");
+
+    // The screens the grid hands a cell to, Schwung's own (shadow_ui.js's,
+    // written again in host.js): a three-option enum's option list, a
+    // string's keyboard.
+    const std::string handoff_dir = "build/test-modules-handoff/sound_generators/handoff";
+    std::filesystem::create_directories(handoff_dir);
+    std::filesystem::copy_file("build/test-modules/sound_generators/fake/dsp.so", handoff_dir + "/dsp.so", std::filesystem::copy_options::overwrite_existing);
+    std::ofstream(handoff_dir + "/module.json") << R"({"id": "handoff", "name": "Handoff", "abbrev": "HND", "api_version": 2,
+      "component_type": "sound_generator", "dsp": "dsp.so", "capabilities": {"midi_in": true,
+      "chain_params": [
+        {"key": "table", "name": "Table", "type": "enum", "options": ["Sine", "Saw", "Organ"]},
+        {"key": "searched", "name": "Searched", "type": "string"},
+        {"key": "level", "name": "Level", "type": "float", "min": 0, "max": 1, "step": 0.01},
+        {"key": "scope", "name": "Scope", "type": "canvas", "canvas_script": "scope.js"}],
+      "ui_hierarchy": {"levels": {
+        "root": {"name": "Handoff", "knobs": ["table", "searched", "level", "scope"], "params": ["table", "searched", "level", "scope"]}}}}})";
+    // A drawn editor of the module's own, dived into from its cell (not a
+    // page): the whole screen its, the wheel its onMidi's.
+    std::ofstream(handoff_dir + "/scope.js") << R"(globalThis.canvas_overlay = {
+  draw(ctx) { ctx.fillRect(0, 0, 20, 20, 1); ctx.print(30, 2, 'SCOPE', 1); },
+  onMidi(ctx, msg) { if (msg.data[1] === 14) ctx.setParam('level', msg.data[2] < 64 ? '0.7' : '0.2'); },
+};
+)";
+    auto handoff = app::scan_modules("build/test-modules-handoff");
+    CHECK(handoff.size() == 1);
+    if (handoff.empty()) return;
+    {
+        Run h;
+        if (!start(handoff[0], h)) return;
+        CHECK(h.s().view == "parampages" && h.s().kind == "knobs");
+        const std::string page = h.s().page;
+        // Table's knob held and the push: the option list, on the value set,
+        // the grid's header band; nothing written while it moves, the wheel
+        // one an option, a knob six detents one.
+        h.touch(0, true);
+        h.press(3);
+        h.touch(0, false);
+        CHECK(h.s().view == "enumpick" && h.s().title == "Table" && h.s().index == 0 && h.s().rows.size() == 3
+              && h.s().rows[0].second == "*");
+        CHECK(h.lit(0, 0, 127, 7) > 20);
+        h.cc(14, 1);
+        h.cc(14, 1);
+        CHECK(h.s().index == 2 && h.module->get_now("table") == "0");
+        for (int n = 0; n < 6; ++n) h.cc(72, 127);
+        CHECK(h.s().index == 1);
+        h.press(3); // set: back on the grid, on its page
+        CHECK(h.s().view == "parampages" && h.s().page == page && h.module->get_now("table") == "1");
+        // Back is a true cancel.
+        h.touch(0, true);
+        h.press(3);
+        h.touch(0, false);
+        CHECK(h.s().view == "enumpick" && h.s().index == 1);
+        h.cc(14, 1);
+        h.press(51);
+        CHECK(h.s().view == "parampages" && h.module->get_now("table") == "1");
+        // Searched's: Schwung's keyboard over its list editor, the value
+        // given; the knob under a hand still turns its parameter; OK writes
+        // it, and a new grid is back on the page it left.
+        h.touch(1, true);
+        h.press(3);
+        h.touch(1, false);
+        CHECK(h.s().typing && h.s().view == "hierarch" && h.s().text.empty());
+        CHECK(h.lit(0, 12, 127, 12) > 120); // the keyboard's rule under its title
+        h.cc(14, 1);
+        h.cc(14, 1);
+        h.press(3); // c
+        CHECK(h.s().text == "c");
+        double level = std::atof(h.module->get_now("level").c_str());
+        h.touch(2, true);
+        for (int n = 0; n < 4; ++n) h.cc(73, 1);
+        h.frames(3);
+        h.touch(2, false);
+        CHECK(std::atof(h.module->get_now("level").c_str()) > level && h.s().typing);
+        h.cc(14, 63); // to OK, the last
+        h.press(3);
+        CHECK(!h.s().typing && h.s().view == "parampages" && h.s().page == page && h.module->get_now("searched") == "c");
+        // Back on the keyboard: nothing written.
+        h.touch(1, true);
+        h.press(3);
+        h.touch(1, false);
+        CHECK(h.s().typing && h.s().text == "c");
+        h.cc(14, 1);
+        h.press(3); // "cb"
+        CHECK(h.s().text == "cb");
+        h.press(51);
+        CHECK(!h.s().typing && h.s().view == "parampages" && h.module->get_now("searched") == "c");
+        // Scope's: the module's own editor, the whole screen; the wheel its;
+        // the push (it is not enterable) back to the grid, on its page.
+        h.touch(3, true);
+        h.press(3);
+        h.touch(3, false);
+        CHECK(h.s().view == "canvas" && h.lit(0, 0, 19, 19) == 400);
+        h.cc(14, 1);
+        CHECK(h.module->get_now("level") == "0.7" && h.s().view == "canvas");
+        h.press(3);
+        CHECK(h.s().view == "parampages" && h.s().page == page);
+        // Back too.
+        h.touch(3, true);
+        h.press(3);
+        h.touch(3, false);
+        CHECK(h.s().view == "canvas");
+        h.press(51);
+        CHECK(h.s().view == "parampages" && h.s().page == page);
+    }
+
+    // A file's cell: held and pushed, Schwung's file browser (folders
+    // first, the filter's files); turned, the files in the set one's folder,
+    // letting go loads the one it is on.
+    const std::string files_root = std::filesystem::absolute("build/test-browse").string();
+    std::filesystem::create_directories(files_root + "/kit");
+    for (const char* name : {"a.wav", "b.wav", "notes.txt"}) std::ofstream(files_root + "/" + name) << "x";
+    const std::string files_dir = "build/test-modules-files/sound_generators/files";
+    std::filesystem::create_directories(files_dir);
+    std::filesystem::copy_file("build/test-modules/sound_generators/fake/dsp.so", files_dir + "/dsp.so", std::filesystem::copy_options::overwrite_existing);
+    std::ofstream(files_dir + "/module.json") << R"({"id": "files", "name": "Files", "abbrev": "FIL", "api_version": 2,
+      "component_type": "sound_generator", "dsp": "dsp.so", "capabilities": {"midi_in": true,
+      "chain_params": [
+        {"key": "searched", "name": "Sample", "type": "filepath", "root": ")" + files_root + R"(", "filter": [".wav"]},
+        {"key": "level", "name": "Level", "type": "float", "min": 0, "max": 1, "step": 0.01}],
+      "ui_hierarchy": {"levels": {"root": {"name": "Files", "knobs": ["searched", "level"], "params": ["searched", "level"]}}}}})";
+    auto files = app::scan_modules("build/test-modules-files");
+    CHECK(files.size() == 1);
+    if (files.empty()) return;
+    {
+        Run f;
+        if (!start(files[0], f)) return;
+        f.touch(0, true);
+        f.press(3);
+        f.touch(0, false);
+        CHECK(f.s().view == "filepathbrowser" && f.s().title == "Sample" && f.s().rows.size() == 3 && f.s().rows[0].first == "[kit]"
+              && f.s().rows[1].first == "a.wav" && f.s().rows[2].first == "b.wav");
+        f.cc(14, 1);
+        f.press(3);
+        CHECK(f.s().view == "parampages" && f.module->get_now("searched") == files_root + "/a.wav");
+        f.touch(0, true);
+        f.cc(71, 1);
+        CHECK(f.s().view == "fileflat" && f.s().title == "test-browse" && f.s().rows.size() == 2 && f.s().index == 0
+              && f.s().rows[0].second == "*");
+        for (int n = 0; n < 6; ++n) f.cc(71, 1);
+        CHECK(f.s().index == 1 && f.module->get_now("searched") == files_root + "/a.wav");
+        f.touch(0, false);
+        CHECK(f.s().view == "parampages" && f.module->get_now("searched") == files_root + "/b.wav");
+        // Back in the browser: nothing chosen.
+        f.touch(0, true);
+        f.press(3);
+        f.touch(0, false);
+        CHECK(f.s().view == "filepathbrowser" && f.s().index == 2);
+        f.press(51);
+        CHECK(f.s().view == "parampages" && f.module->get_now("searched") == files_root + "/b.wav");
+    }
+
+    // A module that declares no ui_hierarchy, while it says it is loading:
+    // Schwung's "Loading..." screen, asked again on its cadence; loaded, it
+    // has none: Schwung's preset browser; Back out.
+    const std::string plain_dir = "build/test-modules-plain/sound_generators/plain";
+    std::filesystem::create_directories(plain_dir);
+    std::filesystem::copy_file("build/test-modules/sound_generators/fake/dsp.so", plain_dir + "/dsp.so", std::filesystem::copy_options::overwrite_existing);
+    std::ofstream(plain_dir + "/module.json") << R"({"id": "plain", "name": "Plain", "abbrev": "PLN", "api_version": 2,
+      "component_type": "sound_generator", "dsp": "dsp.so", "capabilities": {"midi_in": true,
+      "chain_params": [{"key": "level", "name": "Level", "type": "float", "min": 0, "max": 1}]}})";
+    auto plain = app::scan_modules("build/test-modules-plain");
+    CHECK(plain.size() == 1);
+    if (plain.empty()) return;
+    {
+        Run p;
+        p.answers["is_loading"] = "1";
+        if (!start(plain[0], p)) return;
+        CHECK(p.s().view == "comploading" && p.lit(0, 0, 127, 9) > 10);
+        p.answers.clear();
+        for (int n = 0; n < 120 && p.s().view == "comploading"; ++n) p.frames(1);
+        CHECK(p.s().view == "compedit" && !p.pages->left());
+        p.press(51);
+        CHECK(p.pages->left() && p.s().view == "chainedit");
+    }
 }
 
 void test_schwung_modules() {
@@ -1578,7 +1714,7 @@ void test_synth_track() {
         to_page(melodee, "Main");
         press(melodee, Button::MainPush);
         frames(melodee, 1);
-        CHECK(has(melodee.status(), ",sections"));
+        CHECK(has(melodee.status(), ",picker"));
         press(melodee, Button::Back);
         frames(melodee, 1);
         for (int n = 0; n < 3 && has(melodee.status(), "page=module-pages"); ++n) { press(melodee, Button::Back); frames(melodee, 1); }
@@ -1619,6 +1755,10 @@ void test_synth_track() {
     }
     CHECK(!action_saved); // an action has no value to keep
     CHECK(level_saved && table_saved && !saved.values.empty() && saved.values.front().first == "table"); // the choice first
+    // Schwung's Display settings as on Kerem's Move, Pad Typing and Text
+    // Preview on (its shadow_config.json, read when the pages start).
+    const std::string shadow_config = app::SchwungDisplay::root() + "/shadow_config.json";
+    std::ofstream(shadow_config) << R"({"pad_typing": true, "text_preview": true})";
     {
         app::MelodeeApp second(folder, home, modules);
         Session session;
@@ -1641,28 +1781,35 @@ void test_synth_track() {
         CHECK(has(second.status(), ",canvas") && !has(second.status(), ",wheel"));
         juce::Image screen(juce::Image::ARGB, 128, 64, true);
         { juce::Graphics g(screen); second.draw(g); }
-        CHECK(screen.getPixelAt(26 + 1, 9 + 2).getBrightness() > 0.5f); // its block, in the band (ui::content_x, under the strip)
+        CHECK(screen.getPixelAt(1, 9 + 2).getBrightness() > 0.5f); // its block, in Schwung's band (0, 9, 128 x 48)
         press(second, Button::MainPush); // in
         frames(second, 2);
-        CHECK(has(second.status(), ",wheel") && has(second.status(), "typing=0"));
+        CHECK(has(second.status(), ",wheel") && !has(second.status(), ",typing"));
         turn_wheel(second, 1); // the page's: the level to 0.9
         frames(second, 2);
         CHECK(second.synth_value("level") == "0.9");
         press(second, Button::MainPush); // the page's: a level down, and it asks for text
-        frames(second, 1);
-        CHECK(has(second.status(), "typing=1"));
-        second.audio_event(make_event(0x90, pad_note(24), 100)); // a letter now, not a note
+        frames(second, 2);
+        // Schwung's keyboard (text_entry.mjs) over the page, "ab" given; the
+        // pads its keys (Pad Typing), lit its way: the OK key green.
+        CHECK(has(second.status(), ",typing"));
+        auto* pages = second.studio().pages_of(second.studio().pages_target);
+        CHECK(pages && pages->status().text == "ab" && pages->pad_blocked() && pages->pad_colours()[7] == 16);
+        second.audio_event(make_event(0x90, pad_note(26), 100)); // a letter now, not a note
         CHECK(loudest(second, 1) == 0);
-        second.audio_event(make_event(0x80, pad_note(24), 0));
-        press(second, Button::Back);                           // "ab", given, less one: "a" (the Move's Back deletes)
-        tap_pad(second, 25);                                   // b
-        tap_pad(second, 26);                                   // c
-        tap_step(second, 0);                                   // 1
-        second.surface(make_event(0xb0, main_knob_cc, 63));   // the strip to its end, OK (the Move's own typing)
-        press(second, Button::MainPush);                       // done
-        CHECK(has(second.status(), "typing=0"));
-        frames(second, 3);
-        CHECK(second.ask_module("searched") == "abc1" && second.ask_module("level") == "0.9");
+        second.surface(make_event(0x90, pad_note(26), 100));      // c (the top row's third), entered when the slide guard is past
+        second.audio_event(make_event(0x80, pad_note(26), 0));
+        second.surface(make_event(0x80, pad_note(26), 0));
+        frames(second, 5);
+        CHECK(pages && pages->status().text == "abc");
+        tap_pad(second, 7); // OK, the bottom row's last
+        frames(second, 5);
+        CHECK(!has(second.status(), ",typing") && pages && !pages->pad_blocked());
+        CHECK(second.ask_module("searched") == "abc" && second.ask_module("level") == "0.9");
+        second.audio_event(make_event(0x90, pad_note(0), 100)); // the pads the track's again
+        CHECK(loudest(second, 1) > 0);
+        second.audio_event(make_event(0x80, pad_note(0), 0));
+        loudest(second, 1);
         press(second, Button::Back); // up a level: the page keeps the jogwheel
         frames(second, 1);
         CHECK(has(second.status(), ",wheel"));
@@ -1676,7 +1823,8 @@ void test_synth_track() {
         CHECK(has(second.status(), "unsaved=1"));
         CHECK(second.save_now().empty());
         auto with_page = saved_state(project);
-        CHECK(with_page.pages.size() == 1 && with_page.pages[0].first == "browse" && with_page.pages[0].second.find("\"depth\":0") != std::string::npos);
+        CHECK(with_page.pages.size() == 1 && with_page.pages[0].first.find("page.js|") != std::string::npos // Schwung's key: slot|script|overlay
+              && with_page.pages[0].second.find("\"depth\":0") != std::string::npos);
         CHECK(std::none_of(with_page.values.begin(), with_page.values.end(), [](const auto& value) { return value.first == "browse"; }));
         // ARP and CHORD: MIDI effects before the module, as Schwung's MIDI FX
         // boxes; the push shows CHORD whole, Back out; Mute + push turns it on.
@@ -1721,7 +1869,9 @@ void test_synth_track() {
         press(second, Button::MainPush);
         CHECK(has(second.status(), "page=module-pages"));
         frames(second, 8);
-        CHECK(has(second.status(), "pages=") && !has(second.status(), "pages=-") && has(second.status(), ",knobs"));
+        // It declares no ui_hierarchy and has no UI of its own: Schwung's
+        // component editor, its preset browser.
+        CHECK(has(second.status(), "pages=") && !has(second.status(), "pages=-") && has(second.status(), ",view=compedit"));
         press(second, Button::Back);
         frames(second, 1);
         CHECK(has(second.status(), "page=synth-play") && has(second.status(), "item=fx2"));
@@ -1740,6 +1890,7 @@ void test_synth_track() {
         CHECK(has(second.status(), "synth=fake"));
         CHECK(second.save_now().empty());
     }
+    std::filesystem::remove(shadow_config);
     {
         // Its module gone: the track keeps naming it, and saves it so.
         app::MelodeeApp third(folder, home, "build/test-no-modules");
@@ -1803,11 +1954,11 @@ void test_user_presets() {
     auto rows = [&] {
         std::lock_guard<std::mutex> guard(studio.lock);
         auto* pages = studio.pages_of(target);
-        return pages ? pages->view().menu.rows : std::vector<app::ModuleView::Row> {};
+        return pages ? pages->status().rows : std::vector<std::pair<std::string, std::string>> {};
     };
     frames(melodee, 2);
     auto mine = rows();
-    CHECK(mine.size() == 4 && mine[0].label == "Preset" && mine[0].value == "* Bright 2" && mine[3].label == "Delete");
+    CHECK(mine.size() == 4 && mine[0].first == "Preset" && mine[0].second == "* Bright 2" && mine[3].first == "Delete");
     // The list: the first, loaded; back on the pages, the level as saved.
     press_button(melodee, Button::MainPush); // into the page
     frames(melodee, 1);
@@ -1820,13 +1971,13 @@ void test_user_presets() {
     CHECK(melodee.synth_value("level") == "0.5");
     frames(melodee, 2);
     mine = rows();
-    CHECK(!mine.empty() && mine[0].value == "Bright");
+    CHECK(!mine.empty() && mine[0].second == "Bright");
     // As Schwung after a Load: its pages started over, on My Presets, the
     // door closed; the push opens it again.
     {
         std::lock_guard<std::mutex> guard(studio.lock);
         auto* pages = studio.pages_of(target);
-        CHECK(pages && pages->view().page == "My Presets" && !pages->view().menu.entered);
+        CHECK(pages && pages->status().page == "My Presets" && pages->status().footer.size() > 1 && pages->status().footer[1].second == "ENTER");
     }
     press_button(melodee, Button::MainPush);
     frames(melodee, 1);

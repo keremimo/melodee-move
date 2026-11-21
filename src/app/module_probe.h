@@ -19,4 +19,9 @@ int probe_modules(const std::string& root, const std::string& pictures = {});
 // step's screen a PNG in `pictures`, and how long a screen took.
 int probe_schwung_pages(const std::string& root, const std::string& id, const std::string& pictures);
 
+// A page script (canvas_overlay.drawPage) drawn once on Schwung's screen
+// (schwung_display.h), its 128 x 64 pixels written to `out` a byte each: to
+// hold Melodee's screen against Schwung's own drawing of the same calls.
+int probe_schwung_draw(const std::string& script, const std::string& out);
+
 } // namespace app

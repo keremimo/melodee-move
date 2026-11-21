@@ -96,6 +96,14 @@ void place(Studio& studio, unsigned chain, unsigned at, uint8_t entry) {
 }
 } // namespace
 
+unsigned Studio::fx_position(PagesTarget target) const {
+    if (target.fx_entry == melodee::no_plugin || target.track >= melodee::chain_count) return 0;
+    const auto& c = project().chain(target.track);
+    for (unsigned at = 0; at < c.slots.size(); ++at)
+        if (c.slots[at].kind == uint8_t(EffectKind::Plugin) && c.slots[at].params[0] == target.fx_entry) return at;
+    return 0;
+}
+
 bool Studio::load_fx(unsigned chain, unsigned at, const std::string& id) {
     if (chain >= melodee::chain_count) return false; // a kit pad's own chain takes no plug-in, as in Melodee
     auto found = std::find_if(fx_catalog.begin(), fx_catalog.end(), [&](const ModuleInfo& info) { return info.id == id; });

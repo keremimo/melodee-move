@@ -80,6 +80,7 @@ int main(int argc, char** argv) {
             if (argument == "--test-loop" && has_value) return move::write_test_loop(argv[n + 1]) ? 0 : 1;
 
             if (argument == "--schwung-pages" && n + 3 < argc) return app::probe_schwung_pages(argv[n + 1], argv[n + 2], argv[n + 3]);
+            if (argument == "--schwung-draw" && n + 2 < argc) return app::probe_schwung_draw(argv[n + 1], argv[n + 2]);
             if (argument == "--probe-modules" && has_value) return app::probe_modules(argv[n + 1], n + 2 < argc ? argv[n + 2] : "");
             if (argument == "--melodee-previews" && has_value) melodee_previews = argv[++n];
             else if (argument == "--previews" && has_value) previews = argv[++n];

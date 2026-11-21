@@ -315,7 +315,6 @@ public:
     std::optional<std::string> module_read(ModuleTrack& track, const std::string& key);
     CanvasPage::Host canvas_host(unsigned track);
     CanvasPage::Host fx_host(uint8_t entry); // a Schwung effect's (studio_fx.cpp)
-    static constexpr int typing_schwung_pages = -2; // typing_canvas: the text is Schwung's pages' (typing_pages)
     // A module whose pages Schwung's code has (schwung_pages.h): a track's
     // synth, or a Schwung effect (its plug-in entry).
     struct PagesTarget {
@@ -324,10 +323,11 @@ public:
         bool operator==(const PagesTarget& o) const { return track == o.track && fx_entry == o.fx_entry; }
     };
     PagesTarget pages_target;                   // whose pages screens/module_pages.cpp shows
-    PagesTarget typing_pages;                   // whose keyboard is open
     std::optional<PagesTarget> swap_from_pages;   // a Swap Module asked from its pages
     std::optional<PagesTarget> remove_from_pages; // a Remove Module asked from its pages
     SchwungPages* pages_of(PagesTarget target);
+    // A Schwung effect's place in its chain (0 the first): Schwung's "fx1" ...
+    unsigned fx_position(PagesTarget target) const;
     std::unique_ptr<SchwungPages> start_pages(CanvasPage::Host host, const LoadedModule& module, const std::string& dir,
                                               const std::vector<std::pair<std::string, std::string>>& kept, PagesTarget target);
     std::string pages_trailing(PagesTarget target, bool instrument);
@@ -424,6 +424,7 @@ public:
     // Move.settings three seconds on, the project left as it is (no UNSAVED).
     void volume_changed();
     bool shift = false;
+    std::atomic<bool> screen_reader {false}; // the user's screen reader on (MelodeeApp's speech)
 
     // The Looper (app/loop_desk.h, docs/UI.md "Looper"): four loops on
     // tracks L1-L4. loop_pads(): the MIDI thread's word to the audio thread

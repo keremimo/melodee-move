@@ -487,6 +487,7 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point now) {
         lights.button(Button::Back, white_dim);
         return;
     }
+    for (unsigned n = 0; n < move::knob_count; ++n) lights.knob(n, 0); // the knobs' lights off, unless a screen lights them
     if (auto* top = studio.top()) {
         top->lights(lights);
         if (!holding() && top->screen_kind() == bindings::Screen::Play) studio.sequencer().lights(lights, now); // the steps
@@ -728,6 +729,7 @@ void MelodeeApp::speak() {
         speech_started = true;
         if (speech.start()) std::cerr << "melodee-move: speech through Schwung's screen reader (schwung-tts)\n";
     }
+    own->screen_reader.store(speech.enabled(), std::memory_order_relaxed); // Schwung's pages lay out as lists for it
     if (!speech.enabled()) return;
     auto now = Clock::now();
     ScreenReader::View view;

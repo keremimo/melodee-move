@@ -126,6 +126,7 @@ Lights::Lights() {
     cc_want.fill(unset); cc_sent.fill(unset);
     for (const auto& info : buttons)
         if (info.led == LedKind::Rgb) cc_rgb[info.cc & 127] = true;
+    for (unsigned n = 0; n < knob_count; ++n) cc_rgb[knob_first_cc + n] = true; // the knobs' lights are RGB
     // Play, Rec and Sampling keep their colours at every brightness, as on
     // the Move: green, red and dim white have no darker versions of
     // themselves, and a transport light in another colour reads as another state.
@@ -172,6 +173,10 @@ void Lights::step_icon(unsigned index, uint8_t brightness) {
 void Lights::button(Button button, uint8_t value) {
     if (button >= Button::Count || buttons[size_t(button)].led == LedKind::None) return;
     cc_want[button_cc(button)] = value & 0x7f;
+}
+
+void Lights::knob(unsigned index, uint8_t palette_index) {
+    if (index < knob_count) cc_want[knob_first_cc + index] = palette_index & 0x7f;
 }
 
 void Lights::clear_all() {

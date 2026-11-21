@@ -1038,10 +1038,9 @@ CanvasPage::Host Studio::canvas_host(unsigned t) {
 
 // A module's pages by Schwung's own code (schwung_pages.h), started off the
 // lock (its imports take their time): what its module.json declares where
-// the module does not say (as Schwung's chain host answers), Melodee's
-// trailing pages, its keyboard, and its drawn pages' state as the project
-// kept it. Null where the Move has no Schwung code (a Mac, the tests' own
-// fallback): Melodee then draws the module's pages itself.
+// the module does not say (as Schwung's chain host answers), which track and
+// place it is (Schwung's slot and component), and its drawn pages' state as
+// the project kept it. Null where Melodee finds no Schwung code.
 std::unique_ptr<SchwungPages> Studio::start_pages(CanvasPage::Host host, const LoadedModule& module, const std::string& dir,
                                                   const std::vector<std::pair<std::string, std::string>>& kept, PagesTarget target) {
     if (SchwungPages::shared_folder().empty()) return nullptr;
@@ -1053,18 +1052,19 @@ std::unique_ptr<SchwungPages> Studio::start_pages(CanvasPage::Host host, const L
         if (answer && answer->empty() && declared != contract.end()) return declared->second;
         return answer;
     };
-    auto typed = host.text_entry;
-    host.text_entry = [this, typed, target](const std::string& title, const std::string& initial) {
-        typed(title, initial);
-        typing_canvas = typing_schwung_pages;
-        typing_pages = target;
-    };
     SchwungPages::Hooks hooks;
+    hooks.slot = int(target.track);
+    hooks.component = target.fx_entry == melodee::no_plugin ? std::string("synth") : "fx" + std::to_string(fx_position(target) + 1);
+    hooks.module_id = module.info().id;
+    hooks.module_name = module.info().name;
+    hooks.module_abbrev = module.info().abbrev;
     hooks.module_dir = dir;
+    hooks.shift = [this] { return shift; };
+    hooks.reader = [this] { return screen_reader.load(std::memory_order_relaxed); };
     bool instrument = !module.source && target.fx_entry == melodee::no_plugin;
     hooks.trailing = [this, target, instrument] { return pages_trailing(target, instrument); };
     hooks.action = [this, target](const std::string& action) { pages_action(target, action); };
-    hooks.say = [this](const std::string& text) { say(text); };
+    hooks.pad_block = [this](bool on) { pads_typing.store(on || typing); }; // Schwung's keyboard's pads: letters, not notes
     auto states = juce::DynamicObject::Ptr(new juce::DynamicObject());
     for (const auto& [key, state] : kept) states->setProperty(juce::Identifier(key), juce::String(state)); // each page's own JSON text
     hooks.page_states = kept.empty() ? std::string() : juce::JSON::toString(juce::var(states.get()), true).toStdString();
@@ -1269,10 +1269,7 @@ void Studio::finish_typing(bool cancelled) {
         if (!cancelled) done(typed);
         return;
     }
-    int index = typing_canvas;
     typing_canvas = typing_track = -1;
-    if (index == typing_schwung_pages) // a module's pages' keyboard: a text parameter, a drawn page's
-        if (SchwungPages* pages = pages_of(typing_pages)) pages->text_entered(typed, cancelled);
 }
 
 // ---------------------------------------------------------------- undo (history.h)
