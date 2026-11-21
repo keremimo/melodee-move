@@ -197,7 +197,7 @@ void Sampling::service_audio() {
             kept->right.assign(64, 0.0f);
         }
         std::lock_guard<std::mutex> guard(studio.lock);
-        takes[number] = std::move(kept);
+        if (!takes.count(number)) takes[number] = std::move(kept); // one there already may be playing: it stays
     }
     if (!to_read.empty()) {
         std::lock_guard<std::mutex> guard(studio.lock);

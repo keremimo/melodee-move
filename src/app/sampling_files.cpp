@@ -298,6 +298,11 @@ void Sampling::service_files() {
     for (const auto& path : todo_deletes) {
         std::error_code error;
         fs::remove_all(path, error);
+        auto extension = upper_text(fs::path(path).extension().string());
+        if (!error && (extension == ".XPM" || extension == ".XTY")) { // an MPC program goes with the data folder that is its own
+            std::error_code ignored;
+            fs::remove_all(fs::path(path).parent_path() / (fs::path(path).stem().string() + "_[TrackData]"), ignored);
+        }
         std::lock_guard<std::mutex> guard(studio.lock);
         ++deletes;
         studio.say(error ? "NOT DELETED" : "DELETED");
