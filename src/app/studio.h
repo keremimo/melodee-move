@@ -324,10 +324,13 @@ public:
     // the whole line kept and written back unless settings_text() already
     // wrote that word. An area may set its own here too.
     std::map<std::string, std::string> settings_more;
-    // Called on the service thread, outside `lock`, once the open project is
-    // saved and before another is swapped in: what an area still has to
-    // write into the old one (the Looper's playing loops).
+    // Called on the service thread, outside `lock`, before the open project
+    // is saved and another swapped in, the audio thread still running: what
+    // an area still has to write into the old one (the Looper's playing loops).
     std::vector<std::function<void()>> closing;
+    // Called under `lock` before every save's bytes are made: what an area
+    // keeps in the project first (the Looper's values).
+    std::vector<std::function<void()>> saving;
     // Called under `lock` once another project is in (opened or new), its path given: an area's reset (the Looper's loops).
     std::vector<std::function<void(const std::string& path)>> opened;
     // Opening a project: the Loading sheet's counts.
@@ -382,6 +385,7 @@ private:
     std::string write(std::vector<uint8_t> bytes, std::string settings_text);
     SynthFile module_state(unsigned track) const; // a Schwung track's module as it is now: values, preset, its pages' state
     std::vector<uint8_t> project_bytes() const;
+    std::vector<uint8_t> bytes_to_save(); // the `saving` hooks, then project_bytes()
     std::string settings_text() const;
     void read_settings();
     void run_project_job(const ProjectJob& job); // service thread

@@ -192,7 +192,7 @@ Studio::~Studio() {
     for (auto& module : modules_leaving) if (module) module->player.stop();
     std::unique_lock<std::mutex> guard(lock);
     if (!dirty) return;
-    auto bytes = project_bytes();
+    auto bytes = bytes_to_save();
     auto settings = settings_text();
     dirty = false;
     guard.unlock();
@@ -879,6 +879,11 @@ SynthFile Studio::module_state(unsigned t) const {
     return file;
 }
 
+std::vector<uint8_t> Studio::bytes_to_save() {
+    for (const auto& hook : saving) if (hook) hook(); // what other areas keep in the project first (the Looper's values)
+    return project_bytes();
+}
+
 std::vector<uint8_t> Studio::project_bytes() const {
     // Each Schwung track's module, as its PLUG entry's state.
     PluginStates states;
@@ -905,7 +910,7 @@ std::string Studio::write(std::vector<uint8_t> bytes, std::string settings) {
 
 std::string Studio::save_now() {
     std::unique_lock<std::mutex> guard(lock);
-    auto bytes = project_bytes();
+    auto bytes = bytes_to_save();
     auto settings = settings_text();
     dirty = false;
     guard.unlock();
@@ -1029,7 +1034,7 @@ std::string Studio::rebuild() {
         rebuild_wanted = true; // tried again on the next pass
         return "busy";
     }
-    engine->reload(*pack, false); // the audio thread waits, silent; Melodee's way of loading without a late block
+    engine->reload(*pack, true); // the same project: its loops stay (as Melodee's reformat); the audio thread waits, silent
     if (parked.result == Parked::Yes) engine->resume(parked.serial);
     ++rebuilds;
     pack.reset(); // the patterns played before, freed here
@@ -1192,7 +1197,7 @@ void Studio::service() {
     // Autosave: three seconds after the last change, as on the MPC.
     auto now = Clock::now();
     if (dirty && now - changed_at >= autosave_idle && now >= retry_at) {
-        auto bytes = project_bytes();
+        auto bytes = bytes_to_save();
         auto settings = settings_text();
         dirty = false;
         guard.unlock();
@@ -1373,7 +1378,7 @@ std::string Studio::save_project(const std::string& as) {
     std::unique_lock<std::mutex> guard(lock);
     if (!as.empty()) path = as;
     free_unused_slots();
-    auto bytes = project_bytes();
+    auto bytes = bytes_to_save();
     auto settings = settings_text();
     dirty = false;
     std::string file = path;
@@ -1386,11 +1391,13 @@ std::string Studio::save_project(const std::string& as) {
 }
 
 std::string Studio::open_project(const std::string& file, bool fresh) {
+    // Other areas' last writes into it, while the audio thread still runs (the Looper's playing loops).
+    for (const auto& hook : closing) if (hook) hook();
     // What is open now, saved first.
     {
         std::unique_lock<std::mutex> guard(lock);
         if (dirty) {
-            auto bytes = project_bytes();
+            auto bytes = bytes_to_save();
             auto settings_now = settings_text();
             dirty = false;
             guard.unlock();
@@ -1402,7 +1409,6 @@ std::string Studio::open_project(const std::string& file, bool fresh) {
             }
         }
     }
-    for (const auto& hook : closing) if (hook) hook(); // other areas' last writes into it (the Looper's loops)
     // The next one read, outside the lock.
     auto next = std::make_unique<melodee::Project>();
     auto next_bank = std::make_unique<melodee::PatternBank>();
