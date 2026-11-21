@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "move/remote.h"
+
+#include <algorithm>
 #include "move/controls.h"
 #include <fcntl.h>
 #include <poll.h>
@@ -59,6 +61,12 @@ bool edges(const std::string& word, std::array<uint8_t, 3>& down, std::array<uin
 
 uint8_t detents(int n) { return uint8_t(n < 0 ? 128 + std::max(n, -63) : std::min(n, 63)); }
 
+// A turn's word: the name, then a sign and digits ("wheel+2"); "wheel-push" is a button.
+bool is_turn(const std::string& word, size_t name_size) {
+    return word.size() > name_size + 1 && (word[name_size] == '+' || word[name_size] == '-')
+        && std::all_of(word.begin() + long(name_size) + 1, word.end(), [](char c) { return std::isdigit(static_cast<unsigned char>(c)); });
+}
+
 } // namespace
 
 bool press_messages(const std::string& spec, std::vector<Injected>& out, std::string& error) {
@@ -85,9 +93,9 @@ bool press_messages(const std::string& spec, std::vector<Injected>& out, std::st
     }
     auto turn = [&](uint8_t cc, int n) { out.push_back({{0xb0, cc, detents(n)}, gap_ms}); };
     std::array<uint8_t, 3> down {}, up {};
-    if (!last.compare(0, 5, "wheel") && last.size() > 5 && (last[5] == '+' || last[5] == '-')) turn(main_knob_cc, std::atoi(last.c_str() + 5));
-    else if (!last.compare(0, 6, "volume") && last.size() > 6 && (last[6] == '+' || last[6] == '-')) turn(master_knob_cc, std::atoi(last.c_str() + 6));
-    else if (!last.compare(0, 4, "knob") && last.size() > 6 && last[4] >= '1' && last[4] <= '8' && (last[5] == '+' || last[5] == '-'))
+    if (!last.compare(0, 5, "wheel") && is_turn(last, 5)) turn(main_knob_cc, std::atoi(last.c_str() + 5));
+    else if (!last.compare(0, 6, "volume") && is_turn(last, 6)) turn(master_knob_cc, std::atoi(last.c_str() + 6));
+    else if (!last.compare(0, 4, "knob") && last.size() > 6 && last[4] >= '1' && last[4] <= '8' && is_turn(last, 5))
         turn(uint8_t(knob_first_cc + (last[4] - '1')), std::atoi(last.c_str() + 5));
     else if (!last.compare(0, 5, "hold-") && edges(last.substr(5), down, up)) out.push_back({down, gap_ms});
     else if (!last.compare(0, 8, "release-") && edges(last.substr(8), down, up)) out.push_back({up, gap_ms});

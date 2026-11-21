@@ -10,6 +10,7 @@
 #include "move/latency.h"
 #include "move/lights.h"
 #include "move/queues.h"
+#include "move/remote.h"
 #include "move/spi_device.h"
 #include "move/spi_protocol.h"
 #include "move/tools.h"
@@ -110,6 +111,26 @@ void test_controls() {
     CHECK(decode3(0x9f, 50, 127).kind == Input::Kind::None);
     const uint8_t short_message[] {0x9f, 68};
     CHECK(decode(short_message, 2).kind == Input::Kind::None);
+}
+
+// melodee-press: "wheel-push" is the jogwheel's button, "wheel-2" a turn.
+void test_press_messages() {
+    std::vector<Injected> out;
+    std::string error;
+    CHECK(press_messages("wheel-push", out, error) && out.size() == 2);
+    CHECK(out[0].bytes == (std::array<uint8_t, 3> {0xb0, button_cc(Button::MainPush), 127}));
+    CHECK(out[1].bytes == (std::array<uint8_t, 3> {0xb0, button_cc(Button::MainPush), 0}));
+    out.clear();
+    CHECK(press_messages("wheel-2", out, error) && out.size() == 1);
+    CHECK(out[0].bytes == (std::array<uint8_t, 3> {0xb0, main_knob_cc, 126}));
+    out.clear();
+    CHECK(press_messages("shift+wheel+3", out, error) && out.size() == 3 && out[1].bytes[1] == main_knob_cc && out[1].bytes[2] == 3);
+    out.clear();
+    CHECK(press_messages("volume+5", out, error) && out.size() == 1 && out[0].bytes[1] == master_knob_cc);
+    out.clear();
+    CHECK(press_messages("knob1-3", out, error) && out.size() == 1 && out[0].bytes[2] == 125);
+    out.clear();
+    CHECK(!press_messages("wheel-", out, error) && !press_messages("volume+x", out, error));
 }
 
 void test_lights() {
@@ -2595,6 +2616,7 @@ void test_speech() {
 
 int main() {
     test_controls();
+    test_press_messages();
     test_lights();
     test_display();
     test_reblocker();
