@@ -402,9 +402,13 @@ bool Sequencer::job(Job job, const bindings::Use& use) {
     // Motion lanes (14.2.1-3).
     case Job::DeleteMotion: {
         Lane lane_of;
-        if (!knob_lane(unsigned(use.index), lane_of)) { studio.say("NO LANE"); return true; }
-        if (p.clear_lane(lane_of.param, lane_of.pad)) { sync(t, n); studio.say(lane_of.name + " CLEARED"); }
-        else studio.say("NO MOTION");
+        // No lane, or no motion on it: not the sequencer's, so the knob's value
+        // goes back to its start instead (move-projects' Screen::reset_knob(),
+        // Melodee's Erase + pot).
+        if (!knob_lane(unsigned(use.index), lane_of)) return false;
+        if (!p.clear_lane(lane_of.param, lane_of.pad)) return false;
+        sync(t, n);
+        studio.say(lane_of.name + " CLEARED");
         return true;
     }
     case Job::ToggleMotion: {
