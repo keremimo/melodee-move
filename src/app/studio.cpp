@@ -409,6 +409,8 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
             stamp.sounded.store(false, std::memory_order_relaxed);
             stamp.track.store(track, std::memory_order_relaxed);
             stamp.key.store(key, std::memory_order_relaxed);
+            stamp.keys[0].store(key, std::memory_order_relaxed);
+            stamp.count.store(key >= 0 ? 1u : 0u, std::memory_order_relaxed);
             stamp.velocity.store(velocity, std::memory_order_relaxed);
             stamp.position.store(engine->position_of(unsigned(track)), std::memory_order_relaxed);
             stamp.ticks.store(engine->ticks(), std::memory_order_relaxed);

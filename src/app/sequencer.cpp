@@ -1007,24 +1007,33 @@ void Sequencer::input(const move::SurfaceEvent& event) {
         int key = stamp.key.load(std::memory_order_relaxed), t = stamp.track.load(std::memory_order_relaxed);
         int velocity = stamp.velocity.load(std::memory_order_relaxed), position = stamp.position.load(std::memory_order_relaxed);
         uint32_t ticks = stamp.ticks.load(std::memory_order_relaxed);
+        // Every key the pad played (a chord pad stamps several), the first as `key`.
+        auto& chord = pad_chords[in.index];
+        chord.clear();
+        unsigned count = std::min<unsigned>(stamp.count.load(std::memory_order_relaxed), Studio::PadStamp::most);
+        for (unsigned k = 0; k < count; ++k) chord.push_back(stamp.keys[k].load(std::memory_order_relaxed));
+        if (chord.empty() && key >= 0) chord.push_back(key);
         pad_keys[in.index] = key;
         pad_tracks[in.index] = t;
         if (t == int(studio.track()) && !kit()) {
-            if (std::find(keys_down.begin(), keys_down.end(), uint8_t(key)) == keys_down.end()) keys_down.push_back(uint8_t(key));
+            for (int k : chord)
+                if (std::find(keys_down.begin(), keys_down.end(), uint8_t(k)) == keys_down.end()) keys_down.push_back(uint8_t(k));
             studio.current().last_note = uint8_t(key & 0x7f);
         }
-        ring->press(unsigned(t), key, velocity, ms_now(), studio.playing() ? run : 0, ticks);
+        for (int k : chord) ring->press(unsigned(t), k, velocity, ms_now(), studio.playing() ? run : 0, ticks);
         if (entry && t == int(studio.track())) { // step entry (Melodee's Step Edit PLAY): written at the caret
             auto& p = pattern();
-            melodee::Event e;
-            e.tick = seq::step_tick(p, caret);
-            e.length = uint16_t(std::min<uint32_t>(entry_length * p.q(), 65535));
-            e.key = uint8_t(key & 0xff);
-            e.pitch = int8_t(key >> 8);
-            e.velocity = uint8_t(entry_velocity ? entry_velocity : std::clamp(velocity, 1, 127));
-            e.chance = entry_chance;
-            if (e.tick >= p.length) seq::set_length(p, (e.tick / bar_ticks() + 1) * bar_ticks(), studio.project().max_length());
-            p.add(e);
+            for (int k : chord) {
+                melodee::Event e;
+                e.tick = seq::step_tick(p, caret);
+                e.length = uint16_t(std::min<uint32_t>(entry_length * p.q(), 65535));
+                e.key = uint8_t(k & 0xff);
+                e.pitch = int8_t(k >> 8);
+                e.velocity = uint8_t(entry_velocity ? entry_velocity : std::clamp(velocity, 1, 127));
+                e.chance = entry_chance;
+                if (e.tick >= p.length) seq::set_length(p, (e.tick / bar_ticks() + 1) * bar_ticks(), studio.project().max_length());
+                p.add(e);
+            }
             p.free = false;
             entry_written = true;
             sync(studio.track(), number(studio.track()));
@@ -1035,20 +1044,25 @@ void Sequencer::input(const move::SurfaceEvent& event) {
         if (rec && !repeats && unsigned(t) == take_track && studio.playing()) {
             bool early = studio.host().count_in() != 0;
             if (early && studio.host().count_in_ticks() > melodee::sixteenth_ticks) return; // counting in: not yet
-            write_note(key, velocity, position, ticks, early);
+            for (int k : chord) write_note(k, velocity, position, ticks, early);
         }
         return;
     }
     int key = pad_keys[in.index], t = pad_tracks[in.index];
     pad_keys[in.index] = -1;
     if (key < 0) return;
-    keys_down.erase(std::remove(keys_down.begin(), keys_down.end(), uint8_t(key)), keys_down.end());
+    auto chord = std::move(pad_chords[in.index]);
+    pad_chords[in.index].clear();
+    if (chord.empty()) chord.push_back(key);
+    for (int k : chord) keys_down.erase(std::remove(keys_down.begin(), keys_down.end(), uint8_t(k)), keys_down.end());
     if (entry && entry_written && std::all_of(pad_keys.begin(), pad_keys.end(), [](int k) { return k < 0; })) {
         entry_written = false; // the chord let go: the caret moves on
         caret += entry_length;
     }
-    ring->release(unsigned(t), key, ms_now(), studio.host().ticks());
-    if (rec) release_note(key, studio.host().ticks());
+    for (int k : chord) {
+        ring->release(unsigned(t), k, ms_now(), studio.host().ticks());
+        if (rec) release_note(k, studio.host().ticks());
+    }
 }
 
 // ---------------------------------------------------------------- every lights() call
