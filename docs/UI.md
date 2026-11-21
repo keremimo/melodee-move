@@ -312,8 +312,10 @@ hold the code to it. In short:
 
 - **Pads**: a kit in its pads' colours, the last hit white; in Chop the
   slices in alternating colours, the selected one white, and in a manual take
-  the pad that cuts next blinking red; on a module track every C in the
-  track's colour, the other naturals dim, a held pad white.
+  the pad that cuts next blinking red; on a note track (a module, a
+  keygroup, MIDI) the key's roots in the track's colour, its other notes
+  light grey, the rest dark, a held pad white, as the Move's Keys & Scale
+  ("Instruments", above).
 - **Steps**: in Chop, the parts where a cut falls; the playhead while playing.
 - **Track buttons**: the bank's four, each its track's colour, dim; the
   selected one bright; an empty one dark.
@@ -332,7 +334,9 @@ hold the code to it. In short:
 ## Open questions
 
 - The pad pages' exact contents.
-- A module track's note layout: rows of fourths for now, C2 at the bottom
-  left (Ableton's names); a scale or chromatic later.
+- A module track's note layout: settled, the Move's Keys & Scale
+  ("Instruments"). Whether In-Key scales in the pads' MPC Banks layout go up
+  the scale in pad order or in fourths inside each bank waits for Kerem's
+  pick (move-pad-layout).
 - Realtime priority when Schwung launches melodee-move as `ableton`: a
   small root helper, as EvilGenius uses, or not.

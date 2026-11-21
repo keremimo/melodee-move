@@ -92,7 +92,7 @@ the amount, as the Move's wheel sets the number of slices.
 | Control | On the Move | In Melodee | Status |
 | --- | --- | --- | --- |
 | Pad (Play, kit) | Plays the Drum Rack's pad (the left 16), by velocity | Plays the kit pad and makes it the last pad; 32 pads, two banks of 16 | done |
-| Pad (Play, synth) | Plays notes, In-Key or Chromatic, in octaves or 4ths (Shift + Step 9) | Plays the module's notes in rows of fourths, C2 bottom left; the other layouts with Keys & Scales | done |
+| Pad (Play, synth) | Plays notes, In-Key or Chromatic, in octaves or 4ths (Shift + Step 9) | Plays the track's notes as Keys & Scale lays them out (In-Key in octaves at first, C2 bottom left), with Melodee's Prog and Drums, CHORD's chords and the arp | done |
 | Pad, right 16 (16 Pitches) | The selected drum pad's sample at 16 pitches of the key and scale | The last pad at 16 pitches (Melodee's 16 Levels, Tune) | wave 2: kit depth |
 | Pad pressure | Polyphonic aftertouch (Drift, Wavetable) | Polyphonic aftertouch to the Schwung module; a kit pad's pressure waits for its job | done |
 | Shift + Pad (Play, kit) | No job (Control Live's Drum mode: selects a pad without playing it) | Makes the pad the last pad without sounding it (the MPC's Sample held + pad) | done |
@@ -320,7 +320,7 @@ Not checked by the tests: they follow from the screens.
 | Light | On the Move | In Melodee | Status |
 | --- | --- | --- | --- |
 | Pads, a kit | The Drum Rack's pads in their colours; a muted pad dim white | The kit's pads, the last one white; muted dim white | done |
-| Pads, a synth | Roots in the track's colour, the scale's notes light grey, the rest dark | Every C in the track's colour, the other naturals dim; scales with Keys & Scales | done |
+| Pads, a synth | Roots in the track's colour, the scale's notes light grey, the rest dark | The same on every note track (a synth, a keygroup, MIDI), as Keys & Scale lays them out; Prog: chords dim, the file's root chord bright; Drums: dim, the last hit bright; a held pad white | done |
 | Pads, 16 Pitches | The right 16: roots in the track's colour, the scale light grey | The same | wave 2: kit depth |
 | Pads, Session | Clips in the track's colour; the selected one pulsing white; one waiting to start pulsing green, one about to stop pulsing in its colour | The same for patterns | wave 2: sequencer |
 | Pads, Overview | Sets in their colours, the selected one pulsing; an empty slot dark, white when selected | The same for projects | wave 2: MIDI/sync/undo/projects |

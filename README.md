@@ -58,8 +58,9 @@ Three parts so far:
   (`/data/UserData/schwung/modules/sound_generators`, or `--modules DIR`).
   The jogwheel walks the Device View (the module, its preset, its effects);
   its push on the module lists them, and a push loads one. Pads are notes
-  in rows of fourths, C2 at the bottom left; Plus and Minus move an octave (a drum module
-  such as 9w9 wants notes from 36: one octave down); pressure is polyphonic
+  as Keys & Scale lays them out (In-Key in octaves at first, C2 at the bottom
+  left; Instruments, below); Plus and Minus move an octave (a drum module
+  such as 9w9 takes Drums, notes from 36); pressure is polyphonic
   aftertouch. Knobs 1-8 are the module's page (from its `ui_hierarchy`, or
   its parameters eight at a time), Shift + the jogwheel its pages; the
   jogwheel's push on the preset browses its presets (loaded as the jogwheel
@@ -79,6 +80,28 @@ Three parts so far:
   Shift for capitals; push is done, Back held cancels. A file the page hands over (Webstream's download)
   goes onto the first empty kit pad, to play and chop. An action such as
   play/pause or stop is a button: push its menu row, or turn its knob up.
+- **Instruments** (docs/UI.md, "Instruments"; `docs/ui/instruments.png`): a
+  keygroup track plays an SFZ, an MPC keygroup program (`.xpm`, MPC 3's
+  `.xty`), an EXS24 instrument, a SoundFont preset (an `.sf2` opens as a
+  folder of its presets), a DecentSampler preset or one sample, played from
+  the note found in it; read by Melodee's own readers, its zones streamed
+  from storage as Melodee streams them (a file that is not a PCM WAV is laid
+  out in `Melodee/Cache` and read in place too). Its pages (Shift + the
+  wheel): ZONES or TRIM, PLAY, AMP ENV, FILTER, ARP, CHORD. Every note track
+  plays as the Move's **Keys & Scale** (Shift + Step 9) lays its pads out:
+  In-Key or Chromatic, in octaves or 4ths, the project's key and the Move's
+  35 scales, with Melodee's Prog (MPC 3 progressions, a chord a pad, chords
+  stored from the pads held as Mine N) and Drums (notes from 36); CHORD
+  plays a chord of the key a pad, ARP arpeggiates, Shift + Step 10 is Full
+  Velocity, Shift + Plus / Minus a note of the key. A module track opens on
+  **MACRO** (Melodee's FILTER, ECHO and SPACE, the mod wheel, pitch bend).
+  **AUTO SAMPLE** (the last row of a module's menu) plays its own instance
+  of the module a key at a time, faster than real time at the lowest
+  priority, after Melodee's check, into an MPC keygroup program
+  (`Melodee/Samples/Keygroups/<name>/<name>.xpm`) on the first empty track,
+  with the module track's patterns. The pads reach the audio thread as one
+  published table a track (`app/keys.h`, a triple buffer): a chord's notes,
+  the arp's keys or Note Repeat's, in the cycle the pad was read.
 - The master knob is the volume; Shift + Back goes back to Move.
 - **Saving**: the whole project is one Melodee project file,
   `/data/UserData/Melodee/Projects/Move.mldp` (`--home` moves the folder),
@@ -102,7 +125,8 @@ Three parts so far:
   `*.migrated`.
 
 Not yet: more than one project, editing patterns, samples over 60 seconds,
-Record, Capture, Schwung's effects, mixer pages; docs/PARITY.md has the rest.
+Record, Capture, Schwung's effects, mixer pages, auto sampling an instrument
+outside (MIDI out first); docs/PARITY.md has the rest.
 
 ### How a Schwung module is hosted
 
