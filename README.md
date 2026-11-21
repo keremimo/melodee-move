@@ -433,9 +433,10 @@ Needs Docker and Python 3.
 ./build.sh
 ```
 
-It builds `build/melodee-move` for linux/arm64 on Ubuntu 22.04: glibc 2.35 is
-the newest Ableton's firmware has, libstdc++ is linked in, and the code is
-tuned for the Move's Cortex-A72. Then: the unit tests (and the web page's,
+It builds `build/melodee-move` for linux/arm64 on Ubuntu 22.04 with its GCC
+12: glibc 2.35 is the newest Ableton's firmware has, libstdc++ is linked in,
+and the code is tuned for the Move's Cortex-A72. Then: the unit tests (and
+the web page's,
 `build/web-tests`), the sound self-test,
 the screen previews, runs against the simulated Move (the spike: pad,
 jogwheel to LATENCY, the meter timing clicks through a 300-frame cable,
@@ -461,9 +462,10 @@ by side where they share no folder (each lane's output in
 `build/check/`). Compiles go through ccache, its cache shared by every
 checkout and worktree on the machine (`~/.cache/melodee-move/ccache`, or
 `MELODEE_CCACHE`), so a source compiled in one is not compiled again in
-another. JUCE's headers are precompiled (`src/pch.h`), and a new Melodee
-`Project` is built in one file only (`src/app/new_project.cpp`): its
-constructor alone costs GCC -O2 about 90 s wherever it is inlined.
+another. JUCE's headers are precompiled (`src/pch.h`). The compiler is
+22.04's GCC 12, not its default GCC 11 (`tools/Dockerfile`): GCC 11 spends
+minutes at -O2 wherever Melodee's `Project` is made or its patterns reset,
+and a clean build takes 53 s instead of 226 s.
 
 ## Run on the Move
 

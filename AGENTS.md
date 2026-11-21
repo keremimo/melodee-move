@@ -16,9 +16,11 @@ and `jackd -d move` on poundhard-armbian (`jack`), and the apps on it
   the XMOS asks for; clear MIDI in once read; lights go out on channel 1,
   cable 0 (JACK's jack_move wants channel 16; Lights writes 16 and the SPI
   host moves it).
-- Build on Ubuntu 22.04 (glibc 2.35, Ableton's newest) with libstdc++
-  linked in, for the Move's Cortex-A72 (`-mcpu=cortex-a72`, ARMv8.0-A);
-  never the MPC Sample's A55 tuning. libjack is loaded at run time only.
+- Build on Ubuntu 22.04 (glibc 2.35, Ableton's newest) with its GCC 12
+  (`tools/Dockerfile`; its default GCC 11 spends minutes on Melodee's
+  model) and libstdc++ linked in, for the Move's Cortex-A72
+  (`-mcpu=cortex-a72`, ARMv8.0-A); never the MPC Sample's A55 tuning.
+  libjack is loaded at run time only.
 - Never ship or commit `jack_move.so`, `/opt/move` or anything else taken
   from a Move; keep downloads, captures, probe reports and device data in
   ignored `build/`, `dist/` or `.local/`.
@@ -35,10 +37,6 @@ and `jackd -d move` on poundhard-armbian (`jack`), and the apps on it
   sample-base; never edit their files from here.
 - Four-space indentation, `SPDX-License-Identifier: AGPL-3.0-only` headers,
   Conventional Commits.
-- A new `melodee::Project` comes from `app::new_project()`
-  (`src/app/new_project.h`), never `std::make_unique<melodee::Project>()` or
-  a default-constructed one: its inlined constructor costs GCC about 90 s
-  of compiling in each file that has one. Copying one is cheap.
 
 Run `./build.sh quick` (build, unit tests) while working and `./build.sh`
 (also self-test, previews, the simulated Move, packages, crush) before a
