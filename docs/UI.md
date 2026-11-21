@@ -582,18 +582,20 @@ it. `docs/ui/midi.png` is the sheet (`src/ui/mockups_midi.cpp`).
   and the ones saved (`Melodee/Sounds`, `.mlds`), starred ones marked `*`;
   each loads as the wheel turns, push or Back done. Shift held: SAVE SOUND,
   STAR or UNSTAR, SHOW (all, starred, recent).
-- **MIDI Config** (Setup, Shift + Step 2: its MIDI and MIDI SYNC rows): in
+- **MIDI Config** (Setup, Shift + Step 2: its MIDI and MIDI SYNC rows push it; Back goes back to Setup): in
   and out channels, pad MIDI in and out, sync in and out (MIDI clock or
   MTC), Thru, program change, the Remote channel and CCs, PANIC. The wheel
   picks a row, push edits it (`[MTC]`), the wheel sets it, push again done;
   push on PANIC sends it. The rail's bottom says `IN` and `OUT` as MIDI
   passes; the detail line `EXT CLOCK` and the tempo heard, or `EXT MTC`,
   while following.
-- **Track options** (Shift + a track button, as on the Move): its colour,
-  **MIDI IN** (AUTO, or a channel 1-16 that plays this track whichever is
-  selected; AUTO: the selected track hears MIDI Config's in channel) and
+- **Track options** (Shift + a track button, as on the Move; move-projects'
+  screen, Projects and system below): its colour and name, and the MIDI
+  rows: **MIDI IN** (AUTO, or a channel 1-16 that plays this track whichever
+  is selected; AUTO: the selected track hears MIDI Config's in channel) and
   **MIDI OUT** (AUTO, or the channel its notes go out on; a MIDI track's is
-  its DEVICE channel). The wheel, push, as in MIDI Config.
+  its DEVICE channel). Push edits, the wheel turns, push keeps it (an undo
+  step), Back leaves it as it was; the detail line says what the row means.
 - **Tempo, following MIDI clock**: the BPM heard, `MIDI CLOCK IN`, and `EXT`
   on the detail line; the wheel does nothing then.
 
@@ -605,7 +607,7 @@ it. `docs/ui/midi.png` is the sheet (`src/ui/mockups_midi.cpp`).
 | Sound options (Shift held) | `OPT` / track / `SND` | SAVE SOUND, STAR, SHOW | |
 | MIDI Config | `MIDI` / / `IN`, `OUT` | its rows, the one edited `[ ]` | `EXT CLOCK` tempo, `EXT MTC` |
 | Panic pushed | `MIDI` / / `OUT` | `PANIC`, what went | `BACK: MIDI` |
-| Track options | `TRK` / track / `OPT` | colour, MIDI IN, MIDI OUT | what the row means |
+| Track options (move-projects') | `TRK` / track / `OPT` | colour, name, MIDI IN, MIDI OUT | on the MIDI rows, what the row means |
 
 Lights: a MIDI track's pads as a synth's on Keys (every C in the track's
 colour, a held pad white), as a kit's on Drums (32 pads, Plus and Minus the

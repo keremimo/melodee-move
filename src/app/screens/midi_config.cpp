@@ -143,10 +143,7 @@ private:
     bool editing = false, panicked = false;
 };
 
-// Setup (Shift + Step 2) is move-projects' (its MIDI and MIDI SYNC rows push
-// this screen). Until it is merged, Setup is move-pad-layout's stand-in,
-// Setup > PADS, whose MIDI CONFIG row pushes this one: one screen takes the
-// Setup job, so both stand-ins stay in reach.
+// Opened from Setup's MIDI and MIDI SYNC rows (move-projects' screens/setup.cpp).
 RegisterScreen config("midi-config", make<MidiConfig>);
 
 } // namespace

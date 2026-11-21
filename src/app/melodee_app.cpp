@@ -655,6 +655,11 @@ std::string MelodeeApp::command(const std::string& line) {
         else if (line.find("parallel") != std::string::npos) host.set_render_parallel(true);
         return std::string("render=") + (host.render_parallel() ? "parallel" : "serial") + " workers=" + std::to_string(host.render_threads());
     }
+    // melodee-midi HEX... | panic: a message into MIDI in as if it came on the port, or MIDI Panic (src/app/midi.h).
+    if (line.compare(0, 12, "melodee-midi") == 0) {
+        std::lock_guard<std::mutex> guard(own->lock);
+        return own->midi.command(*own, line.substr(std::min<size_t>(line.size(), 13)));
+    }
     return {};
 }
 

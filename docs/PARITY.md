@@ -286,7 +286,7 @@ Kerem has checked it there. `n/a` rows have no box.
 
 | Feature | Status | Move controls | ✓ |
 | --- | --- | --- | --- |
-| **MIDI Config**: port, in and out channels, sync, thru, program change, takeover rows, panic, reset (MELODEE.md › MIDI and sync) | done | Setup's MIDI and MIDI SYNC rows (Shift + Step 2; until move-projects' Setup is merged, Shift + Step 2 opens it): channels, pad in and out, sync in and out, Thru, program change, Remote, PANIC. Port: one; takeover: none, the knobs are endless encoders; reset: Settings (move-projects) | [ ] |
+| **MIDI Config**: port, in and out channels, sync, thru, program change, takeover rows, panic, reset (MELODEE.md › MIDI and sync) | done | Setup's MIDI and MIDI SYNC rows (Shift + Step 2): channels, pad in and out, sync in and out, Thru, program change, Remote, PANIC. Port: one; takeover: none, the knobs are endless encoders; reset: Settings (move-projects) | [ ] |
 | **MIDI jacks** (the External port) (MELODEE.md › MIDI and sync) | n/a | the Move has no MIDI jacks; USB-C only | — |
 | **USB MIDI**: a computer or USB devices on USB-C (MELODEE.md › MIDI and sync) | done | USB-A devices and a computer on USB-C (the Standalone Port), both on cable 2 (docs/MIDI.md); to check on the Move | [ ] |
 | **MIDI in**: notes on the in channel play the selected track; a kit hears 36 as A01; pressure, mod wheel, pitch wheel, sustain pedal, CCs, All Notes Off (MELODEE.md › MIDI and sync; guide/midi-and-sync.md) | done | automatic, every page and track kind; a MIDI track echoes it | [ ] |
@@ -423,7 +423,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Remote presses** `melodee-press`: buttons, pads, knobs (MELODEE.md › Remote) | done | `melodee-move --ctl 'melodee-press shift+step1'` over SSH: the runtime's control socket plays them into the Move's input | [ ] |
 | **`melodee-render`**: render workers off or on (MELODEE.md › Remote) | done | `melodee-move --ctl 'melodee-render serial|parallel'` | [ ] |
 | **`melodee-looper`** (MELODEE.md › Remote) | looper | a command over SSH | [ ] |
-| **`melodee-midi`**: a message into the input; panic (MELODEE.md › Remote) | done | `melodee-midi HEX...` and `melodee-midi panic` in the package, over SSH | [ ] |
+| **`melodee-midi`**: a message into the input; panic (MELODEE.md › Remote) | done | `melodee-move --ctl 'melodee-midi HEX...'` and `--ctl 'melodee-midi panic'`, the runtime's control socket, over SSH | [ ] |
 | **`melodee-print`, `melodee-freeze`, `melodee-unfreeze`** (MELODEE.md › Print and freeze) | song & export | a command over SSH | [ ] |
 | **`melodee-autosample`** (MELODEE.md › Print and freeze) | instruments | a command over SSH | [ ] |
 | **`melodee-usb-input`** (MELODEE.md › Remote) | n/a | no USB audio | — |

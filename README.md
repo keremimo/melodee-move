@@ -214,7 +214,8 @@ Three parts so far:
   slots, EXPRESS, PADS, AUDIO, SYSEX) on the knobs, Shift + the wheel
   walking them, its Sounds (`.mlds`) on the wheel's push. MIDI goes out with
   the exchange that carries the audio it is heard in (a block, 2.9 ms);
-  `melodee-midi` puts a message in, or Panics, over SSH.
+  `melodee-move --ctl 'melodee-midi 90 3c 64'` puts a message in,
+  `--ctl 'melodee-midi panic'` Panics (Remote, below).
 
 
 Not yet: Record, locks and Motion on a Schwung module's own parameters; docs/PARITY.md has the rest.
@@ -276,7 +277,9 @@ on the MPC:
   buttons are `play rec shift back note-session capture sampling loop mute
   undo copy delete plus minus left right wheel-push track1`..`track4`, pads
   `pad1`..`pad32` (bottom left first), steps `step1`..`step16`;
-- `melodee-render serial|parallel`: the render workers left asleep or used.
+- `melodee-render serial|parallel`: the render workers left asleep or used;
+- `melodee-midi HEX...` / `melodee-midi panic`: a message into MIDI in as if
+  it came on the USB port (`90 3c 64`), or MIDI Config's Panic (docs/MIDI.md).
 
 The runtime (`src/move/remote.*`) owns the socket; an app answers its own
 commands through `App::command()`.

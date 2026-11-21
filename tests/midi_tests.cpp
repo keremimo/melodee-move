@@ -269,14 +269,10 @@ void test_in() {
     CHECK(count_of(rig.blocks(2), 0x92, 48) == 1);
     rig.in_message({0x88, 48, 0});
     CHECK(count_of(rig.blocks(2), 0x82, 48) == 1);
-    // melodee-midi: a line into the FIFO, read by the service thread, as if from the port.
-    rig.melodee->service();
-    CHECK(std::filesystem::is_fifo(app::Midi::remote_path()));
-    {
-        std::ofstream fifo(app::Midi::remote_path());
-        fifo << "98 30 46\n" << "panic\n";
-    }
-    rig.melodee->service();
+    // melodee-midi over the control socket (App::command()): as if from the port; then Panic.
+    CHECK(rig.melodee->command("melodee-midi 98 30 46").rfind("in=", 0) == 0);
+    CHECK(rig.melodee->command("melodee-midi panic") == "panic");
+    CHECK(rig.melodee->command("melodee-midi 30 zz").rfind("usage", 0) == 0);
     auto remote = rig.blocks(6);
     CHECK(count_of(remote, 0x92, 48) == 1);
     CHECK(rig.melodee->status().find("melodee_midi_panics=1") != std::string::npos);
@@ -551,6 +547,8 @@ void test_screens() {
     snap(*rig.melodee, "config-panic");
     hand.press(Button::Back); // the list again
     CHECK(has(*rig.melodee, "page=midi-config") && has(*rig.melodee, "midi_panicked=0"));
+    hand.press(Button::Back); // back to Setup, then out
+    CHECK(has(*rig.melodee, "page=setup"));
     hand.press(Button::Back);
     CHECK(has(*rig.melodee, "page=setup"));
     hand.press(Button::Back);
@@ -617,7 +615,6 @@ void test_setup_trigger() {
 
 int main() {
     std::filesystem::create_directories("build/test-midi");
-    setenv("MELODEE_MIDI_FIFO", "build/test-midi/fifo", 1); // not the Move's own
     std::filesystem::create_directories("build/test-samples");
     std::filesystem::create_directories("build/test-no-modules");
     test_packets();

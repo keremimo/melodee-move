@@ -15,6 +15,7 @@
 #include "move/display.h"
 #include "move/font.h"
 #include "move/lights.h"
+#include "ui/system_draw.h"
 #include "ui/track_style.h"
 #include "ui/widgets.h"
 #include <algorithm>
@@ -125,14 +126,19 @@ std::vector<Screen> midi_screens() {
             list(g, content(0, 50), {"REMOTE CH     16", "TRACK CC     102", "PATTERN CC   103", "SEQUENCE CC  104", "PANIC"}, 4, 1);
             detail(g, "PUSH: ALL OFF");
         }},
-        {"track-options", "SHIFT + TRACK 3: MIDI IN AND OUT", [](juce::Graphics& g) {
-            rail(g, "TRK", "3", "OPT");
-            list(g, content(0, 50), {"COLOUR    VIOLET", "MIDI IN     AUTO", "MIDI OUT       2"}, 1, 1);
+        {"track-options", "SHIFT + TRACK 3: ITS OPTIONS, MIDI IN AND OUT", [](juce::Graphics& g) {
+            // move-projects' screen (ui::system::setup_list), with move-midi's rows.
+            system::setup_list(g, "TRK", "OPT", {{"COLOUR", "VIOLET"}, {"NAME", "JUNO"}, {"MIDI IN", "AUTO"}, {"MIDI OUT", "2"}}, 2);
+            g.setColour(off);
+            move::draw_text_centred(g, 0, 25, rail_width, "3", 2);
+            g.setColour(on);
             detail(g, "AUTO: SELECTED");
         }},
         {"track-options-edit", "MIDI IN 5: CHANNEL 5 PLAYS TRACK 3", [](juce::Graphics& g) {
-            rail(g, "TRK", "3", "OPT");
-            list(g, content(0, 50), {"COLOUR    VIOLET", "MIDI IN     [5]", "MIDI OUT       2"}, 1, 1);
+            system::setup_list(g, "TRK", "OPT", {{"COLOUR", "VIOLET"}, {"NAME", "JUNO"}, {"MIDI IN", "5", false, true}, {"MIDI OUT", "2"}}, 2);
+            g.setColour(off);
+            move::draw_text_centred(g, 0, 25, rail_width, "3", 2);
+            g.setColour(on);
             detail(g, "CH 5: TRACK 3");
         }},
         {"tempo-ext", "TEMPO WHILE MIDI CLOCK LEADS", [](juce::Graphics& g) {
