@@ -92,7 +92,7 @@ private:
             return pads;
         }
         if (level == 2)
-            return {{"PAD LIGHTS", {"COLOUR", "WHITE", "OFF"}}, {"PAD FADE", {"60 MS", "100 MS", "150 MS", "250 MS"}},
+            return {{"PAD LIGHTS", {"COLOUR", "WHITE", "OFF"}}, {"PAD FADE", {"150 MS", "250 MS", "400 MS", "600 MS"}},
                     {"BRIGHTNESS", {"LOW", "MID", "HIGH", "MAX"}}, {"LIGHT SHOW", {"OFF", "ON"}},
                     {"SHOW STYLE", {"PULSE", "SWEEP", "CHASE", "RIPPLE", "LEVELS"}}};
         std::vector<Row> top {{"PADS", {}}, {"LIGHTS", {}}};

@@ -103,6 +103,7 @@ int run_app(App& app, const RunOptions& options) {
     std::thread midi_thread([&] {
         Lights lights;
         lights.clear_all();
+        lights.set_rgb(host->rgb_leds());
         auto next_lights = App::Clock::now();
         pollfd wake {host->wake_descriptor(), POLLIN, 0};
         auto send = [&](const uint8_t* bytes) { return host->leds.push({bytes[0], bytes[1], bytes[2]}); };
@@ -137,6 +138,7 @@ int run_app(App& app, const RunOptions& options) {
             if (now >= next_lights) {
                 app.lights(lights, now);
                 lights.update(send);
+                lights.update_fades(send, unsigned(host->leds.room()), now);
                 next_lights = now + lights_interval;
             }
         }

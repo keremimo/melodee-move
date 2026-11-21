@@ -133,6 +133,104 @@ void test_press_messages() {
     CHECK(!press_messages("wheel-", out, error) && !press_messages("volume+x", out, error));
 }
 
+// Pads fading through the RGB SysEx: whole messages only, eased to the
+// colour asked for, quicker up than down, and nothing of it on a way out
+// without RGB.
+void test_pad_fades() {
+    using std::chrono::milliseconds;
+    std::vector<std::array<uint8_t, 3>> sent;
+    auto collect = [&](const uint8_t* bytes) { sent.push_back({bytes[0], bytes[1], bytes[2]}); return true; };
+    // The colours each whole SysEx for `note` set, in order.
+    auto frames = [&](uint8_t note) {
+        std::vector<Rgb> out;
+        for (size_t at = 0; at + Lights::sysex_pieces <= sent.size(); ++at) {
+            const auto* p = &sent[at];
+            if (p[0] != std::array<uint8_t, 3> {0xf0, 0x00, 0x21} || p[1] != std::array<uint8_t, 3> {0x1d, 0x01, 0x01} ||
+                p[2] != std::array<uint8_t, 3> {0x3b, 0x00, note} || p[5][0] != 0xf7) continue;
+            out.push_back({uint8_t(p[3][0] | p[3][1] << 7), uint8_t(p[3][2] | p[4][0] << 7), uint8_t(p[4][1] | p[4][2] << 7)});
+            at += Lights::sysex_pieces - 1;
+        }
+        return out;
+    };
+    auto t0 = std::chrono::steady_clock::time_point {} + std::chrono::hours(1);
+
+    Lights lights;
+    lights.set_rgb(true);
+    lights.set_pad_fade(100);
+    lights.pad(0, colour::white);
+    CHECK(lights.update(collect) == 0); // the pad is the fade's, not a note
+    CHECK(lights.update_fades(collect, 1000, t0) == Lights::sysex_pieces);
+    auto first = frames(pad_note(0));
+    CHECK(first.size() == 1 && first[0].r == 0); // from black (nothing shown yet)
+    // Up in a quarter of the time (25 ms): white by then, and no more after.
+    for (int ms = 1; ms <= 30; ++ms) lights.update_fades(collect, 1000, t0 + milliseconds(ms));
+    auto up = frames(pad_note(0));
+    CHECK(up.size() >= 2 && up.size() <= 4);
+    CHECK(up.back().r == 255 && up.back().g == 255 && up.back().b == 255);
+    for (size_t n = 1; n < up.size(); ++n) CHECK(up[n].r >= up[n - 1].r); // only brighter
+    sent.clear();
+    CHECK(lights.update_fades(collect, 1000, t0 + milliseconds(200)) == 0); // there: quiet
+    // Down to off over the whole 100 ms, never brighter on the way.
+    lights.pad(0, colour::off);
+    for (int ms = 200; ms <= 320; ms += 5) lights.update_fades(collect, 1000, t0 + milliseconds(ms));
+    auto down = frames(pad_note(0));
+    CHECK(down.size() >= 6);
+    CHECK(down.front().r == 255 && down.back().r == 0 && down.back().g == 0 && down.back().b == 0);
+    for (size_t n = 1; n < down.size(); ++n) CHECK(down[n].r <= down[n - 1].r);
+    for (const auto& piece : sent) CHECK(piece[0] != 0x9f); // never a note on the way
+    // No room for a whole SysEx: nothing, rather than half of one.
+    sent.clear();
+    lights.pad(1, colour::white);
+    CHECK(lights.update_fades(collect, Lights::sysex_pieces - 1, t0 + milliseconds(400)) == 0 && sent.empty());
+    CHECK(lights.update_fades(collect, Lights::sysex_pieces, t0 + milliseconds(401)) == Lights::sysex_pieces);
+    // 117, black but not off: its note, at once.
+    sent.clear();
+    lights.pad(2, 117);
+    lights.update_fades(collect, 1000, t0 + milliseconds(500));
+    CHECK(std::count(sent.begin(), sent.end(), std::array<uint8_t, 3> {0x9f, pad_note(2), 117}) == 1);
+    CHECK(frames(pad_note(2)).empty());
+    // Every index fades, the darker rungs a lower brightness picks too
+    // (at MID white is 123, a dim colour its dark rung): none snaps by note.
+    {
+        Lights mid;
+        mid.set_rgb(true);
+        mid.set_pad_fade(250);
+        mid.set_brightness(1);
+        std::vector<std::array<uint8_t, 3>> got;
+        auto take = [&](const uint8_t* bytes) { got.push_back({bytes[0], bytes[1], bytes[2]}); return true; };
+        for (unsigned index = 1; index < 128; ++index) {
+            if (index == 117) continue;
+            mid.pad(0, uint8_t(index));
+            mid.update_fades(take, 1000, t0 + milliseconds(1000 * index));
+        }
+        unsigned notes = 0;
+        for (const auto& piece : got) notes += piece[0] == 0x9f;
+        CHECK(notes == 0 && got.size() >= 126 * Lights::sysex_pieces);
+        CHECK(led_rgb(123).r == 0x40 && led_rgb(122).r == 0xcc && led_rgb(0).r == 0 && led_rgb(127).r == 0xff);
+    }
+    // Fade off again: every pad goes again, by note.
+    lights.set_pad_fade(0);
+    sent.clear();
+    CHECK(lights.update_fades(collect, 1000, t0 + milliseconds(600)) == 0);
+    lights.update(collect, 256);
+    unsigned pad_notes = 0;
+    for (const auto& piece : sent) pad_notes += piece[0] == 0x9f && piece[1] >= pad_note(0) && piece[1] < pad_note(0) + 3;
+    CHECK(pad_notes == 3);
+    // Without RGB (JACK) the fade setting changes nothing: notes, at once.
+    Lights jack;
+    jack.set_pad_fade(250);
+    jack.pad(0, colour::white);
+    sent.clear();
+    CHECK(jack.update(collect) == 1 && jack.update_fades(collect, 1000, t0) == 0);
+    // The ring says how much it takes.
+    SpscRing<int, 8> ring;
+    CHECK(ring.room() == 7);
+    ring.push(1); ring.push(2);
+    CHECK(ring.room() == 5);
+    int item; ring.pop(item);
+    CHECK(ring.room() == 6);
+}
+
 void test_lights() {
     Lights lights;
     std::vector<std::array<uint8_t, 3>> sent;
@@ -165,6 +263,7 @@ void test_lights() {
     unsigned accepted = 0;
     CHECK(lights.update([&](const uint8_t*) { return accepted++ < 1; }) == 1);
     CHECK(lights.pending());
+    test_pad_fades();
     CHECK(nearest_colour({255, 0, 0}) == colour::red);
     CHECK(nearest_colour({0, 0, 0}) == colour::off);
     CHECK(nearest_colour({255, 255, 255}) == colour::white);

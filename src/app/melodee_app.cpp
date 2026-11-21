@@ -446,6 +446,7 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point now) {
     }
     // Holds that came due (a track button, Undo, Back held).
     for (const auto& use : gestures.tick(now)) act(use);
+    studio.pads_held = session().held_pads.load(std::memory_order_relaxed); // for the pads' lights
     if (gesture_open && now - gesture_at >= gesture_quiet) close_gesture(); // a knob left still: its turns are one step
     studio.loops().tick(now); // a clear pad held long enough, the Looper's refusals, its loops kept
     settle();
@@ -519,6 +520,7 @@ void MelodeeApp::settings_lights(move::Lights& lights, Clock::time_point now) {
     auto& studio = *own;
     const auto& settings = studio.settings;
     lights.set_brightness(settings.brightness);
+    lights.set_pad_fade(pad_fade_ms[std::min<unsigned>(settings.pad_fade, 3)]);
     Screen* top = studio.top();
     if (!top || top->screen_kind() != bindings::Screen::Play || holding() || studio.shift) return;
     if (!settings.light_show) {

@@ -4,6 +4,17 @@ Melodee for Ableton Move as Schwung's module catalog installs it
 (`melodee-move-module.tar.gz`). A version is `module/module.json`'s;
 `tools/release.sh` builds it and takes its release notes from here.
 
+## Unreleased
+
+- Pad lights fade. A pad going to a new colour (a press, a sound, a page
+  changing) now gets there smoothly through the Move's true RGB instead of
+  jumping between the palette's few shades: up in a quarter of Setup's PAD
+  FADE time, so a press still lights at once, and down over the whole of it.
+  PAD FADE was saved but did nothing before; its choices are now 150, 250
+  (the default), 400 and 600 ms.
+- On a kit, the last pad pressed now flashes white while held or sounding
+  and fades back to its own colour, bright, instead of staying white.
+
 ## 0.2.1 (2026-11-21)
 
 - A long sample streamed from the card no longer takes memory for the whole

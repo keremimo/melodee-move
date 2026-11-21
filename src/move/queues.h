@@ -26,6 +26,12 @@ public:
         read.store((tail + 1) & (Size - 1), std::memory_order_release);
         return true;
     }
+    // Producer: how many more items push() takes now (at least; the
+    // consumer may free more meanwhile).
+    size_t room() const {
+        size_t head = write.load(std::memory_order_relaxed), tail = read.load(std::memory_order_acquire);
+        return Size - 1 - ((head - tail) & (Size - 1));
+    }
     bool empty() const { return read.load(std::memory_order_acquire) == write.load(std::memory_order_acquire); }
 
 private:

@@ -181,7 +181,7 @@ std::vector<Screen> projects_screens() {
         }},
         {"setup-lights", "SETUP > LIGHTS", [](juce::Graphics& g) {
             sys::setup_list(g, "LGHT", "SETP",
-                            {{"PAD LIGHTS", "COLOUR"}, {"PAD FADE", "100 MS"}, {"BRIGHTNESS", "HIGH"}, {"LIGHT SHOW", "OFF"},
+                            {{"PAD LIGHTS", "COLOUR"}, {"PAD FADE", "250 MS"}, {"BRIGHTNESS", "HIGH"}, {"LIGHT SHOW", "OFF"},
                              {"SHOW STYLE", "PULSE"}},
                             3);
         }},

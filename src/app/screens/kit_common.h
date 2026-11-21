@@ -33,7 +33,9 @@ inline bool blink_on() {
 
 // The kit's pads (Kerem's rule for kit pad lights, docs/MOVE_CONTROLS.md):
 // a pad with a sample dim in its colour and bright while it sounds, the last
-// pad white, a muted pad dark grey (the Move's dim white), an empty one off;
+// pad bright in its colour (white while held or sounding, so a press flashes
+// and fades back to it: Kerem, 2026-11-21), a muted pad dark grey (the
+// Move's dim white), an empty one off;
 // `blinking` (a kit pad, or -1) blinks white. With 16 Pitches the right 16
 // are the last pad's pitches: the key's roots in the track's colour, its
 // other notes light grey.
@@ -52,7 +54,10 @@ inline void kit_pads(const Studio& studio, move::Lights& lights, int blinking = 
         const auto& sound = track.pads[unsigned(kit)];
         uint8_t shown = colour::off;
         if (kit == blinking) shown = blink_on() ? colour::white : sound.used() ? pad_colour(studio, sound, false) : colour::off;
-        else if (unsigned(kit) == studio.pad()) shown = sound.used() ? colour::white : colour::dark_grey;
+        else if (unsigned(kit) == studio.pad()) {
+            bool lit = (studio.pads_held >> at & 1) || sounding[unsigned(kit)];
+            shown = lit ? colour::white : sound.used() ? pad_colour(studio, sound, true) : colour::dark_grey;
+        }
         else if (!sound.used()) shown = colour::off;
         else if (track.pad_muted(unsigned(kit))) shown = colour::dark_grey;
         else shown = pad_colour(studio, sound, sounding[unsigned(kit)]);

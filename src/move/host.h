@@ -25,7 +25,7 @@ struct MidiIn {
     bool external = false;
     uint64_t timestamp_ns = 0;
 };
-using LedMessage = std::array<uint8_t, 3>; // as Lights writes them, channel 16
+using LedMessage = std::array<uint8_t, 3>; // as Lights writes them, channel 16, or a piece of an LED SysEx
 
 class Host {
 public:
@@ -40,6 +40,8 @@ public:
     virtual bool alive() const = 0;
     // Lets the last lights and a blank screen out, then stops, within `limit`.
     virtual void finish(std::chrono::milliseconds limit) = 0;
+    // Whether `leds` may carry the RGB LED SysEx (move/lights.h), in pieces.
+    virtual bool rgb_leds() const { return false; }
 
     int wake_descriptor() const { return wake_fd; }
     SpscRing<MidiIn, 1024> midi_in;

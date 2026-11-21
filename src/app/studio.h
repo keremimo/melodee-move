@@ -142,7 +142,7 @@ struct Settings {
     uint8_t response = 1;    // pad response: 0 soft, 1 medium, 2 hard, 3 full level
     bool pressure = true;    // pad pressure reaches the modules
     uint8_t pad_lights = 0;  // 0 the tracks' colours, 1 white, 2 off
-    uint8_t pad_fade = 1;    // 60, 100, 150, 250 ms: how fast a pad's light fades
+    uint8_t pad_fade = 1;    // 150, 250, 400, 600 ms: how long a pad's light takes to fade down
     uint8_t brightness = 3;  // the lights: 0 low, 1 mid, 2 high, 3 max (the Move's four)
     bool light_show = false;
     uint8_t show_style = 0;  // Pulse, Sweep, Chase, Ripple, Levels
@@ -154,7 +154,7 @@ struct Settings {
                usage_log == o.usage_log && start == o.start;
     }
 };
-constexpr unsigned pad_fade_ms[4] {60, 100, 150, 250};
+constexpr unsigned pad_fade_ms[4] {150, 250, 400, 600};
 constexpr const char* show_styles[5] {"PULSE", "SWEEP", "CHASE", "RIPPLE", "LEVELS"};
 class SongDesk;
 class Sampling;
@@ -347,6 +347,9 @@ public:
     unsigned options_track = 0; // whose options Shift + a track button opened
     // How the Move is doing, for Setup's About (MelodeeApp fills it from the runtime's session).
     struct Machine { float cpu_percent = 0; unsigned peak_us = 0; unsigned late = 0; std::string version; } machine;
+    // The pads held, bit n pad n (physical), as the runtime saw them when
+    // the lights were last asked for (MelodeeApp::lights()). For the lights.
+    uint32_t pads_held = 0;
     unsigned slow_calls = 0; // calls into a module that held the audio thread 1 ms or more
     uint32_t slowest_us = 0;
 

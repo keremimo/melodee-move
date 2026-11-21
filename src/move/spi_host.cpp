@@ -42,6 +42,7 @@ public:
     }
 
     const char* name() const override { return "spi"; }
+    bool rgb_leds() const override { return true; }
 
     void start() override {
         session.rate = spi::audio_rate;
@@ -124,8 +125,14 @@ private:
             session.midi_out.fetch_add(midi_count, std::memory_order_relaxed);
             LedMessage led;
             while (count < spi::midi_out_slots && leds.pop(led)) {
-                const uint8_t bytes[3] {uint8_t(led[0] & 0xf0), led[1], led[2]};
-                if (uint32_t packet = spi::usb_midi_packet(spi::cable_controls, bytes, 3)) packets[count++] = packet;
+                uint32_t packet;
+                if (led[0] >= 0x80 && led[0] < 0xf0) { // a light: note or CC
+                    const uint8_t bytes[3] {uint8_t(led[0] & 0xf0), led[1], led[2]};
+                    packet = spi::usb_midi_packet(spi::cable_controls, bytes, 3);
+                } else { // a piece of an LED SysEx: three bytes, or its F7 alone
+                    packet = spi::usb_midi_out_packet(spi::cable_controls, led.data(), led[0] == 0xf7 ? 1 : 3);
+                }
+                if (packet) packets[count++] = packet;
             }
             spi::write_midi_out(page, packets.data(), count);
             session.leds_sent.fetch_add(count - midi_count, std::memory_order_relaxed);

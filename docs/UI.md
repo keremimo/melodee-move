@@ -361,7 +361,8 @@ the screens were built; the screens are `src/app/screens/kit_play.cpp`,
 
 **Kit lights** (Kerem's rule, 2026-11-20): a pad with a sample dim in its
 colour (COLOUR, an MPC kit's own, or the track's), bright while it sounds (the
-engine's voice taps); the last pad white; a muted pad dark grey (the Move's dim
+engine's voice taps); the last pad bright in its colour, white while held
+or sounding; a muted pad dark grey (the Move's dim
 white); an empty pad off; a pad waiting (the copy's first, the pad a sample
 loads onto) blinks white. With 16 Pitches the right 16 light the key's roots
 in the track's colour and its other notes light grey. Copy is bright while
@@ -777,7 +778,9 @@ sheet (`src/ui/mockups_projects.cpp`); the screens draw with the same code
   red), the steps digits; Back deletes, held cancels; Shift is upper case.
   The rail says `NAME`, the case, and how much of the room the name takes.
 - **Setup** (Shift + Step 2): PADS (response soft, medium, hard, full;
-  pressure), LIGHTS (pad lights colour, white, off; pad fade; brightness
+  pressure), LIGHTS (pad lights colour, white, off; pad fade, 150 to 600 ms, how long a pad takes
+  to fade down to its new colour, a quarter of that on the way up, through the
+  Move's true RGB; brightness
   low to max, as the Move's; the light show and its style: Pulse, Sweep,
   Chase, Ripple, Levels, in time with the tempo), MIDI and SYNC (move-midi),
   WEB PAGE (move-web), USAGE LOG, ABOUT (the audio cycle's share and

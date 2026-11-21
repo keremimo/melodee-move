@@ -12,6 +12,7 @@
 #include "move/controls.h"
 #include "move/lights.h"
 #include "move/tools.h"
+#include "ui/track_style.h"
 #include <algorithm>
 #include <chrono>
 #include <cstdlib>
@@ -148,9 +149,19 @@ void test_kit_and_chop() {
         CHECK(play(16) == 0); // the left bank's third row: A09, empty
         CHECK(play(4) > to_s32(0.05f));
         CHECK(has(melodee.status(), "pad=B01"));
-        // The lights: B01, the last pad, white where it lies; A01 (physical 0) dark.
+        // The lights: B01, the last pad, bright in its colour where it lies,
+        // white while held (a press flashes, then fades back to it); A01
+        // (physical 0) dark.
         auto lit = pad_lights(melodee);
-        CHECK(lit[4] == colour::white);
+        CHECK(lit[4] == colour::white || !melodee.studio().sounding()[16]); // white while it still sounds
+        for (int block = 0; block < 20000 && melodee.studio().sounding()[16]; ++block) { out.fill(0); melodee.render(in, out); }
+        lit = pad_lights(melodee);
+        uint8_t marker = ui::track_colour(melodee.studio().track()).bright;
+        CHECK(lit[4] == marker && marker != colour::white);
+        session.held_pads = 1u << 4;
+        CHECK(pad_lights(melodee)[4] == colour::white);
+        session.held_pads = 0;
+        CHECK(pad_lights(melodee)[4] == marker);
         CHECK(lit[16] == colour::off);
         CHECK(lit[0] == colour::off);
         // A pad picked quietly (Shift + pad) by its number too: physical 9 is A06.

@@ -31,6 +31,30 @@ constexpr PaletteEntry palette[] {
     {116, 0x1a0f18}, {125, 0x0000ff}, {126, 0x00ff00}, {127, 0xff0000},
 };
 
+// Every palette index's colour, so every index a light can ask for fades:
+// the documented ones above; the darker rungs they leave out (colour k's dim
+// at 63 + 2k, dark at 64 + 2k) as colour k scaled to the listed rungs' own
+// peaks, #4D and #1A; the greys' ramp (122 #CCCCCC, 123 #404040); the few
+// pastels left from Schwung's shared/constants.mjs (THIRD_PARTY.md).
+constexpr uint32_t led_colours[128] {
+    0x000000, 0xff2424, 0xf23a0c, 0xff9900, 0xa68956, 0xedf95a, 0xc19d08, 0xffff00,
+    0x56bf13, 0x2c8403, 0x246b24, 0x19ff30, 0x159573, 0x176b50, 0x00ffff, 0x0074fc,
+    0x274fcc, 0x00448c, 0x644ad9, 0x4d3fa0, 0x8700ff, 0xe657e3, 0x660099, 0xff0099,
+    0xa14c5f, 0xff4dc4, 0xeb8be1, 0xa63421, 0x995628, 0x876700, 0x90821f, 0x4a8700,
+    0x007f12, 0x1853b2, 0x624bad, 0x733a67, 0xf8bcaf, 0xff9b76, 0xffbf5f, 0xd9af71,
+    0xfff480, 0xbfba69, 0xbccc88, 0xaeff99, 0x7cdd9f, 0x89b47d, 0x80f3ff, 0x7acefc,
+    0x68a1d3, 0x858fc2, 0xbbaaf2, 0xcdbbe4, 0xef8bb0, 0x859d8c, 0x6b756e, 0x84909b,
+    0x6a7075, 0x88859d, 0x6c6a75, 0x9d859c, 0x746a74, 0x9c9d85, 0x74756a, 0x9d8484,
+    0x756a6a, 0x4d0b0b, 0x1a0404, 0x4d1204, 0x1a0601, 0x4d2e00, 0x1a1000, 0x4d4028,
+    0x1a150d, 0x4d491f, 0x1a180a, 0x403302, 0x1a1501, 0x4d4d00, 0x1a1a00, 0x1c4007,
+    0x0b1a03, 0x113301, 0x091a01, 0x113311, 0x091a09, 0x0a4d0a, 0x031a05, 0x073327,
+    0x041a14, 0x104d39, 0x030d0a, 0x004d4d, 0x001a1a, 0x00234d, 0x000c1a, 0x0c1940,
+    0x050a1a, 0x00254d, 0x000d1a, 0x231a4d, 0x0c091a, 0x251e4d, 0x0c0a1a, 0x29004d,
+    0x0d001a, 0x4d1d4c, 0x1a0a19, 0x33004d, 0x11001a, 0x4d002e, 0x1a000f, 0x4d242d,
+    0x1a0c0f, 0x4d173b, 0x1a0814, 0x4d2d49, 0x1a0f18, 0x000000, 0x595959, 0x1a1a1a,
+    0xffffff, 0x595959, 0xcccccc, 0x404040, 0x1a1a1a, 0x0000ff, 0x00ff00, 0xff0000,
+};
+
 Rgb unpack(uint32_t rgb) { return {uint8_t(rgb >> 16), uint8_t(rgb >> 8), uint8_t(rgb)}; }
 
 // A light made dimmer goes down its own colour's rungs and no other: the
@@ -88,6 +112,8 @@ uint8_t nearest_colour(Rgb rgb) {
     }
     return best;
 }
+
+Rgb led_rgb(uint8_t index) { return unpack(led_colours[index & 127]); }
 
 Rgb palette_rgb(uint8_t index) {
     for (const auto& entry : palette)
@@ -149,8 +175,56 @@ void Lights::button(Button button, uint8_t value) {
 }
 
 void Lights::clear_all() {
+    set_pad_fade(0); // off at once, by note, as every other light
     note_want.fill(0); cc_want.fill(0);
     note_sent.fill(unset); cc_sent.fill(unset);
+}
+
+void Lights::set_rgb(bool on) {
+    if (on == rgb) return;
+    bool was = fading();
+    rgb = on;
+    if (was != fading()) resend_pads();
+}
+
+void Lights::set_pad_fade(unsigned milliseconds) {
+    if (milliseconds == fade_ms) return;
+    bool was = fading();
+    fade_ms = milliseconds;
+    if (was != fading()) resend_pads();
+}
+
+// Fading turned on or off: every pad again, the new way, so none stays
+// halfway through a fade the other path knows nothing of.
+void Lights::resend_pads() {
+    for (unsigned at = 0; at < pad_count; ++at) note_sent[pad_note(at)] = unset;
+    fades.fill(Fade {});
+}
+
+// From what the pad shows now (black when unknown: it has just been lit by
+// a note, or never) to `to`, faster on the way up.
+void Lights::start_fade(Fade& fade, Rgb to, Time now) {
+    Rgb from = fade.active ? fade_at(fade, now) : fade.known ? fade.now : Rgb {};
+    auto sum = [](Rgb c) { return unsigned(c.r) + c.g + c.b; };
+    unsigned ms = sum(to) > sum(from) ? std::max(fade_ms / 4, 15u) : fade_ms;
+    fade.from = from; fade.to = to; fade.now = from;
+    fade.start = now; fade.end = now + std::chrono::milliseconds(ms);
+    fade.owed = true;
+    fade.active = true; fade.known = true;
+}
+
+// Where a fade is at `now`: eased (smoothstep), each channel interpolated in
+// light (squared) so a fade down does not drop to dark too soon.
+Rgb Lights::fade_at(Fade& fade, Time now) {
+    if (now >= fade.end) return fade.now = fade.to;
+    double t = std::chrono::duration<double>(now - fade.start).count() / std::chrono::duration<double>(fade.end - fade.start).count();
+    t = std::clamp(t, 0.0, 1.0);
+    t = t * t * (3 - 2 * t);
+    auto mix = [t](uint8_t a, uint8_t b) {
+        double la = double(a) * a, lb = double(b) * b;
+        return uint8_t(std::lround(std::sqrt(la + (lb - la) * t)));
+    };
+    return fade.now = Rgb {mix(fade.from.r, fade.to.r), mix(fade.from.g, fade.to.g), mix(fade.from.b, fade.to.b)};
 }
 
 bool Lights::pending() const {
