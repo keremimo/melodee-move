@@ -302,8 +302,7 @@ Three parts so far:
 Not yet: Record, locks and Motion on a Schwung module's own parameters, auto sampling an
 instrument outside (MIDI out and the line in at once); docs/PARITY.md has the rest.
 Song's own: typed marker names, punches written into the song (with Pad
-FX), `melodee-print` over SSH (with the remote channel), freezing from the
-patterns grid (with Session).
+FX), freezing from the patterns grid (with Session).
 
 ### How a Schwung module is hosted
 

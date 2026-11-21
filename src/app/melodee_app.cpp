@@ -710,6 +710,17 @@ std::string MelodeeApp::command(const std::string& line) {
         std::lock_guard<std::mutex> guard(own->lock);
         return own->midi.command(*own, line.substr(std::min<size_t>(line.size(), 13)));
     }
+    // melodee-print, melodee-freeze, melodee-unfreeze WORDS: Print and freeze (src/app/prints.h).
+    for (std::string name : {"melodee-print", "melodee-freeze", "melodee-unfreeze"})
+        if (line.compare(0, name.size(), name) == 0 && (line.size() == name.size() || line[name.size()] == ' ')) {
+            std::lock_guard<std::mutex> guard(own->lock);
+            return own->song_desk().printer().command(name, line.substr(name.size()));
+        }
+    // melodee-autosample TRACK [LOW-HIGH] ...: the auto sampler, as Melodee takes it (src/app/auto_sampler.h).
+    if (line.compare(0, 18, "melodee-autosample") == 0) {
+        std::lock_guard<std::mutex> guard(own->lock);
+        return own->autosample_command(line.substr(std::min<size_t>(line.size(), 19)));
+    }
     return {};
 }
 

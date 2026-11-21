@@ -424,8 +424,8 @@ Kerem has checked it there. `n/a` rows have no box.
 | **`melodee-render`**: render workers off or on (MELODEE.md › Remote) | done | `melodee-move --ctl 'melodee-render serial|parallel'` | [ ] |
 | **`melodee-looper`** (MELODEE.md › Remote) | looper | a command over SSH | [ ] |
 | **`melodee-midi`**: a message into the input; panic (MELODEE.md › Remote) | done | `melodee-move --ctl 'melodee-midi HEX...'` and `--ctl 'melodee-midi panic'`, the runtime's control socket, over SSH | [ ] |
-| **`melodee-print`, `melodee-freeze`, `melodee-unfreeze`** (MELODEE.md › Print and freeze) | song & export | Printer::command() answers them (tested); waits for the Move's remote channel (melodee-press, MIDI & sync & undo & projects) | [ ] |
-| **`melodee-autosample`** (MELODEE.md › Print and freeze) | instruments | its words are read (Studio::autosample_command, as Melodee takes them); the command over SSH waits for the runtime's remote channel (MIDI & sync & undo & projects: `melodee-move --ctl`) | [ ] |
+| **`melodee-print`, `melodee-freeze`, `melodee-unfreeze`** (MELODEE.md › Print and freeze) | done | `melodee-move --ctl 'melodee-print 2 A1,A2'` (and freeze, unfreeze) over SSH: the runtime's control socket, Printer::command() | [ ] |
+| **`melodee-autosample`** (MELODEE.md › Print and freeze) | done | `melodee-move --ctl 'melodee-autosample 2 36-84 step 3'` over SSH: the runtime's control socket, Studio::autosample_command (as Melodee takes its words) | [ ] |
 | **`melodee-usb-input`** (MELODEE.md › Remote) | n/a | no USB audio | — |
 | **`card-share`** (MELODEE.md › Remote) | n/a | no card | — |
 | **Page previews** `--melodee-preview` (MELODEE.md › Previews) | done | `--melodee-previews`, `--ui-mockups` | [ ] |
@@ -489,13 +489,13 @@ sections, each on Shift + Step n.
 
 | Status | Rows |
 | --- | --- |
-| `done` | 265 |
+| `done` | 267 |
 | `sequencer` | 4 |
 | `sampling` | 0 |
 | `kit depth` | 2 |
-| `instruments` | 2 |
+| `instruments` | 1 |
 | `mixer & effects` | 2 |
-| `song & export` | 2 |
+| `song & export` | 1 |
 | `looper` | 1 |
 | `MIDI & sync & undo & projects` | 2 |
 | `web page` | 11 |
