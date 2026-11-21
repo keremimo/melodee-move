@@ -69,7 +69,10 @@ public:
     uint8_t pad_wanted(unsigned index) const;
     uint8_t step_wanted(unsigned index) const;
     // How bright the lights go out, as the Move's Setup: 0 low, 1 mid, 2
-    // high, 3 max (as asked). Everything is sent again at the new level.
+    // high, 3 max (as asked). Everything is sent again at the new level. A
+    // pad or RGB button keeps its colour: it goes to the palette's darker
+    // version of that colour, or stays as it is where there is none. Play,
+    // Rec and Sampling stay as asked.
     void set_brightness(uint8_t level);
 
 private:
@@ -79,8 +82,9 @@ private:
     uint8_t brightness = 3;
     std::array<uint8_t, 128> dimmed {};  // each palette index at the brightness
     std::array<bool, 128> cc_rgb {};     // a CC whose LED takes a palette index, not a brightness
+    std::array<bool, 128> cc_kept {};    // a CC shown as asked at every brightness (Play, Rec, Sampling)
     uint8_t shown(bool note, uint8_t number, uint8_t want) const {
-        if (brightness >= 3 || !want) return want;
+        if (brightness >= 3 || !want || (!note && cc_kept[number])) return want;
         if (note || cc_rgb[number]) return dimmed[want & 127];
         return uint8_t(want * (brightness + 1) / 4); // a white LED's brightness
     }

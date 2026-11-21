@@ -22,6 +22,8 @@
 #include "melodee/engine/engine_info.h"
 #include "melodee/engine/sampler.h"
 #include "melodee/model/scales.h"
+#include <algorithm>
+#include <iterator>
 #include <atomic>
 #include <chrono>
 #include <filesystem>
@@ -134,6 +136,41 @@ void test_lights() {
     CHECK(nearest_colour({0, 0, 0}) == colour::off);
     CHECK(nearest_colour({255, 255, 255}) == colour::white);
     CHECK(nearest_colour({1, 1, 1}) != colour::off);
+    // Brightness keeps each light's colour: it goes down that colour's own
+    // rungs (colour k's dim at 63 + 2k, dark at 64 + 2k; the greys' ramp),
+    // or stays as it is where there are none, never to another colour.
+    auto shown = [](uint8_t level, uint8_t index, Button button = Button::Count) {
+        Lights dim;
+        dim.set_brightness(level);
+        if (button == Button::Count) dim.pad(0, index);
+        else dim.button(button, index);
+        uint8_t value = 0;
+        dim.update([&](const uint8_t* bytes) { value = bytes[2]; return true; });
+        return value;
+    };
+    CHECK(shown(3, colour::bright_red) == colour::bright_red);
+    CHECK(shown(2, colour::bright_red) == 65 && shown(1, colour::bright_red) == 65 && shown(0, colour::bright_red) == 66);
+    CHECK(shown(1, colour::orange) == 69 && shown(0, colour::orange) == 70); // the palette's unlisted ones
+    CHECK(shown(1, colour::cyan) == 91 && shown(0, colour::cyan) == 92);
+    CHECK(shown(1, colour::azure) == 93 && shown(0, colour::azure) == 94);
+    CHECK(shown(1, 65) == 66 && shown(0, 66) == 66); // a dim one darker; a dark one as it is
+    CHECK(shown(1, colour::white) == 123 && shown(0, colour::white) == colour::dark_grey);
+    CHECK(shown(0, colour::light_grey) == colour::dark_grey && shown(0, colour::dark_grey) == colour::dark_grey);
+    CHECK(shown(0, colour::green) == colour::green && shown(0, 47) == 47); // no darker version
+    CHECK(shown(0, colour::light_grey, Button::Row1) == colour::dark_grey); // a track button dims
+    // Play, Rec and Sampling keep their colours, as on the Move.
+    CHECK(shown(0, colour::green, Button::Play) == colour::green && shown(1, colour::dark_grey, Button::Play) == colour::dark_grey);
+    CHECK(shown(0, colour::red, Button::Rec) == colour::red && shown(0, colour::light_grey, Button::Sample) == colour::light_grey);
+    auto rung = [](unsigned from, unsigned to) {
+        if (to == from) return true;
+        if (from >= 1 && from <= 26) return to == 63 + 2 * from || to == 64 + 2 * from;
+        if (from >= 65 && from <= 116 && from % 2) return to == from + 1;
+        const unsigned greys[] {120, 122, 118, 123, 124};
+        auto at = [&](unsigned index) { return std::find(std::begin(greys), std::end(greys), index) - std::begin(greys); };
+        return at(from) < 5 && at(to) < 5 && at(to) > at(from);
+    };
+    for (uint8_t level = 0; level < 3; ++level)
+        for (unsigned n = 1; n < 128; ++n) CHECK(rung(n, shown(level, uint8_t(n))));
 }
 
 void test_display() {

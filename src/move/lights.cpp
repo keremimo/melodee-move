@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "move/lights.h"
 #include <algorithm>
+#include <cmath>
+#include <iterator>
 #include <limits>
 
 namespace move {
@@ -31,6 +33,45 @@ constexpr PaletteEntry palette[] {
 
 Rgb unpack(uint32_t rgb) { return {uint8_t(rgb >> 16), uint8_t(rgb >> 8), uint8_t(rgb)}; }
 
+// A light made dimmer goes down its own colour's rungs and no other: the
+// palette's darker rows are colours 1-26 again, colour k's dim version at
+// 63 + 2k and its dark one at 64 + 2k, about a third and a tenth as bright
+// (Schwung's shared/constants.mjs lists every pair; ours lists most). Other
+// palette colours bear no darker version of themselves and stay as they
+// are; neighbouring entries of a like hue are other colours on the Move.
+struct Rung { uint8_t index; float level; };
+constexpr float dim_level = 0.35f, dark_level = 0.12f;
+// The greys, as Schwung's white ramp: white, 122 (#CCCCCC), light grey,
+// 123 (#404040), dark grey.
+constexpr Rung greys[] {{120, 1.0f}, {122, 0.8f}, {118, 0.35f}, {123, 0.25f}, {124, 0.08f}};
+
+// The index that shows `index` at `scale` of its brightness: of its own
+// rungs from it down, the one nearest that (by ratio).
+uint8_t dimmed_colour(uint8_t index, float scale) {
+    Rung rungs[std::size(greys)] {};
+    size_t count = 0;
+    if (index >= 1 && index <= 26) {
+        rungs[count++] = {index, 1.0f};
+        rungs[count++] = {uint8_t(63 + 2 * index), dim_level};
+        rungs[count++] = {uint8_t(64 + 2 * index), dark_level};
+    } else if (index >= 65 && index <= 116 && index % 2) {
+        rungs[count++] = {index, dim_level};
+        rungs[count++] = {uint8_t(index + 1), dark_level};
+    } else {
+        for (const auto& grey : greys)
+            if (count || grey.index == index) rungs[count++] = grey;
+    }
+    if (count < 2) return index; // a dark rung, or no darker version
+    float target = rungs[0].level * scale;
+    uint8_t best = index;
+    float best_distance = std::numeric_limits<float>::max();
+    for (size_t n = 0; n < count; ++n) {
+        float distance = std::fabs(std::log(rungs[n].level / target));
+        if (distance < best_distance) { best_distance = distance; best = rungs[n].index; }
+    }
+    return best;
+}
+
 } // namespace
 
 uint8_t nearest_colour(Rgb rgb) {
@@ -59,6 +100,10 @@ Lights::Lights() {
     cc_want.fill(unset); cc_sent.fill(unset);
     for (const auto& info : buttons)
         if (info.led == LedKind::Rgb) cc_rgb[info.cc & 127] = true;
+    // Play, Rec and Sampling keep their colours at every brightness, as on
+    // the Move: green, red and dim white have no darker versions of
+    // themselves, and a transport light in another colour reads as another state.
+    for (Button kept : {Button::Play, Button::Rec, Button::Sample}) cc_kept[button_cc(kept)] = true;
     for (unsigned n = 0; n < 128; ++n) dimmed[n] = uint8_t(n);
 }
 
@@ -78,13 +123,10 @@ void Lights::set_brightness(uint8_t level) {
     level = std::min<uint8_t>(level, 3);
     if (level == brightness) return;
     brightness = level;
-    static const float scale[4] {0.25f, 0.5f, 0.75f, 1.0f};
-    for (unsigned n = 0; n < 128; ++n) {
-        auto rgb = palette_rgb(uint8_t(n));
-        auto down = [&](uint8_t c) { return uint8_t(float(c) * scale[level]); };
-        dimmed[n] = n ? nearest_colour({down(rgb.r), down(rgb.g), down(rgb.b)}) : 0;
-        if (n && !dimmed[n]) dimmed[n] = uint8_t(n); // never out altogether: a dim colour stays lit
-    }
+    // A quarter, a half and three quarters as the eye sees them: the LEDs'
+    // light to the power 2.2.
+    static const float scale[4] {0.047f, 0.218f, 0.531f, 1.0f};
+    for (unsigned n = 0; n < 128; ++n) dimmed[n] = dimmed_colour(uint8_t(n), scale[level]);
     note_sent.fill(unset); // everything again, at the new level
     cc_sent.fill(unset);
 }

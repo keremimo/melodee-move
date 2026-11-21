@@ -492,6 +492,7 @@ Not checked by the tests: they follow from the screens.
 | Rec | Dim when it can record, flashing in the count-in, solid red recording, dark when it cannot | The same | done |
 | Sampling | Pulses red in Sampling Mode | Red in Sampling Mode, pulsing while it records; dim where it can record (a kit or audio track) | done |
 | Capture | Lit while there is something to keep, dark once cleared | The same | done |
+| Brightness (Setup) | The lights dimmer; Play, Rec and Sampling keep their colours | Pads, steps and track buttons go down their own colour's darker versions (the palette's dim and dark rows, the greys' ramp), or stay where a colour has none; white lights dimmer; Play, Rec and Sampling as they are | done |
 | Steps, Mixer | No Mixer | The sixteen tracks: each its colour, the selected one white, a muted one grey, a soloed one blue, an empty one dark | done |
 | Pads, Knob FX | No Knob FX | A kit's pads with Knob FX white, the rest dim; the steps the tracks with it bright | done |
 | Pads, Pad FX | No Pad FX | The MPC's sixteen orange, Melodee's cyan, a sounding one white; the steps where the kept punches fall | done |
