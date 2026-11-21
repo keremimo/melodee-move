@@ -67,6 +67,7 @@ public:
     struct Frame {
         std::string key;
         std::vector<std::string> keys;
+        int x = 0, y = 0; // where the band starts (info.x, info.y)
         int width = CanvasPage::width, height = CanvasPage::height;
     };
     // The page on the screen, `values` its knobs' and extra_keys' values.

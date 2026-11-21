@@ -332,6 +332,8 @@ void CanvasPage::draw(juce::Graphics& g, const std::map<std::string, std::string
     JS_SetPropertyStr(context, info, "key", JS_NewStringLen(context, frame.key.data(), frame.key.size()));
     JS_SetPropertyStr(context, info, "state", JS_DupValue(context, engine->state));
     JS_SetPropertyStr(context, info, "nowMs", JS_NewFloat64(context, double(juce::Time::currentTimeMillis())));
+    JS_SetPropertyStr(context, info, "x", JS_NewInt32(context, frame.x));
+    JS_SetPropertyStr(context, info, "y", JS_NewInt32(context, frame.y));
     JS_SetPropertyStr(context, info, "width", JS_NewInt32(context, frame.width));
     JS_SetPropertyStr(context, info, "height", JS_NewInt32(context, frame.height));
     JS_SetPropertyStr(context, info, "touched", JS_NewInt32(context, -1));

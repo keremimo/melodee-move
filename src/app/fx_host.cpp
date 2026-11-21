@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "app/fx_host.h"
+#include <juce_core/juce_core.h>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -49,6 +50,13 @@ SynthFile fx_state(const FxModule& fx) {
     state.preset = fx.module->preset_param.empty() ? -1 : fx.module->preset;
     for (const auto& param : fx.module->params)
         if (param.key != fx.module->preset_param && !param.trigger()) state.values.emplace_back(param.key, param.text());
+    if (fx.schwung_pages) { // its drawn pages' state, a page each
+        auto states = juce::JSON::parse(juce::String(fx.schwung_pages->page_states()));
+        if (auto* object = states.getDynamicObject())
+            for (const auto& property : object->getProperties())
+                if (auto text = property.value.toString().toStdString(); text != "{}" && !text.empty())
+                    state.pages.emplace_back(property.name.toString().toStdString(), text);
+    }
     return state;
 }
 

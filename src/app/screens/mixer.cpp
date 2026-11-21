@@ -417,7 +417,7 @@ public:
         auto all = items();
         focus = std::min(focus, int(all.size()) - 1);
         const Entry& at = all[size_t(focus)];
-        if (at.kind == Entry::Effect && fx.job(at.item, job, use)) return true;
+        if (at.kind == Entry::Effect && fx.job(at.item, job, use)) { focus += fx.take_moved(); return true; }
         switch (job) {
         case Job::Focus: focus = std::clamp(focus + (use.delta > 0 ? 1 : -1), 0, int(all.size()) - 1); return true;
         case Job::TurnKnob: case Job::TurnKnobFine: turn(at, unsigned(use.index), use.delta); return true;

@@ -82,9 +82,9 @@ bool DeviceFx::job(const Item& item, Job job, const bindings::Use& use) {
         if (item.plus) return true;
         bool fine = job == Job::TurnKnobFine;
         unsigned which = unsigned(use.index);
-        if (fx) {
-            if (!fx->module || fx->page >= fx->module->pages.size()) return true;
-            const auto& keys = fx->module->pages[fx->page].knobs;
+        if (fx) { // its box's knobs, as on Schwung's chain editor
+            if (!fx->module) return true;
+            auto keys = fx->module->chain_knobs();
             ModuleParam* param = which < keys.size() ? fx->module->param(keys[which]) : nullptr;
             if (!param || param->trigger()) return true;
             param->turn(use.delta, fine);
@@ -96,20 +96,34 @@ bool DeviceFx::job(const Item& item, Job job, const bindings::Use& use) {
         else if (which == 6 && melodee::fx_keyable(slot.kind)) mixing::turn_key(studio, item.chain, item.slot, use.delta);
         return true;
     }
-    case Job::Page: // a Schwung effect's pages
-        if (fx && fx->module && !fx->module->pages.empty())
-            fx->page = unsigned(std::clamp(int(fx->page) + (use.delta > 0 ? 1 : -1), 0, int(fx->module->pages.size()) - 1));
+    case Job::Page: // Shift + the wheel on a Schwung effect: moved along the chain, as Schwung's Shift + jog
+        if (fx && !item.plus) {
+            int way = use.delta > 0 ? 1 : -1;
+            mixing::move_effect(studio, item.chain, item.slot, way);
+            int to = int(item.slot) + way;
+            if (to >= 0 && unsigned(to) < mixing::slots(studio, item.chain)) {
+                const auto& there = mixing::slot(studio, item.chain, unsigned(to));
+                if (there.kind == uint8_t(EffectKind::Plugin) && uint8_t(there.params[0]) == fx->entry) moved += way; // the selection follows it
+            }
+        }
         return true;
     case Job::OpenBrowser:
+        if (fx && fx->module) { // into its pages (screens/module_pages.cpp), as Schwung's click on a box
+            studio.desk.chain = item.chain; // where Swap Module puts the next (fx-browser)
+            studio.desk.slot = item.slot;
+            studio.pages_target = {studio.track(), fx->entry};
+            studio.push("module-pages");
+            return true;
+        }
         studio.desk.chain = item.chain;
         studio.desk.slot = item.slot;
         studio.push("fx-browser");
         return true;
-    case Job::SampleOptions: case Job::ModuleMenu: // Shift + push: its options
+    case Job::SampleOptions: case Job::ModuleMenu: // Shift + push: its options; a Schwung effect swapped, as Schwung's Shift + click
         if (item.plus) { studio.say("PUSH: BROWSE"); return true; }
         studio.desk.chain = item.chain;
         studio.desk.slot = item.slot;
-        studio.push("fx-options");
+        studio.push(fx ? "fx-browser" : "fx-options");
         return true;
     case Job::BypassEffect:
         if (!item.plus) {
@@ -155,11 +169,11 @@ void DeviceFx::draw(juce::Graphics& g, const Item& item) const {
             return;
         }
         auto& module = *fx->module;
-        const ModulePage* page = fx->page < module.pages.size() ? &module.pages[fx->page] : nullptr;
+        auto keys = module.chain_knobs(); // its box's knobs; the push enters its pages
         title = upper(module.info().name);
-        right = std::to_string(fx->page + 1) + "/" + std::to_string(std::max<size_t>(1, module.pages.size()));
-        for (unsigned n = 0; page && n < page->knobs.size() && n < 8; ++n)
-            if (const ModuleParam* param = module.param(page->knobs[n])) {
+        right = mixing::slot(studio, item.chain, item.slot).bypass ? "BYPASS" : "";
+        for (unsigned n = 0; n < keys.size() && n < 8; ++n)
+            if (const ModuleParam* param = module.param(keys[n])) {
                 names[n] = cell_name(*param);
                 values[n] = float(param->fraction());
             }
@@ -190,8 +204,8 @@ void DeviceFx::draw(juce::Graphics& g, const Item& item) const {
 Knob DeviceFx::knob(const Item& item, unsigned which) const {
     if (item.plus) return {};
     if (FxModule* fx = schwung(item)) {
-        if (!fx->module || fx->page >= fx->module->pages.size()) return {};
-        const auto& keys = fx->module->pages[fx->page].knobs;
+        if (!fx->module) return {};
+        auto keys = fx->module->chain_knobs();
         const ModuleParam* param = which < keys.size() ? fx->module->param(keys[which]) : nullptr;
         if (!param) return {};
         return {upper(param->name).substr(0, 16), upper(param->shown()).substr(0, 12), float(param->fraction())};

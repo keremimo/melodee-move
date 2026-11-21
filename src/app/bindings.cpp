@@ -188,6 +188,8 @@ std::vector<Binding> make_table() {
         {"Wheel touch (Sampling)", S::Sampling, T::Any, H::none, C::WheelTouch, G::Press, J::ShowSource, St::Done},
         {"Wheel turn (Canvas)", S::Canvas, T::Any, H::none, C::WheelTurn, G::Turn, J::CanvasTurn, St::Done},
         {"Wheel push (Canvas)", S::Canvas, T::Any, H::none, C::WheelPush, G::Press, J::CanvasPush, St::Done},
+        {"Shift + Wheel turn (Canvas)", S::Canvas, T::Any, H::shift, C::WheelTurn, G::Turn, J::CanvasTurn, St::Done},
+        {"Shift + Wheel push (Canvas)", S::Canvas, T::Any, H::shift, C::WheelPush, G::Press, J::CanvasPush, St::Done},
         {"Wheel push (Typing)", S::Typing, T::Any, H::none, C::WheelPush, G::Press, J::TypeDone, St::Done},
         {"Wheel turn (Session)", S::Session, T::Any, H::none, C::WheelTurn, G::Turn, J::Playhead, St::Done},
         {"Wheel push (Session)", S::Session, T::Any, H::none, C::WheelPush, G::Press, J::LaunchScene, St::Done},

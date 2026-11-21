@@ -312,8 +312,10 @@ while Shift is held.
 | Wheel turn (Sampling) | Picks gain, monitoring or source | Melodee's input rows: source, gain, monitor, start (threshold), length; Shift + turn its SAMPLING settings | done |
 | Wheel push (Sampling) | Switches the source (Mic, Line in, Line in mono, Resampling, USB-C) or the setting | The row's next value (gain and start: push, then the wheel); while a take runs, ends it | done |
 | Wheel touch (Sampling) | Shows the input source | The same | done |
-| Wheel turn (Canvas) | No job | The module's own page | done |
-| Wheel push (Canvas) | No job | Enters the page, then the page's push | done |
+| Wheel turn (Canvas) | No job | A module's pages entered: the next page, or inside an entered door (its presets, a menu, a list, a drawn page) its cursor, as Schwung's jog | done |
+| Wheel push (Canvas) | No job | A module's pages entered: Schwung's click (a held knob: that parameter, a text one the keyboard; none: the Sections picker; a door: in, then its row) | done |
+| Shift + Wheel turn (Canvas) | No job | A module's pages entered: the next section, as Schwung's Shift + jog | done |
+| Shift + Wheel push (Canvas) | No job | A module's pages entered: the Sections picker from anywhere, as Schwung's Shift + click | done |
 | Wheel push (Typing) | Types the character, or Enter | Done | done |
 | Wheel turn (Session) | No job | Moves the playhead by the pattern's Q (Melodee's Shift + wheel on Patterns); stopped, Play continues from it | done |
 | Wheel push (Session) | No job (a scene launches by sliding down a column) | Launches the selected pattern's column on every track (Melodee's sequence), with its tempo | done |
@@ -372,7 +374,7 @@ while Shift is held.
 | Back | Leaves a menu, the browser or Sampling Mode; up a folder; from the Overview, the mode before | The same | done |
 | Back held | Leaves the menu or view altogether | Back to Play from any depth | done |
 | Back (Chop) | Confirms and leaves Slicing Mode, the slices on the pads | Leaves Chop keeping the chop; the pads change only by To Pads | done |
-| Back (Canvas) | No job | The page's own Back, then out of it | done |
+| Back (Canvas) | No job | A module's pages entered: up one layer at a time (the peek, the picker, an entered door), then out to the Device View, as Schwung's Back | done |
 | Back (Typing) | Deletes a character | The same | done |
 | Back held (Typing) | Leaves the text entry | Cancels the typing | done |
 | Shift + Back | No job | Back to Ableton's Move app (the runtime takes it) | done |

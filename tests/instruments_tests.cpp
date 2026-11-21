@@ -708,8 +708,27 @@ void test_screens() {
         std::lock_guard<std::mutex> guard(studio.lock);
         CHECK(studio.project().tracks[1].params[melodee::plugin_track::Macro1] == 0);
     }
-    shifted([&] { button(Button::MainPush); }); // the module's menu
-    wheel(40);                                   // its last row: AUTO SAMPLE
+    // Its pages (the push; Schwung's page code), on to the last, Module: in,
+    // its third row, Auto Sample (Melodee's, after Swap and Remove).
+    auto frames = [&](int n) {
+        AudioBlock in {}, out {};
+        juce::Image screen(juce::Image::ARGB, 128, 64, true);
+        for (int k = 0; k < n; ++k) {
+            melodee.render(in, out);
+            melodee.service();
+            std::this_thread::sleep_for(std::chrono::milliseconds(55));
+            juce::Graphics g(screen);
+            melodee.draw(g);
+        }
+    };
+    button(Button::MainPush);
+    CHECK(has(melodee.status(), "page=module-pages"));
+    frames(8);
+    for (int n = 0; n < 12 && !has(melodee.status(), "pages=Module,"); ++n) { wheel(1); frames(1); }
+    button(Button::MainPush);
+    frames(1);
+    wheel(2);
+    frames(1);
     button(Button::MainPush);
     CHECK(has(melodee.status(), "page=auto-sample"));
     for (int n = 0; n < 2000 && !has(melodee.status(), "auto_sheet=CHECKED"); ++n) std::this_thread::sleep_for(std::chrono::milliseconds(10));

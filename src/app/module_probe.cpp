@@ -141,7 +141,12 @@ int probe_schwung_pages(const std::string& root, const std::string& id, const st
     host.text_entry = [&](const std::string& title, const std::string& initial) { std::printf("    keyboard: %s [%s]\n", title.c_str(), initial.c_str()); };
     host.open_file = [](const std::string&) {};
     auto started = Clock::now();
-    auto pages = SchwungPages::load(host, info->dir, "[]", [](const std::string& action) { std::printf("    action: %s\n", action.c_str()); }, error);
+    SchwungPages::Hooks hooks;
+    hooks.module_dir = info->dir;
+    hooks.trailing = [] { return std::string("[]"); };
+    hooks.action = [](const std::string& action) { std::printf("    action: %s\n", action.c_str()); };
+    hooks.say = [](const std::string& text) { std::printf("    says: %s\n", text.c_str()); };
+    auto pages = SchwungPages::load(host, hooks, error);
     double load_ms = std::chrono::duration<double, std::milli>(Clock::now() - started).count();
     if (!pages) { std::printf("Schwung's pages FAILED: %s\n", error.c_str()); return 1; }
     std::printf("%s: Schwung's page code loaded in %.0f ms\n", id.c_str(), load_ms);
@@ -154,7 +159,7 @@ int probe_schwung_pages(const std::string& root, const std::string& id, const st
             auto t0 = Clock::now();
             {
                 juce::Graphics g(screen);
-                pages->draw(g);
+                pages->frame(g, {0, 10, CanvasPage::width, 45}); // a drawn page's band, as Melodee's pages screen gives it
             }
             double ms = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
             slowest_draw = std::max(slowest_draw, ms);
@@ -164,8 +169,12 @@ int probe_schwung_pages(const std::string& root, const std::string& id, const st
                 char file[512];
                 std::snprintf(file, sizeof file, "%s/%s-%02d-%s.png", pictures.c_str(), id.c_str(), shot++, name);
                 save_screen(screen, file);
-                std::printf("  %-12s %s, page %d of %d%s\n", name, pages->page_name().c_str(), pages->page_index() + 1, pages->page_count(),
-                            pages->wants_wheel() ? ", has the wheel" : "");
+                const auto& v = pages->view();
+                std::string cells, footer;
+                for (const auto& c : v.cells) cells += c.empty ? " _" : " " + (c.short_name.empty() ? c.name : c.short_name) + "=" + c.value;
+                for (const auto& [key, verb] : v.footer) footer += " " + key + " " + verb;
+                std::printf("  %-12s %s (%s), page %d of %d%s%s |%s |%s\n", name, v.page.c_str(), v.kind.c_str(), v.index + 1, v.count,
+                            v.wheel ? ", has the wheel" : "", v.canvas.shown ? ", drawn" : "", cells.c_str(), footer.c_str());
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(23));
         }

@@ -24,15 +24,17 @@ public:
     std::vector<Item> chain_items(unsigned chain) const;
     ui::mix::Item row_item(const Item& item) const; // as the Device View's row draws it
     std::string rail_bottom(const Item& item) const; // FX1-FX6, a pad's own A05
-    // What a wheel touch says of an effect item: "FX2: DELAY", "+: ADD EFFECT".
-    std::string focus_name(const Item& item) const;
     // The row: the track item, the sound item, then `items`; `focus` 0 the
     // track, 1 the sound, 2 on the effects.
     void draw_row(juce::Graphics& g, const std::string& track_item, const std::string& sound_item, const std::vector<Item>& items, int focus) const;
 
-    // An effect item's jobs: its knobs, its push (the browser), Shift + push
-    // (its options), Mute, Delete and Copy held + push, Shift + turn (a
-    // Schwung effect's pages). False: not an effect item's job.
+    // What a wheel touch says of an effect item: "FX2: DELAY", "+: ADD EFFECT".
+    std::string focus_name(const Item& item) const;
+    // An effect item's jobs: its knobs, its push (the browser; a Schwung
+    // effect's pages, as Schwung's click on a box), Shift + push (its options;
+    // a Schwung effect swapped), Mute, Delete and Copy held + push, Shift +
+    // turn (a Schwung effect moved along the chain). False: not an effect
+    // item's job.
     bool job(const Item& item, bindings::Job job, const bindings::Use& use);
     void input(const move::Input& input); // Copy let go: a pending paste forgotten
     void draw(juce::Graphics& g, const Item& item) const; // the subject under the row
@@ -51,11 +53,15 @@ public:
     // motion_send); on a kit's pad sends, that pad's own (`pad`).
     bool mix_lane(unsigned track, unsigned which, unsigned& param, unsigned& pad) const;
     std::string mix_bottom() const { return pad_sends ? "SND" : "MIX"; } // the rail's
+    // How far the effect in focus moved along its chain (Shift + the wheel on
+    // a Schwung effect) since last asked: the screen's focus follows it.
+    int take_moved() { int way = moved; moved = 0; return way; }
 
 private:
     Studio& studio;
     bool copied = false; // Copy held + push copied: another push, Copy still held, pastes
     bool pad_sends = false; // the kit's track item on its last pad's sends
+    int moved = 0;          // take_moved()
     FxModule* schwung(const Item& item) const;
 };
 

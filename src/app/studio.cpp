@@ -972,12 +972,25 @@ void Studio::rescan_modules() { catalog = scan_modules(modules_root); }
 
 CanvasPage::Host Studio::canvas_host(unsigned t) {
     CanvasPage::Host host;
-    host.get = [this, t](const std::string& key) { auto* module = module_track(t); return module ? module_get(*module, key) : std::string(); };
+    host.get = [this, t](const std::string& key) {
+        auto* module = module_track(t);
+        if (!module) return std::string();
+        auto answer = module_get(*module, key);
+        if (ModuleParam* param = module->module && !answer.empty() ? module->module->param(key) : nullptr) param->take(answer); // what a page read, Melodee's too
+        return answer;
+    };
     host.set = [this, t](const std::string& key, const std::string& value) {
         auto* module = module_track(t);
         if (!module) return;
         synth_set(*module, key, value);
         if (ModuleParam* param = module->module ? module->module->param(key) : nullptr) param->take(value); // the knobs and the save see it too
+        if (module->module && key == module->module->preset_param) { // a preset sets every value: each asked again, to show and save
+            auto& loaded = *module->module;
+            loaded.preset = std::atoi(value.c_str());
+            if (!loaded.preset_name_param.empty()) module->player.ask(loaded.preset_name_param, true);
+            for (const auto& param : loaded.params)
+                if (param.key != loaded.preset_param) module->player.ask(param.key);
+        }
     };
     host.text_entry = [this, t](const std::string& title, const std::string& initial) {
         auto* module = module_track(t);
@@ -1011,6 +1024,96 @@ CanvasPage::Host Studio::canvas_host(unsigned t) {
         say("NO EMPTY KIT PAD");
     };
     return host;
+}
+
+// A module's pages by Schwung's own code (schwung_pages.h), started off the
+// lock (its imports take their time): what its module.json declares where
+// the module does not say (as Schwung's chain host answers), Melodee's
+// trailing pages, its keyboard, and its drawn pages' state as the project
+// kept it. Null where the Move has no Schwung code (a Mac, the tests' own
+// fallback): Melodee then draws the module's pages itself.
+std::unique_ptr<SchwungPages> Studio::start_pages(CanvasPage::Host host, const LoadedModule& module, const std::string& dir,
+                                                  const std::vector<std::pair<std::string, std::string>>& kept, PagesTarget target) {
+    if (SchwungPages::shared_folder().empty()) return nullptr;
+    auto asked = host.get;
+    std::map<std::string, std::string> contract {{"ui_hierarchy", module.declared("ui_hierarchy")}, {"chain_params", module.declared("chain_params")}};
+    host.get = [asked, contract](const std::string& key) {
+        auto answer = asked(key);
+        auto declared = contract.find(key);
+        return answer.empty() && declared != contract.end() ? declared->second : answer;
+    };
+    auto typed = host.text_entry;
+    host.text_entry = [this, typed, target](const std::string& title, const std::string& initial) {
+        typed(title, initial);
+        typing_canvas = typing_schwung_pages;
+        typing_pages = target;
+    };
+    SchwungPages::Hooks hooks;
+    hooks.module_dir = dir;
+    bool instrument = !module.source && target.fx_entry == melodee::no_plugin;
+    hooks.trailing = [this, target, instrument] { return pages_trailing(target, instrument); };
+    hooks.action = [this, target](const std::string& action) { pages_action(target, action); };
+    hooks.say = [this](const std::string& text) { say(text); };
+    auto states = juce::DynamicObject::Ptr(new juce::DynamicObject());
+    for (const auto& [key, state] : kept) states->setProperty(juce::Identifier(key), juce::String(state)); // each page's own JSON text
+    hooks.page_states = kept.empty() ? std::string() : juce::JSON::toString(juce::var(states.get()), true).toStdString();
+    std::string failed;
+    auto pages = SchwungPages::load(std::move(host), std::move(hooks), failed);
+    if (!pages) std::fprintf(stderr, "melodee-move: %s's pages by Schwung's code would not start: %s\n", module.info().id.c_str(), failed.c_str());
+    return pages;
+}
+
+SchwungPages* Studio::pages_of(PagesTarget target) {
+    if (target.fx_entry != melodee::no_plugin) {
+        FxModule* fx = fx_module(target.fx_entry);
+        return fx ? fx->schwung_pages.get() : nullptr;
+    }
+    ModuleTrack* track = module_track(target.track);
+    return track && track->module ? track->schwung_pages.get() : nullptr;
+}
+
+// The pages Melodee adds after a module's own, as Schwung adds its My Presets
+// and Module (shadow_ui.js componentTrailingMenus), in its trailingMenus shape.
+std::string Studio::pages_trailing(PagesTarget, bool instrument) {
+    std::string module = R"({"name": "Module", "entries": [{"label": "Swap Module", "action": "swap_module"}, {"label": "Remove Module", "action": "remove_module"})";
+    if (instrument) module += R"(, {"label": "Auto Sample", "action": "melodee:auto_sample"})";
+    return "[" + module + "]}]";
+}
+
+void Studio::pages_action(PagesTarget target, const std::string& action) {
+    if (action == "melodee:auto_sample") { if (target.track == selected) open("auto-sample"); return; }
+    if (action == "swap_module") { swap_from_pages = target; open(target.fx_entry == melodee::no_plugin ? "load-modules" : "fx-browser"); return; }
+    if (action == "remove_module") { remove_from_pages = target; return; } // taken by the pages screen: it closes, then removes
+}
+
+void Studio::remove_module(PagesTarget target) {
+    if (target.fx_entry != melodee::no_plugin) { // where it is now (it may have moved since its pages started)
+        for (unsigned chain = 0; chain < melodee::chain_count; ++chain)
+            for (unsigned at = 0; at < mixing::slots(*this, chain); ++at) {
+                const auto& slot = mixing::slot(*this, chain, at);
+                if (slot.kind != uint8_t(melodee::EffectKind::Plugin) || uint8_t(slot.params[0]) != target.fx_entry) continue;
+                mixing::set_effect(*this, chain, at, melodee::EffectKind::None);
+                say("REMOVED");
+                return;
+            }
+        return;
+    }
+    ModuleTrack* track = module_track(target.track);
+    if (!track || !track->module) return;
+    if (!track->player.set_module(nullptr)) { say("BUSY, TRY AGAIN"); return; }
+    std::string name = upper(track->module->info().name);
+    track->leaving.push_back(std::move(track->module));
+    track->schwung_pages.reset();
+    track->canvas_pages.clear();
+    track->saved = {};
+    track->page = 0;
+    track->menu_open = false;
+    track->canvas_open = -1;
+    track->canvas_entered = false;
+    say(("REMOVED " + name).substr(0, 17));
+    changed();
+    name_step("REMOVE " + name, int(target.track));
+    close_step();
 }
 
 void Studio::ask_text(std::string title, std::string initial, std::function<void(const std::string&)> done) {
@@ -1071,8 +1174,8 @@ void Studio::finish_typing(bool cancelled) {
     auto* module = typing_track >= 0 ? module_track(unsigned(typing_track)) : nullptr;
     int index = typing_canvas;
     typing_canvas = typing_track = -1;
-    if (module && index == typing_schwung_pages && module->schwung_pages) {
-        module->schwung_pages->text_entered(typed, cancelled);
+    if (index == typing_schwung_pages) {
+        if (SchwungPages* pages = pages_of(typing_pages)) pages->text_entered(typed, cancelled);
         return;
     }
     if (module && index >= 0 && index < int(module->canvas_pages.size()) && module->canvas_pages[size_t(index)])
@@ -1366,6 +1469,14 @@ SynthFile Studio::module_state(unsigned t) const {
     file.preset = module.preset_param.empty() ? -1 : module.preset;
     for (const auto& param : module.params) // not a page's own key: it is a page, not a value
         if (param.key != module.preset_param && !param.trigger() && !is_page(param.key)) file.values.emplace_back(param.key, param.text());
+    if (track->schwung_pages) { // its drawn pages' state as Schwung's code keeps it, a page each
+        auto states = juce::JSON::parse(juce::String(track->schwung_pages->page_states()));
+        if (auto* object = states.getDynamicObject())
+            for (const auto& property : object->getProperties())
+                if (auto text = property.value.toString().toStdString(); text != "{}" && !text.empty())
+                    file.pages.emplace_back(property.name.toString().toStdString(), text);
+        return file;
+    }
     for (size_t n = 0; n < track->canvas_pages.size() && n < module.canvases.size(); ++n)
         if (track->canvas_pages[n])
             if (auto state = track->canvas_pages[n]->saved_state(); !state.empty()) file.pages.emplace_back(module.canvases[n].key, state);
@@ -2068,31 +2179,12 @@ std::string Studio::load_module_now(unsigned t, const std::string& id, const Syn
                 for (const auto& [key, state] : saved->pages)
                     if (key == canvas.key) started.back()->restore_state(state);
         }
-    // Its pages and menus as Schwung draws them, by Schwung's own code where
-    // the Move has it (schwung_pages.h); Melodee's AUTO SAMPLE a page after
-    // the module's, for an instrument.
+    // Its pages and menus as Schwung's own code has them, where the Move has
+    // it (schwung_pages.h, screens/module_pages.cpp).
     std::unique_ptr<SchwungPages> schwung_pages;
-    if (loaded && !SchwungPages::shared_folder().empty()) {
-        std::string failed;
-        std::string trailing = loaded->source ? "[]" : R"([{"name": "Melodee", "entries": [{"label": "Auto Sample", "action": "melodee:auto_sample"}]}])";
-        auto host = canvas_host(t);
-        auto asked = host.get;
-        std::map<std::string, std::string> contract {{"ui_hierarchy", loaded->declared("ui_hierarchy")}, {"chain_params", loaded->declared("chain_params")}};
-        host.get = [asked, contract](const std::string& key) { // what its module.json declares, where the module does not say
-            auto answer = asked(key);
-            auto declared = contract.find(key);
-            return answer.empty() && declared != contract.end() ? declared->second : answer;
-        };
-        auto typed = host.text_entry;
-        host.text_entry = [this, typed](const std::string& title, const std::string& initial) {
-            typed(title, initial);
-            typing_canvas = typing_schwung_pages;
-        };
-        schwung_pages = SchwungPages::load(std::move(host), info.dir, trailing, [this, t](const std::string& action) {
-            if (action == "melodee:auto_sample" && t == selected) open("auto-sample");
-        }, failed);
-        if (!schwung_pages) std::fprintf(stderr, "melodee-move: %s's pages by Schwung's code would not start: %s\n", id.c_str(), failed.c_str());
-    }
+    if (loaded)
+        schwung_pages = start_pages(canvas_host(t), *loaded, info.dir, saved && saved->module == id ? saved->pages : std::vector<std::pair<std::string, std::string>> {},
+                                    PagesTarget {t, melodee::no_plugin});
     std::unique_lock<std::mutex> guard(lock);
     auto* track = modules[t].get();
     if (!track) return "track gone"; // deleted meanwhile: `loaded` destroyed here, never played

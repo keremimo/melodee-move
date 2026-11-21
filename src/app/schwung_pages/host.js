@@ -1,48 +1,71 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// A Schwung module's own pages and menus, drawn by Schwung's knob-page code
-// (its shared/param_pages, MIT, Charles Vestal and contributors) as Schwung's
-// shadow UI draws them, inside a page Melodee hosts (app/canvas_page.h).
+// A Schwung module's pages and menus as Schwung's own knob-page code decides
+// them (its shared/param_pages, MIT, Charles Vestal and contributors), for
+// Melodee to draw in its own look (src/app/schwung_pages.h).
 //
-// Nothing of Schwung's is copied here: its library is imported from the
-// Schwung installed beside Melodee, so a module is drawn by the very code it
-// was written against. This file is only the seam Schwung's own consumer
-// (src/shadow/shadow_ui_param_pages.mjs) is for the shadow UI: parameter
-// reads and writes, visible_if, the module's drawn pages, the clock and the
-// Move's controls in.
+// Schwung's page controller is the model: the level walk, visible_if, the
+// staggered reads, doors, the Sections picker, the preset browser, Back one
+// layer at a time, the enum peek. Melodee is the view: this file draws
+// nothing of Schwung's. Each frame it publishes the page as data, from the
+// controller's describePage() ("the third way to use this library"), plus
+// what that leaves out, and the footer verbs Schwung's shadow UI shows
+// (src/shadow/shadow_ui_param_pages.mjs footerHints(), ported here: it is the
+// one piece that lives only in Schwung's host).
 //
-// Melodee answers ctx.getParam("melodee:module_dir") and "melodee:trailing",
-// takes ctx.setParam("melodee:described") (where the controller is) and
-// "melodee:action" (a trailing menu's entry pushed); every other key is the
-// module's (Schwung's "synth:" prefix taken off). MELODEE_SCHWUNG_SHARED
-// names Schwung's shared folder where it is not the Move's.
+// Nothing of Schwung's is copied: its library is imported from the Schwung
+// installed beside Melodee, so a module behaves as under the very code it was
+// written against. MELODEE_SCHWUNG_SHARED names that folder elsewhere (tests).
+//
+// The seam, through the page ctx Melodee lends each hook:
+//   getParam("melodee:module_dir")   where the module's own page scripts are
+//   getParam("melodee:trailing")     the pages Melodee adds after the module's (JSON)
+//   getParam("melodee:page_states")  the drawn pages' kept state, at start (JSON)
+//   setParam("melodee:view", json)   the page as data, after every hook
+//   setParam("melodee:action", id)   a trailing page's entry pushed
+//   setParam("melodee:page_states", json) a drawn page's state changed
+//   setParam("melodee:say", text)    a word for Melodee's message line
+// and every other key is the module's (Schwung's "synth:" prefix taken off).
 import * as std from "std";
 
 const PREFIX = "synth";
-const TICK_MS = 1000 / 44; // Schwung's shadow UI ticks once a block of 128 frames, about 44 times a second
-const MAX_TICKS_PER_DRAW = 8;
+const TICK_MS = 1000 / 44; // Schwung's shadow UI ticks once a block of 128 frames
+const MAX_TICKS_PER_FRAME = 8;
+const LOADING_POLL_TICKS = 8, LOADING_POLL_MAX_TICKS = 160; // as shadow_ui_param_pages.mjs
 
-let ctx = null;          // the ctx of the hook running now: Melodee's drawing and parameters
+let ctx = null;          // the ctx of the hook running now
 let controller = null;
-let lib = null;          // Schwung's modules, once imported
 let moduleDir = "";
 let lastTick = 0;
 let shift = false;
-const stats = { ticks: 0, tickMs: 0, renders: 0, renderMs: 0, slowestRender: 0, slowestTick: 0, reads: 0, writes: 0 };
+let exited = false;      // Back at the top: Melodee's to take
+let pendingText = null;  // a text parameter whose keyboard is open
+let textForPage = null;  // a drawn page whose keyboard is open
+let enumPicker = null;   // {key, title, options, index}
+let opened = null;       // a canvas parameter opened from its cell: {key, script, enterable}
+let loadingPoll = 0, loadingInterval = LOADING_POLL_TICKS, wasLoading = false;
 
-// Schwung's device globals, over whichever ctx is drawing: its menus draw
-// through them when handed no ctx of their own.
+// Schwung's device globals, for the few shared helpers that reach for them.
 globalThis.fill_rect = (x, y, w, h, c) => ctx && ctx.fillRect(x, y, w, h, c);
 globalThis.set_pixel = (x, y, c) => ctx && ctx.setPixel(x, y, c);
 globalThis.draw_line = (x0, y0, x1, y1, c) => ctx && ctx.line(x0, y0, x1, y1, c);
 globalThis.print = (x, y, text, c) => ctx ? ctx.print(x, y, String(text), c) : 0;
 globalThis.text_width = (text) => ctx ? ctx.textWidth(String(text)) : 0;
 globalThis.clear_screen = () => ctx && ctx.fillRect(0, 0, 128, 64, 0);
-globalThis.fill_circle = (cx, cy, r, c) => {
-    for (let dy = -r; dy <= r; dy++) {
-        const dx = Math.floor(Math.sqrt(r * r - dy * dy));
-        ctx && ctx.fillRect(cx - dx, cy + dy, 2 * dx + 1, 1, c);
-    }
-};
+
+// Schwung's library, imported while Melodee loads this page (it waits for
+// the imports).
+const SHARED = std.getenv("MELODEE_SCHWUNG_SHARED") || "/data/UserData/schwung/shared";
+const lib = {};
+{
+    const parts = await Promise.all([
+        import(SHARED + "/param_pages/page_controller.mjs"),
+        import(SHARED + "/param_pages/page_input.mjs"),
+        import(SHARED + "/param_pages/frame_ctx.mjs"),
+        import(SHARED + "/param_pages/param_meta.mjs"),
+        import(SHARED + "/param_pages/page_plan.mjs"),
+    ]);
+    for (const part of parts) Object.assign(lib, part);
+}
 
 function bare(key) {
     const k = String(key);
@@ -52,13 +75,11 @@ function bare(key) {
 // Three answers, as Schwung's param channel gives them: text, "" (served,
 // nothing), null (no answer). Melodee's read answers text or "".
 function getParam(key) {
-    stats.reads++;
     if (!ctx) return null;
     const answer = ctx.getParam(bare(key));
     return answer === undefined ? null : answer;
 }
 function setParam(key, value) {
-    stats.writes++;
     if (ctx) ctx.setParam(bare(key), String(value));
     return true;
 }
@@ -81,18 +102,17 @@ function visible(cond) {
     const gt = cond.gt ?? cond.greater_than ?? cond.greater, lt = cond.lt ?? cond.smaller_than ?? cond.smaller;
     if (gt !== undefined) return Number(raw) > Number(gt);
     if (lt !== undefined) return Number(raw) < Number(lt);
-    if (cond.truthy !== undefined) return same(raw, true) === !!cond.truthy || (Number(raw) !== 0) === !!cond.truthy;
-    if (cond.falsey !== undefined || cond.falsy !== undefined) return Number(raw) === 0 || !same(raw, true);
+    if (cond.truthy !== undefined) return (Number(raw) !== 0 || same(raw, true)) === !!cond.truthy;
+    if (cond.falsey !== undefined || cond.falsy !== undefined) return !(Number(raw) !== 0 || same(raw, true));
     return true;
 }
 
-// The module's drawn pages: its canvas script, loaded once into this
-// context the way Schwung loads it. A plain script (Schimera's) runs at once,
-// canvas_overlay saved and put back; a module (one that imports std, as Radio
-// Garden's and Webstream's do) is imported, and is there from the next frame
-// (Melodee runs the script's pending jobs after each hook).
+// The module's drawn pages: its canvas script, loaded once into this context
+// the way Schwung loads it. A plain script (Schimera's) runs at once; a module
+// (one that imports std, as Radio Garden's and Webstream's do) is imported,
+// and is there from the next frame (Melodee runs pending jobs after a hook).
 const overlays = {};
-const pageStates = {};
+let pageStates = {};
 function overlayFor(canvas) {
     const path = moduleDir + "/" + (canvas.script || "canvas.js");
     if (path in overlays) return overlays[path];
@@ -121,60 +141,84 @@ function overlayFor(canvas) {
     globalThis.canvas_overlay = ours;
     return overlays[path];
 }
-function drawCanvasPage(drawCtx, band, canvas, payload) {
+function stateFor(key) { return pageStates[key] || (pageStates[key] = {}); }
+let savedStates = "";
+function keepStates() { // a drawn page's ctx.state, kept with the project: {key: its state as JSON text}
+    const each = {};
+    for (const key of Object.keys(pageStates)) {
+        try { each[key] = JSON.stringify(pageStates[key]); } catch (e) { /* a cycle, a BigInt: not kept */ }
+    }
+    const text = JSON.stringify(each);
+    if (text !== savedStates) { savedStates = text; if (ctx) ctx.setParam("melodee:page_states", text); }
+}
+function pageCtx(canvas) {
+    return {
+        width: 128, height: 64, state: stateFor(canvas.key),
+        getParam: (k) => getParam(PREFIX + ":" + k),
+        setParam: (k, v) => setParam(PREFIX + ":" + k, v),
+        getValue: () => getParam(PREFIX + ":" + canvas.key) || "",
+        openTextEntry: (o) => { textForPage = canvas; if (ctx) ctx.openTextEntry(o || {}); },
+        openFileInTool: (path, tool) => ctx && ctx.openFileInTool(path, tool),
+        close: () => { if (opened && opened.key === canvas.key) opened = null; },
+    };
+}
+function canvasPageHook(canvas, hook, payload) {
+    const ov = overlayFor(canvas);
+    if (!ov || typeof ov[hook] !== "function") return undefined;
+    try { return ov[hook](pageCtx(canvas), payload); } catch (e) { console.log("schwung pages: " + hook + ": " + e); return undefined; }
+}
+// A drawn page into Melodee's band, with what Schwung's host hands it
+// (shadow_ui.js drawCanvasPageBody).
+function drawCanvas(c, band, canvas) {
     const ov = overlayFor(canvas);
     if (!ov || typeof ov.drawPage !== "function") return;
-    const state = pageStates[canvas.key] || (pageStates[canvas.key] = {});
+    const s = controller.state;
+    const values = Object.assign({}, s.values || {}, s.modValues || {});
+    const page = controller.page;
+    let preset = null;
+    if (page && page.kind === lib.PAGE_PRESET) {
+        const st = (s.preset || {})[page.name] || {};
+        preset = { name: st.name, index: st.index, count: st.count, entered: menuEntered() };
+    }
     try {
-        ov.drawPage(lib.frameCtx(drawCtx, band), {
-            key: canvas.key,
-            values: (payload && payload.values) || {},
-            base: (payload && payload.base) || {},
-            keys: (payload && payload.keys) || [],
-            touched: payload && typeof payload.touched === "number" ? payload.touched : -1,
-            preset: (payload && payload.preset) || null,
-            nowMs: payload && typeof payload.nowMs === "number" ? payload.nowMs : Date.now(),
-            width: band.w, height: band.h, state,
+        ov.drawPage(lib.frameCtx(c, band), {
+            key: canvas.key, values, base: s.values || {}, metaIndex: s.metaIndex,
+            keys: (page && page.keys) || [], touched: typeof s.touched === "number" ? s.touched : -1,
+            preset, nowMs: Date.now(), width: band.w, height: band.h, state: stateFor(canvas.key),
         });
     } catch (e) {
         console.log("schwung pages: drawPage of " + canvas.key + ": " + e);
     }
 }
-function canvasPageHook(canvas, hook, payload) {
-    const ov = overlayFor(canvas);
-    if (!ov || typeof ov[hook] !== "function") return undefined;
-    const state = pageStates[canvas.key] || (pageStates[canvas.key] = {});
-    const pageCtx = {
-        width: 128, height: 64, state,
-        getParam: (k) => getParam(PREFIX + ":" + k),
-        setParam: (k, v) => setParam(PREFIX + ":" + k, v),
-        getValue: () => getParam(PREFIX + ":" + canvas.key) || "",
-        openTextEntry: (o) => ctx && ctx.openTextEntry(o),
-    };
-    try { return ov[hook](pageCtx, payload); } catch (e) { console.log("schwung pages: " + hook + ": " + e); return undefined; }
+
+function menuEntered() {
+    if (!controller) return false;
+    return !!(typeof controller.menuEntered === "function" ? controller.menuEntered() : controller.menuEntered);
 }
 
-// Schwung's library, imported while Melodee loads this page (it waits for
-// the imports); the controller is made on the first hook, when the module's
-// parameters answer.
-const SHARED = std.getenv("MELODEE_SCHWUNG_SHARED") || "/data/UserData/schwung/shared";
-{
-    const [pc, input, frame] = await Promise.all([
-        import(SHARED + "/param_pages/page_controller.mjs"),
-        import(SHARED + "/param_pages/page_input.mjs"),
-        import(SHARED + "/param_pages/frame_ctx.mjs"),
-    ]);
-    lib = { ...pc, ...input, ...frame };
+// Pages Melodee adds after the module's, as Schwung adds My Presets and Module.
+function trailingMenus() {
+    try { return JSON.parse((ctx && ctx.getParam("melodee:trailing")) || "[]"); } catch (e) { return []; }
 }
 
 function ensure() {
-    if (controller) return;
+    if (controller || !ctx) return;
     moduleDir = ctx.getParam("melodee:module_dir");
+    pageStates = {};
+    try {
+        const kept = JSON.parse(ctx.getParam("melodee:page_states") || "{}") || {};
+        for (const key of Object.keys(kept)) pageStates[key] = typeof kept[key] === "string" ? JSON.parse(kept[key]) : kept[key];
+    } catch (e) { pageStates = {}; }
+    if (typeof lib.createController !== "function") return;
     controller = lib.createController({
         getParam, setParam,
         announce: () => {},
         now: () => Date.now(),
-        drawCanvasPage, canvasPageHook,
+        // Melodee draws plain cells, never Schwung's graphics: the peek and the
+        // two-option turn then behave as on a plain cell.
+        enableViz: false,
+        heldStep: () => -1, deleteHeld: () => false, sceneArmed: () => false, heldStepIsHold: () => false,
+        canvasPageHook,
         trailingMenus,
     });
     controller.load({ slot: 0, component: PREFIX, prefix: PREFIX, visible, paginate: true });
@@ -182,48 +226,215 @@ function ensure() {
     lastTick = Date.now();
 }
 
-// Pages Melodee adds after the module's, as Schwung adds My Presets and
-// Module: what Melodee answers for "melodee:trailing" (JSON, the same shape).
-// An entry's action goes back to Melodee as "melodee:action".
-function trailingMenus() {
-    try { return JSON.parse(ctx.getParam("melodee:trailing") || "[]"); } catch (e) { return []; }
-}
-
+// Schwung's tick, and its host's duties around it (shadow_ui_param_pages.mjs
+// tickParamPages): a module still loading is asked, with backoff, and planned
+// again once it has loaded; Shift reveals.
 function tick() {
     const now = Date.now();
-    let n = Math.min(MAX_TICKS_PER_DRAW, Math.max(1, Math.floor((now - lastTick) / TICK_MS)));
+    let n = Math.min(MAX_TICKS_PER_FRAME, Math.max(1, Math.floor((now - lastTick) / TICK_MS)));
     lastTick = now;
     while (n-- > 0) {
-        const t0 = Date.now();
+        if (++loadingPoll >= loadingInterval) {
+            loadingPoll = 0;
+            const raw = getParam(PREFIX + ":is_loading");
+            if (raw === "") loadingInterval = Infinity;
+            else if (raw === null || raw === undefined) { if (loadingInterval < LOADING_POLL_MAX_TICKS) loadingInterval *= 2; }
+            else {
+                loadingInterval = LOADING_POLL_TICKS;
+                const loading = raw === "1";
+                if (!loading && wasLoading) controller.reloadIfChanged({ visible });
+                wasLoading = loading;
+            }
+        }
+        controller.setReveal(shift);
         controller.tick();
-        const took = Date.now() - t0;
-        stats.ticks++;
-        stats.tickMs += took;
-        stats.slowestTick = Math.max(stats.slowestTick, took);
     }
 }
 
-// What the probe and Melodee read back: where the controller is.
-function menuEntered() {
-    if (!controller) return false;
-    return !!(typeof controller.menuEntered === "function" ? controller.menuEntered() : controller.menuEntered);
+// shadow_ui_param_pages.mjs footerHints(), as Schwung's shadow UI builds it:
+// jog first, click second, Back last; the verbs of what is under the cursor.
+let sectionsPages = null, sectionsDiffer = false;
+function sectionsAreDistinct() {
+    const pages = controller.pages;
+    if (!pages || !pages.length) return false;
+    if (pages === sectionsPages) return sectionsDiffer;
+    sectionsPages = pages;
+    const seen = new Set();
+    sectionsDiffer = false;
+    for (const p of pages) {
+        const lv = p && p.level;
+        if (lv == null) continue;
+        if (seen.has(lv)) { sectionsDiffer = true; break; }
+        seen.add(lv);
+    }
+    return sectionsDiffer;
 }
-let exited = false; // Back at the top: Melodee's to take
-function describe() {
-    const page = controller && controller.page;
-    return JSON.stringify({
-        index: controller ? controller.pageIndex : 0, count: controller ? (controller.pages || []).length : 0,
-        wheel: menuEntered() || !!(controller && controller.pickerOpen), exit: exited,
-        page: page ? page.name : null, kind: page ? page.kind : null, keys: page ? page.keys : [],
-        pages: controller ? (controller.pages || []).map((p) => p.name) : [],
-        menu: menuEntered(),
-        unresolved: controller ? !!controller.contractUnresolved : false,
-        stats,
-    });
+function hints({ jog, click, extra }) {
+    const out = [];
+    if (jog) out.push(["JOG", jog]);
+    if (click) out.push(["CLK", click]);
+    for (const e of (extra || [])) if (e) out.push(e);
+    return out;
+}
+function footer() {
+    if (enumPicker) return hints({ jog: "SEL", click: "SET", extra: [["BACK", "EXIT"]] });
+    if (opened) return hints({ extra: [["BACK", "OUT"]] });
+    if (controller.pickerOpen) return hints({ jog: "SECT", click: "GO", extra: [["BACK", "EXIT"]] });
+    const fine = shift ? [["KNB", "FINE"]] : null;
+    const mp = controller.page;
+    const entered = menuEntered();
+    if (mp && mp.kind === lib.PAGE_MENU)
+        return entered ? hints({ jog: "SEL", click: "OPEN", extra: [["BACK", "OUT"]] }) : hints({ jog: "PAGE", click: "ENTER", extra: fine });
+    if (mp && mp.kind === lib.PAGE_KNOBS && controller.isDoor && controller.isDoor(mp)) {
+        if (!entered) return hints({ jog: "PAGE", click: "ENTER", extra: fine });
+        if (controller.knobEditing) return hints({ jog: "ADJ", click: "DONE", extra: [["BACK", "OUT"]] });
+        const rows = controller.knobRows ? controller.knobRows() : [];
+        const row = rows[controller.knobRowIndex ? controller.knobRowIndex() : 0];
+        const rmeta = row && controller.metaAt ? controller.metaAt(row.slot) : null;
+        let verb = null;
+        if (rmeta) {
+            if (rmeta.writeOnly) verb = "FIRE";
+            else if (lib.isTurnable(rmeta) && (!rmeta.divable || lib.flipsOnClick(rmeta))) verb = "EDIT";
+            else if (rmeta.divable) verb = "OPEN";
+        }
+        return hints({ jog: "SEL", click: verb, extra: [["BACK", "OUT"]] });
+    }
+    if (mp && mp.kind === lib.PAGE_ITEMS)
+        return entered ? hints({ jog: "SEL", click: "LOAD", extra: [["BACK", "OUT"]] }) : hints({ jog: "PAGE", click: "ENTER", extra: fine });
+    if (mp && mp.kind === lib.PAGE_PRESET)
+        return entered ? hints({ jog: "PRST", click: "EDIT", extra: [["BACK", "OUT"]] }) : hints({ jog: "PAGE", click: "ENTER", extra: fine });
+    const held = controller.state ? controller.state.touched : -1;
+    if (held >= 0) {
+        const meta = controller.metaAt ? controller.metaAt(held) : null;
+        if (meta && meta.writeOnly) return hints({ jog: "PAGE", click: "FIRE", extra: [["KNB", "FIRE"], ...(fine || [])] });
+        if (lib.flipsOnClick(meta)) return hints({ jog: "PAGE", click: "FLIP", extra: fine });
+        if ((meta && meta.divable) || (controller.diveTargetAt && controller.diveTargetAt(held)))
+            return hints({ jog: "PAGE", click: "OPEN", extra: fine });
+    }
+    return hints({ jog: (shift && sectionsAreDistinct()) ? "SECT" : "PAGE", click: "MENU", extra: fine });
+}
+
+// The page as data, for Melodee to draw (schwung_pages.h, ModuleView).
+function view() {
+    if (typeof lib.createController !== "function" || (controller && typeof controller.describePage !== "function"))
+        return { unsupported: true };
+    if (!controller) return {};
+    const d = controller.describePage({ title: "" });
+    const s = controller.state;
+    const p = controller.page;
+    const entered = menuEntered();
+    const v = {
+        kind: p ? p.kind : null,
+        page: p ? (controller.pageLabel ? controller.pageLabel(p) : p.name) : null,
+        index: controller.pageIndex, count: (controller.pages || []).length,
+        header: d.header || null,
+        unresolved: !!d.unresolved,
+        wheel: !!(enumPicker || opened || controller.pickerOpen || entered),
+        exit: exited,
+        footer: footer(),
+        livePress: !!(controller.livePressParam && controller.livePressParam()),
+        cells: [],
+    };
+    if (p && p.kind === lib.PAGE_KNOBS) {
+        for (let slot = 0; slot < (p.keys || []).length; slot++) {
+            const c = d.cells ? d.cells[slot] : null;
+            if (!c) { v.cells.push(null); continue; }
+            const meta = s.metaIndex ? s.metaIndex.getOrGuess(c.key) : null;
+            v.cells.push({
+                key: c.key, name: c.name,
+                short: (p.shortNames && p.shortNames[c.key]) || (meta && meta.short_name) || c.name,
+                value: c.value, headerValue: c.headerValue,
+                normalized: typeof c.normalized === "number" ? c.normalized : null,
+                widget: c.widget, enumIndex: c.enumIndex, options: c.options ? c.options.length : 0,
+                readOnly: c.readOnly, turnable: c.turnable, divable: c.divable, touched: c.touched,
+            });
+        }
+    }
+    if (p && p.kind === lib.PAGE_MENU)
+        v.menu = { entered, cursor: controller.menuIndex ? controller.menuIndex() : 0,
+                   rows: (p.entries || []).map((e) => ({ label: String(e.label || ""), value: e.value === undefined || e.value === null ? "" : String(e.value) })) };
+    if (p && p.kind === lib.PAGE_PRESET) {
+        const st = (s.preset || {})[p.name] || {};
+        v.preset = { entered, name: st.name || "", index: st.index || 0, count: st.count || 0 };
+    }
+    if (p && p.kind === lib.PAGE_ITEMS) {
+        const st = (s.items || {})[p.name] || {};
+        v.items = { entered, cursor: st.cursor || 0, current: st.current === undefined ? -1 : st.current,
+                    rows: (st.list || []).map((i) => String(i.label)) };
+    }
+    if (controller.pickerOpen)
+        v.picker = { cursor: controller.pickerIndex || 0,
+                     rows: (controller.pickerEntries || []).map((e) => ({ label: String(e.name), value: e.pages > 1 ? String(e.pages) : "" })) };
+    const peek = controller.enumPeek ? controller.enumPeek() : null;
+    if (peek) v.peek = { title: String(peek.title || ""), index: peek.index, rows: (peek.options || []).map(String) };
+    if (enumPicker) v.enumPicker = { title: enumPicker.title, index: enumPicker.index, rows: enumPicker.options };
+    if (s.notice && (!s.notice.until || Date.now() < s.notice.until)) v.notice = String(s.notice.text || "");
+    if (s.hintLines && s.hintLines.lines) v.hint = { title: String(s.hintLines.title || ""), lines: s.hintLines.lines.map(String) };
+    const canvas = opened || (p && p.canvas) || null;
+    if (canvas) v.canvas = { key: canvas.key, enterable: !!canvas.enterable, entered: !!opened || entered, opened: !!opened };
+    return v;
+}
+
+function publish() {
+    if (!ctx) return;
+    ctx.setParam("melodee:view", JSON.stringify(view()));
+    keepStates();
+}
+
+// An "open" the controller hands back (page_input.mjs click): an enum list
+// picker, a text keyboard, a drawn page; a trailing page's entry is Melodee's.
+function take(todo) {
+    if (!todo) return;
+    exited = todo.action === "exit";
+    if (todo.action === "menu" && todo.entry && todo.entry.action) { ctx.setParam("melodee:action", String(todo.entry.action)); return; }
+    if (todo.action !== "open") return;
+    const meta = todo.meta || {};
+    const key = todo.key || bare(todo.fullKey || "");
+    const title = meta.label || meta.name || key;
+    if (Array.isArray(todo.options) && todo.options.length) {
+        enumPicker = { key, title: String(title), options: todo.options.map(String), index: todo.index || 0 };
+        return;
+    }
+    if (meta.type === "string") {
+        pendingText = key;
+        ctx.openTextEntry({ title, initial: getParam(PREFIX + ":" + key) || "" });
+        return;
+    }
+    if (meta.type === "canvas" || meta.canvas_script) {
+        opened = { key, script: meta.canvas_script || "canvas.js", enterable: true };
+        return;
+    }
+    ctx.setParam("melodee:say", "NOT ON MELODEE YET"); // a file or sample editor: Schwung's own screens
+}
+
+// The enum picker, as shadow_ui.js's ENUM_PICKER: the jog or any knob moves,
+// the click sets, Back leaves it unset.
+function pickerMidi(data) {
+    const cc = (data[0] & 0xf0) === 0xb0, number = data[1], value = data[2];
+    if (cc && (number === 14 || (number >= 71 && number <= 78))) {
+        const delta = value === 0 ? 0 : value < 64 ? 1 : -1;
+        enumPicker.index = Math.max(0, Math.min(enumPicker.options.length - 1, enumPicker.index + delta));
+    } else if (cc && number === 3 && value > 0) {
+        controller.commitEnum(enumPicker.key, enumPicker.index);
+        enumPicker = null;
+    } else if (cc && number === 51 && value > 0) {
+        enumPicker = null;
+    }
+}
+
+// A canvas opened from its cell: the jog and its push are the page's, Back
+// asks the page first ("true": it went up a level) and else closes it.
+function openedMidi(data) {
+    const cc = (data[0] & 0xf0) === 0xb0, number = data[1], value = data[2];
+    if (cc && number === 51) {
+        if (value > 0 && canvasPageHook(opened, "handleBack", {}) !== true) opened = null;
+        return;
+    }
+    if (cc && (number === 14 || number === 3)) canvasPageHook(opened, "onMidi", { data: [data[0], data[1], data[2]] });
 }
 
 // A throw in a hook ends the page for good (Melodee's rule, as Schwung's):
-// say where, once, and carry on.
+// say where, a few times, and carry on.
 let reported = 0;
 function guarded(name, f) {
     return (...args) => {
@@ -235,54 +446,45 @@ function guarded(name, f) {
 }
 
 globalThis.canvas_overlay = {
+    // A frame: Schwung's ticks since the last, the page published, and a drawn
+    // page into the band Melodee gives (info.x, y, width, height).
     drawPage(c, info) {
         ctx = c;
         ensure();
-        tick();
-        const t0 = Date.now();
-        controller.render(
-            { fillRect: c.fillRect, print: (x, y, s, col) => c.print(x, y, String(s), col), textWidth: (s) => c.textWidth(String(s)),
-              line: c.line, fillCircle: globalThis.fill_circle },
-            { title: (info && info.title) || "", footer: [["JOG", "PG"], ["SHFT", "SECT"], ["CLK", "MENU"]] });
-        controller.renderOverlays({ fillRect: c.fillRect, print: (x, y, s, col) => c.print(x, y, String(s), col), textWidth: (s) => c.textWidth(String(s)) },
-                                  { clearScreen: globalThis.clear_screen });
-        const took = Date.now() - t0;
-        stats.renders++;
-        stats.renderMs += took;
-        stats.slowestRender = Math.max(stats.slowestRender, took);
-        c.setParam("melodee:described", describe());
+        if (controller) {
+            tick();
+            const canvas = opened || (controller.page && controller.page.canvas) || null;
+            if (canvas && info && info.height > 0)
+                drawCanvas(c, { x: info.x || 0, y: info.y || 0, w: info.width || 128, h: info.height }, canvas);
+        }
+        publish();
     },
     // The Move's controls, raw: knobs (CC 71-78) and their touches (notes
-    // 0-7), the jogwheel (CC 14, its push CC 3), Back (CC 51), Shift (CC 49).
+    // 0-7), the jogwheel (CC 14, its push CC 3), Back (CC 51), Shift (CC 49),
+    // Copy / Delete / Undo (CC 60 / 119 / 56), a pad (notes 68-99).
     onMidi(c, msg) {
         ctx = c;
         ensure();
-        if (!msg || !msg.data) return;
+        if (!controller || !msg || !msg.data) return;
         const data = msg.data;
-        if ((data[0] & 0xf0) === 0xb0 && data[1] === 49) { shift = data[2] > 0; return; }
+        if ((data[0] & 0xf0) === 0xb0 && data[1] === 49) { shift = data[2] > 0; publish(); return; }
+        const pressed = data[2] > 0 && (data[0] & 0xf0) !== 0x80;
+        if (pressed) exited = false; // a release (Back's own) leaves the answer as it was
+        if (enumPicker) { pickerMidi(data); publish(); return; }
+        if (opened) { openedMidi(data); publish(); return; }
+        if (lib.isHardwarePadPress && lib.isHardwarePadPress(data)) { controller.vouchLivePress(); publish(); return; }
         const intent = lib.decodeInput(data, { shift, mute: false });
-        if (!intent) return;
-        const todo = lib.applyInput(controller, intent, { nowMs: Date.now(), reveal: false });
-        exited = !!(todo && todo.action === "exit");
-        if (todo && todo.action === "menu" && todo.entry && todo.entry.action) c.setParam("melodee:action", String(todo.entry.action));
-        if (todo && todo.action === "open" && todo.meta && todo.meta.type === "string") {
-            const key = todo.key || bare(todo.fullKey || "");
-            pendingText = key;
-            c.openTextEntry({ title: todo.meta.label || todo.meta.name || key, initial: getParam(PREFIX + ":" + key) || "" });
-        }
-        c.setParam("melodee:described", describe());
+        if (intent) take(lib.applyInput(controller, intent, { nowMs: Date.now(), reveal: false }));
+        publish();
     },
+    // The keyboard's answer: a text parameter's, or a drawn page's.
     onTextEntry(c, answer) {
         ctx = c;
-        if (pendingText && answer && !answer.cancelled) setParam(PREFIX + ":" + pendingText, answer.text);
+        if (textForPage) { canvasPageHook(textForPage, "onTextEntry", answer); textForPage = null; }
+        else if (pendingText && answer && !answer.cancelled) setParam(PREFIX + ":" + pendingText, answer.text);
         pendingText = null;
-    },
-    handleBack(c) {
-        ctx = c;
-        if (menuEntered()) { controller.exitMenu(); return true; }
-        return false;
+        publish();
     },
 };
-let pendingText = null;
-for (const name of ["drawPage", "onMidi", "onTextEntry", "handleBack"])
+for (const name of ["drawPage", "onMidi", "onTextEntry"])
     globalThis.canvas_overlay[name] = guarded(name, globalThis.canvas_overlay[name]);

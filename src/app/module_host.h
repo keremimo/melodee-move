@@ -114,6 +114,9 @@ public:
     // (ui_hierarchy, chain_params), as JSON: what Schwung's chain host
     // answers for a module that does not serve it itself. Empty: none.
     std::string declared(const std::string& key) const;
+    // ui_hierarchy and chain_params as the module itself answered them when
+    // it was read (before it played); empty where it did not.
+    std::string served_hierarchy, served_chain_params;
     const ModuleInfo& info() const { return about; }
 
     std::vector<ModuleParam> params;
@@ -135,6 +138,10 @@ public:
     bool key_shown(size_t level, const std::string& key) const;
     bool page_shown(size_t page) const;
     std::vector<std::string> page_knobs(size_t page) const; // its knobs, hidden ones closed up
+    // The knobs on its item in the Device View, as on its box in Schwung's
+    // chain editor (shadow_ui.js buildChainKnobContext): root's declared
+    // knobs, else the first child level's, else chain_params in order.
+    std::vector<std::string> chain_knobs() const;
     std::string preset_param, preset_count_param, preset_name_param; // a preset list, where it has one
     int preset = 0, preset_count = 0;
     std::string preset_name;
@@ -213,6 +220,10 @@ public:
     // made last. The input goes to the device page apart (module_input()).
     void render_add(float* left, float* right, unsigned frames);
     bool live() const { return current != nullptr; }
+    // Bypassed (Mute + push on its item, as Schwung's bypass): the module
+    // still takes its notes and renders, so a tail rings on and nothing
+    // jumps when it comes back, but none of it is heard.
+    std::atomic<bool> bypassed {false};
 
 private:
     struct Command {

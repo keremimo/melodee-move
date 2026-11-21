@@ -28,6 +28,39 @@ void Studio::rescan_fx() { fx_catalog = scan_modules(modules_root, "audio_fx"); 
 
 FxModule* Studio::fx_module(uint8_t entry) { return entry < melodee::max_plugins ? fx[entry].get() : nullptr; }
 
+// What a Schwung effect's pages reach (schwung_pages.h). Once it plays, the
+// audio thread alone calls it, and nothing is asked of it there: its values
+// are the ones Melodee keeps (each set goes through fx_set), its contract as
+// it answered when it was read.
+CanvasPage::Host Studio::fx_host(uint8_t entry) {
+    CanvasPage::Host host;
+    host.get = [this, entry](const std::string& key) -> std::string {
+        FxModule* effect = fx_module(entry);
+        if (!effect || !effect->module) return {};
+        const auto& module = *effect->module;
+        if (key == "ui_hierarchy") return module.served_hierarchy;
+        if (key == "chain_params") return module.served_chain_params;
+        const ModuleParam* param = module.param(key);
+        return param ? param->text() : std::string();
+    };
+    host.set = [this, entry](const std::string& key, const std::string& value) {
+        if (FxModule* effect = fx_module(entry)) fx_set(*effect, key, value);
+    };
+    host.text_entry = [this](const std::string& title, const std::string& initial) {
+        typing = true;
+        typing_done = nullptr; // the pages': Studio::finish_typing() hands them the text
+        typing_room = 120;
+        typing_strip = 0;
+        typed = initial;
+        typing_title = title;
+        typing_track = int(selected);
+        pads_typing.store(true);
+    };
+    host.changed = [this] { changed(); };
+    host.open_file = [](const std::string&) {};
+    return host;
+}
+
 void Studio::fx_set(FxModule& effect, const std::string& key, const std::string& value) {
     if (!effect.module) return;
     if (ModuleParam* param = effect.module->param(key)) param->take(value);
@@ -181,6 +214,11 @@ void Studio::service_fx() {
                     param->take(value);
                 }
         }
+        // Its pages by Schwung's own code (schwung_pages.h), as a synth's.
+        std::unique_ptr<SchwungPages> pages;
+        if (loaded)
+            pages = start_pages(fx_host(uint8_t(entry)), *loaded, info.dir, saved.module == info.id ? saved.pages : std::vector<std::pair<std::string, std::string>> {},
+                                PagesTarget {selected, uint8_t(entry)});
         std::lock_guard<std::mutex> guard(lock);
         FxModule* effect = fx[entry].get();
         if (!effect) continue; // let go meanwhile: `loaded` destroyed here, never played
@@ -191,6 +229,7 @@ void Studio::service_fx() {
         }
         effect->missing = false;
         effect->module = std::move(loaded);
+        effect->schwung_pages = std::move(pages);
         effect->runner.attach(effect->module.get());
         effect->saved = {};
         effect->offered = true;

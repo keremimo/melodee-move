@@ -378,6 +378,22 @@ bool LoadedModule::page_shown(size_t n) const {
     return page.canvas < 0 || size_t(page.canvas) >= canvases.size() || key_shown(page.level, canvases[size_t(page.canvas)].key);
 }
 
+std::vector<std::string> LoadedModule::chain_knobs() const {
+    auto row = [&](bool root) -> const ModulePage* {
+        for (const auto& page : pages)
+            if (page.canvas < 0 && (page.level == 0) == root &&
+                std::any_of(page.knobs.begin(), page.knobs.end(), [](const std::string& key) { return !key.empty(); }))
+                return &page;
+        return nullptr;
+    };
+    if (const ModulePage* page = row(true)) return page->knobs;
+    if (const ModulePage* page = row(false)) return page->knobs;
+    std::vector<std::string> keys;
+    for (const auto& p : params)
+        if (!p.selector && keys.size() < 8) keys.push_back(p.key);
+    return keys;
+}
+
 std::vector<std::string> LoadedModule::page_knobs(size_t n) const {
     std::vector<std::string> keys;
     if (n >= pages.size()) return keys;
@@ -400,9 +416,11 @@ void LoadedModule::read_parameters() {
     auto manifest = parse(about.manifest);
     const auto& capabilities = field(manifest, "capabilities");
     // What the module says now wins over what its module.json says.
-    auto chain = parse(get_now("chain_params"));
+    served_chain_params = get_now("chain_params");
+    served_hierarchy = get_now("ui_hierarchy");
+    auto chain = parse(served_chain_params);
     if (!chain.isArray()) chain = field(capabilities, "chain_params");
-    auto hierarchy = parse(get_now("ui_hierarchy"));
+    auto hierarchy = parse(served_hierarchy);
     if (!hierarchy.isObject()) hierarchy = field(capabilities, "ui_hierarchy");
 
     std::map<std::string, std::string> max_params;
@@ -847,7 +865,7 @@ bool SynthPlayer::next_block() {
 
 void SynthPlayer::render(const move::AudioBlock& input, move::AudioBlock& output, float gain) {
     module_input(input);
-    if (!next_block()) return;
+    if (!next_block() || bypassed.load(std::memory_order_relaxed)) return;
     for (unsigned n = 0; n < block.size(); ++n) {
         int64_t mixed = int64_t(output[n]) + int64_t(float(block[n]) * gain * 65536.0f);
         output[n] = int32_t(std::clamp<int64_t>(mixed, INT32_MIN + 1, INT32_MAX));
@@ -863,7 +881,7 @@ void SynthPlayer::render_add(float* left, float* right, unsigned frames) {
         }
         unsigned n = std::min(frames, move::audio_frames - block_used);
         const int16_t* from = block.data() + 2 * block_used;
-        for (unsigned f = 0; f < n; ++f) {
+        for (unsigned f = 0; f < n && !bypassed.load(std::memory_order_relaxed); ++f) {
             left[f] += float(from[2 * f]) * scale;
             right[f] += float(from[2 * f + 1]) * scale;
         }

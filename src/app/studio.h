@@ -28,6 +28,7 @@
 #include <chrono>
 #include <functional>
 #include <map>
+#include <optional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -318,7 +319,25 @@ public:
     void synth_set(ModuleTrack& track, const std::string& key, const std::string& value);
     std::string module_get(ModuleTrack& track, const std::string& key); // now, as a page script asks
     CanvasPage::Host canvas_host(unsigned track);
-    static constexpr int typing_schwung_pages = -2; // typing_canvas: the text is Schwung's pages' (a module's text parameter)
+    CanvasPage::Host fx_host(uint8_t entry); // a Schwung effect's (studio_fx.cpp)
+    static constexpr int typing_schwung_pages = -2; // typing_canvas: the text is Schwung's pages' (typing_pages)
+    // A module whose pages Schwung's code has (schwung_pages.h): a track's
+    // synth, or a Schwung effect (its plug-in entry).
+    struct PagesTarget {
+        unsigned track = 0;
+        uint8_t fx_entry = melodee::no_plugin;
+        bool operator==(const PagesTarget& o) const { return track == o.track && fx_entry == o.fx_entry; }
+    };
+    PagesTarget pages_target;                   // whose pages screens/module_pages.cpp shows
+    PagesTarget typing_pages;                   // whose keyboard is open
+    std::optional<PagesTarget> swap_from_pages;   // a Swap Module asked from its pages
+    std::optional<PagesTarget> remove_from_pages; // a Remove Module asked from its pages
+    SchwungPages* pages_of(PagesTarget target);
+    std::unique_ptr<SchwungPages> start_pages(CanvasPage::Host host, const LoadedModule& module, const std::string& dir,
+                                              const std::vector<std::pair<std::string, std::string>>& kept, PagesTarget target);
+    std::string pages_trailing(PagesTarget target, bool instrument);
+    void pages_action(PagesTarget target, const std::string& action);
+    void remove_module(PagesTarget target); // Remove Module: the synth's module (the track stays, empty) or the effect
     std::vector<ModuleInfo> catalog;
     std::string modules_root;
     void rescan_modules();

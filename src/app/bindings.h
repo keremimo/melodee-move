@@ -39,7 +39,7 @@ enum class Screen : uint8_t {
     ToPads,
     Sampling,
     Typing,
-    Canvas,     // a module's own page, entered
+    Canvas,     // a module's pages entered (Schwung's), or its own drawn page
     Tracks,     // the sixteen tracks, latched (Shift + Note/Session)
     Mixer,      // Shift + Step 4: the sixteen tracks' levels, pans, sends, the main out
     KnobFx,     // Shift + Step 4 again: Knob FX

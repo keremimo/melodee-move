@@ -47,7 +47,7 @@ public:
         // push and Shift + push are theirs there.
         auto effects = fx.track_items();
         focus = std::min(focus, 1 + int(effects.size()));
-        if (focus >= 2 && fx.job(effects[size_t(focus - 2)], job, use)) return true;
+        if (focus >= 2 && fx.job(effects[size_t(focus - 2)], job, use)) { focus += fx.take_moved(); return true; }
         if (focus == 0 && fx.mix_job(studio.track(), job, use)) return true;
         switch (job) {
         case Job::PlayPad: case Job::SelectPadQuietly:

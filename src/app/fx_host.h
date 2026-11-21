@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #pragma once
 #include "app/module_host.h"
+#include "app/schwung_pages.h"
 #include "app/project_store.h"
 #include "melodee/model/limits.h"
 #include "melodee/plugin/plugin_runner.h"
@@ -64,6 +65,7 @@ struct FxModule {
     bool offered = false;   // its runner is the engine host's
     bool missing = false;   // the module is not installed: the slot passes the sound through
     unsigned page = 0;      // the screen's: its page of knobs
+    std::unique_ptr<SchwungPages> schwung_pages; // its pages by Schwung's own code (schwung_pages.h); null: Melodee's own
 };
 
 // Its state as the project file keeps it (the PLUG entry's): the module's

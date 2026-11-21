@@ -25,6 +25,10 @@ phase() { echo "== $1 ($(( $(date +%s) - START )) s)"; }
 # Every core, and ccache where build.sh gave it a cache: the cache is the
 # host's, shared by every checkout and worktree (each is /work here, so the
 # same source compiles once for all of them).
+# A module's pages are Schwung's own page code's (src/app/schwung_pages.h):
+# every run here, the tests and the simulated Move, uses the release the Move
+# runs, fetched by tools/dependencies.py.
+export MELODEE_SCHWUNG_SHARED="$PWD/build/deps/schwung/shared"
 JOBS=$(nproc)
 phase "make -j$JOBS"
 if command -v ccache > /dev/null 2>&1 && [ -d /ccache ]; then
