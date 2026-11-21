@@ -420,6 +420,10 @@ public:
     std::string listing_folder;                  // the folder in view, under the root ("" the top)
     projects::Folder listing;                    // as read last
     unsigned listings = 0;                       // how many times read, for screens waiting on one
+    // Files changed from outside (the web page's uploads, renames, deletes, folders): the browser lists its folder
+    // again, the projects their folder (`melodee-files-changed`). Under `lock`.
+    unsigned file_changes = 0;
+    void files_changed();
     std::string project_message;                 // what the last job said ("" fine)
     Settings settings;
     void settings_changed();                     // Setup changed a setting: kept, and the audio thread told

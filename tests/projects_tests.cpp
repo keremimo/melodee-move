@@ -7,6 +7,7 @@
 #include "move/controls.h"
 #include "move/tools.h"
 #include <chrono>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -311,6 +312,19 @@ void test_projects() {
     press(melodee, Button::Undo);
     CHECK(!melodee.studio().project().tracks[0].pads[0].used());
     CHECK(has(status(), "undo_last=LOAD_KIT"));
+
+    // A project put into the folder from outside (the web page's upload): the projects look again.
+    shift_step(melodee, 0);
+    melodee.service();
+    auto items = [&] { auto line = status(); auto at = line.find("overview_items="); return at == std::string::npos ? -1 : std::atoi(line.c_str() + at + 15); };
+    int before = items();
+    CHECK(has(status(), "page=projects") && before >= 2);
+    std::filesystem::copy_file(home + "/Projects/Movea 2.mldp", home + "/Projects/Uploaded.mldp");
+    melodee.service();
+    CHECK(items() == before); // nothing said: not read again
+    CHECK(melodee.command("melodee-files-changed") == "ok");
+    melodee.service();
+    CHECK(items() == before + 1);
 }
 
 void test_setup_and_tracks() {

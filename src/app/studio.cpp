@@ -2061,6 +2061,11 @@ std::string Studio::project_name() const { return projects::name_of(path); }
 
 void Studio::ask_projects(ProjectJob job) { project_jobs.push_back(std::move(job)); }
 
+void Studio::files_changed() {
+    ++file_changes;
+    if (listings) ask_projects({}); // the projects' folder read again, if one was ever read
+}
+
 void Studio::setup_modules_from(const PluginStates& states, const melodee::PrintTable& prints) {
     // Schwung's modules: each PLUGIN track whose entry holds a module's
     // state, and each PLUGIN track with none yet (a synth track waiting for

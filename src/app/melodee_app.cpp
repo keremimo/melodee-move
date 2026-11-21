@@ -697,6 +697,12 @@ std::string MelodeeApp::command(const std::string& line) {
         std::lock_guard<std::mutex> guard(own->lock);
         return own->loops().remote(line.substr(14));
     }
+    // melodee-files-changed: the web page changed Melodee's folder; the browser and the projects look again.
+    if (line == "melodee-files-changed") {
+        std::lock_guard<std::mutex> guard(own->lock);
+        own->files_changed();
+        return "ok";
+    }
     // melodee-render [serial|parallel]: the render workers left asleep (the
     // audio thread renders alone) or used, from the next block (MELODEE.md › Remote).
     if (line.compare(0, 14, "melodee-render") == 0) {

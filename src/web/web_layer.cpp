@@ -84,6 +84,7 @@ void WebLayer::draw(juce::Graphics& g) {
 
 void WebLayer::service() {
     inner.service();
+    if (web.take_files_changed()) inner.command("melodee-files-changed"); // Load and the projects look again
     if (!serving) return;
     const auto now = Clock::now();
     if (now < next_look) return;

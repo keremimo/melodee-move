@@ -64,7 +64,13 @@ public:
         root = folder = places[size_t(std::max(place, 0))].path;
     }
 
-    void enter() override { seen_installs = sampling().installs; seen_deletes = sampling().deletes; list_folder(); landed(); }
+    void enter() override {
+        seen_installs = sampling().installs;
+        seen_deletes = sampling().deletes;
+        seen_changes = studio.file_changes;
+        list_folder();
+        landed();
+    }
     void leave() override { sampling().preview_file("", studio.track()); }
 
     bindings::Screen screen_kind() const override { return bindings::Screen::Browser; }
@@ -113,6 +119,13 @@ public:
             if (!s.installed.empty()) open_folder(s.installed);
         }
         if (s.deletes != seen_deletes) { seen_deletes = s.deletes; list_folder(); landed(); }
+        if (studio.file_changes != seen_changes) { // the web page put a file here, or took one away
+            seen_changes = studio.file_changes;
+            const auto* was = cursor < int(entries.size()) ? &entries[size_t(cursor)] : nullptr;
+            std::string name = was ? was->name : std::string();
+            list_folder();
+            if (!name.empty()) land_on(name);
+        }
         // The pad a file loads onto blinks (the Move's browser), the kit's in their colour, where the pad layout puts them.
         kit_pads(studio, lights, int(studio.pad()));
         steps_playhead(studio, lights);
@@ -310,7 +323,7 @@ private:
     std::string root, folder;
     std::vector<Entry> entries;
     int cursor = 0;
-    unsigned seen_installs = 0, seen_deletes = 0;
+    unsigned seen_installs = 0, seen_deletes = 0, seen_changes = 0;
     std::string pending, refused;
 };
 

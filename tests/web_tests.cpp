@@ -304,7 +304,9 @@ public:
     void surface(const move::SurfaceEvent& event) override { seen.push_back(event.input); }
     void draw(juce::Graphics& g) override { g.fillRect(0, 0, 4, 4); ++draws; }
     std::string status() const override { return "app=yes"; }
+    std::string command(const std::string& line) override { commands.push_back(line); return {}; }
     std::vector<move::Input> seen;
+    std::vector<std::string> commands;
     int draws = 0;
 };
 
@@ -365,6 +367,15 @@ void test_layer(const fs::path& scratch) {
     CHECK(app.seen.size() == before);
     unsigned seconds = 0;
     CHECK(layer.page().pairing().state("10.0.0.5", Clock::now(), seconds) == "refused");
+
+    // A file put into Melodee's folder from the page: the app's browser and projects look again, once.
+    web::Request up = request("POST", "/api/upload", {{"path", ""}, {"name", "Snare.wav"}});
+    up.length = 4;
+    CHECK(layer.page().handle(up, body_of("RIFF")).status == 200);
+    layer.service();
+    CHECK(app.commands.size() == 1 && app.commands[0] == "melodee-files-changed");
+    layer.service();
+    CHECK(app.commands.size() == 1);
 }
 
 } // namespace
