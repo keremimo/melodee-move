@@ -265,6 +265,10 @@ std::unique_ptr<CanvasPage> CanvasPage::load(const std::string& script, Host hos
     std::ifstream in(script, std::ios::binary);
     if (!in) { error = "no " + script; return nullptr; }
     std::string source((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    return load_source(source, script, std::move(host), error);
+}
+
+std::unique_ptr<CanvasPage> CanvasPage::load_source(const std::string& source, const std::string& script, Host host, std::string& error) {
 
     std::unique_ptr<CanvasPage> page(new CanvasPage());
     page->host = std::move(host);

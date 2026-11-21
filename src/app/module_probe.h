@@ -14,4 +14,9 @@ namespace app {
 // that fetches in the background), and entered with a turn of the jogwheel.
 int probe_modules(const std::string& root, const std::string& pictures = {});
 
+// Module `id` under `root` drawn by Schwung's own knob-page code
+// (schwung_pages.h), driven with the Move's controls as raw MIDI: each
+// step's screen a PNG in `pictures`, and how long a screen took.
+int probe_schwung_pages(const std::string& root, const std::string& id, const std::string& pictures);
+
 } // namespace app

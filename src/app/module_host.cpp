@@ -327,6 +327,13 @@ const ModuleParam* LoadedModule::param(const std::string& key) const {
     return nullptr;
 }
 
+std::string LoadedModule::declared(const std::string& key) const {
+    auto manifest = parse(about.manifest);
+    const auto& value = field(field(manifest, "capabilities"), key.c_str());
+    if (value.isVoid() || value.isUndefined()) return {};
+    return juce::JSON::toString(value, true).toStdString();
+}
+
 bool LoadedModule::shown(const ShownIf& rule) const {
     using Test = ShownIf::Test;
     if (rule.test == Test::Always) return true;

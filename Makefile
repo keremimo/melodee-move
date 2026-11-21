@@ -85,6 +85,8 @@ $(WEB_BUNDLE): tools/web_bundle.py $(wildcard src/web/static/*) docs/GUIDE.md
 	@mkdir -p $(@D)
 	MELODEE=$(MELODEE) python3 tools/web_bundle.py $@
 build/obj/web/web_bundle.o: $(WEB_BUNDLE)
+# Schwung's pages' seam (src/app/schwung_pages.h), carried the same way.
+build/obj/app/schwung_pages.o: src/app/schwung_pages/host.js
 build/obj/web/web_page.o: CPPFLAGS += -DMELODEE_MOVE_VERSION=\"v$(VERSION)\"
 WEB_TESTS := build/web-tests
 $(WEB_TESTS): build/obj/tests/web_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS) $(MELODEE_LIBRARY)

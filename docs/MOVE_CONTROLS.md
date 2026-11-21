@@ -275,10 +275,10 @@ while Shift is held.
 | Control | On the Move | In Melodee | Status |
 | --- | --- | --- | --- |
 | Wheel turn (Play) | Device View: walks the Track Preset, its instrument, sample and effects | Walks the track, its sound (a kit's last pad, a module's preset) and its effects | done |
-| Wheel push (Play) | Opens the browser for the item in focus | Opens its browser: a synth's track its Schwung modules, a kit's track (KIT) and pad Load (kits, banks, samples; the track types' sheet not yet); the module's presets; Schwung's effects | done |
+| Wheel push (Play) | Opens the browser for the item in focus | Opens its browser: a synth's track its Schwung modules, a kit's track (KIT) and pad Load (kits, banks, samples; the track types' sheet not yet); on a module, Schwung's click (a touched knob's parameter, else its Sections; its presets are its first page); Schwung's effects | done |
 | Shift + Wheel push (Play, kit) | Sample Options for the sample in focus: Slice, Reverse | Sample Options: Chop, Reverse, Trim, Normalize, Save | done |
-| Shift + Wheel push (Play, synth) | No job (in the browser, Shift opens Options: Save Preset) | The module's menu: its levels, presets and own pages | done |
-| Shift + Wheel turn (Play) | The parameter banks of the instrument or sample in focus | The pad pages, a module's pages | done |
+| Shift + Wheel push (Play, synth) | No job (in the browser, Shift opens Options: Save Preset) | Schwung's Shift + click on the module's pages (Schwung's own code draws them, docs/UI.md); without Schwung's code, the module's menu: its levels, presets and own pages | done |
+| Shift + Wheel turn (Play) | The parameter banks of the instrument or sample in focus | The pad pages, a module's pages (Schwung's, then ARP and CHORD) | done |
 | Wheel touch (Play) | Highlights the sample (audio track) | Names the item in focus | done |
 | Mute held + Wheel push (Play) | No job (Control Live: deactivates the device) | Bypasses the effect in focus, or brings it back | done |
 | Delete held + Wheel push (Play) | No job | Removes the effect in focus; the rest close up | done |

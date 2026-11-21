@@ -6,6 +6,13 @@ Melodee for Ableton Move as Schwung's module catalog installs it
 
 ## Unreleased
 
+- A Schwung module's pages and menus now look and work as under Schwung,
+  drawn by Schwung's own code: its knob grid and widgets, its presets page
+  and Sections list, its pages shown or hidden as the module asks
+  (Schimera's Vowel pages in Vowel mode), and a module's drawn pages in
+  place with their knobs (Schimera's mouth). A text parameter opens the
+  keyboard: touch its knob and push the wheel (Schimera's Lyrics). Auto
+  Sample is on the last page, Melodee.
 - Pad lights fade. A pad going to a new colour (a press, a sound, a page
   changing) now gets there smoothly through the Move's true RGB instead of
   jumping between the palette's few shades: up in a quarter of Setup's PAD

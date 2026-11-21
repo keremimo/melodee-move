@@ -56,6 +56,9 @@ public:
     };
     // Reads and starts `script`. Null with `error` set when it cannot.
     static std::unique_ptr<CanvasPage> load(const std::string& script, Host host, std::string& error);
+    // The same from a script held in memory, `script` its name (where its
+    // relative imports start from).
+    static std::unique_ptr<CanvasPage> load_source(const std::string& source, const std::string& script, Host host, std::string& error);
     ~CanvasPage();
 
     // What a draw is told besides the values: which page (a canvas

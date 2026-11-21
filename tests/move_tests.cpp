@@ -16,6 +16,7 @@
 #include "move/tools.h"
 #include "spike/spike_app.h"
 #include "app/canvas_page.h"
+#include "app/schwung_pages.h"
 #include <juce_core/juce_core.h>
 #include "app/melodee_app.h"
 #include "app/pad_layout.h"
@@ -843,6 +844,73 @@ void test_module_pages_shown() {
     if (wave) wave->value = 0;                                                     // Sine
     CHECK(!loaded->page_shown(0) && loaded->page_shown(1) && loaded->page_shown(2));
     CHECK((loaded->page_knobs(1) == std::vector<std::string> {"level", "words", "voices"}));
+}
+
+void test_schwung_pages() {
+    // A module's pages drawn by Schwung's own knob-page code (schwung_pages.h)
+    // against the fake module: its contract from module.json, a knob turned
+    // writes, and Melodee's trailing page hands its action back. Needs a
+    // Schwung checkout in build/schwung-src; skipped without one.
+    const std::string shared = "build/schwung-src/src/shared";
+    if (!std::filesystem::exists(shared + "/param_pages/page_controller.mjs")) {
+        std::cerr << "schwung pages: no Schwung checkout in build/schwung-src, skipped\n";
+        return;
+    }
+    setenv("MELODEE_SCHWUNG_SHARED", shared.c_str(), 1);
+    auto found = app::scan_modules("build/test-modules");
+    CHECK(found.size() == 1);
+    if (found.empty()) return;
+    std::string error;
+    auto module = app::LoadedModule::load(found[0], error);
+    CHECK(module != nullptr);
+    if (!module) return;
+    std::vector<std::string> writes, actions;
+    app::CanvasPage::Host host;
+    host.get = [&](const std::string& key) {
+        auto answer = module->get_now(key);
+        return answer.empty() && (key == "ui_hierarchy" || key == "chain_params") ? module->declared(key) : answer;
+    };
+    host.set = [&](const std::string& key, const std::string& value) { writes.push_back(key + "=" + value); module->set_now(key, value); };
+    host.text_entry = [](const std::string&, const std::string&) {};
+    host.open_file = [](const std::string&) {};
+    const std::string trailing = R"([{"name": "Melodee", "entries": [{"label": "Auto Sample", "action": "melodee:auto_sample"}]}])";
+    auto pages = app::SchwungPages::load(host, found[0].dir, trailing, [&](const std::string& action) { actions.push_back(action); }, error);
+    CHECK(pages != nullptr);
+    if (!pages) { std::cerr << "schwung pages: " << error << '\n'; unsetenv("MELODEE_SCHWUNG_SHARED"); return; }
+    juce::Image screen(juce::Image::ARGB, 128, 64, true);
+    auto draw = [&](int times) {
+        for (int n = 0; n < times; ++n) {
+            juce::Graphics g(screen);
+            g.fillAll(juce::Colours::black);
+            pages->draw(g);
+            std::this_thread::sleep_for(std::chrono::milliseconds(25));
+        }
+    };
+    draw(10);
+    CHECK(module->declared("ui_hierarchy").find("levels") != std::string::npos);
+    CHECK(pages->page_count() >= 2 && !pages->page_name().empty());
+    int lit = 0;
+    for (int y = 0; y < 64; ++y)
+        for (int x = 0; x < 128; ++x) lit += screen.getPixelAt(x, y).getBrightness() > 0.5f;
+    CHECK(lit > 100); // a page drawn, not a blank
+    // To its root page (Schwung calls it Main), knob 1 touched and turned: the module is written.
+    for (int n = 0; n < pages->page_count() && pages->page_name() != "Main"; ++n) { pages->midi(0xb0, 14, 1); draw(1); }
+    pages->midi(0x90, 0, 127);
+    for (int n = 0; n < 4; ++n) pages->midi(0xb0, 71, 1);
+    draw(4);
+    pages->midi(0x80, 0, 0);
+    draw(2);
+    CHECK(!writes.empty());
+    if (writes.empty()) std::cerr << "schwung pages: no write; on page " << pages->page_name() << " of " << pages->page_count() << '\n';
+    // Melodee's page last: its entry pushed, its action back to Melodee.
+    for (int n = 0; n < 2 * pages->page_count() && pages->page_name() != "Melodee"; ++n) { pages->midi(0xb0, 14, 1); draw(1); }
+    CHECK(pages->page_name() == "Melodee");
+    pages->midi(0xb0, 3, 127); pages->midi(0xb0, 3, 0); draw(1);
+    CHECK(pages->wants_wheel());
+    pages->midi(0xb0, 3, 127); pages->midi(0xb0, 3, 0); draw(1);
+    CHECK((actions == std::vector<std::string> {"melodee:auto_sample"}));
+    pages->midi(0xb0, 51, 127); pages->midi(0xb0, 51, 0); draw(1);
+    unsetenv("MELODEE_SCHWUNG_SHARED");
 }
 
 void test_schwung_modules() {
@@ -2799,6 +2867,7 @@ int main() {
     test_module_macros();
     test_schwung_modules();
     test_module_pages_shown();
+    test_schwung_pages();
     test_canvas_page();
     test_synth_track();
     test_module_replace();

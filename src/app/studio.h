@@ -11,6 +11,7 @@
 #include <functional>
 #include "app/keys.h"
 #include "app/module_host.h"
+#include "app/schwung_pages.h"
 #include "app/pad_layout.h"
 #include "app/project_store.h"
 #include "move/app.h"
@@ -114,6 +115,7 @@ struct ModuleTrack {
     std::unique_ptr<LoadedModule> module;
     std::vector<std::unique_ptr<LoadedModule>> leaving;
     std::vector<std::unique_ptr<CanvasPage>> canvas_pages; // one a module->canvases, null where its script failed
+    std::unique_ptr<SchwungPages> schwung_pages;           // its pages drawn by Schwung's own code; null: Melodee draws them
     SynthFile saved;            // as the project file has it: kept while the module is missing
     std::string job;            // a module to load (the service thread's)
     bool job_restores = false;  // set as `saved` has it (a project opened, a track copied)
@@ -316,6 +318,7 @@ public:
     void synth_set(ModuleTrack& track, const std::string& key, const std::string& value);
     std::string module_get(ModuleTrack& track, const std::string& key); // now, as a page script asks
     CanvasPage::Host canvas_host(unsigned track);
+    static constexpr int typing_schwung_pages = -2; // typing_canvas: the text is Schwung's pages' (a module's text parameter)
     std::vector<ModuleInfo> catalog;
     std::string modules_root;
     void rescan_modules();

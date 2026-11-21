@@ -1071,6 +1071,10 @@ void Studio::finish_typing(bool cancelled) {
     auto* module = typing_track >= 0 ? module_track(unsigned(typing_track)) : nullptr;
     int index = typing_canvas;
     typing_canvas = typing_track = -1;
+    if (module && index == typing_schwung_pages && module->schwung_pages) {
+        module->schwung_pages->text_entered(typed, cancelled);
+        return;
+    }
     if (module && index >= 0 && index < int(module->canvas_pages.size()) && module->canvas_pages[size_t(index)])
         module->canvas_pages[size_t(index)]->text_entered(typed, cancelled);
 }
@@ -2064,6 +2068,31 @@ std::string Studio::load_module_now(unsigned t, const std::string& id, const Syn
                 for (const auto& [key, state] : saved->pages)
                     if (key == canvas.key) started.back()->restore_state(state);
         }
+    // Its pages and menus as Schwung draws them, by Schwung's own code where
+    // the Move has it (schwung_pages.h); Melodee's AUTO SAMPLE a page after
+    // the module's, for an instrument.
+    std::unique_ptr<SchwungPages> schwung_pages;
+    if (loaded && !SchwungPages::shared_folder().empty()) {
+        std::string failed;
+        std::string trailing = loaded->source ? "[]" : R"([{"name": "Melodee", "entries": [{"label": "Auto Sample", "action": "melodee:auto_sample"}]}])";
+        auto host = canvas_host(t);
+        auto asked = host.get;
+        std::map<std::string, std::string> contract {{"ui_hierarchy", loaded->declared("ui_hierarchy")}, {"chain_params", loaded->declared("chain_params")}};
+        host.get = [asked, contract](const std::string& key) { // what its module.json declares, where the module does not say
+            auto answer = asked(key);
+            auto declared = contract.find(key);
+            return answer.empty() && declared != contract.end() ? declared->second : answer;
+        };
+        auto typed = host.text_entry;
+        host.text_entry = [this, typed](const std::string& title, const std::string& initial) {
+            typed(title, initial);
+            typing_canvas = typing_schwung_pages;
+        };
+        schwung_pages = SchwungPages::load(std::move(host), info.dir, trailing, [this, t](const std::string& action) {
+            if (action == "melodee:auto_sample" && t == selected) open("auto-sample");
+        }, failed);
+        if (!schwung_pages) std::fprintf(stderr, "melodee-move: %s's pages by Schwung's code would not start: %s\n", id.c_str(), failed.c_str());
+    }
     std::unique_lock<std::mutex> guard(lock);
     auto* track = modules[t].get();
     if (!track) return "track gone"; // deleted meanwhile: `loaded` destroyed here, never played
@@ -2088,6 +2117,7 @@ std::string Studio::load_module_now(unsigned t, const std::string& id, const Syn
     if (track->module) track->leaving.push_back(std::move(track->module));
     track->module = std::move(loaded);
     track->canvas_pages.swap(started); // the module before's pages end with this function, outside the lock
+    track->schwung_pages.swap(schwung_pages);
     track->canvas_open = -1;
     track->canvas_entered = false;
     if (typing && typing_track == int(t)) { typing = false; pads_typing.store(false); typing_canvas = typing_track = -1; }

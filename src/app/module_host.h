@@ -110,6 +110,10 @@ public:
 
     ModuleParam* param(const std::string& key);
     const ModuleParam* param(const std::string& key) const;
+    // A contract key its module.json declares under capabilities
+    // (ui_hierarchy, chain_params), as JSON: what Schwung's chain host
+    // answers for a module that does not serve it itself. Empty: none.
+    std::string declared(const std::string& key) const;
     const ModuleInfo& info() const { return about; }
 
     std::vector<ModuleParam> params;

@@ -39,6 +39,8 @@ public:
         auto* track = const_cast<Studio&>(studio).module_track();
         if (!track || !track->module) return bindings::Screen::Play;
         if (browsing) return bindings::Screen::Browser;
+        if (const SchwungPages* pages = schwung(*track)) // its menu, a list, an entered page: the wheel and Back are Schwung's
+            return pages->wants_wheel() ? bindings::Screen::Canvas : bindings::Screen::Play;
         if (shown_canvas(*track) >= 0 && track->canvas_entered) return bindings::Screen::Canvas; // a door until pushed
         if (track->menu_open) return bindings::Screen::List;
         return bindings::Screen::Play;
@@ -49,6 +51,15 @@ public:
             held[input.index] = input.pressed;
             if (input.pressed) last_pad = int(input.index);
         }
+        // Schwung's pages read the knobs' touches (a cell held, its value
+        // shown large) and Shift (fine turns) as its shadow UI does.
+        if (auto* track = studio.module_track(); track)
+            if (SchwungPages* pages = schwung(*track)) {
+                if (input.kind == move::Input::Kind::Touch && input.index < 8)
+                    pages->midi(input.pressed ? 0x90 : 0x80, input.index, input.pressed ? 127 : 0);
+                if (input.kind == move::Input::Kind::Button && input.index == uint8_t(move::Button::Shift))
+                    pages->midi(0xb0, move::button_cc(move::Button::Shift), input.pressed ? 127 : 0);
+            }
         fx.input(input);
     }
 
@@ -63,6 +74,7 @@ public:
         bool device = !browsing && !track->menu_open && shown_canvas(*track) < 0;
         if (device && focus >= 2 && fx.job(effects[size_t(focus - 2)], job, use)) return true;
         if (device && focus == 0 && fx.mix_job(studio.track(), job, use)) return true;
+        if (SchwungPages* pages = schwung(*track); pages && schwung_job(*track, *pages, job, use)) return true;
         switch (job) {
         case Job::PlayNote: return true; // its sound went from the audio thread
         case Job::TurnKnob: case Job::TurnKnobFine:
@@ -131,7 +143,8 @@ public:
         for (auto button : {Button::Left, Button::Right, Button::Loop, Button::Menu}) lights.button(button, 0);
         lights.button(Button::Up, octave < highest_octave ? white_dim : 0);
         lights.button(Button::Down, octave > lowest_octave ? white_dim : 0);
-        lights.button(Button::Back, track && (browsing || track->menu_open || track->canvas_entered || track->canvas_open >= 0) ? white_dim : 0);
+        const SchwungPages* pages = track ? schwung(*track) : nullptr;
+        lights.button(Button::Back, track && (browsing || track->menu_open || track->canvas_entered || track->canvas_open >= 0 || (pages && pages->wants_wheel())) ? white_dim : 0);
     }
 
     void draw(juce::Graphics& g) override {
@@ -148,6 +161,7 @@ public:
             browsing = track->menu_open = track->canvas_entered = false;
             track->canvas_open = -1;
         }
+        if (SchwungPages* pages = schwung(*track)) { pages->draw(g); return; } // the whole screen, as Schwung draws it
         if (int shown = shown_canvas(*track); shown >= 0 && track->canvas_entered) { draw_canvas(g, *track, shown); return; }
         if (track->menu_open) { draw_menu(g, *track); return; }
         if (browsing) { draw_presets(g, *track); return; }
@@ -159,7 +173,7 @@ public:
         auto effects = fx.track_items();
         focus = std::min(focus, 1 + int(effects.size()));
         ui::rail(g, upper(module.info().abbrev).substr(0, 4), track_number(studio),
-                 focus == 0 ? "MIX" : focus >= 2 ? fx.rail_bottom(effects[size_t(focus - 2)]) : std::to_string(position(*track) + 1) + "/" + std::to_string(shown_pages(*track).size() + 2));
+                 focus == 0 ? "MIX" : focus >= 2 ? fx.rail_bottom(effects[size_t(focus - 2)]) : std::to_string(position(*track) + 1) + "/" + std::to_string((track->schwung_pages ? size_t(track->schwung_pages->page_count()) : shown_pages(*track).size()) + 2));
         fx.draw_row(g, item(*track, 0), item(*track, 1), effects, focus);
         if (focus == 0) { fx.draw_mix(g, studio.track()); return; }
         if (focus >= 2) { fx.draw(g, effects[size_t(focus - 2)]); return; }
@@ -205,6 +219,7 @@ public:
     Knob knob(unsigned which) const override {
         if (const NotePage* own = const_cast<SynthPlay*>(this)->melodee_page()) return note_page_knob(studio, studio.track(), *own, which);
         auto* track = const_cast<Studio&>(studio).module_track();
+        if (track && schwung(*track)) return {}; // Schwung's pages show a touched knob themselves
         if (track && track->module && !browsing && !track->menu_open && shown_canvas(*track) < 0) {
             if (focus == 0) return fx.mix_knob(studio.track(), which);
             auto effects = fx.track_items();
@@ -226,7 +241,9 @@ public:
         auto* track = const_cast<Studio&>(studio).module_track();
         if (!track) return " menu=- canvas=- entered=0";
         int shown = shown_canvas(*track);
-        return std::string(" menu=") + (track->menu_open && !track->menu_path.empty() ? track->menu_path.back() : "-") + " canvas="
+        const SchwungPages* pages = schwung(*track);
+        return std::string(" schwung_page=") + (pages ? pages->page_name() + "," + std::to_string(pages->page_index() + 1) + "/" + std::to_string(pages->page_count()) + (pages->wants_wheel() ? ",wheel" : "") : "-")
+             + " menu=" + (track->menu_open && !track->menu_path.empty() ? track->menu_path.back() : "-") + " canvas="
              + (shown >= 0 ? track->module->canvases[size_t(shown)].key : "-") + " entered=" + std::to_string(int(track->canvas_entered));
     }
 
@@ -246,10 +263,56 @@ private:
         uint8_t at = own_page[studio.track()];
         return at ? &pages[at] : nullptr;
     }
+    // Schwung's own code drawing the module's pages (schwung_pages.h): on
+    // the module's item, off ARP and CHORD, no sheet of Melodee's over it.
+    SchwungPages* schwung(const ModuleTrack& track) const {
+        if (!track.module || !track.schwung_pages || studio.top() != this) return nullptr;
+        if (focus != 1 || browsing || own_page[studio.track()]) return nullptr;
+        return track.schwung_pages.get();
+    }
+
+    // The Move's controls to Schwung's pages, as its shadow UI takes them:
+    // knobs turn, the wheel's push is its click (with Shift held, its own
+    // Shift + click), Shift + the wheel its pages (on to ARP and CHORD after
+    // its last), and while it has the wheel (its menu, a list, an entered
+    // page) the wheel and Back. The wheel alone still walks the Device View.
+    bool schwung_job(ModuleTrack& track, SchwungPages& pages, bindings::Job job, const bindings::Use& use) {
+        using bindings::Job;
+        auto cc = [&](uint8_t number, uint8_t value) { pages.midi(0xb0, number, value); };
+        auto press = [&](move::Button button) { cc(move::button_cc(button), 127); cc(move::button_cc(button), 0); };
+        auto wheel = [&](int delta) { // one message a detent, as the Move sends them
+            for (int n = 0; n < std::min(std::abs(delta), 16); ++n) cc(move::main_knob_cc, delta > 0 ? 1 : 127);
+        };
+        switch (job) {
+        case Job::TurnKnob: case Job::TurnKnobFine:
+            if (use.index < 0 || use.index >= 8 || !use.delta) return true;
+            for (int n = 0; n < std::min(std::abs(use.delta), 16); ++n) cc(uint8_t(71 + use.index), use.delta > 0 ? 1 : 127);
+            studio.changed();
+            return true;
+        case Job::Page: {
+            if (pages.wants_wheel()) { wheel(use.delta); return true; }
+            if (use.delta > 0 && pages.page_index() >= pages.page_count() - 1) { page_by(track, 1); return true; } // on to ARP
+            cc(move::button_cc(move::Button::Shift), 0); // Shift is the binding's here: a page, not Schwung's section jump
+            wheel(use.delta > 0 ? 1 : -1);
+            cc(move::button_cc(move::Button::Shift), 127);
+            return true;
+        }
+        case Job::OpenBrowser: case Job::ModuleMenu: case Job::CanvasPush: case Job::ListPush:
+            press(move::Button::MainPush);
+            return true;
+        case Job::CanvasTurn: case Job::ListTurn: case Job::ListTurnFine: wheel(use.delta); return true;
+        case Job::Back: case Job::CanvasBack:
+            press(move::Button::Back);
+            return !pages.left(); // at its top: Melodee's Back
+        default: return false;
+        }
+    }
+
     // The page as Shift + the wheel counts them: the module's, ARP, CHORD.
     unsigned position(const ModuleTrack& track) const {
         auto shown = shown_pages(track);
         uint8_t own = own_page[studio.track()];
+        if (own && track.schwung_pages) return unsigned(track.schwung_pages->page_count()) + own - 1;
         if (own) return unsigned(shown.size()) + own - 1;
         return unsigned(std::count_if(shown.begin(), shown.end(), [&](size_t n) { return n < track.page; }));
     }

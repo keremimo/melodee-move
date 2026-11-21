@@ -99,6 +99,22 @@ link, offset), **FILTER** (cutoff, resonance, type, envelope attack, decay,
 depth, kit filter), **TIME** (warp, beats, follow, loop, loop point,
 reverse), **CLOUD** (position, size, density, scan, spread, on).
 
+Where the Move has Schwung (always, as Melodee is its tool), a module's
+pages and menus are drawn by **Schwung's own knob-page code** (Kerem,
+2026-11-21; `src/app/schwung_pages.h`): the same grid, widgets, drawn pages
+(Schimera's mouth, in place, its knobs working), presets page, Sections
+list and `visible_if` as under Schwung, on the whole screen. Melodee adds
+one page after the module's, **Melodee**, with **Auto Sample** (not for a
+source). The controls: knobs and their touches as under Schwung; the
+wheel's push is Schwung's click (a knob touched: that parameter, so a text
+one such as Schimera's Lyrics opens the keyboard; none: its Sections; with
+Shift, its Shift + click); Shift + the wheel its pages, then ARP and CHORD
+after its last; while Schwung has the wheel (its Sections, a list, an
+entered page) the wheel and Back are its. The wheel alone still walks the
+Device View, to the track's mix and the effects. The rest of this section
+is Melodee's own drawing, used where Schwung's code is not there (the tests,
+a Mac).
+
 A Schwung module's pages come from its `module.json`: `ui_hierarchy` where it
 has one, else its `chain_params` eight at a time. Names are cut to the cell
 (3 to 5 characters); the touched knob shows the full name. A chooser (a preset

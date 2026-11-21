@@ -2,6 +2,7 @@
 #include "app/module_probe.h"
 #include "app/canvas_page.h"
 #include "app/module_host.h"
+#include "app/schwung_pages.h"
 #include <map>
 #include <algorithm>
 #include <chrono>
@@ -121,6 +122,65 @@ int probe_modules(const std::string& root, const std::string& pictures) {
         if (peak == 0) ++failed;
     }
     return failed ? 1 : 0;
+}
+
+int probe_schwung_pages(const std::string& root, const std::string& id, const std::string& pictures) {
+    using Clock = std::chrono::steady_clock;
+    auto found = scan_modules(root);
+    auto info = std::find_if(found.begin(), found.end(), [&](const ModuleInfo& one) { return one.id == id; });
+    if (info == found.end()) { std::printf("no module %s in %s\n", id.c_str(), root.c_str()); return 1; }
+    std::string error;
+    auto module = LoadedModule::load(*info, error);
+    if (!module) { std::printf("%s FAILED: %s\n", id.c_str(), error.c_str()); return 1; }
+    CanvasPage::Host host;
+    host.get = [&](const std::string& key) {
+        auto answer = module->get_now(key);
+        return answer.empty() && (key == "ui_hierarchy" || key == "chain_params") ? module->declared(key) : answer;
+    };
+    host.set = [&](const std::string& key, const std::string& value) { module->set_now(key, value); };
+    host.text_entry = [&](const std::string& title, const std::string& initial) { std::printf("    keyboard: %s [%s]\n", title.c_str(), initial.c_str()); };
+    host.open_file = [](const std::string&) {};
+    auto started = Clock::now();
+    auto pages = SchwungPages::load(host, info->dir, "[]", [](const std::string& action) { std::printf("    action: %s\n", action.c_str()); }, error);
+    double load_ms = std::chrono::duration<double, std::milli>(Clock::now() - started).count();
+    if (!pages) { std::printf("Schwung's pages FAILED: %s\n", error.c_str()); return 1; }
+    std::printf("%s: Schwung's page code loaded in %.0f ms\n", id.c_str(), load_ms);
+
+    int shot = 0, draws = 0;
+    double slowest_draw = 0, total_draw = 0;
+    auto frame = [&](int count, const char* name) { // `count` screens, 23 ms apart, as Melodee's screen thread draws; the last kept
+        for (int n = 0; n < count; ++n) {
+            juce::Image screen(juce::Image::ARGB, CanvasPage::width, CanvasPage::height, true);
+            auto t0 = Clock::now();
+            {
+                juce::Graphics g(screen);
+                pages->draw(g);
+            }
+            double ms = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+            slowest_draw = std::max(slowest_draw, ms);
+            total_draw += ms;
+            ++draws;
+            if (n == count - 1 && name && *name) {
+                char file[512];
+                std::snprintf(file, sizeof file, "%s/%s-%02d-%s.png", pictures.c_str(), id.c_str(), shot++, name);
+                save_screen(screen, file);
+                std::printf("  %-12s %s, page %d of %d%s\n", name, pages->page_name().c_str(), pages->page_index() + 1, pages->page_count(),
+                            pages->wants_wheel() ? ", has the wheel" : "");
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(23));
+        }
+    };
+    auto cc = [&](int number, int value) { pages->midi(0xb0, uint8_t(number), uint8_t(value)); };
+    auto note = [&](int number, bool on) { pages->midi(on ? 0x90 : 0x80, uint8_t(number), on ? 127 : 0); };
+
+    frame(60, "first"); // the contract read, values in over the first ticks
+    for (int n = 0; n < int(pages->page_count()); ++n) { cc(14, 1); frame(25, "jog"); } // every page
+    note(0, true); for (int n = 0; n < 6; ++n) cc(71, 1); frame(10, "knob1"); note(0, false); frame(40, "released");
+    cc(3, 127); cc(3, 0); frame(25, "push");  // its sections
+    cc(14, 1); frame(10, "menu-turn");
+    cc(51, 127); cc(51, 0); frame(25, "back");
+    std::printf("draws: %d, %.1f ms mean, %.1f ms slowest (Schwung's tick + render + Melodee's ctx)\n", draws, total_draw / draws, slowest_draw);
+    return 0;
 }
 
 } // namespace app
