@@ -5,6 +5,7 @@
 // track playing them from the pads.
 #include "app/auto_sampler.h"
 #include "app/instruments.h"
+#include "app/pad_layout.h"
 #include "app/melodee_app.h"
 #include "app/studio.h"
 #include "melodee/engine/engine_host.h"
@@ -399,6 +400,16 @@ void test_keys() {
     app::set_keys_mode(midi, app::KeysMode::Drums, false);
     midi.midi.drum_note[2] = 40;
     CHECK(app::pad_notes(*project, midi, 2).keys[0] == 40); // a MIDI track's drum map
+    // Two MPC banks (Kerem's reading (a)): In-Key and Chromatic run up in pad order, 1-16 the left 4x4, 17-32 the
+    // right; Drums numbered the same. Physical pad 4 (bottom row, fifth column) is pad 17.
+    app::set_pad_layout(app::PadLayout::Banks);
+    app::set_keys_mode(track, app::KeysMode::InKey, false);
+    CHECK(note(0) == 48 && note(1) == 50 && note(8) == 55 && note(4) == 48 + 24 + 4); // pad 5 (the left bank's second row) the fifth note, G; pad 17 the 17th, E
+    app::set_keys_mode(track, app::KeysMode::Chromatic, true);
+    CHECK(note(8) == 52 && note(4) == 64);
+    app::set_keys_mode(track, app::KeysMode::Drums, false);
+    CHECK(note(8) == 40 && note(4) == 52);
+    app::set_pad_layout(app::PadLayout::Rows);
     // The pad map: a note track's route; a kit has none.
     app::PadMap map;
     track.arp = true;

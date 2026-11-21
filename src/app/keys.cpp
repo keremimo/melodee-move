@@ -120,12 +120,12 @@ unsigned keys_bank_count(const Track& track) {
 PadNotes pad_notes(const melodee::Project& project, const Track& track, unsigned pad, int shift) {
     PadNotes out;
     if (pad >= keys_pads) return out;
-    const int column = int(move::pad_column(pad)), row = int(move::pad_row(pad));
+    const auto layout = pad_layout(); // Rows, or two MPC banks (app/pad_layout.h)
     std::array<int, most_keys> keys {};
     switch (keys_mode(track)) {
     case KeysMode::Prog: {
         // "Pad n": numbered in the layout the pads are in (app/pad_layout.h).
-        unsigned index = 16 * std::min<unsigned>(track.bank, keys_bank_count(track) - 1) + logical_pad(uint8_t(pad), pad_layout());
+        unsigned index = 16 * std::min<unsigned>(track.bank, keys_bank_count(track) - 1) + logical_pad(uint8_t(pad), layout);
         if (index >= melodee::prog_chords) return out;
         std::array<int, melodee::notes_per_step> prog {};
         unsigned n = melodee::prog_keys(track, index, prog);
@@ -136,7 +136,7 @@ PadNotes pad_notes(const melodee::Project& project, const Track& track, unsigned
         return out;
     }
     case KeysMode::Drums: {
-        unsigned at = 16 * std::min<unsigned>(track.bank, keys_bank_count(track) - 1) + logical_pad(uint8_t(pad), pad_layout());
+        unsigned at = 16 * std::min<unsigned>(track.bank, keys_bank_count(track) - 1) + logical_pad(uint8_t(pad), layout);
         int key = track.engine == melodee::EngineKind::Midi ? int(track.midi.drum_note[at % melodee::sampler_pads]) : int(melodee::drum_first_key + at);
         if (key > 127) return out;
         keys[0] = key;
@@ -146,7 +146,7 @@ PadNotes pad_notes(const melodee::Project& project, const Track& track, unsigned
     }
     case KeysMode::Chromatic: {
         Key key = key_of(project, track);
-        int note = key.base + column + 5 * row + shift;
+        int note = key.base + pad_steps(uint8_t(pad), layout, 5) + shift; // Rows: right a semitone, up a fourth; Banks: 1-32 up
         out.root = key.root(note);
         out.in_key = key.has(note);
         unsigned n = 1;
@@ -160,7 +160,7 @@ PadNotes pad_notes(const melodee::Project& project, const Track& track, unsigned
         int rows = 0;
         if (keys_fourths(track)) for (unsigned d = 0; d < key.count; ++d) rows += key.degrees[d] < 5; // the key's notes within a fourth
         else rows = int(key.count);                                                                 // an octave a row
-        int index = column + std::max(rows, 1) * row + shift;
+        int index = pad_steps(uint8_t(pad), layout, std::max(rows, 1)) + shift; // Banks: 1-32 up the key (Kerem's reading (a))
         keys[0] = key.degree(index);
         unsigned n = track.chord ? chord_on(key, index, track, keys) : 1;
         out.root = key.root(keys[0]);

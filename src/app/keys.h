@@ -7,6 +7,8 @@
 // A note track's 32 pads as the Move's Keys & Scale lays them out (its
 // manual, 9.1; docs/UI.md, "Instruments"), with Melodee's own layouts:
 //
+// (in the Move's Rows; in two MPC Banks, In-Key and Chromatic run up in
+// pad order, app/pad_layout.h)
 // - In-Key, in octaves: a row an octave, a column the next note of the key
 //   (a scale of more than eight notes cut at the eighth, of fewer going on
 //   into the next octave on the same row);
@@ -46,9 +48,11 @@ struct PadNotes {
     std::array<uint8_t, most_keys> keys {};
     bool root = false, in_key = false;
 };
-// `pad` is the physical pad (move::Input's): In-Key and Chromatic lay their
-// notes out on the Move's rows; Prog's chords and Drums' notes go by the
-// pad's number in the layout the pads are in (app/pad_layout.h).
+// `pad` is the physical pad (move::Input's). In the Move's Rows, In-Key and
+// Chromatic lay their notes out in rows (octaves or 4ths); in two MPC Banks
+// they run up the key, or the semitones, in pad order, 1-16 on the left and
+// 17-32 on the right (Kerem's reading (a); pad_layout.h pad_steps()). Prog's
+// chords and Drums' notes go by the pad's number in either layout.
 // `shift`: Shift + Plus / Minus, the bottom-left pad that many notes of the
 // key up (In-Key; Chromatic a semitone each); not kept in the project.
 PadNotes pad_notes(const melodee::Project& project, const melodee::Track& track, unsigned pad, int shift = 0);
