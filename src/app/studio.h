@@ -265,9 +265,9 @@ public:
     int slot_for(const melodee::SampleRef& ref); // this project's slot for a file, a new one queued to be read; -1 none free
     std::vector<unsigned> slots_wanted;
     std::string program_path; // the MPC drum program the LOAD KIT sheet loads (load_kit.cpp)
-    // Typing for Melodee's own use (Save Sample's name): `done` with the text unless cancelled.
+    // Typing for Melodee's own use (Save Sample's name): ask_name() below with
+    // the usual room; `done` with the text unless cancelled.
     void ask_text(std::string title, std::string initial, std::function<void(const std::string&)> done);
-    std::function<void(const std::string&)> typing_done;
     bool loading = false;
 
     // Transport and tempo.
