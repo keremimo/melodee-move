@@ -35,14 +35,16 @@ quick | full) ;;
     ;;
 esac
 python3 tools/dependencies.py
-# Melodee's engine comes from a melodee-sample checkout beside this one
-# (MELODEE_SAMPLE), compiled as it is.
-MELODEE_SAMPLE=${MELODEE_SAMPLE:-../melodee-sample}
-[ -f "$MELODEE_SAMPLE/src/melodee/engine/sampler.h" ] && [ -f "$MELODEE_SAMPLE/base/src/surface/midi.h" ] || {
-    echo "Needs melodee-sample, with its base submodule, at $MELODEE_SAMPLE (or set MELODEE_SAMPLE)." >&2
+# Melodee's engine, model and files: ellic-core, the core/ submodule,
+# compiled as it is. A melodee-sample checkout beside this one
+# (MELODEE_SAMPLE), if there is one, only draws the web page's wordmark.
+[ -f core/core.mk ] || git submodule update --init core
+[ -f core/core.mk ] || {
+    echo "Needs ellic-core in core/ (git submodule update --init)." >&2
     exit 1
 }
-echo "melodee-sample: $(git -C "$MELODEE_SAMPLE" describe --always --dirty 2>/dev/null || echo unknown)"
+echo "ellic-core: $(git -C core describe --always --dirty 2>/dev/null || echo unknown)"
+MELODEE_SAMPLE=${MELODEE_SAMPLE:-../melodee-sample}
 # What the packages say they were built from (SOURCE.txt, tools/bundle.sh):
 # each checkout's commit, "-dirty" when it has changes, and the commit's
 # time for the files in the catalog's asset. tools/release.sh passes a
@@ -53,8 +55,7 @@ commit_of() {
     echo "$commit"
 }
 MELODEE_MOVE_COMMIT=${MELODEE_MOVE_COMMIT:-$(commit_of .)}
-MELODEE_SAMPLE_COMMIT=${MELODEE_SAMPLE_COMMIT:-$(commit_of "$MELODEE_SAMPLE")}
-SAMPLE_BASE_COMMIT=${SAMPLE_BASE_COMMIT:-$(commit_of "$MELODEE_SAMPLE/base")}
+ELLIC_CORE_COMMIT=${ELLIC_CORE_COMMIT:-$(commit_of core)}
 MELODEE_MOVE_EPOCH=${MELODEE_MOVE_EPOCH:-$(git log -1 --format=%ct 2> /dev/null || date +%s)}
 docker build --quiet --platform linux/arm64 -t melodee-move-builder tools > /dev/null
 PREVIEWS=${MELODEE_PREVIEWS:-../melodee-sample/build/melodee-preview}
@@ -62,10 +63,13 @@ MOUNT=""
 if [ -d "$PREVIEWS" ]; then
     MOUNT="-v $(cd "$PREVIEWS" && pwd):/previews:ro"
 fi
+if [ -f "$MELODEE_SAMPLE/tools/web_bundle.py" ]; then
+    MOUNT="$MOUNT -v $(cd "$MELODEE_SAMPLE" && pwd):/melodee:ro -e MELODEE=/melodee"
+fi
 CCACHE=${MELODEE_CCACHE:-$HOME/.cache/melodee-move/ccache}
 mkdir -p "$CCACHE"
 # shellcheck disable=SC2086
-docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE" && pwd):/melodee:ro" -e MELODEE=/melodee \
-    -e MELODEE_MOVE_COMMIT="$MELODEE_MOVE_COMMIT" -e MELODEE_SAMPLE_COMMIT="$MELODEE_SAMPLE_COMMIT" \
-    -e SAMPLE_BASE_COMMIT="$SAMPLE_BASE_COMMIT" -e MELODEE_MOVE_EPOCH="$MELODEE_MOVE_EPOCH" \
+docker run --rm --platform linux/arm64 -v "$PWD:/work" \
+    -e MELODEE_MOVE_COMMIT="$MELODEE_MOVE_COMMIT" -e ELLIC_CORE_COMMIT="$ELLIC_CORE_COMMIT" \
+    -e MELODEE_MOVE_EPOCH="$MELODEE_MOVE_EPOCH" \
     -v "$CCACHE:/ccache" $MOUNT melodee-move-builder tools/check.sh "$MODE"

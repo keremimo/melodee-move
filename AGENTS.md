@@ -30,11 +30,13 @@ and `jackd -d move` on poundhard-armbian (`jack`), and the apps on it
   Never use FM-1 firmware code (EvilGenius's core is one).
 - Nothing here may change a Move for good: scripts stop and start Ableton's
   app, add folders under `/data/UserData` and say how to remove them.
-- Melodee's engine and model (`src/melodee/engine`, `src/melodee/model`,
-  and header-only pieces such as `shell/chop.h`) are compiled unchanged from
-  the melodee-sample checkout beside this one (`MELODEE`, `MELODEE_SAMPLE`).
-  Melodee itself is changed in melodee-sample, and sample-base in
-  sample-base; never edit their files from here.
+- Melodee's engine, model and files (`melodee/engine`, `melodee/model`,
+  `melodee/shell/...`) are ellic-core, the `core/` git submodule, compiled
+  unchanged through `core/core.mk`. The core is changed in ellic-core
+  (`core/AGENTS.md`), then the submodule moved
+  (`git -C core pull origin main && git add core`); never edit `core/`
+  from here. A melodee-sample checkout beside this one (`MELODEE_SAMPLE`)
+  only draws the web page's wordmark.
 - Four-space indentation, `SPDX-License-Identifier: AGPL-3.0-only` headers,
   Conventional Commits.
 

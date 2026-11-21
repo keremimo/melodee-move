@@ -1,8 +1,9 @@
 #!/bin/sh
 # SPDX-License-Identifier: AGPL-3.0-only
-# The build and its checks, inside the build image (./build.sh runs it, the
-# melodee-sample checkout at $MELODEE, Melodee's own page previews at
-# /previews where they are at hand, ccache's cache at /ccache).
+# The build and its checks, inside the build image (./build.sh runs it, with
+# ellic-core in core/, a melodee-sample checkout at $MELODEE for the page's
+# wordmark and Melodee's own page previews at /previews where they are at
+# hand, ccache's cache at /ccache).
 #
 # quick: the build and the unit tests. full (the default): then the sound
 # self-test, the screen previews, runs of the whole runtime against a

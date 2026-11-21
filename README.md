@@ -11,7 +11,8 @@ Three parts so far:
   runs on a Move on Ableton's firmware (realtime, 1 late block in 98,000).
 - **Melodee** (`src/app/`) in the Rail design ([docs/UI.md](docs/UI.md)):
   sixteen tracks on Melodee's own engine host and project, compiled
-  unchanged from melodee-sample: kits of 32 pads on Melodee's sampler and
+  unchanged from [ellic-core](core/), Melodee's engine shared with
+  melodee-sample: kits of 32 pads on Melodee's sampler and
   Chop, synth tracks playing Schwung's sound generators, keygroup, MIDI and
   audio tracks; Play, tempo and metronome; the whole project in Melodee's
   `.mldp`. It runs on a Move. What is left of Melodee's features, and who
@@ -350,8 +351,8 @@ loads each one beside Ableton's app (the device is not touched), lists its
 pages, plays a chord and times the renders; with PICTURES it also starts
 each module's own pages and draws them there as PNGs.
 
-Melodee's engine and model are compiled from a melodee-sample checkout
-beside this one (`../melodee-sample`, or `MELODEE_SAMPLE`), unchanged.
+Melodee's engine and model are ellic-core, the `core/` submodule
+(`git submodule update --init`), compiled unchanged.
 `build/melodee-move --melodee-previews DIR` draws its real screens.
 
 ### Remote
@@ -494,11 +495,9 @@ default. A release:
    `download_url` the release's asset), and its section in `CHANGELOG.md`;
    committed.
 2. `tools/release.sh` builds it from that commit, never from the working
-   tree: the commit exported into `build/release/vX.Y.Z/src`, the full check
-   run there against melodee-sample exported the same way at a commit on
-   GitHub (`MELODEE_SAMPLE_REF`, by default `origin/main`) with the
-   sample-base it names (they are this build's source too), whatever the
-   checkout beside this one is on. It leaves the asset, its
+   tree: the commit exported into `build/release/vX.Y.Z/src` with the
+   ellic-core commit it pins (which must be on GitHub; it is this build's
+   source too), and the full check run there. It leaves the asset, its
    SHA-256, `release.json` and the release's notes in `build/release/vX.Y.Z/`,
    and prints the tag and upload it would make.
 3. The tag `vX.Y.Z` on that commit, pushed with main, and a GitHub release

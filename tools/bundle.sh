@@ -61,9 +61,8 @@ Free software under the GNU Affero General Public License 3.0
 (licenses/LICENSE-AGPL-3.0.txt). This build's source:
 
   https://github.com/$OWNER/$REPOSITORY/tree/${MELODEE_MOVE_COMMIT:-unknown}
-  Melodee's engine and model, compiled unchanged:
-  https://github.com/$OWNER/melodee-sample/tree/${MELODEE_SAMPLE_COMMIT:-unknown}
-  https://github.com/$OWNER/sample-base/tree/${SAMPLE_BASE_COMMIT:-unknown}
+  Melodee's engine and model (ellic-core), compiled unchanged:
+  https://github.com/$OWNER/ellic-core/tree/${ELLIC_CORE_COMMIT:-unknown}
 
 The third parts and their licences: licenses/THIRD_PARTY.md, licenses/.
 EOF

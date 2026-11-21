@@ -43,41 +43,19 @@ WARNINGS := -Wall -Wextra -Werror
 LDFLAGS := -static-libstdc++ -static-libgcc -Wl,--export-dynamic-symbol=schwung_move_info
 LDLIBS := $(shell pkg-config --libs $(PACKAGES)) -ldl -pthread -lrt -lm
 
-# Melodee's own engine and model, compiled unchanged from a melodee-sample
-# checkout (MELODEE; ./build.sh mounts ../melodee-sample there) into a
-# library, of which the linker takes only what is used. Melodee is changed
-# in melodee-sample, never here.
-MELODEE ?= ../melodee-sample
-MELODEE_INCLUDES := -I$(MELODEE)/src -I$(MELODEE)/base/src
-# shell/sample_decode.cpp: Melodee's own reader for WAV, and AIFF, FLAC, Ogg
-# and MP3 through JUCE, as on the MPC.
-# Kit depth: shell/sample_cache.cpp (long MP3, FLAC, Ogg and AIFF decoded once
-# into Melodee/Cache as WAVs, read from storage as they play), project_kits.cpp
-# (Load Kit, bank files) and the MPC drum programs' readers. shell/midi_route.cpp
-# and mtc_in.cpp: where MIDI in goes, and MTC in (src/app/midi.*).
-MELODEE_SOURCES := $(wildcard $(MELODEE)/src/melodee/engine/*.cpp $(MELODEE)/src/melodee/model/*.cpp) \
-    $(MELODEE)/src/melodee/shell/sample_decode.cpp $(MELODEE)/src/melodee/shell/sample_cache.cpp \
-    $(addprefix $(MELODEE)/src/melodee/shell/,project_kits.cpp mpc_program.cpp mpc_project.cpp mpc_wav_slices.cpp) \
-    $(MELODEE)/src/melodee/shell/midi_route.cpp $(MELODEE)/src/melodee/shell/mtc_in.cpp
-# web/web_server.cpp and web/card_files.cpp: the helpers of Melodee's page on
-# the MPC (JSON text, safe names, paths kept in a folder, file types), plain
-# C++, for the page on the Move (src/web/).
-MELODEE_SOURCES += $(MELODEE)/src/melodee/web/web_server.cpp $(MELODEE)/src/melodee/web/card_files.cpp
-# Song's MPC 3 export (src/app/exports.*): Melodee's exporter and the MPC
-# file pieces it writes with (mpc_program, mpc_project and mpc_wav_slices are
-# listed above). Its template JSON is assembled in from Melodee's checkout
-# (.incbin, found through -Wa,-I). What it asks of the sample library about
-# instrument files is the Move's: src/app/mpc3_shell.cpp.
-MELODEE_SOURCES += $(addprefix $(MELODEE)/src/melodee/shell/,mpc3_export.cpp xpm_write.cpp)
-# Melodee's instrument files (src/app/instruments.*): MPC programs (.xpm,
-# MPC 3's .xty and projects' keygroups), SoundFonts, DecentSampler presets,
-# MPC 3 progressions, and the .xpm the auto sampler writes (mpc_program,
-# mpc_project, mpc_wav_slices and xpm_write are listed above). Each reads or
-# writes its file alone, through JUCE's XML and JSON as on the MPC.
-MELODEE_SOURCES += $(addprefix $(MELODEE)/src/melodee/shell/,sf2_file.cpp dspreset_file.cpp progression_file.cpp)
-MELODEE_OBJECTS := $(patsubst $(MELODEE)/src/%.cpp,build/obj/melodee-sample/%.o,$(MELODEE_SOURCES))
+# Melodee's engine, model and files: ellic-core, the core/ submodule
+# (shared with melodee-sample, core/AGENTS.md), compiled unchanged into a
+# library, of which the linker takes only what is used. The core is changed
+# in ellic-core, never here. Its sources and flags are core/core.mk's; the
+# MPC 3 export's template is assembled in from the checkout (CORE_ASFLAGS).
+CORE := core
+include core/core.mk
+MELODEE_OBJECTS := $(patsubst core/src/%.cpp,build/obj/core/%.o,$(CORE_SOURCES))
 MELODEE_LIBRARY := build/melodee.a
-CPPFLAGS += $(MELODEE_INCLUDES)
+CPPFLAGS += $(CORE_CPPFLAGS)
+# A melodee-sample checkout, if there is one, for the web page's wordmark
+# alone (tools/web_bundle.py draws it with melodee-sample's own tool).
+MELODEE ?= ../melodee-sample
 
 MODULE_CPP := $(wildcard $(JUCE)/juce_core/*.cpp $(JUCE)/juce_events/*.cpp $(JUCE)/juce_graphics/*.cpp \
     $(JUCE)/juce_audio_basics/*.cpp) $(JUCE)/juce_audio_formats/juce_audio_formats.cpp
@@ -185,9 +163,10 @@ $(PADS_APP_TESTS): build/obj/tests/pads_app_tests.o $(SHARED_OBJECTS) $(JUCE_OBJ
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 $(MELODEE_LIBRARY): $(MELODEE_OBJECTS)
 	rm -f $@ && $(AR) rcs $@ $^
-build/obj/melodee-sample/%.o: $(MELODEE)/src/%.cpp
+build/obj/core/%.o: core/src/%.cpp
 	@mkdir -p $(@D)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Wa,-I$(MELODEE) -w -c $< -o $@
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(CORE_ASFLAGS) -w -c $< -o $@
+build/obj/core/melodee/shell/mpc3_export.o: $(CORE_TEMPLATE)
 # JUCE's headers precompiled (src/pch.h), given to every file of ours. The
 # copy beside the .gch is what GCC reads instead if the .gch will not do,
 # and -Winvalid-pch (an error here) says so. Files linked without JUCE (the

@@ -1,0 +1,4 @@
+[submodule "core"]
+	path = core
+	url = ../ellic-core.git
+	branch = main
