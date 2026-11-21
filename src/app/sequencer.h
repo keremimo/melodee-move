@@ -52,8 +52,10 @@ public:
     // Every lights() call: Seq Record's free length growing, the engine's
     // repeats written, the click for Rec only, a launched pattern's loop.
     void tick(Clock::time_point now);
-    // The steps, Rec, Capture, Loop and the arrows on a Play screen.
+    // The steps, Loop and the arrows on a Play screen.
     void lights(move::Lights& lights, Clock::time_point now);
+    // Rec and Capture, on every screen.
+    void transport_lights(move::Lights& lights, Clock::time_point now);
     // A held step's card, its TRIG knobs, a lock just turned: drawn over the
     // Play screen. False: nothing to draw.
     bool draw(juce::Graphics& g);

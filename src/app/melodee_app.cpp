@@ -247,7 +247,8 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point now) {
     }
     if (auto* top = studio.top()) {
         top->lights(lights);
-        if (!holding() && top->screen_kind() == bindings::Screen::Play) studio.sequencer().lights(lights, now); // the steps, Rec, Capture
+        if (!holding() && top->screen_kind() == bindings::Screen::Play) studio.sequencer().lights(lights, now); // the steps
+        studio.sequencer().transport_lights(lights, now); // Rec, Capture
     }
     if (holding()) {
         if (auto* sixteen = tracks()) sixteen->lights(lights); // the steps as the tracks, over the screen's

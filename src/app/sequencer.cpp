@@ -1105,13 +1105,17 @@ void Sequencer::tick(Clock::time_point now) {
 
 // ---------------------------------------------------------------- lights
 
-void Sequencer::lights(move::Lights& lights, Clock::time_point now) {
+void Sequencer::transport_lights(move::Lights& lights, Clock::time_point now) {
     using namespace move;
-    lights_steps(lights, now);
     bool blink = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count() / 250 % 2;
     // Rec (14.1): dim when it can record, flashing through the count-in, red recording.
     lights.button(Button::Rec, counting_in() ? (blink ? colour::red : colour::off) : rec ? colour::red : colour::dark_grey);
     lights.button(Button::Capture, can_capture() ? white_bright : 0);
+}
+
+void Sequencer::lights(move::Lights& lights, Clock::time_point now) {
+    using namespace move;
+    lights_steps(lights, now);
     lights.button(Button::Loop, white_dim);
     lights.button(Button::Menu, white_dim);
     lights.button(Button::Copy, white_dim);
