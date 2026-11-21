@@ -178,6 +178,9 @@ public:
     void set_pitches_octave(int octave);       // melodee's kit Levels octave, kit_level_octave as it is
     int pitch_semitones(unsigned pitch) const; // pitch 0-15 (bottom left first): its semitones from the pad's own
     void refresh_pads();                       // the audio thread's copy of the above, after anything moved them
+    // While Chop is open the engine's kit pads 0-31 are its slices: the pads
+    // play them by their number in the pad layout, whatever bank is in view.
+    void pads_play_slices(bool on) { audio_slices.store(on, std::memory_order_relaxed); }
     // Copy the sound of one pad onto another (its sample and values, chain,
     // mute, zone trims). Clear: the pad's notes in the selected pattern, or
     // with none its sound, or an empty pad's gap closed (the pads after it
@@ -330,7 +333,7 @@ private:
     std::atomic<int> audio_track {0}, audio_kind {0}, audio_octave {0};
     // A kit's: the lower bank in view, 16 Pitches on, its pad and each pitch's semitones.
     std::atomic<int> audio_bank {0}, audio_levels_pad {0};
-    std::atomic<bool> audio_pitches {false};
+    std::atomic<bool> audio_pitches {false}, audio_slices {false};
     std::array<std::atomic<int>, 16> audio_semitones {};
     std::atomic<bool> pads_typing {false};
     // The MIDI thread's word to the audio thread: a pad pressed now has

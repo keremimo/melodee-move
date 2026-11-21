@@ -315,7 +315,9 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
                 // right 16 the last pad at its pitches (Melodee's 16 Levels).
                 // (The user's pad layout: app/pad_layout.h; 16 Pitches is two MPC banks in either.)
                 unsigned bank = unsigned(audio_bank.load(std::memory_order_relaxed)) * 16;
-                if (audio_pitches.load(std::memory_order_relaxed)) {
+                if (audio_slices.load(std::memory_order_relaxed)) { // Chop: the slices on pads 1-32
+                    key = int(melodee::sampler_first_note + logical_pad(input.index, pad_layout()));
+                } else if (audio_pitches.load(std::memory_order_relaxed)) {
                     unsigned n = logical_pad(input.index, PadLayout::Banks);
                     if (n >= 16) {
                         int semitones = audio_semitones[n - 16].load(std::memory_order_relaxed);

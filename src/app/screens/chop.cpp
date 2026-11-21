@@ -6,6 +6,7 @@
 // jogwheel for To Pads (Poly, Mono, Thru), onto the first empty pads. Back
 // or Loop leaves Chop without changing the pads.
 #include "app/screens/common.h"
+#include "app/pad_layout.h"
 #include "melodee/shell/chop.h"
 
 namespace app::screens {
@@ -28,6 +29,7 @@ public:
         pad = studio.pad();
         selected = 0;
         sounding = true;
+        studio.pads_play_slices(true); // the pads its slices, whatever kit bank is in view
         // The sample's chop as it was left, where it was of this same region.
         const auto& sound = studio.current().pads[pad];
         uint32_t frames = sample->data->model_frames();
@@ -45,6 +47,7 @@ public:
     void leave() override {
         if (sounding) studio.sound_pads(track); // the pads back as the kit has them
         sounding = false;
+        studio.pads_play_slices(false);
     }
 
     bindings::Screen screen_kind() const override { return bindings::Screen::Chop; }
@@ -52,7 +55,7 @@ public:
         using bindings::Job;
         switch (job) {
         case Job::PlaySlice:
-            if (unsigned(use.index) < slices.count) selected = unsigned(use.index);
+            if (unsigned slice = logical_pad(uint8_t(use.index), pad_layout()); slice < slices.count) selected = slice; // the pad layout's number
             return true;
         case Job::TurnKnob: case Job::TurnKnobFine: turn(unsigned(use.index), use.delta); return true;
         case Job::ChopAmount: turn(3, use.delta); return true; // the wheel: the amount, as the Move's the number of slices
@@ -69,8 +72,8 @@ public:
         using namespace move;
         const Sample* sample = studio.sample_of(track, pad);
         uint32_t frames = sample ? std::max<uint32_t>(1, sample->data->model_frames()) : 1;
-        for (unsigned at = 0; at < pad_count; ++at)
-            lights.pad(at, at < slices.count ? (at == selected ? colour::white : at % 2 ? colour::brown_yellow : colour::orange) : colour::off);
+        for (unsigned at = 0; at < pad_count; ++at) // `at` the slice; its pad in the layout
+            lights.pad(physical_pad(uint8_t(at), pad_layout()), at < slices.count ? (at == selected ? colour::white : at % 2 ? colour::brown_yellow : colour::orange) : colour::off);
         // The sample in 16 parts, lit where a cut falls.
         for (unsigned step = 0; step < step_count; ++step) {
             bool cut = false;

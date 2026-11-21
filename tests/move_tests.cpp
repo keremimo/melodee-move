@@ -1380,6 +1380,13 @@ void test_kit_depth() {
     press_button(melodee, Button::Up);
     CHECK(has(status(), " bank=2 "));
     CHECK(play(16, 20) > to_s32(0.1f)); // D01, as A01
+    // Chop, with banks C-D in view: the pads are its slices all the same.
+    tap_pad(melodee, 16);
+    open_chop(melodee);
+    CHECK(has(status(), "page=chop "));
+    CHECK(play(1, 20) > to_s32(0.05f)); // slice 2, not C02
+    press_button(melodee, Button::Back);
+    CHECK(play(1, 20) == 0);            // C02 again: empty
 }
 
 int main() {
