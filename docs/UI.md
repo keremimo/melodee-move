@@ -911,7 +911,8 @@ doors (docs/MOVE_CONTROLS.md, Decisions). `docs/ui/song.png` is the sheet
   Sampler), a synth track its notes on a MIDI track and its prints on an
   audio track beside it; levels, pans, mutes, sends (the buses as return
   tracks), tempo, scenes' tempos, markers and the loop brace go with it.
-  Effects, Motion and pad filters do not (src/app/live_export.h).
+  Effects, Motion and pad filters do not (ellic-core's
+  src/melodee/shell/live_export.h).
 - **PRINT** (a track button held + Sampling): the track's patterns on the
   pads (Plus / Minus: 32 a bank), with notes dim in its colour, to print
   ice, the one playing blinking; a pad takes one out or back. TAP (knob 1),

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "app/exports.h"
-#include "app/live_export.h"
 #include "app/prints.h"
 #include "app/project_store.h"
 #include "app/song_desk.h"
@@ -8,7 +7,9 @@
 #include "app/wav_out.h"
 #include "melodee/model/audio_track.h"
 #include "melodee/model/print.h"
+#include "melodee/shell/live_export.h"
 #include "melodee/shell/mpc3_export.h"
+#include "ui/track_style.h"
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
@@ -391,8 +392,9 @@ void Exports::project_job() {
     std::string error;
     char said[64] = {};
     if (kind == Kind::Live) {
-        LiveExport report;
-        error = export_live_set(*copy_project, *copy_bank, path, name, report, copy_prints.get(), copy_prints_dir, copy_audio_dir);
+        melodee::LiveExport report;
+        error = melodee::export_live_set(*copy_project, *copy_bank, path, name, report, copy_prints.get(), copy_prints_dir,
+                                         copy_audio_dir, &ui::live_track_colours);
         // Run as root over SSH, everything it wrote goes to the Move's user.
         if (error.empty()) {
             const fs::path made = fs::path(path) / (name + " Project");

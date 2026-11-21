@@ -7,7 +7,6 @@
 // opened frozen again. The tests drive the audio thread themselves (render)
 // and the service thread (service), as the runtime would.
 #include "app/exports.h"
-#include "app/live_export.h"
 #include "app/new_project.h"
 #include "app/melodee_app.h"
 #include "app/pad_layout.h"
@@ -23,6 +22,7 @@
 #include "melodee/engine/midi_engine.h"
 #include "melodee/model/project_file.h"
 #include "melodee/model/smf.h"
+#include "melodee/shell/live_export.h"
 #include <chrono>
 #include <cmath>
 #include <cstring>
@@ -357,10 +357,10 @@ juce::String value_of(juce::XmlElement* e, const char* path) { // "Name/Effectiv
 }
 
 void test_live_numbers() {
-    CHECK(app::live_time_signature(4, 4) == 201);
-    CHECK(app::live_time_signature(3, 4) == 200);
-    CHECK(app::live_time_signature(6, 8) == 302);
-    CHECK(app::live_time_signature(7, 16) == 402);
+    CHECK(melodee::live_time_signature(4, 4) == 201);
+    CHECK(melodee::live_time_signature(3, 4) == 200);
+    CHECK(melodee::live_time_signature(6, 8) == 302);
+    CHECK(melodee::live_time_signature(7, 16) == 402);
 }
 
 // The Live Set's pieces, written from a project made here: a kit of layers, a choke group, a muted pad and a pad
@@ -434,8 +434,8 @@ void test_live_set_details() {
     song.loop_end = 2;
     song.step_marker(2);
 
-    app::LiveExport report;
-    CHECK(app::export_live_set(*project, *bank, folder, "Details", report).empty());
+    melodee::LiveExport report;
+    CHECK(melodee::export_live_set(*project, *bank, folder, "Details", report).empty());
     CHECK(report.tracks == 4 && report.scenes == 17 && report.missing == 0 && report.samples == 1);
     auto set = live_set(folder + "/Details Project/Details.als");
     CHECK(set != nullptr);

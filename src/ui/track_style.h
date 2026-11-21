@@ -18,6 +18,10 @@ constexpr std::array<TrackColour, 16> track_colours {{
 }};
 constexpr TrackColour track_colour(unsigned track) { return track_colours[track % track_colours.size()]; }
 
+// Each track's colour in an Ableton Live Set (melodee/shell/live_export.h): the
+// index of the colour in Live's palette nearest the one above.
+constexpr std::array<uint8_t, 16> live_track_colours {8, 1, 10, 5, 17, 11, 7, 14, 9, 12, 6, 24, 4, 0, 22, 2};
+
 // Four tracks to a bank: the four track buttons are the selected track's
 // bank (tracks 1-4, 5-8, 9-12, 13-16).
 constexpr unsigned tracks_a_bank = 4;

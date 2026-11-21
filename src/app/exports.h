@@ -18,7 +18,7 @@
 // TPDF dithered (the only files Melodee dithers); stems (the mix as Mix.wav
 // and each track and bus as it joins the mix, all 32-bit float, the same
 // frames, in the same pass); a MIDI file; an MPC 3 project; an Ableton Live
-// Set (live_export.h); the song into a new pattern. Under Melodee's own folder
+// Set (melodee/shell/live_export.h); the song into a new pattern. Under Melodee's own folder
 // (/data/UserData/Melodee on the Move, as Melodee/ on the MPC's card):
 // Mixdowns/<name>.wav, Stems/<name>/, MIDI/<name>.mid, MPC 3/<name>.xpj,
 // Ableton/<name> Project/<name>.als; <name> is the project's, numbered so
