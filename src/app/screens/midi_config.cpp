@@ -144,10 +144,10 @@ private:
 };
 
 // Setup (Shift + Step 2) is move-projects' (its MIDI and MIDI SYNC rows push
-// this screen). Until it is merged, Setup opens MIDI Config here;
-// midi-tests fails once a "setup" screen is registered beside this
-// Trigger, so the merge takes it out.
-RegisterScreen config("midi-config", make<MidiConfig>, {{bindings::Job::Setup}});
+// this screen). Until it is merged, Setup is move-pad-layout's stand-in,
+// Setup > PADS, whose MIDI CONFIG row pushes this one: one screen takes the
+// Setup job, so both stand-ins stay in reach.
+RegisterScreen config("midi-config", make<MidiConfig>);
 
 } // namespace
 } // namespace app::screens

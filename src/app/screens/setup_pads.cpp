@@ -7,7 +7,8 @@
 //
 // Setup itself is move-projects' (Shift + Step 2, a PADS row opening this
 // list beside RESPONSE and PRESSURE); until it lands, Shift + Step 2 opens
-// this page.
+// this page, and its MIDI CONFIG row opens move-midi's MIDI Config (the
+// other stand-in for Setup), so both are in reach.
 #include "app/pad_setting.h"
 #include "app/screens/common.h"
 #include "ui/pad_numbering.h"
@@ -24,7 +25,7 @@ class SetupPads final : public Screen {
 public:
     using Screen::Screen;
 
-    void enter() override { editing = false; }
+    void enter() override { editing = false; cursor = 0; }
     bindings::Screen screen_kind() const override { return bindings::Screen::List; }
 
     bool job(bindings::Job job, const bindings::Use& use) override {
@@ -32,8 +33,10 @@ public:
         switch (job) {
         case Job::ListTurn: case Job::ListTurnFine:
             if (editing) pending = pad_setting::turned(pending, use.delta);
+            else cursor = std::clamp(cursor + use.delta, 0, 1);
             return true;
         case Job::ListPush:
+            if (!editing && cursor == 1) { studio.push("midi-config"); return true; }
             if (!editing) { editing = true; pending = pad_layout(); }
             else { editing = false; pad_setting::apply(studio, pending); }
             return true;
@@ -62,13 +65,14 @@ public:
             ui::detail(g, pad_setting::detail_left(pending), pad_setting::detail_right(pending));
             return;
         }
-        ui::list(g, ui::content(0, ui::height), {row(pad_setting::name, pad_setting::value(pad_layout()))}, 0, 1);
+        ui::list(g, ui::content(0, ui::height), {row(pad_setting::name, pad_setting::value(pad_layout())), "MIDI CONFIG >"}, cursor, 1);
     }
 
     std::string status() const override { return std::string(" layout=") + pad_layout_name(pad_layout()) + (editing ? "*" : ""); }
 
 private:
     bool editing = false;
+    int cursor = 0; // 0 LAYOUT, 1 MIDI CONFIG
     PadLayout pending = PadLayout::Rows;
 };
 
