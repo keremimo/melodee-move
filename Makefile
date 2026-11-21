@@ -165,12 +165,6 @@ $(INSTRUMENTS_TESTS): build/obj/tests/instruments_tests.o $(SHARED_OBJECTS) $(JU
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 $(CONTROLS_TESTS): build/obj/tests/controls_tests.o build/obj/app/bindings.o
 	$(CXX) -static-libstdc++ -static-libgcc $^ -pthread -o $@
-# USB audio to a computer (src/move/usb_audio.*): the writer alone, against a
-# stand-in for the gadget's PCM.
-USB_TESTS := build/usb-tests
-all: $(USB_TESTS)
-$(USB_TESTS): build/obj/tests/usb_tests.o build/obj/move/usb_audio.o
-	$(CXX) -static-libstdc++ -static-libgcc $^ -pthread -o $@
 $(PAD_TESTS): build/obj/tests/pad_layout_tests.o build/obj/app/pad_layout.o
 	$(CXX) -static-libstdc++ -static-libgcc $^ -pthread -o $@
 $(PADS_APP_TESTS): build/obj/tests/pads_app_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS) $(MELODEE_LIBRARY)
@@ -187,8 +181,8 @@ build/obj/melodee-sample/%.o: $(MELODEE)/src/%.cpp
 # it is in. -fpch-preprocess lets ccache cache what uses it.
 PCH := build/pch/pch.h
 PCH_FLAGS = -include $(PCH) -Winvalid-pch -fpch-preprocess
-LIGHT_OBJECTS := build/obj/app/bindings.o build/obj/app/pad_layout.o build/obj/move/usb_audio.o \
-    build/obj/tests/controls_tests.o build/obj/tests/pad_layout_tests.o build/obj/tests/usb_tests.o
+LIGHT_OBJECTS := build/obj/app/bindings.o build/obj/app/pad_layout.o \
+    build/obj/tests/controls_tests.o build/obj/tests/pad_layout_tests.o
 $(LIGHT_OBJECTS): PCH_FLAGS :=
 $(PCH).gch: src/pch.h
 	@mkdir -p $(@D) build/obj/pch

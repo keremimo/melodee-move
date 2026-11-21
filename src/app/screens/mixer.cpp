@@ -249,13 +249,8 @@ void play_lights(Studio& studio, move::Lights& lights) {
 }
 
 // The hub's pages, as the wheel walks them (docs/UI.md, "Mixer and effects").
-enum Page : int { Vol, Pan, SendA, SendB, SendC, SendD, Main, Usb, page_count };
+enum Page : int { Vol, Pan, SendA, SendB, SendC, SendD, Main, page_count };
 bool is_send(int page) { return page >= SendA && page <= SendD; }
-
-// USB (docs/USB_AUDIO.md): a submix's number, "-" for none; its channels.
-std::string sub_text(unsigned sub) { return sub ? std::to_string(sub) : "-"; }
-std::string sub_value(unsigned sub) { return sub ? "SUB " + std::to_string(sub) : "OFF"; }
-std::string sub_channels(unsigned sub) { return sub ? "CH " + std::to_string(2 * sub + 1) + "-" + std::to_string(2 * sub + 2) : "MIX ONLY"; }
 
 class Mixer final : public Screen {
 public:
@@ -265,21 +260,14 @@ public:
 
     bool job(Job job, const bindings::Use& use) override {
         switch (job) {
-        case Job::MixerPage:
-            page = std::clamp(page + use.delta, 0, page_count - 1);
-            if (page != Usb) half = std::min(half, 1); // the buses' bank is USB's alone
-            return true;
-        case Job::MixerHalf: // 1-8 and 9-16; on USB, then the buses A-D
-            if (page == Usb) half = std::clamp(half + (use.control == bindings::Control::Left ? -1 : 1), 0, 2);
-            else half = use.control == bindings::Control::Left ? 0 : 1;
-            return true;
+        case Job::MixerPage: page = std::clamp(page + use.delta, 0, page_count - 1); return true;
+        case Job::MixerHalf: half = use.control == bindings::Control::Left ? 0 : 1; return true;
         case Job::TurnKnob: case Job::TurnKnobFine: turn(unsigned(use.index), use.delta); return true;
         case Job::PickTrack:
             studio.select(unsigned(use.index));
             studio.open(own_page()); // select() goes home: back here
             return true;
         case Job::OpenChain:
-            if (page == Usb) return true; // nothing behind a submix
             if (page < SendA) { studio.desk.show_effects = true; studio.home(); return true; } // the track's Device View, on its effects
             studio.desk.chain = page == Main ? mixing::master : mixing::bus(unsigned(page - SendA));
             studio.push("chain");
@@ -301,7 +289,6 @@ public:
 
     void draw(juce::Graphics& g) override {
         unsigned first = unsigned(half) * 8;
-        if (page == Usb) { draw_usb(g); return; }
         ui::rail(g, "MIX", page == Main ? "" : track_number(studio), page == Main ? "MAIN" : half ? "9-16" : "1-8");
         ui::mix::item_row(g, hub(), page);
         if (page == Main) { draw_main(g); return; }
@@ -338,14 +325,6 @@ public:
         return true;
     }
     Knob knob(unsigned which) const override {
-        if (page == Usb) {
-            int stem = usb_stem(which);
-            if (stem < 0) return {};
-            unsigned sub = studio.extras().usb_submix[unsigned(stem)];
-            std::string who = stem >= int(melodee::track_count) ? std::string("BUS ") + char('A' + stem - int(melodee::track_count))
-                                                                 : std::to_string(stem + 1) + " " + upper(studio.project().tracks[unsigned(stem)].name).substr(0, 6);
-            return {who + " USB", sub_value(sub), sub / float(move::usb_submixes)};
-        }
         if (page == Main) {
             if (which < 4) return {std::string("RETURN ") + char('A' + int(which)), std::to_string(studio.project().buses[which].level),
                                    studio.project().buses[which].level / 100.0f};
@@ -361,29 +340,16 @@ public:
         unsigned b = unsigned(page - SendA);
         return {who + ">" + char('A' + int(b)), std::to_string(track.mix.sends[b]), track.mix.sends[b] / 100.0f};
     }
-    // A touched knob on USB: the submix's channels on the computer under it.
-    std::string knob_detail(unsigned which) const override {
-        int stem = page == Usb ? usb_stem(which) : -1;
-        return stem < 0 ? std::string() : sub_channels(studio.extras().usb_submix[unsigned(stem)]);
-    }
     std::string knob_owner() const override {
-        static const char* const names[] {"VOL", "PAN", "SNDA", "SNDB", "SNDC", "SNDD", "MAIN", "USB"};
+        static const char* const names[] {"VOL", "PAN", "SNDA", "SNDB", "SNDC", "SNDD", "MAIN"};
         return names[page];
     }
     std::string status() const override { return " mixer_page=" + std::to_string(page) + " mixer_half=" + std::to_string(half); }
 
 private:
-    int page = Vol, half = 0; // half: 0 tracks 1-8, 1 tracks 9-16, 2 (USB only) the buses
-    unsigned usb_bus = 0;     // USB's A-D: the bus last turned, in the rail and the detail line
+    int page = Vol, half = 0; // half: 0 tracks 1-8, 1 tracks 9-16
 
-    static std::vector<ui::mix::Item> hub() { return {{"VOL"}, {"PAN"}, {"SNDA"}, {"SNDB"}, {"SNDC"}, {"SNDD"}, {"MAIN"}, {"USB"}}; }
-
-    // USB: knob `which`'s stem (a track, or 16-19 the buses on A-D), -1 for none or an empty track.
-    int usb_stem(unsigned which) const {
-        if (half == 2) return which < melodee::bus_count ? int(melodee::track_count + which) : -1;
-        unsigned t = unsigned(half) * 8 + which;
-        return which < 8 && studio.kind(t) != TrackKind::Empty ? int(t) : -1;
-    }
+    static std::vector<ui::mix::Item> hub() { return {{"VOL"}, {"PAN"}, {"SNDA"}, {"SNDB"}, {"SNDC"}, {"SNDD"}, {"MAIN"}}; }
 
     std::string own_page() const { return "mixer"; }
 
@@ -395,53 +361,12 @@ private:
         s.muted = mix.mute;
         s.soloed = mix.solo;
         s.meter = meter_fraction(studio.host().meter(t));
-        if (page == Usb) s.text = sub_text(studio.extras().usb_submix[t]);
-        else if (page == Pan) { s.bipolar = true; s.value = mix.pan / 50.0f; }
+        if (page == Pan) { s.bipolar = true; s.value = mix.pan / 50.0f; }
         else s.value = page == Vol ? mix.level / 127.0f : mix.sends[unsigned(page - SendA)] / 100.0f;
         return s;
     }
 
-    // USB (docs/USB_AUDIO.md): each track's submix in a chip, or the buses'
-    // on A-D under knobs 1-4; the selected one's (or the bus last turned)
-    // submix and channels below.
-    void draw_usb(juce::Graphics& g) {
-        const auto& submix = studio.extras().usb_submix;
-        ui::mix::item_row(g, hub(), Usb);
-        unsigned sub = 0;
-        if (half == 2) {
-            ui::rail(g, "MIX", std::string(1, char('A' + int(usb_bus))), "A-D");
-            std::vector<ui::mix::Strip> list;
-            for (unsigned b = 0; b < melodee::bus_count; ++b) {
-                ui::mix::Strip s;
-                s.label = std::string(1, char('A' + int(b)));
-                s.text = sub_text(submix[melodee::track_count + b]);
-                list.push_back(s);
-            }
-            ui::mix::strips(g, {ui::content_x, 10, 4 * (ui::content_width / 8), 44}, list, int(usb_bus));
-            sub = submix[melodee::track_count + usb_bus];
-        } else {
-            unsigned first = unsigned(half) * 8;
-            ui::rail(g, "MIX", track_number(studio), half ? "9-16" : "1-8");
-            std::vector<ui::mix::Strip> list;
-            for (unsigned t = first; t < first + 8; ++t) list.push_back(strip(t));
-            int selected = int(studio.track()) - int(first);
-            ui::mix::strips(g, ui::content(10, 44), list, selected >= 0 && selected < 8 ? selected : -1);
-            sub = submix[studio.track()];
-        }
-        if (sub) ui::detail(g, sub_value(sub), sub_channels(sub));
-        else ui::detail(g, "OFF", "MIX ONLY");
-    }
-
     void turn(unsigned which, int delta) {
-        if (page == Usb) { // a submix a detent, OFF to 8
-            int stem = usb_stem(which);
-            if (stem < 0 || !delta) return;
-            auto& sub = studio.extras().usb_submix[unsigned(stem)];
-            sub = uint8_t(std::clamp(int(sub) + (delta > 0 ? 1 : -1), 0, int(move::usb_submixes)));
-            if (half == 2) usb_bus = which;
-            studio.changed();
-            return;
-        }
         if (page == Main) {
             if (which < 4) mixing::set_return(studio, which, int(studio.project().buses[which].level) + delta);
             else if (which == 7) mixing::set_compressor(studio, mixing::CompAmount, int(studio.project().compressor.amount) + delta);

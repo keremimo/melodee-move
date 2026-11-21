@@ -87,7 +87,6 @@ samples_tests() {
 phase "unit tests"
 lane samples samples_tests
 lane controls build/controls-tests
-lane usb build/usb-tests
 lane mixer build/mixer-tests
 lane pad_layout build/pad-layout-tests
 lane web_tests build/web-tests

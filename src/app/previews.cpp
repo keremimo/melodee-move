@@ -95,11 +95,6 @@ bool mixer_previews(MelodeeApp& melodee, const juce::File& folder, Send& send, P
     wheel(2);
     ok = save(melodee, folder, "main-chain") && ok;
     press(move::Button::Back);
-    wheel(1);
-    ok = save(melodee, folder, "mixer-usb") && ok; // USB: each track's submix (docs/USB_AUDIO.md)
-    press(move::Button::Right);
-    press(move::Button::Right);
-    ok = save(melodee, folder, "mixer-usb-bus") && ok;
     shift_step(3);
     ok = save(melodee, folder, "knob-fx") && ok;
     shift_step(3);

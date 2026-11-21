@@ -333,8 +333,8 @@ Kerem has checked it there. `n/a` rows have no box.
 | **SCREEN settings**: palette, fonts, brightness, the place bar's place (MELODEE.md › Project and system; guide/settings.md) | n/a | a one-bit screen with one font (UI.md) | — |
 | **Screen Mirror**: the MPC as a USB webcam of its screen (MELODEE.md › Project and system) | n/a | no USB video gadget on the Move's kernel; a screen view on the web page could stand in | — |
 | **AUDIO settings**: sample rate 44.1, 48, 96 kHz; buffer 256-1024 frames (MELODEE.md › Project and system) | n/a | the Move runs 44.1 kHz in blocks of 128 frames, set by its XMOS link | — |
-| **USB volume** (MELODEE.md › Project and system) | done | Setup > USB VOLUME: FULL (the default) or KNOB, what a computer records on 1-2; USB AUDIO beside it says OFF, NO COMPUTER or 18 CH (docs/USB_AUDIO.md) | [ ] |
-| **USB audio out**: what a computer records over USB-C, the mix on 1-2 and the tracks on 3-18 (MELODEE.md › Project and system; base HARDWARE.md, Stems) | done | Kerem (2026-11-20): eight stereo submixes on 3-18 instead of sixteen mono stems; each track and bus A-D on one (OFF, 1-8), a copy beside the main mix, on the Mixer's USB page (Left / Right: 1-8, 9-16, A-D); tracks 1-8 on 1-8 by default. Kernel modules built for the stock kernel, `usb-audio.sh on` as root once a boot (docs/USB_AUDIO.md). Not yet heard on a Move | [ ] |
+| **USB volume** (MELODEE.md › Project and system) | n/a | no USB audio beyond Ableton's own stereo (USB audio out) | — |
+| **USB audio out**: what a computer records over USB-C, the mix on 1-2 and the tracks on 3-18 (MELODEE.md › Project and system; base HARDWARE.md, Stems) | n/a | Ableton's own USB audio is the XMOS's, stereo, fixed by its firmware; a second 18-channel device of Melodee's own was built and dropped (Kerem, 2026-11-21; MOVE_CONTROLS.md, Decisions) | — |
 | **SAMPLING settings**: Recall grab, gap, trim end; Take auto end, after, silence below (MELODEE.md › Project and system) | done | Sampling's settings page (Shift + the wheel), kept in Move.settings | [ ] |
 | **ABOUT**: each core's load, dropouts, storage room and stream misses, plug-ins' cost; versions, licence (MELODEE.md › Project and system) | done | Setup > ABOUT: the audio cycle's share and longest, late exchanges, room left, synths and their slow calls, the build | [ ] |
 | **Usage log**: what the hands do, no names, a file each start (MELODEE.md › Files on the card; guide/settings.md) | done | Setup > USAGE LOG: Usage/usage-<start>.txt, a line a job (the time, the screen, the job), no names, written every 10 s | [ ] |
@@ -491,7 +491,7 @@ sections, each on Shift + Step n.
 
 | Status | Rows |
 | --- | --- |
-| `done` | 282 |
+| `done` | 280 |
 | `sequencer` | 0 |
 | `sampling` | 0 |
 | `kit depth` | 0 |
@@ -502,7 +502,7 @@ sections, each on Shift + Step n.
 | `MIDI & sync & undo & projects` | 0 |
 | `web page` | 0 |
 | `schwung` | 20 |
-| `n/a` | 32 |
+| `n/a` | 34 |
 | All rows | 336 |
 
 # Ableton Move parity

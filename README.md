@@ -525,18 +525,6 @@ back to the Move's user on the way out, so Schwung can write it again.
 **On poundhard-armbian**: `tools/deploy.sh move.local` (the JACK host; the
 launcher menu is stopped while it runs).
 
-**USB audio to a computer** (docs/USB_AUDIO.md): the mix and eight stereo
-submixes, 18 channels over USB-C. Build and check the kernel modules once
-(`tools/kernel-modules.sh move.local`, `tools/check-kernel.sh move.local`,
-both read the Move only); `./build.sh` packs them. Then, once after each
-boot, as root over Wi-Fi SSH:
-
-```sh
-ssh root@move.local sh /data/UserData/melodee-move/usb-audio.sh on
-```
-
-A reboot, or `usb-audio.sh off`, takes it out again.
-
 On the Move: pads play sines, C3 upward, pressure adds the octave. Play runs
 a 16-step click, steps toggle it, knob 1 is the tempo, knob 2 the overtone,
 the master knob the volume. The jogwheel turns the pages: HOME, INPUTS

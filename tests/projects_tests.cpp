@@ -360,28 +360,19 @@ void test_setup_and_tracks() {
     melodee.studio().settings_more["other_area"] = "other_area=2";
     melodee.studio().settings_more["other_word"] = "other_word 7";
     melodee.studio().settings_more["full"] = "full 0"; // FEATURES, gone: an old file's line is dropped
+    melodee.studio().settings_more["usb_full"] = "usb_full 0"; // USB VOLUME, gone with USB audio: dropped too
     CHECK(melodee.save_now().empty());
     {   // Kept in Move.settings.
         app::MelodeeApp again(folder, home);
         CHECK(again.studio().settings.response == 2 && !again.studio().settings.pressure);
         CHECK(again.studio().settings_more.count("other_area") && again.studio().settings_more.at("other_word") == "other_word 7");
-        CHECK(!again.studio().settings_more.count("full"));
+        CHECK(!again.studio().settings_more.count("full") && !again.studio().settings_more.count("usb_full"));
     }
-    // USB AUDIO after PADS, LIGHTS, then move-midi's MIDI and MIDI SYNC and
-    // move-web's WEB PAGE where those screens are here: read only, a push
-    // changes nothing. USB VOLUME: FULL or KNOB, flipped at once
-    // (docs/USB_AUDIO.md).
+    // ABOUT, past PADS, LIGHTS, then move-midi's MIDI and MIDI SYNC and
+    // move-web's WEB PAGE where those screens are here, and USAGE LOG. No
+    // FEATURES: the Move is always Full.
     int doors = (studio.screen("midi-config") ? 2 : 0) + (studio.screen("web-page") ? 1 : 0);
-    turn_wheel(melodee, 2 + doors);   // USB AUDIO
-    press(melodee, Button::MainPush);
-    CHECK(has(status(), "page=setup") && has(status(), "setup_editing=0") && studio.settings.usb_full);
-    turn_wheel(melodee, 1);           // USB VOLUME
-    press(melodee, Button::MainPush);
-    CHECK(!studio.settings.usb_full);
-    press(melodee, Button::MainPush);
-    CHECK(studio.settings.usb_full);
-    // ABOUT, past USAGE LOG. No FEATURES: the Move is always Full.
-    turn_wheel(melodee, 2);
+    turn_wheel(melodee, 3 + doors);
     press(melodee, Button::MainPush);
     CHECK(has(status(), "page=about"));
     press(melodee, Button::Back);
@@ -449,48 +440,6 @@ void test_setup_and_tracks() {
 }
 
 } // namespace
-
-// USB submixes (docs/USB_AUDIO.md): each track's and bus's, kept in the
-// Move's section where it is not the default, read back, undone.
-void test_usb_submixes() {
-    auto project = app::new_project();
-    auto bank = std::make_unique<melodee::PatternBank>();
-    app::PluginStates none;
-    app::MoveExtras extras;
-    // The default: tracks 1-8 on submixes 1-8, the rest and the buses on none.
-    CHECK(extras.usb_submix[0] == 1 && extras.usb_submix[7] == 8 && extras.usb_submix[8] == 0 && extras.usb_submix[16] == 0);
-    auto plain = app::project_file_bytes(*project, *bank, none, &extras);
-    std::string plain_text(plain.begin(), plain.end());
-    CHECK(plain_text.find("\nusb") == std::string::npos); // defaults are not written
-
-    extras.usb_submix[2] = 0;                           // track 3 on none
-    extras.usb_submix[10] = 5;                          // track 11 on submix 5
-    extras.usb_submix[melodee::track_count + 1] = 8;    // bus B on submix 8
-    auto bytes = app::project_file_bytes(*project, *bank, none, &extras);
-    std::string text(bytes.begin(), bytes.end());
-    CHECK(text.find("\nusb 2 0\n") != std::string::npos && text.find("\nusb 10 5\n") != std::string::npos &&
-          text.find("\nusb_bus 1 8\n") != std::string::npos && text.find("\nusb 0 ") == std::string::npos);
-    auto back = app::new_project();
-    auto back_bank = std::make_unique<melodee::PatternBank>();
-    app::MoveExtras read;
-    read.usb_submix.fill(7);
-    CHECK(app::read_project_bytes(bytes, *back, *back_bank, none, &read).empty());
-    CHECK(read.usb_submix == extras.usb_submix);
-    // A project from before submixes: the defaults.
-    app::MoveExtras old;
-    old.usb_submix.fill(7);
-    CHECK(app::read_project_bytes(plain, *back, *back_bank, none, &old).empty());
-    CHECK(old.usb_submix == app::usb_defaults());
-
-    // A change is a step of its own, undone and redone.
-    app::Live live {*project, *bank, extras};
-    app::History history;
-    history.reset(live);
-    extras.usb_submix[4] = 2;
-    CHECK(history.close(live, "5 USB", 4, app::History::Clock::now()));
-    CHECK(history.undo(live) && extras.usb_submix[4] == 5);
-    CHECK(history.redo(live) && extras.usb_submix[4] == 2);
-}
 
 // An MPC project (.xpj: gzip around the header lines and the JSON), as melodee-sample's tests/test_mpc_project.py
 // writes one: a drum track of `pads` instruments, sequence 2 with two notes on it; a keygroup track (MPC 3) if asked.
@@ -591,7 +540,6 @@ int main() {
     test_undo_app();
     test_projects();
     test_setup_and_tracks();
-    test_usb_submixes();
     test_mpc_projects();
     std::cout << "projects-tests: " << checks - failures << "/" << checks << " checks passed\n";
     return failures ? 1 : 0;
