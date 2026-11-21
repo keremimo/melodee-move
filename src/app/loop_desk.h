@@ -138,8 +138,15 @@ public:
     std::string status() const; // the status line's fields
 
     // Saving: each loop's length, tempo and layers into the project before
-    // its bytes are made, and its file marked to be written if it changed.
+    // its bytes are made, and its file marked to be written if it changed,
+    // or every loop's once the project's folder is another (a Save As, a
+    // rename: the loops playing go with the project they are saved in).
     void keep_values();
+    // Another project swapped in (its engine reloaded, Studio's `opened`
+    // hooks): the one before forgotten, the new one's loops read from its
+    // folder on the next service pass. Call flush() outside the lock before
+    // the swap, so the project before has its loops written.
+    void reopen();
 
     // ---------------------------------------------------------- audio thread
     // The Looper is on top: the left 16 pads are the loops' rows. Shift: a
@@ -195,6 +202,7 @@ private:
     bool files_due = false;
     uint8_t load_mask = 0;                   // saved loops to read back (the first service pass)
     bool loaded = false;
+    std::string written_dir;                 // the folder the loop files on the card belong to
 };
 
 } // namespace app
