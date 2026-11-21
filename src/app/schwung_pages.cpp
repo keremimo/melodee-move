@@ -45,8 +45,7 @@ ModuleView::List list_of(const juce::var& from, bool rows_are_objects) {
 } // namespace
 
 std::string SchwungPages::shared_folder() {
-    const char* given = std::getenv("MELODEE_SCHWUNG_SHARED");
-    std::string folder = given && *given ? given : "/data/UserData/schwung/shared";
+    std::string folder = SchwungDisplay::root() + "/shared";
     std::error_code error;
     return std::filesystem::exists(std::filesystem::path(folder) / "param_pages" / "page_controller.mjs", error) ? folder : std::string();
 }

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #pragma once
+#include "app/schwung_display.h"
 #include <juce_graphics/juce_graphics.h>
 #include <array>
 #include <cstdint>
@@ -32,8 +33,9 @@
 //   onTextEntry(ctx, p)   the keyboard's answer: {text, cancelled}
 //
 // and reaches the host through ctx: fillRect, setPixel, line, print and
-// textWidth on the 128 x 64 screen (Schwung's own font when the Move has
-// it, /data/UserData/schwung/host/font.png); getParam and setParam on the
+// textWidth on the 128 x 64 screen, Schwung's (schwung_display.h: its
+// shapes and font; its globals, fill_rect, print and the rest, are on the
+// script's global object too); getParam and setParam on the
 // module; state, an object kept for the page; openTextEntry({title,
 // initial}); openFileInTool(path). QuickJS's std and os modules are there
 // to import, as under Schwung (the pages fetch with wget, read and write
@@ -75,6 +77,9 @@ public:
         std::vector<std::string> keys;
         int x = 0, y = 0; // where the band starts (info.x, info.y)
         int width = CanvasPage::width, height = CanvasPage::height;
+        // The screen cleared first. Off for Schwung's own screen code, which
+        // clears for itself (its host never does).
+        bool clear = true;
     };
     // The page on the screen, `values` its knobs' and extra_keys' values.
     void draw(juce::Graphics& g, const std::map<std::string, std::string>& values, const Frame& frame);
@@ -92,7 +97,10 @@ public:
     void restore_state(const std::string& json);
 
     // The screen as the last draw left it, for tests.
-    bool pixel(int x, int y) const { return x >= 0 && x < width && y >= 0 && y < height && screen[size_t(y * width + x)]; }
+    bool pixel(int x, int y) const { return display.pixel(x, y); }
+    // The screen: Schwung's (schwung_display.h), whose globals (fill_rect,
+    // print ...) are on the script's global object; ctx draws on it too.
+    const SchwungDisplay& screen() const { return display; }
 
     static constexpr int width = 128, height = 64;
 
@@ -101,7 +109,7 @@ private:
     CanvasPage() = default;
     std::unique_ptr<Engine> engine;
     Host host;
-    std::array<uint8_t, width * height> screen {};
+    SchwungDisplay display;
     friend struct CanvasBindings;
 };
 

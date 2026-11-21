@@ -19,9 +19,12 @@ google/fonts revision melodee-sample embeds; the page carries it
 (tools/web_bundle.py)."""
 from pathlib import Path
 import hashlib
+import json
+import struct
 import subprocess
 import tarfile
 import urllib.request
+import zlib
 
 ROOT = Path(__file__).resolve().parents[1]
 JUCE_TAG = "9.0.5"
@@ -74,9 +77,14 @@ def prepare_quickjs(root=ROOT):
 
 
 def prepare_schwung(root=ROOT):
-    """Schwung's src/shared, alone, in build/deps/schwung/shared."""
+    """Schwung's src/shared and src/shadow in build/deps/schwung, and its
+    screen font in host/, as /data/UserData/schwung has them on a Move
+    (MELODEE_SCHWUNG_ROOT in the tests). The font is drawn from Schwung's own
+    table of it (tools/param-pages/font5x7.json, made from the Move's
+    font.png), cell for cell."""
     path = Path(root) / "build/deps/schwung"
-    if (path / "shared/param_pages/page_controller.mjs").exists():
+    wanted = ["shared/param_pages/page_controller.mjs", "shadow/shadow_ui_param_pages.mjs", "host/font.png"]
+    if all((path / name).exists() for name in wanted):
         return
     archive = Path(root) / f"build/deps/schwung-{SCHWUNG_REVISION[:7]}.tar.gz"
     archive.parent.mkdir(parents=True, exist_ok=True)
@@ -86,14 +94,50 @@ def prepare_schwung(root=ROOT):
     if digest != SCHWUNG_SHA256:
         archive.unlink()
         raise RuntimeError(f"Schwung archive hash mismatch: {digest}")
-    prefix = f"schwung-{SCHWUNG_REVISION}/src/shared/"
+    top = f"schwung-{SCHWUNG_REVISION}/"
+    parts = {"src/shared/": "shared", "src/shadow/": "shadow"}
+    table = top + "tools/param-pages/font5x7.json"
     staging = Path(root) / "build/deps/schwung-staging"
+    subprocess.run(["rm", "-rf", str(staging), str(path)], check=True)
     with tarfile.open(archive) as tar:
-        members = [m for m in tar.getmembers() if m.name.startswith(prefix)]
+        members = [m for m in tar.getmembers()
+                   if any(m.name.startswith(top + prefix) for prefix in parts) or m.name == table]
         tar.extractall(staging, members=members, filter="data")
     path.mkdir(parents=True, exist_ok=True)
-    (staging / prefix).rename(path / "shared")
+    for prefix, name in parts.items():
+        (staging / top / prefix).rename(path / name)
+    write_schwung_font(json.loads((staging / table).read_text(encoding="utf-8")), path / "host")
     subprocess.run(["rm", "-rf", str(staging)], check=True)
+
+
+def write_schwung_font(table, folder):
+    """font.png and font.png.dat as Schwung's generator lays them out: the
+    characters in a strip of equal cells, white ink on transparency, each
+    glyph from its cell's left edge (Schwung's loader trims every glyph to
+    its ink, so where in the cell it starts changes nothing)."""
+    folder.mkdir(parents=True, exist_ok=True)
+    chars = list(table["glyphs"])
+    cell, height = table["cellWidth"], table["height"]
+    width = cell * len(chars)
+    rows = [bytearray(width * 4) for _ in range(height)]
+    for n, char in enumerate(chars):
+        glyph = table["glyphs"][char]
+        for y, bits in enumerate(glyph["rows"][:height]):
+            for x in range(glyph["w"]):
+                if bits & (1 << x):
+                    at = (n * cell + x) * 4
+                    rows[y][at:at + 4] = b"\xff\xff\xff\xff"
+
+    def chunk(kind, data):
+        return (struct.pack(">I", len(data)) + kind + data
+                + struct.pack(">I", zlib.crc32(kind + data) & 0xffffffff))
+
+    raw = b"".join(b"\x00" + bytes(row) for row in rows)
+    png = (b"\x89PNG\r\n\x1a\n"
+           + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0))
+           + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b""))
+    (folder / "font.png").write_bytes(png)
+    (folder / "font.png.dat").write_text("".join(chars) + "\n", encoding="utf-8")
 
 
 def prepare(root=ROOT):

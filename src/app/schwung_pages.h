@@ -60,7 +60,7 @@ struct ModuleView {
 
 class SchwungPages {
 public:
-    // Where Schwung's shared code is: MELODEE_SCHWUNG_SHARED, else the
+    // Where Schwung's shared code is: MELODEE_SCHWUNG_ROOT's shared/, else the
     // Move's /data/UserData/schwung/shared. Empty when it is not there.
     static std::string shared_folder();
 

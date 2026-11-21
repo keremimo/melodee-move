@@ -14,7 +14,7 @@
 //
 // Nothing of Schwung's is copied: its library is imported from the Schwung
 // installed beside Melodee, so a module behaves as under the very code it was
-// written against. MELODEE_SCHWUNG_SHARED names that folder elsewhere (tests).
+// written against. MELODEE_SCHWUNG_ROOT moves that folder elsewhere (tests).
 //
 // The seam, through the page ctx Melodee lends each hook:
 //   getParam("melodee:module_dir")   where the module's own page scripts are
@@ -56,7 +56,7 @@ globalThis.clear_screen = () => ctx && ctx.fillRect(0, 0, 128, 64, 0);
 
 // Schwung's library, imported while Melodee loads this page (it waits for
 // the imports).
-const SHARED = std.getenv("MELODEE_SCHWUNG_SHARED") || "/data/UserData/schwung/shared";
+const SHARED = "/data/UserData/schwung/shared"; // MELODEE_SCHWUNG_ROOT moves it (canvas_page.cpp)
 const lib = {};
 {
     const parts = await Promise.all([

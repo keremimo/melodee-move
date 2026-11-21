@@ -853,9 +853,9 @@ void test_schwung_pages() {
     // pages, Shift + jog a section, the click: Sections, a door, a held
     // knob's parameter; Back one layer at a time, then out), and a trailing
     // page's action back to Melodee. Runs against the pinned Schwung
-    // (tools/dependencies.py, MELODEE_SCHWUNG_SHARED from tools/check.sh).
+    // (tools/dependencies.py, MELODEE_SCHWUNG_ROOT from tools/check.sh).
     if (app::SchwungPages::shared_folder().empty()) {
-        std::cerr << "schwung pages: no Schwung shared code (MELODEE_SCHWUNG_SHARED), skipped\n";
+        std::cerr << "schwung pages: no Schwung shared code (MELODEE_SCHWUNG_ROOT), skipped\n";
         return;
     }
     struct Run {
@@ -1249,6 +1249,125 @@ void test_schwung_modules() {
     CHECK(player.set_module(nullptr));
     player.render(in, out, 1.0f);
     CHECK(!player.live() && player.retired() == loaded.get());
+}
+
+void test_schwung_display() {
+    // Schwung's screen, rule by rule as its js_display.c has them
+    // (schwung_display.h), then the same through the JS globals Schwung's
+    // own screen code calls.
+    using app::SchwungDisplay;
+    auto lit = [](const SchwungDisplay& d) {
+        std::vector<std::pair<int, int>> on;
+        for (int y = 0; y < SchwungDisplay::height; ++y)
+            for (int x = 0; x < SchwungDisplay::width; ++x)
+                if (d.pixel(x, y)) on.emplace_back(x, y);
+        return on;
+    };
+    using Points = std::vector<std::pair<int, int>>;
+    SchwungDisplay d;
+    // A line's pixels depend on the end it starts from.
+    d.draw_line(0, 0, 2, 1, 1);
+    CHECK((lit(d) == Points {{0, 0}, {1, 0}, {2, 1}}));
+    d.clear();
+    d.draw_line(2, 1, 0, 0, 1);
+    CHECK((lit(d) == Points {{0, 0}, {1, 1}, {2, 1}}));
+    d.clear();
+    d.draw_line(5, 9, 5, 7, 1); // a vertical run, both ends in
+    CHECK((lit(d) == Points {{5, 7}, {5, 8}, {5, 9}}));
+    d.clear();
+    d.draw_line(3, 3, 3, 3, 7); // any colour but 0 is white; a point is one pixel
+    CHECK((lit(d) == Points {{3, 3}}));
+    // Rectangles: nothing for a size <= 0; clipped at the edges.
+    d.clear();
+    d.fill_rect(0, 0, 0, 5, 1);
+    d.fill_rect(0, 0, 5, -1, 1);
+    d.draw_rect(0, 0, -2, 2, 1);
+    CHECK(lit(d).empty());
+    d.fill_rect(126, 62, 5, 5, 1);
+    CHECK((lit(d) == Points {{126, 62}, {127, 62}, {126, 63}, {127, 63}}));
+    d.clear();
+    d.draw_rect(1, 1, 3, 3, 1);
+    CHECK(lit(d).size() == 8 && !d.pixel(2, 2));
+    // Circles: a point at r 0, a plus at r 1; the outline is one pixel per
+    // row and per column, unioned; an arc runs clockwise from twelve o'clock.
+    d.clear();
+    d.fill_circle(10, 10, 0, 1);
+    CHECK((lit(d) == Points {{10, 10}}));
+    d.clear();
+    d.fill_circle(10, 10, 1, 1);
+    CHECK((lit(d) == Points {{10, 9}, {9, 10}, {10, 10}, {11, 10}, {10, 11}}));
+    d.clear();
+    d.draw_circle(20, 20, 4, 1);
+    CHECK(d.pixel(20, 16) && d.pixel(24, 20) && d.pixel(20, 24) && d.pixel(16, 20) && !d.pixel(20, 20));
+    d.clear();
+    d.draw_arc(20, 20, 4, 0, 90, 1); // twelve to three o'clock
+    CHECK(d.pixel(20, 16) && d.pixel(24, 20) && !d.pixel(16, 20) && !d.pixel(20, 24));
+    d.clear();
+    d.draw_arc(20, 20, 4, 450, 90, 1); // 450 is 90: three to six o'clock
+    CHECK(d.pixel(24, 20) && d.pixel(20, 24) && !d.pixel(20, 16) && !d.pixel(16, 20));
+    d.clear();
+    d.draw_arc(20, 20, 4, 0, 0, 1);
+    CHECK(lit(d).empty());
+
+    // The font: Schwung's own (the Move's, or its table of it in the tests'
+    // copy, tools/dependencies.py).
+    if (!std::filesystem::exists(SchwungDisplay::root() + "/host/font.png")) {
+        std::cerr << "schwung display: no Schwung font (MELODEE_SCHWUNG_ROOT), text skipped\n";
+        return;
+    }
+    CHECK(d.text_width("Hi") == 10);    // H 5 + 1, i 3 + 1
+    CHECK(d.text_width("\xc2\xb0") == 5); // UTF-8's lead byte has no glyph (1), then ° (3 + 1)
+    CHECK(d.text_width("\xc3\xa4") == 2); // ä never draws
+    CHECK(d.font_height() == 7);
+    d.clear();
+    d.print(4, 2, "!", 1); // trimmed to its ink, drawn from y down
+    CHECK((lit(d) == Points {{4, 2}, {4, 3}, {4, 4}, {4, 5}, {4, 6}, {4, 8}}));
+    d.fill_rect(0, 20, 20, 9, 1);
+    d.print(1, 21, "!", 0); // only the ink is written: black on white
+    CHECK(!d.pixel(1, 21) && d.pixel(2, 21) && d.pixel(0, 21));
+    auto packed = d.packed(); // Schwung's packed screen: a byte a column of 8 rows
+    CHECK(packed[4] == ((1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (1 << 6)) && packed[128 + 4] == 1);
+
+    // The globals, as Schwung's bindings answer: too few arguments draw
+    // nothing (fill_rect needs five, print four); the line and circles
+    // default to white; text_width counts as above.
+    std::vector<std::string> sets;
+    app::CanvasPage::Host host;
+    host.get = [](const std::string&) { return std::string(); };
+    host.set = [&](const std::string& key, const std::string& value) { sets.push_back(key + "=" + value); };
+    std::string error;
+    auto page = app::CanvasPage::load_source(R"(
+        globalThis.canvas_overlay = { drawPage(ctx) {
+            clear_screen();
+            fill_rect(0, 0, 4, 4);
+            fill_rect(0, 10, 2, 2, 1);
+            print(10, 0, "A");
+            print(10, 10, "A", 1);
+            draw_line(30, 0, 30, 2);
+            fill_circle(40, 5, 0);
+            draw_arc(50, 10, 2, 0, 90);
+            set_pixel(60, 0);
+            set_pixel(60, 1, 1);
+            ctx.setParam("width", String(text_width("Hi")));
+            ctx.setParam("names", [fill_rect.name, print.name, draw_line.name].join());
+            ctx.setParam("fonts", String(set_font("/no/such.png")) + "," + get_font_height());
+        } };)", "globals.js", host, error);
+    CHECK(page && error.empty());
+    if (!page) { std::cerr << "globals.js: " << error << '\n'; return; }
+    juce::Image screen(juce::Image::ARGB, 128, 64, true);
+    {
+        juce::Graphics g(screen);
+        app::CanvasPage::Frame frame;
+        frame.clear = false;
+        page->draw(g, {}, frame);
+    }
+    const auto& on = page->screen();
+    CHECK(!on.pixel(0, 0) && on.pixel(0, 10) && on.pixel(1, 11));       // four arguments: nothing
+    CHECK(!on.pixel(12, 0) && on.pixel(12, 10));                        // three: nothing
+    CHECK(on.pixel(30, 0) && on.pixel(30, 2) && on.pixel(40, 5));       // white by default
+    CHECK(on.pixel(50, 8) && on.pixel(52, 10) && !on.pixel(48, 10));    // its quarter
+    CHECK(!on.pixel(60, 0) && on.pixel(60, 1));                         // set_pixel needs three
+    CHECK((sets == std::vector<std::string> {"width=10", "names=fill_rect,print,draw_line", "fonts=false,7"}));
 }
 
 void test_canvas_page() {
@@ -3174,6 +3293,7 @@ int main() {
     test_module_macros();
     test_schwung_modules();
     test_module_pages_shown();
+    test_schwung_display();
     test_schwung_pages();
     test_canvas_page();
     test_synth_track();

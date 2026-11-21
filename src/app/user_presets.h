@@ -12,7 +12,7 @@
 namespace app {
 
 // /data/UserData/schwung/presets on the Move: beside Schwung's shared code
-// (MELODEE_SCHWUNG_SHARED's parent elsewhere, the tests'). Empty: none.
+// (MELODEE_SCHWUNG_ROOT's presets/ elsewhere, the tests'). Empty: none.
 std::string user_presets_folder();
 
 struct UserPreset { std::string name, file; };

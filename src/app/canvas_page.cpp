@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "app/canvas_page.h"
-#include "move/font.h"
+#include "app/schwung_display.h"
 #include <quickjs-libc.h>
 #include <quickjs.h>
 #include <algorithm>
@@ -16,75 +16,32 @@
 namespace app {
 namespace {
 
-// ---------------------------------------------------------------- the font
+// ---------------------------------------------------------------- modules
 
-// Schwung's: a strip of equal cells, one a character of the .dat file's
-// list, each glyph trimmed to its pixels and followed by one blank column
-// (Schwung's js_display.c). Melodee's own 5 x 7 where the Move has none.
-struct Glyph { int width = 0; std::vector<uint8_t> bits; };
-struct PageFont {
-    int height = move::glyph_height, spacing = 1;
-    std::array<Glyph, 256> glyphs;
-};
-
-constexpr const char* schwung_font = "/data/UserData/schwung/host/font.png";
-
-bool read_schwung_font(PageFont& font) {
-    juce::File png(schwung_font), list_file(juce::String(schwung_font) + ".dat");
-    if (!png.existsAsFile() || !list_file.existsAsFile()) return false;
-    auto image = juce::ImageFileFormat::loadFrom(png);
-    juce::MemoryBlock bytes;
-    if (!image.isValid() || !list_file.loadFileAsData(bytes)) return false;
-    auto list = juce::String::fromUTF8(static_cast<const char*>(bytes.getData()), int(bytes.getSize())).upToFirstOccurrenceOf("\n", false, false);
-    int count = list.length(), cell = count ? image.getWidth() / count : 0;
-    if (cell <= 0) return false;
-    font.height = image.getHeight();
-    juce::Image::BitmapData pixels(image, juce::Image::BitmapData::readOnly);
-    for (int n = 0; n < count; ++n) {
-        auto code = list[n];
-        if (code >= 256) continue;
-        int x0 = n * cell, start = -1, end = -1;
-        for (int x = 0; x < cell; ++x)
-            for (int y = 0; y < font.height; ++y)
-                if (pixels.getPixelColour(x0 + x, y).getAlpha() > 0) {
-                    if (start < 0) start = x;
-                    end = x;
-                    break;
-                }
-        Glyph glyph;
-        if (start < 0) { // blank: a space as wide as the cell
-            glyph.width = cell;
-            glyph.bits.assign(size_t(cell * font.height), 0);
-        } else {
-            glyph.width = end - start + 1;
-            for (int y = 0; y < font.height; ++y)
-                for (int x = 0; x < glyph.width; ++x) glyph.bits.push_back(pixels.getPixelColour(x0 + start + x, y).getAlpha() > 0);
+// A module's name, as QuickJS's own default makes it (a relative one from
+// the importing module's folder), then Schwung's folder moved where
+// MELODEE_SCHWUNG_ROOT says (schwung_display.h): Schwung's code imports its
+// own by absolute paths under /data/UserData/schwung.
+char* module_name(JSContext* context, const char* base, const char* name, void*) {
+    std::string out;
+    if (name[0] != '.') out = name;
+    else {
+        std::string folder = base;
+        auto slash = folder.rfind('/');
+        folder = slash == std::string::npos ? std::string() : folder.substr(0, slash);
+        std::string rest = name;
+        for (;;) {
+            if (rest.rfind("./", 0) == 0) rest = rest.substr(2);
+            else if (rest.rfind("../", 0) == 0 && !folder.empty() && folder != "." && folder != "..") {
+                auto up = folder.rfind('/');
+                folder = up == std::string::npos ? std::string() : folder.substr(0, up);
+                rest = rest.substr(3);
+            } else break;
         }
-        font.glyphs[size_t(code)] = std::move(glyph);
+        out = folder.empty() ? rest : folder + "/" + rest;
     }
-    return true;
-}
-
-const PageFont& page_font() {
-    static const PageFont font = [] {
-        PageFont made;
-        if (read_schwung_font(made)) return made;
-        for (int c = 32; c < 127; ++c) {
-            juce::Image image(juce::Image::ARGB, move::glyph_advance, move::glyph_height, true);
-            {
-                juce::Graphics g(image);
-                g.setColour(juce::Colours::white);
-                move::draw_text(g, 0, 0, std::string(1, char(c)));
-            }
-            Glyph glyph;
-            glyph.width = move::glyph_width;
-            for (int y = 0; y < move::glyph_height; ++y)
-                for (int x = 0; x < move::glyph_width; ++x) glyph.bits.push_back(image.getPixelAt(x, y).getAlpha() > 127);
-            made.glyphs[size_t(c)] = std::move(glyph);
-        }
-        return made;
-    }();
-    return font;
+    out = SchwungDisplay::schwung_path(out);
+    return js_strdup(context, out.c_str());
 }
 
 std::string exception_text(JSContext* context) {
@@ -161,62 +118,37 @@ struct CanvasPage::Engine {
 struct CanvasBindings {
     static CanvasPage& page(JSContext* context) { return *static_cast<CanvasPage*>(JS_GetContextOpaque(context)); }
 
-    static void set_pixel(CanvasPage& on, int x, int y, int value) {
-        if (x >= 0 && x < CanvasPage::width && y >= 0 && y < CanvasPage::height) on.screen[size_t(y * CanvasPage::width + x)] = value ? 1 : 0;
-    }
-
+    // ctx's drawing, on Schwung's screen with Schwung's shapes and font
+    // (schwung_display.h); the colour may be left out (white), as a page's
+    // frame-scoped ctx under Schwung allows.
     static JSValue fill_rect(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
         if (argc < 4) return JS_UNDEFINED;
-        int x = int_of(context, argv[0]), y = int_of(context, argv[1]), w = int_of(context, argv[2]), h = int_of(context, argv[3]);
-        int value = argc > 4 ? int_of(context, argv[4], 1) : 1;
-        auto& on = page(context);
-        for (int row = std::max(0, y); row < std::min(CanvasPage::height, y + h); ++row)
-            for (int column = std::max(0, x); column < std::min(CanvasPage::width, x + w); ++column) set_pixel(on, column, row, value);
+        page(context).display.fill_rect(int_of(context, argv[0]), int_of(context, argv[1]), int_of(context, argv[2]), int_of(context, argv[3]),
+                                        argc > 4 ? int_of(context, argv[4], 1) : 1);
         return JS_UNDEFINED;
     }
 
     static JSValue pixel(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
-        if (argc >= 2) set_pixel(page(context), int_of(context, argv[0]), int_of(context, argv[1]), argc > 2 ? int_of(context, argv[2], 1) : 1);
+        if (argc >= 2) page(context).display.set_pixel(int_of(context, argv[0]), int_of(context, argv[1]), argc > 2 ? int_of(context, argv[2], 1) : 1);
         return JS_UNDEFINED;
     }
 
     static JSValue line(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
         if (argc < 4) return JS_UNDEFINED;
-        int x0 = int_of(context, argv[0]), y0 = int_of(context, argv[1]), x1 = int_of(context, argv[2]), y1 = int_of(context, argv[3]);
-        int value = argc > 4 ? int_of(context, argv[4], 1) : 1;
-        int dx = std::abs(x1 - x0), dy = -std::abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, error = dx + dy;
-        for (int steps = 0; steps < 1024; ++steps) {
-            set_pixel(page(context), x0, y0, value);
-            if (x0 == x1 && y0 == y1) break;
-            int twice = 2 * error;
-            if (twice >= dy) { error += dy; x0 += sx; }
-            if (twice <= dx) { error += dx; y0 += sy; }
-        }
+        page(context).display.draw_line(int_of(context, argv[0]), int_of(context, argv[1]), int_of(context, argv[2]), int_of(context, argv[3]),
+                                        argc > 4 ? int_of(context, argv[4], 1) : 1);
         return JS_UNDEFINED;
     }
 
     static JSValue print(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
         if (argc < 3) return JS_UNDEFINED;
-        int x = int_of(context, argv[0]), y = int_of(context, argv[1]);
-        int value = argc > 3 ? int_of(context, argv[3], 1) : 1;
-        const auto& font = page_font();
-        auto& on = page(context);
-        for (unsigned char c : string_of(context, argv[2])) {
-            const auto& glyph = font.glyphs[c];
-            for (int row = 0; row < font.height && !glyph.bits.empty(); ++row)
-                for (int column = 0; column < glyph.width; ++column)
-                    if (glyph.bits[size_t(row * glyph.width + column)]) set_pixel(on, x + column, y + row, value);
-            x += glyph.width + font.spacing;
-        }
+        page(context).display.print(int_of(context, argv[0]), int_of(context, argv[1]), string_of(context, argv[2]), argc > 3 ? int_of(context, argv[3], 1) : 1);
         return JS_UNDEFINED;
     }
 
     static JSValue text_width(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
         if (argc < 1) return JS_NewInt32(context, 0);
-        const auto& font = page_font();
-        int width = 0;
-        for (unsigned char c : string_of(context, argv[0])) width += font.glyphs[c].width + font.spacing;
-        return JS_NewInt32(context, width);
+        return JS_NewInt32(context, page(context).display.text_width(string_of(context, argv[0])));
     }
 
     static JSValue get_param(JSContext* context, JSValueConst, int argc, JSValueConst* argv) {
@@ -283,7 +215,7 @@ std::unique_ptr<CanvasPage> CanvasPage::load_source(const std::string& source, c
     JS_SetMemoryLimit(engine.runtime, 64u << 20);
     JS_SetMaxStackSize(engine.runtime, 1u << 20);
     js_std_init_handlers(engine.runtime);
-    JS_SetModuleLoaderFunc(engine.runtime, nullptr, js_module_loader, nullptr);
+    JS_SetModuleLoaderFunc(engine.runtime, module_name, js_module_loader, nullptr);
     JS_SetInterruptHandler(engine.runtime, CanvasBindings::interrupt, &engine);
     engine.context = JS_NewContext(engine.runtime);
     if (!engine.context) { error = "no memory for a script"; return nullptr; }
@@ -292,6 +224,7 @@ std::unique_ptr<CanvasPage> CanvasPage::load_source(const std::string& source, c
     js_init_module_std(context, "std");
     js_init_module_os(context, "os");
     js_std_add_helpers(context, 0, nullptr);
+    page->display.install(context); // after the helpers: print is the screen's, as in Schwung's shadow UI
 
     // The script, as a module (it imports std and os).
     engine.deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
@@ -326,7 +259,7 @@ std::unique_ptr<CanvasPage> CanvasPage::load_source(const std::string& source, c
 CanvasPage::~CanvasPage() = default;
 
 void CanvasPage::draw(juce::Graphics& g, const std::map<std::string, std::string>& values, const Frame& frame) {
-    screen.fill(0);
+    if (frame.clear) display.clear();
     JSContext* context = engine->context;
     // The band, on ctx as Schwung's frame-scoped ctx has it: a page lays
     // itself out from ctx.width and ctx.height.
@@ -360,7 +293,7 @@ void CanvasPage::draw(juce::Graphics& g, const std::map<std::string, std::string
     {
         juce::Image::BitmapData pixels(image, juce::Image::BitmapData::writeOnly);
         for (int y = 0; y < height; ++y)
-            for (int x = 0; x < width; ++x) pixels.setPixelColour(x, y, screen[size_t(y * width + x)] ? juce::Colours::white : juce::Colours::black);
+            for (int x = 0; x < width; ++x) pixels.setPixelColour(x, y, display.pixels[size_t(y * width + x)] ? juce::Colours::white : juce::Colours::black);
     }
     g.drawImageAt(image, 0, 0);
 }
