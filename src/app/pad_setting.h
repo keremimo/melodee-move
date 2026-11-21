@@ -5,12 +5,11 @@
 
 // Setup > PADS > LAYOUT (docs/UI.md, "Pads"; Kerem, 2026-11-20): the pad
 // layout, Move rows or two MPC banks, one for every track and project, kept
-// in Move.settings ("pads 0" Rows, "pads 1" Banks); no shortcut. Push edits
-// it: the wheel turns it while the screen and the pads show its numbering
-// (ui/pad_numbering.h), push sets it, Back leaves it as it was.
-//
-// The row for Setup's PADS list (move-projects' Setup; until it lands,
-// screens/setup_pads.cpp is that list, on Shift + Step 2).
+// in Move.settings ("pads 0" Rows, "pads 1" Banks); no shortcut. A row of
+// Setup's PADS list (move-projects' screens/setup.cpp) whose push opens
+// screens/setup_pads.cpp (`setup-pads`): the wheel turns it while the
+// screen and the pads show its numbering (ui/pad_numbering.h), push sets
+// it, Back leaves it as it was.
 namespace app {
 class Studio;
 

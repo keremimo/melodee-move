@@ -36,8 +36,8 @@ Three parts so far:
   the groove. A track button held with the Volume knob sets that track's
   volume; Mute mutes the selected track, Mute + a track button that one,
   Shift + Mute + a track button solos it.
-- **Pads**, in either of two layouts (Setup > PADS > LAYOUT, Shift + Step
-  2): the Move's rows of eight, 1-8 the bottom row, or two MPC 4x4 banks
+- **Pads**, in either of two layouts (Setup > PADS > LAYOUT, Setup on Shift
+  + Step 2): the Move's rows of eight, 1-8 the bottom row, or two MPC 4x4 banks
   side by side, 1-16 the left bank from its bottom left and 17-32 the right.
   Every pad job follows the one chosen: the kit's pads, Chop's slices, the
   notes (in the banks 1-32 up the semitones, as the MPC's pads run up a
@@ -386,8 +386,8 @@ card. The report stays in `.local/probe/`.
   map both ways in Rows and Banks, notes for both readings of a scale, the
   typing keyboard; through the app, a kit's pads, Shift + pad, their lights,
   Chop's slices and a synth's notes in both layouts, Setup > PADS and
-  `Move.settings`. In the simulated Move, Setup > PADS set to Banks by the
-  Move's own keys, a pad then B01, and the next start still in Banks.
+  `Move.settings`. In the simulated Move, with `Move.settings` in Banks,
+  the bottom row's fifth pad is B01, and the next start is still in Banks.
 - `./build.sh`'s simulated run: the meter timed 8 of 8 clicks at exactly 428
   frames (300 of cable plus the block a render waits for the next exchange);
   a pad went from read to rendered in 37 µs; the cycle's own work took 33 µs

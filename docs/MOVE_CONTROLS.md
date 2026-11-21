@@ -114,7 +114,7 @@ bindings table matches pads by where they lie (16 Pitches' right 4x4), the
 screens and the audio thread turn the pad into its number; `audio_event()`
 does it once for every note a pad plays or writes (Seq Record, Capture,
 Repeat, the arp go through the track and key it works out). The Move's
-grids stay where they lie in both layouts until Kerem says otherwise:
+grids keep where the pads lie in both layouts (the decision above):
 Session (a row a track of the bank, a column a pattern) and the Overview.
 
 | Control | On the Move | In Melodee | Status |

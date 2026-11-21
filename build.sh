@@ -61,10 +61,10 @@ TRANSPORT_EXPECTED='page=kit-play .*playing=1 tick=[1-9][0-9]* tempo=122.0 click
 SEQUENCER_SCRIPT='50:0x90,16,127;51:0x80,16,0;60:0x90,20,127;61:0x80,20,0;70:0x90,24,127;71:0x80,24,0;80:0x90,28,127;81:0x80,28,0;100:0xb0,85,127;101:0xb0,85,0;200:0xb0,86,127;201:0xb0,86,0;300:0x90,69,100;330:0x80,69,0;500:0x90,69,100;530:0x80,69,0;700:0x90,69,100;730:0x80,69,0;900:0x90,69,100;930:0x80,69,0'
 SEQUENCER_EXPECTED='playing=1 .*seq_notes=[5-9] .*rec=1'
 # The pad layouts, on that project (A01 the loop, A02 to B01 its 16
-# slices): Shift + Step 2 at 100 opens Setup > PADS, push edits LAYOUT, the
-# wheel right turns it to Banks, push sets it, Back at 180; the bottom row's
-# fifth pad at 300 is B01 in Banks (A05 in Rows). The next start keeps Banks.
-PADS_SCRIPT='100:0xb0,49,127;101:0x90,17,127;102:0x80,17,0;103:0xb0,49,0;120:0xb0,3,127;121:0xb0,3,0;140:0xb0,14,1;160:0xb0,3,127;161:0xb0,3,0;180:0xb0,51,127;181:0xb0,51,0;300:0x90,72,100;330:0x80,72,0'
+# slices), with Move.settings saying MPC banks (as Setup > PADS > LAYOUT
+# leaves it): the bottom row's fifth pad at 100 is B01 in Banks (A05 in
+# Rows); the save on the way out keeps Banks, and so does the next start.
+PADS_SCRIPT='100:0x90,72,100;130:0x80,72,0'
 PADS_EXPECTED='page=kit-play .*pad=B01 .*layout=banks'
 # Kit depth, on that project (A01 the loop, A02-A17 its slices): Plus at 100
 # shows banks B-C and Minus at 160 back; Shift + Step 8 at 240 turns 16
@@ -149,6 +149,7 @@ docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE
     { build/melodee-move --backend simulated --samples build/simulated-samples --home build/simulated-home --seconds 4 --script '$KIT_SCRIPT' 2> build/simulated-kit.log || true; } &&
     tail -n 1 build/simulated-kit.log &&
     grep -qE '$KIT_EXPECTED' build/simulated-kit.log &&
+    echo 'pads 1' >> build/simulated-home/Move.settings &&
     { build/melodee-move --backend simulated --samples build/simulated-samples --home build/simulated-home --seconds 3 --script '$PADS_SCRIPT' 2> build/simulated-pads.log || true; } &&
     tail -n 1 build/simulated-pads.log &&
     grep -qE '$PADS_EXPECTED' build/simulated-pads.log &&

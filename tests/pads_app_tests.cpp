@@ -2,7 +2,8 @@
 // The pad layouts in Melodee (docs/UI.md, "Pads"): every pad job in both
 // layouts, through the Move app as a hand uses it. A kit's pads and their
 // lights, Chop's slices, a synth's notes (Kerem's reading (a): 1-32 up the
-// semitones in Banks), the setting in Setup > PADS and Move.settings.
+// semitones in Banks), the setting (Setup > PADS > LAYOUT) and
+// Move.settings.
 // Run from the repository's root (./build.sh does): it reads
 // build/test-modules, the stand-in Schwung module.
 #include "app/melodee_app.h"
@@ -19,6 +20,7 @@
 #include <future>
 #include <iostream>
 #include <map>
+#include <mutex>
 #include <sstream>
 #include <string>
 
@@ -41,10 +43,6 @@ template <class Do> void with_shift(App& app, Do&& what) {
     what();
     app.surface(make_event(0xb0, button_cc(Button::Shift), 0));
 }
-void tap_step(App& app, unsigned step) {
-    app.surface(make_event(0x90, step_note(step), 127));
-    app.surface(make_event(0x80, step_note(step), 0));
-}
 void turn_wheel(App& app, int detents) { app.surface(make_event(0xb0, main_knob_cc, uint8_t(detents < 0 ? 128 + detents : detents))); }
 
 // A physical pad hit as the runtime hands it on: the MIDI thread's job,
@@ -61,14 +59,17 @@ int32_t peak_of(const AudioBlock& block) {
     return peak;
 }
 
-// Setup > PADS on Shift + Step 2: push edits LAYOUT, the wheel turns it,
-// push sets it, Back leaves.
+// Setup > PADS > LAYOUT: Setup's PADS list (move-projects') pushes
+// `setup-pads` from its LAYOUT row; here it is pushed as that row does. The
+// wheel turns the layout, push sets it and goes back.
+void edit_layout(app::MelodeeApp& melodee) {
+    std::lock_guard<std::mutex> guard(melodee.studio().lock);
+    melodee.studio().push("setup-pads");
+}
 void choose_layout(app::MelodeeApp& melodee, PadLayout layout) {
-    with_shift(melodee, [&] { tap_step(melodee, 1); });
-    press_button(melodee, Button::MainPush);
+    edit_layout(melodee);
     turn_wheel(melodee, layout == PadLayout::Banks ? 1 : -1);
     press_button(melodee, Button::MainPush);
-    press_button(melodee, Button::Back);
 }
 
 // The pads' lights as the app sends them now: physical pad -> palette.
@@ -127,7 +128,19 @@ void test_kit_and_chop() {
         CHECK(has(melodee.status(), "pad=B01"));
         CHECK(play(4) == 0); // A05, empty
 
-        // Banks, set in Setup > PADS: B01 is the right bank's first pad (physical 4).
+        // Setup > PADS > LAYOUT turned to Banks, then Back: nothing changes,
+        // but while it is turned the pads light Banks' numbering (pad 17 white
+        // at the bottom row's fifth pad, pad 5 azure above pad 1).
+        edit_layout(melodee);
+        CHECK(has(melodee.status(), "page=setup-pads"));
+        turn_wheel(melodee, 1);
+        auto numbering = pad_lights(melodee);
+        CHECK(numbering[0] == colour::white && numbering[4] == colour::white);
+        CHECK(numbering[8] == colour::azure && numbering[28] == colour::violet);
+        press_button(melodee, Button::Back);
+        CHECK(app::pad_layout() == PadLayout::Rows);
+        CHECK(has(melodee.status(), "page=kit-play"));
+        // Banks, set: B01 is the right bank's first pad (physical 4).
         choose_layout(melodee, PadLayout::Banks);
         CHECK(app::pad_layout() == PadLayout::Banks);
         CHECK(has(melodee.status(), "layout=banks"));
