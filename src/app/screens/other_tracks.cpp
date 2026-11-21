@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // The Play screens of the tracks whose own screens come later (docs/PARITY.md,
-// wave 2): a keygroup, a MIDI track, an audio track, another host's plug-in,
-// and an empty track. Each plays: a keygroup's, a MIDI track's and a
-// plug-in's pads are notes as a synth track's (Up / Down the octave); an
-// audio track's pads do nothing. An empty track says how to make one.
+// wave 2): a keygroup, an audio track, another host's plug-in, and an empty
+// track (a MIDI track's is screens/midi_play.cpp). Each plays: a keygroup's
+// and a plug-in's pads are notes as a synth track's (Up / Down the octave);
+// an audio track's pads do nothing. An empty track says how to make one.
 #include "app/screens/common.h"
 #include "melodee/engine/engine_info.h"
 
@@ -63,19 +63,6 @@ public:
     }
 };
 
-class MidiPlay final : public NoteTrack {
-public:
-    using NoteTrack::NoteTrack;
-    void draw(juce::Graphics& g) override {
-        int channel = studio.current().params[melodee::midi_track::Channel];
-        ui::rail(g, "MIDI", track_number(studio), "CH" + std::to_string(channel));
-        move::draw_text(g, ui::content_x + 2, 2, "CH " + std::to_string(channel), 3);
-        move::draw_text(g, ui::content_x + 2, 30, name());
-        move::draw_text(g, ui::content_x + 2, 40, "LOWEST " + lowest());
-        ui::detail(g, "MIDI OUT: LATER", bar_beat(studio));
-    }
-};
-
 class PluginPlay final : public NoteTrack {
 public:
     using NoteTrack::NoteTrack;
@@ -128,7 +115,6 @@ public:
 };
 
 RegisterScreen keys("keys-play", make<KeysPlay>, {}, kind_bit(TrackKind::Keys));
-RegisterScreen midi("midi-play", make<MidiPlay>, {}, kind_bit(TrackKind::Midi));
 RegisterScreen plugin("plugin-play", make<PluginPlay>, {}, kind_bit(TrackKind::Plugin));
 RegisterScreen audio("audio-play", make<AudioPlay>, {}, kind_bit(TrackKind::Audio));
 RegisterScreen empty("empty-play", make<EmptyPlay>, {}, kind_bit(TrackKind::Empty));

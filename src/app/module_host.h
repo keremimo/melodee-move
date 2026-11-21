@@ -32,6 +32,9 @@ struct ModuleInfo {
 // by name; or, with `folder` "audio_fx", its audio effects, each library
 // where Schwung's Signal Chain looks for it: <id>/<id>.so.
 std::vector<ModuleInfo> scan_modules(const std::string& modules_root, const std::string& folder = "sound_generators");
+// Where a module's MIDI out (host_api's midi_send_external: USB-MIDI
+// packets) goes: the Move's MIDI port (midi.h). None set: refused.
+void set_external_midi(int (*send)(const uint8_t* packets, int length));
 
 struct ModuleParam {
     std::string key, name, short_name;

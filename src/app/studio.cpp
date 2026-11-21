@@ -223,9 +223,14 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
                 else if (word == "click") click_on = value != 0;
                 else if (word == "click_level") click_volume = std::min(value, 100u);
                 else if (word == "pads") set_pad_layout(value ? PadLayout::Banks : PadLayout::Rows);
+                else midi.read_setting(word, int(value)); // MIDI Config's keys
             }
     }
     selected = played;
+    if (!fresh) midi.read_section_of(path); // each track's MIDI OUT
+    static Studio* running = nullptr; // the one studio a process runs: its modules' MIDI out goes to its port
+    running = this;
+    set_external_midi([](const uint8_t* packets, int length) { return running ? running->midi.module_send(packets, length) : 0; });
     // Schwung's modules: each PLUGIN track whose entry holds a module's
     // state, and each PLUGIN track with none yet (a synth track waiting for
     // one). Any other plug-in is another host's to play.
@@ -284,6 +289,7 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
 Studio::~Studio() {
     for (auto& module : modules) if (module) module->player.stop();
     for (auto& module : modules_leaving) if (module) module->player.stop();
+    set_external_midi(nullptr); // the modules' MIDI out had this studio's port
     std::unique_lock<std::mutex> guard(lock);
     if (!dirty) return;
     auto bytes = project_bytes();
@@ -307,10 +313,12 @@ void Studio::render(const move::AudioBlock& input, move::AudioBlock& output) {
     // Melodee's transport, for the modules that follow it (sequencer.h): stores only.
     set_module_transport(engine->playing(), engine->ticks() / double(melodee::ticks_per_quarter), audio_beats.load(std::memory_order_relaxed),
                          audio_unit.load(std::memory_order_relaxed));
+    midi.after_render(*engine); // what is heard in this block goes out with it
 }
 
 void Studio::audio_opened(const move::AudioFormat& format) {
     engine->set_audio_format(double(format.rate), 0);
+    Midi::audio_thread();
 }
 
 void Studio::audio_event(const move::SurfaceEvent& event) {
@@ -925,6 +933,7 @@ std::string Studio::settings_text() const {
     out << settings_header << '\n' << "track " << selected << '\n' << "click " << int(click_on) << '\n' << "click_level " << click_volume << '\n';
     out << "pads " << int(pad_layout() == PadLayout::Banks) << '\n';
     out << seq->settings_text();
+    midi.write_settings(out);
     return out.str();
 }
 
@@ -964,7 +973,9 @@ std::vector<uint8_t> Studio::project_bytes() const {
         states[module->entry] = synth_state(module_state(t));
     }
     fx_states(states);
-    return project_file_bytes(*song, *bank, states);
+    auto bytes = project_file_bytes(*song, *bank, states);
+    midi.append_section(bytes); // each track's MIDI OUT
+    return bytes;
 }
 
 std::string Studio::write(std::vector<uint8_t> bytes, std::string settings) {
@@ -1033,6 +1044,10 @@ std::string Studio::restore() {
     std::lock_guard<std::mutex> guard(lock);
     if (missing) say(std::to_string(missing) + " FILES MISSING");
     else if (!wanted.empty()) say("PROJECT LOADED");
+    // A MIDI track's SysEx, sent as the project loads (its ON LOAD).
+    for (unsigned t = 0; t < melodee::track_count; ++t)
+        if (song->tracks[t].engine == EngineKind::Midi && song->tracks[t].params[melodee::midi_track::SysexOnLoad] && song->tracks[t].midi.sysex[0])
+            midi.send_sysex(*this, t);
     return {};
 }
 
@@ -1190,6 +1205,7 @@ void Studio::service() {
         if (slot >= samples.size()) samples.resize(slot + 1);
         samples[slot] = std::move(sample);
     }
+    midi.service(*this); // SysEx files read for the audio thread, the sent ones freed
     std::unique_lock<std::mutex> guard(lock);
     loading = false;
     // Autosave: three seconds after the last change, as on the MPC.
@@ -1523,6 +1539,7 @@ std::string Studio::status() const {
     line += text;
     for (const auto& screen : screens) line += screen->status();
     line += seq->status();
+    line += midi.status();
     return line;
 }
 

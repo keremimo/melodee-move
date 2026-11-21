@@ -3,6 +3,7 @@
 #include "app/canvas_page.h"
 #include "app/fx_host.h"
 #include "app/mixing.h"
+#include "app/midi.h"
 #include "app/module_host.h"
 #include "app/pad_layout.h"
 #include "app/project_store.h"
@@ -298,6 +299,8 @@ public:
     const std::string& home_folder() const { return home_path; }
     std::string library;
     std::string status() const;
+    // MIDI and sync (midi.h): MIDI Config, each track's MIDI OUT, the port.
+    Midi midi;
     // MIDI thread: whether a pad pressed now stays quiet, its job another
     // than its sound (bindings::pad_sounds()); the audio thread reads it.
     void quiet_pads(bool quiet) { pads_quiet.store(quiet, std::memory_order_relaxed); }

@@ -27,9 +27,11 @@ struct SurfaceEvent {
     uint64_t timestamp_ns = 0;
 };
 
-// A channel message from an external MIDI port (system:midi_capture_ext).
-// The spike passes only messages of up to three bytes; SysEx is counted
-// and dropped.
+// A message from or to the external MIDI port (system:midi_capture_ext;
+// on the Move's own device, USB-MIDI cable 2: a device on USB-A and a
+// computer on USB-C, docs/MIDI.md): a channel or system message of one to
+// three bytes, or a piece of a SysEx, three bytes at most, the first piece
+// beginning with F0 and the last ending with F7.
 struct ExternalMidi {
     std::array<uint8_t, 3> bytes {};
     uint8_t size = 0;
@@ -44,6 +46,7 @@ struct Session {
     std::atomic<unsigned> rate {44100}, period {128}, latency_frames {0};
     std::atomic<uint64_t> blocks {0}, xruns {0}, underruns {0};
     std::atomic<uint64_t> midi_in {0}, midi_dropped {0}, leds_sent {0}, frames_sent {0}, frames_failed {0};
+    std::atomic<uint64_t> midi_out {0}; // messages sent on the external MIDI port
     std::atomic<float> input_peak {0}, output_peak {0}; // The last period's, 0..1
     std::atomic<float> cpu_load {0};                    // JACK's DSP load, percent
     std::atomic<uint64_t> process_calls {0}, process_ns {0}; // time in the audio thread's cycle, ours alone
@@ -79,6 +82,11 @@ public:
     virtual void surface(const SurfaceEvent&) {}
     // MIDI thread: a message from an external MIDI port.
     virtual void midi(const ExternalMidi&) {}
+    // Audio thread, before each exchange with the device (each JACK period):
+    // what goes out on the external MIDI port with the audio of the last
+    // render(), up to `room` messages in order. Returns how many it wrote;
+    // the rest waits for the next. Keeps render()'s rules.
+    virtual unsigned midi_out(ExternalMidi*, unsigned /*room*/) { return 0; }
     // MIDI thread, every 5 ms: ask for lights. Only changes are sent.
     virtual void lights(Lights&, Clock::time_point) {}
 

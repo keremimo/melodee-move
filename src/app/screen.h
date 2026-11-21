@@ -56,6 +56,8 @@ public:
     // the knob moves Seq Record writes (sequencer.h). False: none. A kit's
     // page that names its knobs as kit-play does (TUNE, LEVEL ...) needs none.
     virtual bool knob_lane(unsigned, unsigned& /*param*/, unsigned& /*pad*/) const { return false; }
+    // The detail line under knob n shown large; empty: none.
+    virtual std::string knob_detail(unsigned) const { return {}; }
     // Fields for the status line (" key=value ..."), whether shown or not.
     virtual std::string status() const { return {}; }
 

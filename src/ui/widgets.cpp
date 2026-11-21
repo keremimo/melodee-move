@@ -175,4 +175,24 @@ void knob_cells(juce::Graphics& g, juce::Rectangle<int> area, const std::array<s
     g.setColour(on);
 }
 
+void knob_values(juce::Graphics& g, juce::Rectangle<int> area, const std::array<std::string, 8>& names,
+                 const std::array<std::string, 8>& values, int touched) {
+    int cell_width = area.getWidth() / 4, cell_height = area.getHeight() / 2;
+    size_t fits = size_t(std::max(1, cell_width / move::glyph_advance));
+    for (int knob = 0; knob < 8; ++knob) {
+        if (names[size_t(knob)].empty()) continue; // no knob there: an empty cell
+        int x = area.getX() + (knob % 4) * cell_width, y = area.getY() + (knob / 4) * cell_height;
+        bool chosen = knob == touched;
+        // The name inverted, a pixel between cells; the value under it,
+        // centred (the touched knob's whole cell inverted).
+        g.setColour(on);
+        g.fillRect(x, y, cell_width - 1, chosen ? cell_height - 1 : move::glyph_height + 1);
+        g.setColour(off);
+        move::draw_text(g, x, y + 1, std::string_view(names[size_t(knob)]).substr(0, fits));
+        g.setColour(chosen ? off : on); // centred, so values side by side keep apart
+        move::draw_text_centred(g, x, y + cell_height - move::glyph_height - 1, cell_width - 1, std::string_view(values[size_t(knob)]).substr(0, fits));
+    }
+    g.setColour(on);
+}
+
 } // namespace ui

@@ -25,9 +25,20 @@ unsigned read_midi_in(const uint8_t* page, std::array<MidiIn, midi_in_slots>& ev
     for (unsigned slot = 0; slot < midi_in_slots; ++slot) {
         const uint8_t* event = page + in_midi + slot * 8;
         if (event[0] == 0) break; // an empty slot ends the list
-        uint8_t code = event[0] & 0x0f;
+        uint8_t code = event[0] & 0x0f, cable = event[0] >> 4;
         unsigned size = code_index_size(code);
-        if (!size || !(event[1] & 0x80)) { ++skipped; continue; }
+        bool piece = false; // a SysEx piece: data bytes may come first
+        if (!size && cable == cable_external) {
+            switch (code) {
+            case 0x2: size = 2; break;                       // two-byte system common (MTC quarter frame)
+            case 0x3: size = 3; break;                       // three-byte system common (Song Position)
+            case 0x4: case 0x7: size = 3; piece = true; break; // SysEx going on; ending with three bytes
+            case 0x5: size = 1; piece = true; break;         // SysEx ending with one byte (or one-byte system common)
+            case 0x6: size = 2; piece = true; break;         // SysEx ending with two bytes
+            default: break;
+            }
+        }
+        if (!size || (!piece && !(event[1] & 0x80))) { ++skipped; continue; }
         MidiIn& in = events[count++];
         in.cable = event[0] >> 4;
         in.size = uint8_t(size);
@@ -48,6 +59,31 @@ uint32_t usb_midi_packet(uint8_t cable, const uint8_t* bytes, size_t size) {
     uint32_t packet = uint32_t((cable & 0x0f) << 4 | code) | uint32_t(bytes[0]) << 8;
     if (size > 1) packet |= uint32_t(bytes[1] & 0x7f) << 16;
     if (size > 2 && code_index_size(code) > 2) packet |= uint32_t(bytes[2] & 0x7f) << 24;
+    return packet;
+}
+
+uint32_t usb_midi_out_packet(uint8_t cable, const uint8_t* bytes, size_t size) {
+    if (size < 1 || size > 3) return 0;
+    uint8_t first = bytes[0], code = 0;
+    if (first == 0xf0 || first < 0x80) { // a SysEx piece: three bytes going on, or the end with one to three
+        if (bytes[size - 1] == 0xf7) code = uint8_t(0x4 + size);
+        else if (size == 3) code = 0x4;
+        else return 0;
+    } else if (first >= 0xf8) {
+        code = 0xf; size = 1;
+    } else if (first >= 0xf0) {
+        switch (first) {
+        case 0xf1: case 0xf3: code = 0x2; if (size < 2) return 0; size = 2; break;
+        case 0xf2: code = 0x3; if (size < 3) return 0; break;
+        case 0xf6: case 0xf7: code = 0x5; size = 1; break;
+        default: return 0;
+        }
+    } else {
+        return usb_midi_packet(cable, bytes, size);
+    }
+    uint32_t packet = uint32_t((cable & 0x0f) << 4 | code) | uint32_t(first) << 8;
+    if (size > 1) packet |= uint32_t(bytes[1]) << 16;
+    if (size > 2) packet |= uint32_t(bytes[2]) << 24;
     return packet;
 }
 

@@ -50,14 +50,24 @@ struct MidiIn {
 };
 
 // The MIDI events in an RX page, up to the first empty slot. The XMOS
-// heartbeat (no status byte) and SysEx pieces are left out; `skipped`
-// counts them.
+// heartbeat (no status byte) is left out, and so are SysEx pieces and
+// system common messages on any cable but the external one (where an MTC
+// quarter frame, Song Position or a SysEx piece is kept as it came);
+// `skipped` counts what was left out.
 unsigned read_midi_in(const uint8_t* page, std::array<MidiIn, midi_in_slots>& events, unsigned& skipped);
 // Events stay in the RX page until overwritten: clear them once read.
 void clear_midi_in(uint8_t* page);
 
 // A channel message as a USB-MIDI packet on `cable`; 0 when it is not one.
 uint32_t usb_midi_packet(uint8_t cable, const uint8_t* bytes, size_t size);
+// Any message of one to three bytes as a USB-MIDI packet on `cable`: a
+// channel message, a system common or realtime one, or a piece of a SysEx
+// (one beginning with F0 or a data byte; the piece that ends with F7 closes
+// it). 0 when it cannot be one.
+uint32_t usb_midi_out_packet(uint8_t cable, const uint8_t* bytes, size_t size);
+// How many slots of the MIDI out the external port may take in one
+// exchange; the lights have the rest.
+constexpr unsigned external_out_slots = 16;
 // Writes up to 20 packets and zeroes the rest of the MIDI-out slots.
 void write_midi_out(uint8_t* page, const uint32_t* packets, unsigned count);
 

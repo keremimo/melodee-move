@@ -92,6 +92,10 @@ after Schwung) differ for some buttons:
 | Melodee's sequencer pages | **Shift + Loop (a tap) opens Melodee's SEQ pages**: Pattern (its push: Half and Double Seq and Speed, the variations), Step entry, Roll, Motion, MOD, Macros, Feel, Follow, Lane and Euclid; Shift + turn the page. Held with the wheel, Shift + Loop stays the Move's fine length. Chop stays on Shift + push. |
 | Fill | **Loop held 0.4 s while playing is Fill** until it is let go (FILL conditions play). Loop tapped stays Loop Mode; Loop held + wheel the length. |
 | Tap tempo, metronome on Rec | **On Tempo (Shift + Step 5) the steps tap the tempo, Left / Right halve and double it**; **Workflow (Shift + Step 3) has Metronome: Always / Rec only** (Melodee's metronome Rec). The Move has neither. |
+| Track options: MIDI | **Shift + a track button shows MIDI IN and MIDI OUT**, as the Move (1.5) does: MIDI IN is AUTO or a channel 1-16 that plays the track whichever is selected (Melodee's track channel); MIDI OUT is AUTO or the channel its notes go out on, kept in a section of the Move's own in the project (the MPC keeps one channel); a MIDI track's MIDI OUT is its DEVICE channel. |
+| MIDI Panic | **No Move key**: MIDI Config's PANIC row (push) and `melodee-midi panic`, as Melodee's P4 kept it. Stopping already ends the notes sent. |
+| A MIDI track's slots | **Shift + a knob on a CC page is what that slot sends** (the Move's second parameter): touched, the address shows large; turned, it changes (CC, 14-bit CC, NRPN, bend, pressure). |
+| Schwung modules' MIDI out | **A module's `midi_send_external` goes out on the Move's MIDI port** with Melodee's own MIDI. |
 
 Followed from the rule without a choice: Left and Right become the
 pattern's bars, so pages move to Shift + turn; in Typing, Back deletes a
@@ -213,7 +217,7 @@ while Shift is held.
 | Track button | Selects the track (and Note Mode, from the Overview or Session) | Selects that track of the bank in view, as it is let go (today on the press) | done |
 | Track button held | Shows that track while held, without selecting it | The sixteen tracks on the screen, the steps picking (core's design A; it selects the track on the press today) | done |
 | Track button held + Volume knob | The track's volume, in dB on the screen | The track's level | done |
-| Shift + Track button | The track's options: colour, MIDI In and Out channel | The same | wave 2: MIDI/sync/undo/projects |
+| Shift + Track button | The track's options: colour, MIDI In and Out channel | Selects it and shows its options: its colour, MIDI IN and MIDI OUT (docs/UI.md, MIDI and sync) | done |
 | Mute held + Track button | Mutes or unmutes the track (its LED dims) | The same | done |
 | Shift + Mute held + Track button | Solos or unsolos the track (its LED blue) | The same | done |
 | Track button held + Copy held + Step | No job (Control Live: Copy + a track button duplicates the track) | Copies that track onto the next step's, asking before replacing | done |

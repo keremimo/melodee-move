@@ -71,7 +71,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Track types**: kit, keygroup, plug-in, MIDI and audio engines (MELODEE.md › Sound engines; guide/tracks.md) | done | new-track sheet | [ ] |
 | **New-track sheet**: the types as a carousel (its undo: MIDI & sync & undo & projects) (MELODEE.md › Playing, An empty track) | done | track button held + empty step; jogwheel, push | [ ] |
 | **Drum sources**: Card (opens the browser), Empty, Input (opens Record) (guide/tracks.md) | sampling | new-track sheet, second step | [ ] |
-| **MIDI track ports** on the new-track sheet: Out jack, USB-C, All USB (guide/tracks.md) | MIDI & sync & undo & projects | new-track sheet; USB only | [ ] |
+| **MIDI track ports** on the new-track sheet: Out jack, USB-C, All USB (guide/tracks.md) | n/a | one port on the Move: a device on USB-A and a computer on USB-C arrive together on cable 2, so there is nothing to pick (docs/MIDI.md) | — |
 | **Delete a track**: sound, kit, patterns; its mix strip stays; asks (its undo: MIDI & sync & undo & projects) (MELODEE.md › The panel, Pad Bank) | done | track button held + Delete + step | [ ] |
 | **Copy a track**: sound, kit, 128 patterns, motion; the target keeps its strip; a synth gets its own instance of the module (MELODEE.md › Across every page, Copy) | done | track button held + Copy + step, then a step | [ ] |
 | **Move a track**: trades places; song clips, keys, lanes and sources follow it (MELODEE.md › Across every page, Move) | MIDI & sync & undo & projects | track button held + Shift + Copy + step, then a step | [ ] |
@@ -89,7 +89,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Chord builder**: held keys stored onto a pad, saved as Mine N (MELODEE.md › Playing, Prog) | instruments | Keys page: push stores | [ ] |
 | **Drums layout**: a drum plug-in's or MIDI drum machine's pads from note 36, voices named (MELODEE.md › Playing, Drums) | instruments | 32 pads are notes 36-67; Up / Down the bank | [ ] |
 | **Pads page**: the bank's pads each drawing its waveform (MELODEE.md › Playing, Pads) | n/a | 128 x 64 cannot show 32 waveforms; the pads light in their colours and the screen shows the last pad | — |
-| **Sounds**: a MIDI track's saved sounds (`.mlds`), favourites (MELODEE.md › Playing, Sounds) | MIDI & sync & undo & projects | Menu (load) on a MIDI track | [ ] |
+| **Sounds**: a MIDI track's saved sounds (`.mlds`), favourites (MELODEE.md › Playing, Sounds) | done | the wheel's push on a MIDI track's sound: its own and the saved `.mlds` (Melodee/Sounds), loaded as the wheel turns; Shift held: save, star, show starred or recent | [ ] |
 | **16 Levels**: the last pad or note on every pad as Velocity, Filter, Tune, Scale or Zones; ends, octave; a MIDI keyboard plays the pad on every key (MELODEE.md › Playing, 16 Levels) | done | as the Move's 16 Pitches (Shift + Step 8): the last pad on the right 16 in the project's key (Melodee's Scale; Kerem, 2026-11-20), Plus / Minus the octave; the left 16 one bank. Velocity, Filter, Tune and Zones are not on the Move's Layout | [ ] |
 | **Note Repeat**: 1/4-1/64 and triplets, swung, pressure as velocity, written under Seq Record (MELODEE.md › Playing, Note Repeat) | done | Shift + Step 11: on, its screen (style Repeat / arp Up, Down, Random; rate 1/4-1/64T; pressure as velocity); again off; repeats written under Rec | [ ] |
 | **Tempo**: BPM, swing, metronome level, metronome on / off (MELODEE.md › Playing, Tempo) | done | Shift + Step 5 / 6 / 7: tempo, metronome, groove, as on the Move | [ ] |
@@ -286,28 +286,28 @@ Kerem has checked it there. `n/a` rows have no box.
 
 | Feature | Status | Move controls | ✓ |
 | --- | --- | --- | --- |
-| **MIDI Config**: port, in and out channels, sync, thru, program change, takeover rows, panic, reset (MELODEE.md › MIDI and sync) | MIDI & sync & undo & projects | Settings > MIDI (Shift + Step 8) | [ ] |
+| **MIDI Config**: port, in and out channels, sync, thru, program change, takeover rows, panic, reset (MELODEE.md › MIDI and sync) | done | Setup's MIDI and MIDI SYNC rows (Shift + Step 2; until move-projects' Setup is merged, Shift + Step 2 opens it): channels, pad in and out, sync in and out, Thru, program change, Remote, PANIC. Port: one; takeover: none, the knobs are endless encoders; reset: Settings (move-projects) | [ ] |
 | **MIDI jacks** (the External port) (MELODEE.md › MIDI and sync) | n/a | the Move has no MIDI jacks; USB-C only | — |
-| **USB MIDI**: a computer or USB devices on USB-C (MELODEE.md › MIDI and sync) | MIDI & sync & undo & projects | USB-C, if the device page passes it (to check) | [ ] |
-| **MIDI in**: notes on the in channel play the selected track; a kit hears 36 as A01; pressure, mod wheel, pitch wheel, sustain pedal, CCs, All Notes Off (MELODEE.md › MIDI and sync; guide/midi-and-sync.md) | MIDI & sync & undo & projects | automatic | [ ] |
-| **MIDI in recorded**: under Seq Record; keys write on Step Edit and Roll (guide/midi-and-sync.md) | MIDI & sync & undo & projects | Rec | [ ] |
-| **Track channel, Track MIDI in, Pad MIDI in / out**: a controller a track (guide/midi-and-sync.md) | MIDI & sync & undo & projects | Settings > MIDI | [ ] |
-| **Remote CCs**: select a track, launch a pattern or a sequence (CC 102-104) (guide/midi-and-sync.md) | MIDI & sync & undo & projects | Settings > MIDI | [ ] |
-| **Program change** launches that pattern (MELODEE.md › MIDI and sync) | MIDI & sync & undo & projects | Settings > MIDI | [ ] |
-| **MIDI out**: pads, patterns, the arp, each at the frame it is heard (MELODEE.md › MIDI and sync, Out) | MIDI & sync & undo & projects | automatic | [ ] |
-| **MIDI clock in and out**: Start, Continue, Stop, Song Position, tempo (MELODEE.md › MIDI and sync) | MIDI & sync & undo & projects | Settings > MIDI | [ ] |
-| **MTC in and out**: in at 24, 25, 29.97 df, 30 fps; out at 25 (MELODEE.md › MIDI and sync) | MIDI & sync & undo & projects | Settings > MIDI | [ ] |
-| **MIDI Thru** (MELODEE.md › MIDI and sync) | MIDI & sync & undo & projects | Settings > MIDI | [ ] |
-| **MIDI Panic and all notes off** (MELODEE.md › MIDI and sync; The panel, Stop) | MIDI & sync & undo & projects | HERE > Panic; Settings > MIDI | [ ] |
+| **USB MIDI**: a computer or USB devices on USB-C (MELODEE.md › MIDI and sync) | done | USB-A devices and a computer on USB-C (the Standalone Port), both on cable 2 (docs/MIDI.md); to check on the Move | [ ] |
+| **MIDI in**: notes on the in channel play the selected track; a kit hears 36 as A01; pressure, mod wheel, pitch wheel, sustain pedal, CCs, All Notes Off (MELODEE.md › MIDI and sync; guide/midi-and-sync.md) | done | automatic, every page and track kind; a MIDI track echoes it | [ ] |
+| **MIDI in recorded**: under Seq Record; keys write on Step Edit and Roll (guide/midi-and-sync.md) | sequencer | MIDI notes reach the engine as the pads' do (to the frame they came at); recording them is Seq Record's (move-seq) | [ ] |
+| **Track channel, Track MIDI in, Pad MIDI in / out**: a controller a track (guide/midi-and-sync.md) | done | Shift + a track button: MIDI IN and MIDI OUT (Kerem); Pad MIDI in and out in MIDI Config; Track MIDI in's ports: one port | [ ] |
+| **Remote CCs**: select a track, launch a pattern or a sequence (CC 102-104) (guide/midi-and-sync.md) | done | MIDI Config: Remote channel and CCs | [ ] |
+| **Program change** launches that pattern (MELODEE.md › MIDI and sync) | done | MIDI Config: PROG CHANGE | [ ] |
+| **MIDI out**: pads, patterns, the arp, each at the frame it is heard (MELODEE.md › MIDI and sync, Out) | done | automatic: with the exchange that carries the block it is heard in (block timing, 2.9 ms: the device takes MIDI once an exchange); played by hand at once | [ ] |
+| **MIDI clock in and out**: Start, Continue, Stop, Song Position, tempo (MELODEE.md › MIDI and sync) | done | MIDI Config: SYNC IN, SYNC OUT; Tempo shows the tempo heard | [ ] |
+| **MTC in and out**: in at 24, 25, 29.97 df, 30 fps; out at 25 (MELODEE.md › MIDI and sync) | done | MIDI Config: SYNC IN, SYNC OUT (a cue while stopped leaves the playhead) | [ ] |
+| **MIDI Thru** (MELODEE.md › MIDI and sync) | done | MIDI Config: THRU (one port: what comes in goes back out on it) | [ ] |
+| **MIDI Panic and all notes off** (MELODEE.md › MIDI and sync; The panel, Stop) | done | MIDI Config: PANIC; `melodee-midi panic`; no Move key (Kerem) | [ ] |
 | **CV / sync out**, base and division (MELODEE.md › MIDI and sync) | n/a | no CV or sync jacks on the Move | — |
-| **MIDI track DEVICE**: port and channel, USB devices by name, OFFLINE, DELAY ±50 ms (MELODEE.md › MIDI and sync, MIDI tracks) | MIDI & sync & undo & projects | knobs | [ ] |
-| **MIDI track PROGRAM**: bank MSB, LSB, program; a pattern's own program (MELODEE.md › Playing, A MIDI track) | MIDI & sync & undo & projects | knobs | [ ] |
-| **MIDI track CC and SLOTS**: 24 controls (CC, 14-bit CC, bend, pressure, NRPN), recorded as motion (MELODEE.md › MIDI and sync) | MIDI & sync & undo & projects | eight knobs a page, three pages | [ ] |
-| **MIDI track EXPRESS**: a bend lane; pressure out as Poly, Channel or Off (MELODEE.md › MIDI and sync) | MIDI & sync & undo & projects | knobs | [ ] |
-| **MIDI track PADS**: Keys or Drums with General MIDI names (MELODEE.md › MIDI and sync) | MIDI & sync & undo & projects | knobs; pads | [ ] |
-| **MIDI in echoed** out on a MIDI track's port and channel, without loops (MELODEE.md › MIDI and sync) | MIDI & sync & undo & projects | automatic | [ ] |
-| **MIDI track AUDIO**: the instrument heard back through the track's strip and chain (MELODEE.md › MIDI and sync) | MIDI & sync & undo & projects | knobs; line in or mic | [ ] |
-| **SysEx**: a `.syx` sent, ON LOAD (MELODEE.md › MIDI and sync) | MIDI & sync & undo & projects | knobs; push sends | [ ] |
+| **MIDI track DEVICE**: port and channel, USB devices by name, OFFLINE, DELAY ±50 ms (MELODEE.md › MIDI and sync, MIDI tracks) | done | DEVICE page: channel, delay. Port, USB devices by name, OFFLINE: one port, no names reach Linux (n/a) | [ ] |
+| **MIDI track PROGRAM**: bank MSB, LSB, program; a pattern's own program (MELODEE.md › Playing, A MIDI track) | done | PROGRAM page: bank MSB, LSB, program, this pattern's | [ ] |
+| **MIDI track CC and SLOTS**: 24 controls (CC, 14-bit CC, bend, pressure, NRPN), recorded as motion (MELODEE.md › MIDI and sync) | done | CC 1-8, 9-16, 17-24: knobs the values, Shift + a knob what it sends (Kerem); motion lanes with Seq Record (move-seq) | [ ] |
+| **MIDI track EXPRESS**: a bend lane; pressure out as Poly, Channel or Off (MELODEE.md › MIDI and sync) | done | EXPRESS page: bend, pressure out | [ ] |
+| **MIDI track PADS**: Keys or Drums with General MIDI names (MELODEE.md › MIDI and sync) | done | PADS page: Keys or Drums, the last pad's note and its General MIDI name; the pads play the map through move-instruments' pad layouts (Melodee's drum_key()) | [ ] |
+| **MIDI in echoed** out on a MIDI track's port and channel, without loops (MELODEE.md › MIDI and sync) | done | automatic, with the loop guard | [ ] |
+| **MIDI track AUDIO**: the instrument heard back through the track's strip and chain (MELODEE.md › MIDI and sync) | done | AUDIO page: the Move's input, L, R or both (line in or mic, as the Move routes it), monitor, level; USB as an input: none | [ ] |
+| **SysEx**: a `.syx` sent, ON LOAD (MELODEE.md › MIDI and sync) | done | SYSEX page: knob 1 the file, 2 on load, 3 turned up sends; paced, the rest waits | [ ] |
 
 ## Project and system
 
@@ -412,7 +412,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Samples folders**: Recorded, Edits, Banks, Looper, Expansions, Keygroups, Stems (MELODEE.md › Files on the card) | sampling | /data/UserData/Melodee/Samples | [ ] |
 | **Cache**: decoded long samples and instrument files, 4 GB, aged out after 30 days (MELODEE.md › Files on the card) | done | /data/UserData/Melodee/Cache (Melodee's shell/sample_cache.h: tidied at start, 4 GB, 30 days) | [ ] |
 | **Export folders**: Mixdowns, Stems, MIDI, MPC 3 (MELODEE.md › Files on the card; guide/song.md) | song & export | /data/UserData/Melodee | [ ] |
-| **SysEx folder** (MELODEE.md › Files on the card) | MIDI & sync & undo & projects | /data/UserData/Melodee/SysEx | [ ] |
+| **SysEx folder** (MELODEE.md › Files on the card) | done | /data/UserData/Melodee/SysEx | [ ] |
 | **Plugins folder**, read only (MELODEE.md › Files on the card) | schwung | covered by Schwung's modules, the Move's plug-ins | — |
 
 ## Remote and previews
@@ -423,7 +423,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Remote presses** `melodee-press`: buttons, pads, knobs (MELODEE.md › Remote) | MIDI & sync & undo & projects | a command over SSH | [ ] |
 | **`melodee-render`**: render workers off or on (MELODEE.md › Remote) | MIDI & sync & undo & projects | a command over SSH | [ ] |
 | **`melodee-looper`** (MELODEE.md › Remote) | looper | a command over SSH | [ ] |
-| **`melodee-midi`**: a message into the input; panic (MELODEE.md › Remote) | MIDI & sync & undo & projects | a command over SSH | [ ] |
+| **`melodee-midi`**: a message into the input; panic (MELODEE.md › Remote) | done | `melodee-midi HEX...` and `melodee-midi panic` in the package, over SSH | [ ] |
 | **`melodee-print`, `melodee-freeze`, `melodee-unfreeze`** (MELODEE.md › Print and freeze) | song & export | a command over SSH | [ ] |
 | **`melodee-autosample`** (MELODEE.md › Print and freeze) | instruments | a command over SSH | [ ] |
 | **`melodee-usb-input`** (MELODEE.md › Remote) | n/a | no USB audio | — |
@@ -489,18 +489,18 @@ sections, each on Shift + Step n.
 
 | Status | Rows |
 | --- | --- |
-| `done` | 141 |
-| `sequencer` | 3 |
+| `done` | 163 |
+| `sequencer` | 4 |
 | `sampling` | 22 |
 | `kit depth` | 2 |
 | `instruments` | 25 |
 | `mixer & effects` | 2 |
 | `song & export` | 21 |
 | `looper` | 13 |
-| `MIDI & sync & undo & projects` | 54 |
+| `MIDI & sync & undo & projects` | 30 |
 | `web page` | 11 |
 | `schwung` | 16 |
-| `n/a` | 25 |
+| `n/a` | 26 |
 | All rows | 335 |
 
 # Ableton Move parity
@@ -525,7 +525,7 @@ tempo) touches, and where each stands now.
 | **Mute** | mute the selected track (16.4) | the same | done | [ ] |
 | **Mute + track button** | mute that track (16.4) | the same; its button grey | done | [ ] |
 | **Shift + Mute + track button** | solo that track, its button blue (16.3) | the same | done | [ ] |
-| **Shift + track button** | the track's options (colour, MIDI channel) | nothing yet | MIDI & sync & undo & projects | [ ] |
+| **Shift + track button** | the track's options (colour, MIDI channel) | selects it, its options: colour, MIDI IN, MIDI OUT (Kerem) | done | [ ] |
 | **Copy / Delete + track button** | Control Live only (18.2) | free; Melodee copies and deletes with a track button held and the steps | done | [ ] |
 | **Shift + Step 5** | Tempo: the wheel, Shift + wheel finer, push confirms (10.1) | the same | done | [ ] |
 | **Shift + Step 6** | Metronome on / off (10.3) | the same; the wheel its level | done | [ ] |

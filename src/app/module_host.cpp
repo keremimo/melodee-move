@@ -37,7 +37,13 @@ void host_log(const char* message) {
     // Never from the audio thread: a write() there is a dropout.
     if (!on_audio_thread && message) std::fprintf(stderr, "schwung module: %s\n", message);
 }
-int refuse_midi(const uint8_t*, int) { return 0; }       // no Move tracks, no external send yet
+int refuse_midi(const uint8_t*, int) { return 0; }       // no Move tracks to send to
+// A module's MIDI out: onto the Move's MIDI port (set_external_midi()).
+std::atomic<int (*)(const uint8_t*, int)> external_midi {nullptr};
+int send_external(const uint8_t* packets, int length) {
+    auto send = external_midi.load(std::memory_order_acquire);
+    return send && packets && length > 0 ? send(packets, length) : 0;
+}
 int clock_status() { return transport_playing.load(std::memory_order_relaxed) ? schwung::clock_running : schwung::clock_stopped; }
 float bpm() { return tempo.load(std::memory_order_relaxed); }
 double beat_position() { return transport_beats.load(std::memory_order_relaxed); } // quarters since Play
@@ -55,7 +61,7 @@ const host_api_v1_t& host_table() {
         made.audio_in_offset = audio_in_offset;
         made.log = host_log;
         made.midi_send_internal = refuse_midi;
-        made.midi_send_external = refuse_midi;
+        made.midi_send_external = send_external;
         made.get_clock_status = clock_status;
         made.mod_emit_value = emit_value;
         made.mod_clear_source = clear_source;
@@ -115,6 +121,8 @@ bool param_from(const juce::var& entry, ModuleParam& out) {
 }
 
 } // namespace
+
+void set_external_midi(int (*send)(const uint8_t*, int)) { external_midi.store(send, std::memory_order_release); }
 
 void set_module_tempo(float bpm_value) { tempo.store(bpm_value, std::memory_order_relaxed); }
 

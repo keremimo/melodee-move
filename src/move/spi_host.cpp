@@ -101,16 +101,24 @@ private:
         unsigned failures = 0, faded = 0, blank_chunks = 0;
         uint64_t last_transfer = 0;
 
+        std::array<ExternalMidi, spi::external_out_slots> outgoing {};
         while (running) {
-            // Lights: up to 20 a cycle, moved to the controls' channel 1.
+            // MIDI out first (cable 2: USB-A and USB-C), with the audio of
+            // the render it was decided in; then lights, up to 20 a cycle in
+            // all, moved to the controls' channel 1.
             unsigned count = 0;
+            unsigned taken = app.midi_out(outgoing.data(), spi::external_out_slots);
+            for (unsigned n = 0; n < taken && n < outgoing.size(); ++n)
+                if (uint32_t packet = spi::usb_midi_out_packet(spi::cable_external, outgoing[n].bytes.data(), outgoing[n].size)) packets[count++] = packet;
+            const unsigned midi_count = count;
+            session.midi_out.fetch_add(midi_count, std::memory_order_relaxed);
             LedMessage led;
             while (count < spi::midi_out_slots && leds.pop(led)) {
                 const uint8_t bytes[3] {uint8_t(led[0] & 0xf0), led[1], led[2]};
                 if (uint32_t packet = spi::usb_midi_packet(spi::cable_controls, bytes, 3)) packets[count++] = packet;
             }
             spi::write_midi_out(page, packets.data(), count);
-            session.leds_sent.fetch_add(count, std::memory_order_relaxed);
+            session.leds_sent.fetch_add(count - midi_count, std::memory_order_relaxed);
 
             if (!device->transfer()) {
                 if (++failures > failures_before_giving_up) break;
