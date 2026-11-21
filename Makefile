@@ -40,6 +40,11 @@ MELODEE_INCLUDES := -I$(MELODEE)/src -I$(MELODEE)/base/src
 # and MP3 through JUCE, as on the MPC.
 MELODEE_SOURCES := $(wildcard $(MELODEE)/src/melodee/engine/*.cpp $(MELODEE)/src/melodee/model/*.cpp) \
     $(MELODEE)/src/melodee/shell/sample_decode.cpp
+# Song's MPC 3 export (src/app/exports.*): Melodee's exporter and the MPC
+# file pieces it writes with. Its template JSON is assembled in from
+# Melodee's checkout (.incbin, found through -Wa,-I). What it asks of the
+# sample library about instrument files is the Move's: src/app/mpc3_shell.cpp.
+MELODEE_SOURCES += $(addprefix $(MELODEE)/src/melodee/shell/,mpc3_export.cpp mpc_program.cpp mpc_project.cpp mpc_wav_slices.cpp xpm_write.cpp)
 MELODEE_OBJECTS := $(patsubst $(MELODEE)/src/%.cpp,build/obj/melodee-sample/%.o,$(MELODEE_SOURCES))
 MELODEE_LIBRARY := build/melodee.a
 CPPFLAGS += $(MELODEE_INCLUDES)
@@ -79,13 +84,18 @@ $(TARGET): build/obj/main.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS)
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 $(TESTS): build/obj/tests/move_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS) $(MELODEE_LIBRARY)
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
+# Song, its exports, print and freeze, against the whole app (tests/song_tests.cpp).
+SONG_TESTS := build/song-tests
+all: $(SONG_TESTS)
+$(SONG_TESTS): build/obj/tests/song_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS) $(MELODEE_LIBRARY)
+	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 $(CONTROLS_TESTS): build/obj/tests/controls_tests.o build/obj/app/bindings.o
 	$(CXX) -static-libstdc++ -static-libgcc $^ -pthread -o $@
 $(MELODEE_LIBRARY): $(MELODEE_OBJECTS)
 	rm -f $@ && $(AR) rcs $@ $^
 build/obj/melodee-sample/%.o: $(MELODEE)/src/%.cpp
 	@mkdir -p $(@D)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -w -c $< -o $@
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Wa,-I$(MELODEE) -w -c $< -o $@
 build/obj/tests/%.o: tests/%.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(WARNINGS) -c $< -o $@
@@ -108,5 +118,5 @@ $(foreach m,$(MODULE_C),$(eval $(call c_module_rule,$(m))))
 juce: $(JUCE_OBJECTS)
 .PHONY: all clean juce
 clean:
-	rm -rf build/obj $(TARGET) $(TESTS) $(CONTROLS_TESTS)
+	rm -rf build/obj $(TARGET) $(TESTS) $(CONTROLS_TESTS) $(SONG_TESTS)
 -include $(shell find build/obj -name '*.d' 2>/dev/null)

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "app/studio.h"
+#include "app/prints.h"
 #include "app/screen.h"
+#include "app/song_desk.h"
 #include "melodee/engine/engine_info.h"
 #include "melodee/shell/sample_decode.h"
 #include <juce_core/juce_core.h>
@@ -102,7 +104,8 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
 
     // The project, read before the audio thread starts.
     PluginStates states;
-    auto failed = read_project_file(path, *song, *bank, states);
+    melodee::PrintTable prints;
+    auto failed = read_project_file(path, *song, *bank, states, &prints);
     bool fresh = failed == "missing", migrated = false;
     unsigned played = 0;
     if (!failed.empty() && !fresh) {
@@ -112,6 +115,7 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
         song = std::make_unique<melodee::Project>();
         bank = std::make_unique<melodee::PatternBank>();
         states = {};
+        prints = {};
         fresh = true;
         say("PROJECT UNREADABLE");
     }
@@ -152,8 +156,9 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
         if (ours) {
             module.entry = track.plugin;
             module.saved = saved;
-            module.job = saved.module;
-            module.job_restores = true;
+            // A deep-frozen track's module stays unloaded, its state kept, until it thaws.
+            module.job = prints.freeze[t].state == melodee::FreezeState::Deep ? std::string() : saved.module;
+            module.job_restores = !module.job.empty();
         }
     }
     engine = std::make_unique<melodee::EngineHost>();
@@ -166,6 +171,11 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
     audio_track.store(int(selected));
     audio_kind.store(int(kind(selected)));
     audio_octave.store(octave(selected));
+
+    // Song, its exports and prints; the song to the engine, as the file has it.
+    song_desk = std::make_unique<SongDesk>(*this);
+    song_desk->printer().table() = prints;
+    song_desk->send_song(false);
 
     // The screens, one of each, and the track's Play screen shown.
     for (const auto& entry : registered_screens()) {
@@ -183,6 +193,7 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
 }
 
 Studio::~Studio() {
+    if (song_desk) song_desk->stop(); // the print host and the exports' thread, before the engine host goes
     for (auto& module : modules) if (module) module->player.stop();
     for (auto& module : modules_leaving) if (module) module->player.stop();
     std::unique_lock<std::mutex> guard(lock);
@@ -244,6 +255,7 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
 // ---------------------------------------------------------------- the model, under `lock`
 
 bool Studio::send(const melodee::Command& command) {
+    if (command.type == Type::Pattern && song_desk) song_desk->launched(command.track, unsigned(command.value)); // Rec into the song
     if (commands.push(command)) return true;
     say("BUSY, TRY AGAIN");
     return false;
@@ -595,28 +607,40 @@ std::string Studio::settings_text() const {
     return out.str();
 }
 
-std::vector<uint8_t> Studio::project_bytes() const {
+SynthFile Studio::synth_file(unsigned t) const {
+    SynthFile file;
+    t %= melodee::track_count;
+    const auto* module = modules[t].get();
+    if (!module) return file;
+    file.track = t;
+    file.octave = octave(t);
+    if (module->module) {
+        file.module = module->module->info().id;
+        file.preset = module->module->preset_param.empty() ? -1 : module->module->preset;
+        for (const auto& param : module->module->params)
+            if (param.key != module->module->preset_param && !param.trigger()) file.values.emplace_back(param.key, param.text());
+    } else { // a module that would not load this time (or a deep freeze let go) stays named, for when it is back
+        file.module = module->saved.module;
+        file.preset = module->saved.preset;
+        file.values = module->saved.values;
+    }
+    return file;
+}
+
+PluginStates Studio::plugin_states() const {
     // Each Schwung track's module, as its PLUG entry's state.
     PluginStates states;
     for (unsigned t = 0; t < melodee::track_count; ++t) {
         const auto* module = modules[t].get();
         if (!module || module->entry == melodee::no_plugin) continue;
-        SynthFile file;
-        file.track = t;
-        file.octave = octave(t);
-        if (module->module) {
-            file.module = module->module->info().id;
-            file.preset = module->module->preset_param.empty() ? -1 : module->module->preset;
-            for (const auto& param : module->module->params)
-                if (param.key != module->module->preset_param && !param.trigger()) file.values.emplace_back(param.key, param.text());
-        } else { // a module that would not load this time stays named, for when it is back
-            file.module = module->saved.module;
-            file.preset = module->saved.preset;
-            file.values = module->saved.values;
-        }
-        states[module->entry] = synth_state(file);
+        states[module->entry] = synth_state(synth_file(t));
     }
-    return project_file_bytes(*song, *bank, states);
+    return states;
+}
+
+std::vector<uint8_t> Studio::project_bytes() const {
+    const auto* prints = song_desk ? &song_desk->printer().table() : nullptr;
+    return project_file_bytes(*song, *bank, plugin_states(), prints);
 }
 
 std::string Studio::write(std::vector<uint8_t> bytes, std::string settings) {
@@ -780,10 +804,18 @@ void Studio::destroy_retired() {
 }
 
 void Studio::service() {
-    if (!restored) restore();
+    if (!restored) {
+        restore();
+        song_desk->printer().opened(); // the frozen tracks' prints read and sent
+    }
     take_back();
     take_answers();
     destroy_retired();
+    {
+        std::lock_guard<std::mutex> guard(lock);
+        song_desk->tick();             // Rec into the song: the clips written grow with the bar
+        song_desk->printer().tick();   // prints in, freezes sent, packs freed, deep freezes and thaws
+    }
     // A module asked for (a track's job).
     for (unsigned t = 0; t < melodee::track_count; ++t) {
         std::string wanted;
@@ -950,6 +982,7 @@ std::string Studio::status() const {
                   int(track.mix.solo), slow_calls, slowest_us / 1000.0,
                   module ? module->player.stream_late() : 0u, engine->dropped());
     std::string line = text;
+    line += song_desk->status();
     for (const auto& screen : screens) line += screen->status();
     return line;
 }

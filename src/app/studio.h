@@ -104,6 +104,7 @@ struct ModuleTrack {
 };
 
 class Screen;
+class SongDesk;
 
 class Studio {
 public:
@@ -232,6 +233,15 @@ public:
     // than its sound (bindings::pad_sounds()); the audio thread reads it.
     void quiet_pads(bool quiet) { pads_quiet.store(quiet, std::memory_order_relaxed); }
 
+    // Song, its exports, print and freeze (song_desk.h, exports.h, prints.h):
+    // made with the studio, its threads stopped first as it goes.
+    SongDesk& desk() { return *song_desk; }
+    const SongDesk& desk() const { return *song_desk; }
+    // Each Schwung track's module as its PLUG entry keeps it (under `lock`).
+    PluginStates plugin_states() const;
+    SynthFile synth_file(unsigned track) const;
+    const Sample* sample_in(unsigned slot) const { return slot < samples.size() ? samples[slot].get() : nullptr; }
+
 private:
     void forward();                        // audio thread: the ring into the host
     void apply_track(unsigned track);      // the engine's track made whole again from the project's (TrackLoad)
@@ -270,6 +280,7 @@ private:
     std::atomic<bool> pads_quiet {false};
     struct Went { int track = -1, key = -1; };
     std::array<Went, pad_count> pad_went {};
+    std::unique_ptr<SongDesk> song_desk;
     // Last, so it goes first: it holds the samples and runners above.
     std::unique_ptr<melodee::EngineHost> engine;
 };

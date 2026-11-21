@@ -115,8 +115,9 @@ KitFile chops_of(const melodee::Project& project) {
 
 } // namespace
 
-std::vector<uint8_t> project_file_bytes(const melodee::Project& project, const melodee::PatternBank& patterns, const PluginStates& states) {
-    auto bytes = melodee::save_project(project, patterns, &states);
+std::vector<uint8_t> project_file_bytes(const melodee::Project& project, const melodee::PatternBank& patterns, const PluginStates& states,
+                                        const melodee::PrintTable* prints) {
+    auto bytes = melodee::save_project(project, patterns, &states, prints);
     auto text = chops_text(chops_of(project));
     bytes.insert(bytes.end(), chops_tag, chops_tag + 4);
     auto size = uint32_t(text.size());
@@ -125,11 +126,12 @@ std::vector<uint8_t> project_file_bytes(const melodee::Project& project, const m
     return bytes;
 }
 
-std::string read_project_file(const std::string& path, melodee::Project& project, melodee::PatternBank& patterns, PluginStates& states) {
+std::string read_project_file(const std::string& path, melodee::Project& project, melodee::PatternBank& patterns, PluginStates& states,
+                              melodee::PrintTable* prints) {
     std::ifstream in(path, std::ios::binary);
     if (!in) return "missing";
     std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-    if (auto error = melodee::load_project(bytes, project, patterns, nullptr, &states); !error.empty()) return error;
+    if (auto error = melodee::load_project(bytes, project, patterns, nullptr, &states, prints); !error.empty()) return error;
     // The Move's chops, where the file has them.
     if (bytes.size() < 8 || std::memcmp(bytes.data(), project_magic, 8)) return {};
     for (size_t at = 8; at + 8 <= bytes.size();) {
