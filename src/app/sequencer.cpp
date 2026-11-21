@@ -43,7 +43,11 @@ int pad_lane_named(const std::string& name) {
     struct Named { const char* name; P param; };
     static const Named named[] {{"TUNE", P::Pitch}, {"PITCH", P::Pitch}, {"FINE", P::Fine}, {"LEVEL", P::Level}, {"PAN", P::Pan},
                                 {"ATTACK", P::Attack}, {"DECAY", P::Decay}, {"SUSTAIN", P::Sustain}, {"RELEASE", P::Release},
-                                {"CUTOFF", P::FilterCutoff}, {"RESO", P::FilterResonance}, {"RESONANCE", P::FilterResonance}};
+                                {"CUTOFF", P::FilterCutoff}, {"RESO", P::FilterResonance}, {"RESONANCE", P::FilterResonance},
+                                // kit depth's pad pages, by their full names
+                                {"FINE TUNE", P::Fine}, {"OFFSET", P::Offset}, {"SEND A", P::SendA}, {"SEND B", P::SendB},
+                                {"SEND C", P::SendC}, {"SEND D", P::SendD}, {"POSITION", P::CloudPosition}, {"SIZE", P::CloudSize},
+                                {"DENSITY", P::CloudDensity}, {"SCAN", P::CloudScan}, {"SPREAD", P::CloudSpread}};
     for (const auto& n : named)
         if (name == n.name) return int(melodee::motion_pad_param(n.param));
     return -1;
