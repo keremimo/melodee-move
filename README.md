@@ -37,6 +37,13 @@ Three parts so far:
   volume; Mute mutes the selected track, Mute + a track button that one,
   Shift + Mute + a track button solos it. Editing patterns comes next
   (docs/PARITY.md, sequencer); a project from the MPC plays its patterns.
+- **Pads**, in either of two layouts (Setup > PADS > LAYOUT, Shift + Step
+  2): the Move's rows of eight, 1-8 the bottom row, or two MPC 4x4 banks
+  side by side, 1-16 the left bank from its bottom left and 17-32 the right.
+  Every pad job follows the one chosen: the kit's pads, Chop's slices, the
+  notes (in the banks 1-32 up the semitones, as the MPC's pads run up a
+  scale), the typing keyboard and the lights. The choice is the Move's, kept
+  in `Move.settings` ([docs/UI.md](docs/UI.md), "Pads").
 - **Play** (a kit track): the last pad's sample. Knobs 1-8: tune, level, pan, start, end,
   attack, decay, cutoff (Shift: finer). Touch a knob to see it large.
 - **Load** (the wheel's push on the pad, the Move's Device View): WAV,
@@ -58,7 +65,8 @@ Three parts so far:
   (`/data/UserData/schwung/modules/sound_generators`, or `--modules DIR`).
   The jogwheel walks the Device View (the module, its preset, its effects);
   its push on the module lists them, and a push loads one. Pads are notes
-  in rows of fourths, C2 at the bottom left; Plus and Minus move an octave (a drum module
+  in rows of fourths, C2 at the bottom left (in MPC banks, 1-32 up the
+  semitones from C2); Plus and Minus move an octave (a drum module
   such as 9w9 wants notes from 36: one octave down); pressure is polyphonic
   aftertouch. Knobs 1-8 are the module's page (from its `ui_hierarchy`, or
   its parameters eight at a time), Shift + the jogwheel its pages; the
@@ -97,8 +105,8 @@ Three parts so far:
   (Melodee's PLUG section) holds the module by id, its preset and each
   parameter's value; on the MPC the track stays named and silent, and a
   module that has gone stays named until it is back. What is the Move's and
-  not the project's (the track played last, the metronome) is in
-  `/data/UserData/Melodee/Move.settings`. Each file is written whole or not
+  not the project's (the track played last, the metronome, the pad
+  layout) is in `/data/UserData/Melodee/Move.settings`. Each file is written whole or not
   at all (a temporary file, flushed, renamed). A project saved by the first
   scope (`Move.mldp` with `Move.mldp.chops` and `Move.mldp.synth` beside it)
   is folded into one file on the first start; the old side files stay as
@@ -217,8 +225,8 @@ tuned for the Move's Cortex-A72. Then: the unit tests, the sound self-test,
 the screen previews, runs against the simulated Move (the spike: pad,
 jogwheel to LATENCY, the meter timing clicks through a 300-frame cable,
 Shift + Back; Melodee: load, chop, To Pads, saved and restored; Play, the
-tempo and the metronome; the synth track with the stand-in module, saved
-and restored), and the packages:
+tempo and the metronome; the pad layout set to MPC banks and kept; the
+synth track with the stand-in module, saved and restored), and the packages:
 
 - `dist/melodee-move/`: the binary, the libraries Ableton's firmware lacks,
   a launcher and `run-stock.sh`;
@@ -294,6 +302,12 @@ card. The report stays in `.local/probe/`.
   audio with dither, the screen's pull handshake), the latency meter, and the
   device host against the simulated Move (lights out on channel 1, every
   screen chunk answered, a blank screen on the way out, the pad sounding).
+- The pad layouts (`build/pad-layout-tests`, `build/pads-app-tests`): the
+  map both ways in Rows and Banks, notes for both readings of a scale, the
+  typing keyboard; through the app, a kit's pads, Shift + pad, their lights,
+  Chop's slices and a synth's notes in both layouts, Setup > PADS and
+  `Move.settings`. In the simulated Move, Setup > PADS set to Banks by the
+  Move's own keys, a pad then B01, and the next start still in Banks.
 - `./build.sh`'s simulated run: the meter timed 8 of 8 clicks at exactly 428
   frames (300 of cable plus the block a render waits for the next exchange);
   a pad went from read to rendered in 37 µs; the cycle's own work took 33 µs

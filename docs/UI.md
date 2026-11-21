@@ -188,7 +188,8 @@ Chop), Kerem decides with that map. `docs/ui/tracks.png` is the sheet
 
 ## Pads
 
-Two layouts for the 32 pads, the user's choice (Kerem, 2026-11-20):
+Two layouts for the 32 pads, the user's choice (Kerem, 2026-11-20; he
+approved `docs/ui/pads.png` and took the decisions below the same day):
 
 - **Rows**, the Move's own: eight a row, the bottom row 1-8, then 9-16
   above it, up to 25-32.
@@ -210,28 +211,44 @@ lit and labelled, Rows on the left and Banks on the right.
 | A kit's 32 pads | bank A the bottom two rows, B the top two | A the left bank, B the right |
 | Chop's slices | 1-8 the bottom row, on up | 1-16 the left bank, 17-32 the right |
 | 16 Pitches (Shift + Step 8) | the left 4x4 one bank of the kit as the MPC lays it, the right 4x4 the pitches (as approved in controls.png) | the same: exactly the two banks |
-| Notes | rows of fourths, C2 bottom left (as today) | to choose: (a) or (b), below |
+| Notes | rows of fourths, C2 bottom left (as before) | 1-32 up the scale, reading (a) below |
 | Typing | the keys in reading order across the eight columns | through the left bank, then the right; Delete bottom right in both |
 
-Notes in Banks, two readings:
+Notes in Banks, two readings were drawn; **Kerem chose (a)**:
 
 - **(a)** the 32 pads run up the scale in pad order, 1-16 the left bank,
   17-32 going on in the right, as the MPC's pads run up a scale: In-Key, a
-  pad the next note of the key (C major: 32 notes, C2 to E6); Chromatic, a
+  pad the next note of the key (C major: 32 notes, C2 to F6); Chromatic, a
   semitone a pad (C2 to G4). Every pad a different note, none skipped.
-- **(b)** rows of fourths inside each 4-wide bank, the right bank an octave
+- (b), not taken: rows of fourths inside each 4-wide bank, the right bank an octave
   above the left: In-Key, up a row three notes of the key; Chromatic, up a
   row a fourth, so four columns skip a note each row (E, A, D), and the two
   banks share notes.
 
-With either, Up and Down move an octave, Shift + Plus and Minus a note of
-the key; the roots light in the track's colour wherever they fall. Chords
-and Prog put a pad's chord on its number, Drums plays 36 + the pad's number
-(as a kit), note repeat repeats the note the pad pressed. Recommended: (a).
+In Banks there are no rows, so Keys & Scale's 4ths or octaves is Rows' only.
+Up and Down move an octave, Shift + Plus and Minus a note of the key; the
+roots light in the track's colour wherever they fall. Chords and Prog put a
+pad's chord on its number, Drums plays 36 + the pad's number (as a kit),
+note repeat repeats the note the pad pressed. `pad_steps()` in
+`pad_layout.h` is the maths: how many steps of the scale a pad lies above
+the bottom-left one, `typing_key()` the keyboard.
 
-The setting: proposed global (Setup > PADS > LAYOUT, kept in
-`Move.settings`), the same for every track; turning it shows the numbering
-on the screen and on the pads, and the pads change at once.
+**The setting** is global: Setup > PADS > LAYOUT (`ROWS` or `BANKS`), kept in
+`Move.settings` (`pads 0` or `pads 1`), the same for every track and
+project, as it is the hands' and not the song's. No shortcut (Kerem): the
+Move has few free keys, and a stray press would move every pad. Push edits
+it: the wheel turns it while the screen shows where each run of pads starts
+and the pads light their numbering (pad 1 white, the banks or rows in two
+colours); push sets it, said on the screen (`PADS: MPC BANKS`), and every
+pad's job and light changes at once; Back leaves it as it was. Setup is
+move-projects' (Shift + Step 2); until it lands, Shift + Step 2 opens
+SETUP > PADS itself (`src/app/screens/setup_pads.cpp`, the row
+`src/app/pad_setting.*`).
+
+| Screen | Rail | Subject | Detail |
+| --- | --- | --- | --- |
+| Setup > PADS | `PADS` / / `SETP` | the list: `LAYOUT  BANKS` | |
+| Editing LAYOUT | `PADS` / / `SETP` | the 32 pads, each run's first number inverted | `MOVE ROWS 8 A ROW`, `MPC BANKS 2 X 4X4` |
 
 ## Screens in code
 
@@ -278,6 +295,8 @@ hold the code to it. In short:
 
 ## Lights
 
+- **Pads, either layout**: each lit where its number lies in the layout
+  chosen ("Pads", above); while LAYOUT is edited, the numbering itself.
 - **Pads**: a kit in its pads' colours, the last hit white; in Chop the
   slices in alternating colours, the selected one white, and in a manual take
   the pad that cuts next blinking red; on a module track every C in the
