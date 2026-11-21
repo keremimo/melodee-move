@@ -5,7 +5,8 @@
 # whole runtime against a simulated Move (the spike: a pad, the jogwheel to
 # LATENCY, the meter timing clicks through a 300-frame cable, Shift + Back to
 # quit; Melodee: load, chop, To Pads, saved and restored, transport and
-# tempo, the synth track saved and restored),
+# tempo, the synth track saved and restored, a new project from the
+# projects, Setup, and a press over the control channel),
 # and the packages in dist/. When Melodee's own page previews are at hand
 # (MELODEE_PREVIEWS, by default ../melodee-sample/build/melodee-preview),
 # also crush them to the Move's 128 x 64 screen in build/crushed.
@@ -60,6 +61,14 @@ TRANSPORT_EXPECTED='page=kit-play .*playing=1 tick=[1-9][0-9]* tempo=122.0 click
 SYNTH_SCRIPT='50:0xb0,42,127;51:0xb0,42,0;60:0xb0,3,127;61:0xb0,3,0;80:0xb0,3,127;81:0xb0,3,0;400:0x90,68,110;430:0x80,68,0;500:0xb0,71,3;520:0xb0,55,127;521:0xb0,55,0'
 SYNTH_EXPECTED='kind=synth .*synth=fake octave=1'
 SYNTH_FLAGS='--backend simulated --samples build/simulated-samples --home build/simulated-synth --modules build/test-modules'
+# Projects and Setup, with the Move's keys (docs/MOVE_CONTROLS.md): Shift +
+# Step 1 at 100 opens the projects; an empty pad (the overview's second, pad
+# 26) at 300; Back at 400 makes a new project there and opens it, the engine
+# parked while it is built; Shift + Step 2 at 1000 opens Setup, its push at
+# 1100 the PADS settings. Then a run is driven over the control channel:
+# melodee-press shift+step1 opens the projects, and status says so.
+PROJECTS_SCRIPT='100:0xb0,49,127;101:0x90,16,127;102:0x80,16,0;103:0xb0,49,0;300:0x90,93,100;301:0x80,93,0;400:0xb0,51,127;401:0xb0,51,0;1000:0xb0,49,127;1001:0x90,17,127;1002:0x80,17,0;1003:0xb0,49,0;1100:0xb0,3,127;1101:0xb0,3,0'
+PROJECTS_EXPECTED='page=setup .*project=Project_1 opening=0'
 # shellcheck disable=SC2086
 docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE" && pwd):/melodee:ro" -e MELODEE=/melodee \
     $MOUNT melodee-move-builder sh -c "
@@ -94,6 +103,16 @@ docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE
     { build/melodee-move $SYNTH_FLAGS --seconds 3 2> build/simulated-synth-restore.log || true; } &&
     tail -n 1 build/simulated-synth-restore.log &&
     grep -qE '$SYNTH_EXPECTED' build/simulated-synth-restore.log &&
+    rm -rf build/simulated-projects build/simulated-remote &&
+    { build/melodee-move --backend simulated --samples build/simulated-samples --home build/simulated-projects --seconds 5 --script '$PROJECTS_SCRIPT' 2> build/simulated-projects.log || true; } &&
+    tail -n 1 build/simulated-projects.log &&
+    grep -qE '$PROJECTS_EXPECTED' build/simulated-projects.log &&
+    test -s 'build/simulated-projects/Projects/Project 1.mldp' &&
+    { build/melodee-move --backend simulated --samples build/simulated-samples --home build/simulated-remote --seconds 4 2> build/simulated-remote.log & } &&
+    sleep 2 &&
+    build/melodee-move --ctl 'melodee-press shift+step1' --home build/simulated-remote | grep -q ok &&
+    build/melodee-move --ctl status --home build/simulated-remote | grep -q 'page=projects' &&
+    wait &&
     build/melodee-move --melodee-previews build/melodee-previews --modules build/test-modules > /dev/null &&
     build/melodee-move --probe-modules build/test-modules &&
     tools/bundle.sh &&

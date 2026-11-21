@@ -662,7 +662,11 @@ void Studio::release_step() {
 bool Studio::close_step(const std::string& fallback, bool keep) {
     if (holding_step) return false;
     std::string what = !step_name.empty() ? step_name : !fallback.empty() ? fallback : "EDIT";
-    bool kept = history.close(live(), what, step_track, Clock::now(), keep && step_kept);
+    auto began = Clock::now();
+    bool kept = history.close(live(), what, step_track, began, keep && step_kept);
+    // What a close costs the MIDI thread (the project compared with the baseline): the status line's step_us.
+    step_us = unsigned(std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - began).count());
+    step_us_peak = std::max(step_us_peak, step_us);
     for (auto& module : modules)
         if (module) module->edited.clear();
     step_name.clear();
@@ -1675,7 +1679,8 @@ std::string Studio::status() const {
                   int(track.mix.solo), slow_calls, slowest_us / 1000.0,
                   module ? module->player.stream_late() : 0u, engine->dropped());
     std::string line = text;
-    line += " undo=" + std::to_string(history.size()) + " redo=" + std::to_string(history.redos()) + " rebuilds=" + std::to_string(rebuilds);
+    line += " undo=" + std::to_string(history.size()) + " redo=" + std::to_string(history.redos()) + " rebuilds=" + std::to_string(rebuilds) +
+            " step_us=" + std::to_string(step_us) + "/" + std::to_string(step_us_peak);
     std::string name = project_name();
     std::replace(name.begin(), name.end(), ' ', '_');
     line += " project=" + name + " opening=" + std::to_string(int(opening)) + " listings=" + std::to_string(listings);

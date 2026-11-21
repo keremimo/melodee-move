@@ -266,6 +266,8 @@ void MelodeeApp::act(const bindings::Use& use) {
     last_job = job;
     std::string name = (turn && gesture_open) || job == bindings::Job::Undo || job == bindings::Job::Redo ? std::string() : step_name(job, use);
     if (studio.opening && job != bindings::Job::MainVolume) return; // a project opening: presses wait (the Loading sheet)
+    // Basic (Setup's FEATURES): the Move's own pages, tracks, modules, the mixer and Song; Melodee's Looper waits for Full.
+    if (!studio.settings.full && job == bindings::Job::Looper) { studio.say("FULL ONLY: SETUP"); return; }
     [&] {
         if (global(job, use)) return;
         Screen* top = studio.top();

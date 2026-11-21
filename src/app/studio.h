@@ -287,6 +287,7 @@ public:
     MoveExtras& extras() { return move_extras; }
     const MoveExtras& extras() const { return move_extras; }
     std::string last_step; // the step undone or redone last, for the status line
+    unsigned step_us = 0, step_us_peak = 0; // the last close's time and the longest (MIDI thread)
 
     // Messages, saving.
     void say(std::string text);
