@@ -838,6 +838,8 @@ void test_synth_track() {
         loudest(melodee, 3);
         melodee.service();
         CHECK(melodee.synth_value("preset") == "1" && melodee.synth_value("level") == "0.1");
+        with_shift(melodee, [&] { turn_wheel(melodee, 1); }); // past MACRO, Melodee's first page (Kerem, 2026-11-20), to the module's
+        std::this_thread::sleep_for(std::chrono::milliseconds(350)); // the next Shift no double press (that locks it)
         melodee.surface(make_event(0xb0, knob_first_cc, 3)); // knob 1: level, up three
         CHECK(melodee.synth_value("level") == "0.13");
         // Shift + the wheel's push: the module's menu. Root's rows: the
@@ -907,8 +909,8 @@ void test_synth_track() {
         second.audio_event(make_event(0x80, pad_note(0), 0));
         loudest(second, 1);
 
-        // The module's own page: Shift + the wheel to it, after Fake and Envelope.
-        with_shift(second, [&] { turn_wheel(second, 1); turn_wheel(second, 1); });
+        // The module's own page: Shift + the wheel to it, after MACRO, Fake and Envelope.
+        with_shift(second, [&] { turn_wheel(second, 1); turn_wheel(second, 1); turn_wheel(second, 1); });
         CHECK(has(second.status(), "canvas=browse entered=0"));
         std::this_thread::sleep_for(std::chrono::milliseconds(60)); // no audio thread: the page's reads go to the module directly
         juce::Image screen(juce::Image::ARGB, 128, 64, true);
@@ -929,7 +931,7 @@ void test_synth_track() {
         tap_step(second, 0);                                   // 1
         press(second, Button::MainPush);                       // done
         CHECK(has(second.status(), "typing=0"));
-        loudest(second, 1); // the page's sets reach the module
+        loudest(second, 4); // the page's sets reach the module (after the pages' asks, four a block)
         std::this_thread::sleep_for(std::chrono::milliseconds(60));
         CHECK(second.ask_module("searched") == "abc1" && second.ask_module("level") == "0.9");
         press(second, Button::Back); // up a level: the page keeps the jogwheel

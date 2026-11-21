@@ -93,7 +93,7 @@ std::vector<Binding> make_table() {
         {"Shift + Step 6", S::Any, T::Any, H::shift, C::Step, G::Press, J::Metronome, St::Done, "", step(6)},
         {"Shift + Step 7", S::Any, T::Any, H::shift, C::Step, G::Press, J::Groove, St::Done, "", step(7)},
         {"Shift + Step 8", S::Any, T::Any, H::shift, C::Step, G::Press, J::SixteenPitches, St::Wave2, kit_depth, step(8)},
-        {"Shift + Step 9", S::Any, T::Any, H::shift, C::Step, G::Press, J::KeysAndScales, St::Wave2, instruments, step(9)},
+        {"Shift + Step 9", S::Any, T::Any, H::shift, C::Step, G::Press, J::KeysAndScales, St::Done, "", step(9)},
         {"Shift + Step 10", S::Any, T::Any, H::shift, C::Step, G::Press, J::FullVelocity, St::Done, "", step(10)},
         {"Shift + Step 11", S::Any, T::Any, H::shift, C::Step, G::Press, J::Repeat, St::Wave2, sequencer, step(11)},
         {"Shift + Step 12", S::Any, T::Any, H::shift, C::Step, G::Press, J::Looper, St::Wave2, looper, step(12)},

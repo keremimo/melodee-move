@@ -350,7 +350,7 @@ bool AutoSampler::start(const Job& job, const melodee::AutoSampleSettings& setti
         std::lock_guard<std::mutex> guard(lock);
         why.clear();
         made.clear();
-        rows.clear();
+        if (!(job.sample && settings.found.heard)) rows.clear();
         job_now = job;
     }
     phase.store(Phase::Opening);
@@ -392,10 +392,10 @@ void AutoSampler::run(Job job, melodee::AutoSampleSettings settings, Opener open
     std::string error;
     auto source = open(error);
     if (!source) { fail(error.empty() ? "Cannot open it" : error); return; }
-    phase.store(Phase::Checking);
-    std::vector<std::string> heard_rows;
-    settings.found = check_source(*source, settings, &heard_rows, &cancelled);
-    {
+    if (!(job.sample && settings.found.heard)) { // a check the sheet already has is not run again
+        phase.store(Phase::Checking);
+        std::vector<std::string> heard_rows;
+        settings.found = check_source(*source, settings, &heard_rows, &cancelled);
         std::lock_guard<std::mutex> guard(lock);
         found = settings.found;
         rows = heard_rows;

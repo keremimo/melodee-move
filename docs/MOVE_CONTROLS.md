@@ -78,6 +78,7 @@ after Schwung) differ for some buttons:
 | Shift + Steps 4, 12, 13 | No Move job (no icon): **4 the Mixer** (16 tracks, their effects), **12 the Looper**, **13 Song**. |
 | Shift held | **Nothing on the screen**, as on the stock Move: the steps with a Shift job light, Melodee's 4, 12 and 13 too (Kerem dropped the on-screen Shift card from the mockups). |
 | Undo, quit | **Undo held 0.4 s opens the undo list** (as Melodee's Shift + − hold on the MPC). **Shift + Back goes back to Ableton's Move app**, as today, and Setup (Shift + Step 2) lists it too. |
+| Instruments | **The instruments mockups are built as drawn** (`docs/ui/instruments.png`). **AUTO SAMPLE is a row at the end of a module track's menu (Shift + push)**, not Shift + Step 11, which stays the Move's Repeat and Arp; the Arp styles there turn Melodee's arpeggiator on. **Keys & Scale (Shift + Step 9) lists the Move's scales** in Ableton's order (Live 12's and Push 3's 35, kept in Melodee's scale table after its own 13 so the MPC opens them: melodee-sample branch `move-scales`). **MACRO (FILTER, ECHO, SPACE, MOD, BEND) is a module track's first page** (Shift + turn). |
 
 Followed from the rule without a choice: Left and Right become the
 pattern's bars, so pages move to Shift + turn; in Typing, Back deletes a
@@ -160,7 +161,7 @@ while Shift is held.
 | Shift + Step 6 | Metronome on or off | The same (today a push on the Tempo screen) | done |
 | Shift + Step 7 | Groove: triplet sixteenth swing, 0-100 % and beyond | Swing (today knob 2 on the Tempo screen) | done |
 | Shift + Step 8 | Layout: 16 Pitches on or off (drums) | 16 Pitches on the right 16 pads | wave 2: kit depth |
-| Shift + Step 9 | Keys & Scales: In-Key or Chromatic, octaves or 4ths, key, scale | The project's key and scale, a synth's layout | wave 2: instruments |
+| Shift + Step 9 | Keys & Scales: In-Key or Chromatic, octaves or 4ths, key, scale | Keys & Scale: the project's key and scale (the Move's scales), a note track's mode (In-Key, Chromatic, Prog, Drums), rows, transpose; Prog's progression; STORE CHORD | done |
 | Shift + Step 10 | Full Velocity on or off | Full Level: every pad at 127; its step bright while Shift is held | done |
 | Shift + Step 11 | Repeat and the Arpeggiator (rate; Repeat, Up, Down, Random) | Note Repeat and Arp | wave 2: sequencer |
 | Shift + Step 12 | No job | The Looper | wave 2: looper |

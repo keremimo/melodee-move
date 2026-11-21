@@ -293,6 +293,7 @@ int Studio::octave(unsigned t) const { return int(song->tracks[t % melodee::trac
 void Studio::set_octave(unsigned t, int value) {
     song->tracks[t % melodee::track_count].octave = int8_t(3 + value);
     if (t == selected) audio_octave.store(value, std::memory_order_relaxed);
+    publish_pads();
     changed();
 }
 
