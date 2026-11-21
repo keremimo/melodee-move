@@ -92,6 +92,16 @@ SYNTH_FLAGS='--backend simulated --samples build/simulated-samples --home build/
 # seconds of it through the whole runtime, its process_us in the log.
 MIXER_SCRIPT='200:0xb0,85,127;201:0xb0,85,0'
 MIXER_EXPECTED='process_us=.* playing=1 .*effects=126 '
+# The Looper (docs/UI.md, "Looper") through a 300-frame cable: Shift + Step
+# 6 the metronome on, Back; Shift + Step 12 at 60, its push at 80 turns it
+# on; the push at 200 opens L1's sheet, the wheel to its last item (IN
+# DELAY) and the push at 240 measures the input's round trip (428: the
+# cable and one block); Back at 1100, knob 2 at 1120 a bar's length, Rec
+# at 1140 arms L1, Play at 1160 takes it. The next start has it back.
+LOOPER_SCRIPT='20:0xb0,49,127;21:0x90,21,127;22:0x80,21,0;23:0xb0,49,0;40:0xb0,51,127;41:0xb0,51,0;60:0xb0,49,127;61:0x90,27,127;62:0x80,27,0;63:0xb0,49,0;80:0xb0,3,127;81:0xb0,3,0;200:0xb0,3,127;201:0xb0,3,0;220:0xb0,14,7;240:0xb0,3,127;241:0xb0,3,0;1100:0xb0,51,127;1101:0xb0,51,0;1120:0xb0,72,3;1140:0xb0,86,127;1141:0xb0,86,0;1160:0xb0,85,127;1161:0xb0,85,0'
+LOOPER_EXPECTED='page=looper .*looper=on .*loop_latency=428 .*loop1=PLAY,len=88200,bars=1,layers=1,src=input'
+LOOPER_RESTORED='looper=on .*loop_latency=428 .*loop1=(PLAY|STOP),len=88200,'
+LOOPER_FLAGS='--backend simulated --loopback 300 --samples build/simulated-samples --home build/simulated-looper'
 # shellcheck disable=SC2086
 docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE" && pwd):/melodee:ro" -e MELODEE=/melodee \
     $MOUNT melodee-move-builder sh -c "
@@ -150,6 +160,14 @@ docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE
     { build/melodee-move --backend simulated --samples build/test-samples-mixer --home build/bench-home-busy --seconds 5 --script '$MIXER_SCRIPT' 2> build/simulated-mixer.log || true; } &&
     tail -n 1 build/simulated-mixer.log | grep -o 'process_us=[^ ]* of [0-9]*' &&
     grep -qE '$MIXER_EXPECTED' build/simulated-mixer.log &&
+    rm -rf build/simulated-looper &&
+    { build/melodee-move $LOOPER_FLAGS --seconds 8 --script '$LOOPER_SCRIPT' 2> build/simulated-looper.log || true; } &&
+    tail -n 1 build/simulated-looper.log &&
+    grep -qE '$LOOPER_EXPECTED' build/simulated-looper.log &&
+    test -s 'build/simulated-looper/Projects/Move Loops/Loop 1.wav' &&
+    { build/melodee-move $LOOPER_FLAGS --seconds 2 2> build/simulated-looper-restore.log || true; } &&
+    tail -n 1 build/simulated-looper-restore.log &&
+    grep -qE '$LOOPER_RESTORED' build/simulated-looper-restore.log &&
     build/melodee-move --melodee-previews build/melodee-previews --modules build/test-modules > /dev/null &&
     build/melodee-move --probe-modules build/test-modules &&
     tools/bundle.sh &&

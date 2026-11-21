@@ -208,8 +208,10 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
         migrated = migrate(path, *song, states, folder_of, this, played);
     }
     // The Move's own settings: the track played last, the metronome, the
-    // pad layout (Rows unless the file says Banks).
+    // pad layout (Rows unless the file says Banks), the input's round trip
+    // for the Looper (`loop_latency`, device frames).
     set_pad_layout(PadLayout::Rows);
+    int loop_latency = LoopDesk::default_latency;
     if (std::ifstream in(settings_path); in) {
         std::string line;
         if (std::getline(in, line) && line == settings_header)
@@ -223,6 +225,7 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
                 else if (word == "click") click_on = value != 0;
                 else if (word == "click_level") click_volume = std::min(value, 100u);
                 else if (word == "pads") set_pad_layout(value ? PadLayout::Banks : PadLayout::Rows);
+                else if (word == "loop_latency") loop_latency = int(std::min(value, 48000u));
                 else midi.read_setting(word, int(value)); // MIDI Config's keys
             }
     }
@@ -264,6 +267,8 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
     for (unsigned t = 0; t < melodee::track_count; ++t)
         if (modules[t] && modules[t]->entry != melodee::no_plugin) engine->offer_plugin(modules[t]->entry, &modules[t]->runner);
     send({Type::Click, 0, 0, uint16_t(click_volume), int16_t(click_on)});
+    loop_desk = std::make_unique<LoopDesk>(*this);
+    loop_desk->set_latency(loop_latency);
     set_module_tempo(song->tempo / 10.0f);
     audio_track.store(int(selected));
     audio_kind.store(int(kind(selected)));
@@ -314,11 +319,13 @@ void Studio::render(const move::AudioBlock& input, move::AudioBlock& output) {
     set_module_transport(engine->playing(), engine->ticks() / double(melodee::ticks_per_quarter), audio_beats.load(std::memory_order_relaxed),
                          audio_unit.load(std::memory_order_relaxed));
     midi.after_render(*engine); // what is heard in this block goes out with it
+    loop_desk->meter.process(input, output, loop_desk->measuring.load(std::memory_order_relaxed)); // the Looper's input delay, measured
 }
 
 void Studio::audio_opened(const move::AudioFormat& format) {
     engine->set_audio_format(double(format.rate), 0);
     Midi::audio_thread();
+    loop_desk->meter.set_rate(format.rate);
 }
 
 void Studio::audio_event(const move::SurfaceEvent& event) {
@@ -336,6 +343,21 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
                              input.value, input.kind == Kind::PadPressure)) // the punch or Flex pad by its number in the layout
         return;
     if (input.kind == Kind::Pad) {
+        // The Looper on top: a loop's row of pads (L1 the top row) acts in
+        // the cycle it was read; a clear is held, the MIDI thread's.
+        bool looping = loop_desk->pads_shown.load(std::memory_order_relaxed);
+        auto layout = pad_layout();
+        auto at = LoopDesk::pad_at(logical_pad(uint8_t(input.index), layout), layout);
+        if (looping && at.loop >= 0) {
+            went = {};
+            if (!input.pressed || pads_typing.load(std::memory_order_relaxed) || !loop_desk->pads_free.load(std::memory_order_relaxed)) return;
+            using Do = melodee::looper::Do;
+            Do what = at.job == LoopDesk::RecordPad ? Do::Primary
+                    : at.job == LoopDesk::PlayPad ? (loop_desk->pads_shift.load(std::memory_order_relaxed) ? Do::Now : Do::Toggle)
+                    : at.job == LoopDesk::UndoPad ? Do::Undo : Do::Enable;
+            if (what != Do::Enable) engine->send({Type::Looper, uint8_t(at.loop), 0, uint16_t(what), 0});
+            return;
+        }
         if (input.pressed) {
             went = {};
             if (pads_typing.load(std::memory_order_relaxed)) return; // a letter, not a note
@@ -366,6 +388,12 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
                 }
             } else if (kind == TrackKind::Synth || kind == TrackKind::Keys || kind == TrackKind::Midi || kind == TrackKind::Plugin) {
                 key = note_for(input.index, audio_octave.load(std::memory_order_relaxed));
+            }
+            if (looping && at.track >= 0) { // the track's 16 on the Looper: a kit's bank of 16, or 16 notes up from C
+                bool note_track = kind == TrackKind::Synth || kind == TrackKind::Keys || kind == TrackKind::Midi || kind == TrackKind::Plugin;
+                pitch_pad = -1;
+                key = kind == TrackKind::Kit ? int(melodee::sampler_first_note + unsigned(loop_desk->pads_bank.load(std::memory_order_relaxed)) * 16 + unsigned(at.track))
+                    : note_track ? std::clamp(synth_base_note + 12 * audio_octave.load(std::memory_order_relaxed) + at.track, 0, 127) : -1;
             }
             // Stamped for the MIDI thread (Seq Record, a step held + the pad), quiet or not.
             auto& stamp = stamps[input.index];
@@ -934,6 +962,7 @@ std::string Studio::settings_text() const {
     out << "pads " << int(pad_layout() == PadLayout::Banks) << '\n';
     out << seq->settings_text();
     midi.write_settings(out);
+    out << "loop_latency " << loop_desk->latency() << '\n';
     return out.str();
 }
 
@@ -993,6 +1022,7 @@ std::string Studio::write(std::vector<uint8_t> bytes, std::string settings) {
 
 std::string Studio::save_now() {
     std::unique_lock<std::mutex> guard(lock);
+    loop_desk->keep_values();
     auto bytes = project_bytes();
     auto settings = settings_text();
     dirty = false;
@@ -1151,6 +1181,7 @@ void Studio::service() {
     if (!restored) restore();
     hold_streams();
     take_back();
+    loop_desk->service(); // the Looper's memory and fits, its files, commits
     take_answers();
     destroy_retired();
     // A module asked for (a track's job).
@@ -1211,6 +1242,7 @@ void Studio::service() {
     // Autosave: three seconds after the last change, as on the MPC.
     auto now = Clock::now();
     if (dirty && now - changed_at >= autosave_idle && now >= retry_at) {
+        loop_desk->keep_values(); // the loops' lengths and tempos, their files written next pass
         auto bytes = project_bytes();
         auto settings = settings_text();
         dirty = false;
@@ -1398,6 +1430,23 @@ void Studio::run_file_jobs() {
     }
 }
 
+void Studio::stopping() {
+    loop_desk->flush(std::chrono::milliseconds(300)); // a loop being written is waited for, a moment
+    bool unsaved = false;
+    {
+        std::lock_guard<std::mutex> guard(lock);
+        unsaved = dirty;
+    }
+    if (unsaved) save_now();
+}
+
+void Studio::loop_pads(bool shown, bool free) {
+    loop_desk->pads_shown.store(shown, std::memory_order_relaxed);
+    loop_desk->pads_free.store(free, std::memory_order_relaxed);
+    loop_desk->pads_shift.store(shift, std::memory_order_relaxed);
+    loop_desk->pads_bank.store(int(current().last_pad / 16 % 2), std::memory_order_relaxed);
+}
+
 std::string Studio::load_now(const std::string& file, unsigned at) {
     std::string error;
     auto sample = read_sample(file, error, &cache);
@@ -1537,6 +1586,7 @@ std::string Studio::status() const {
     std::snprintf(text, sizeof text, " effects=%u schwung_fx=%u fx_slow=%u render_threads=%u load=%.2f", effects, schwung_fx, fx_slow,
                   engine->render_threads(), double(engine->render_load()));
     line += text;
+    line += loop_desk->status();
     for (const auto& screen : screens) line += screen->status();
     line += seq->status();
     line += midi.status();

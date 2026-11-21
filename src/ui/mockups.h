@@ -30,6 +30,8 @@ bool write_mixer_mockups(const std::string& directory);
 // MIDI and sync (docs/UI.md, "MIDI and sync"): midi.png and midi/
 // (mockups_midi.cpp).
 bool write_midi_mockups(const std::string& directory);
+// The Looper (Shift + Step 12): looper.png and looper/ (mockups_looper.cpp).
+bool write_looper_mockups(const std::string& directory);
 
 namespace mockup {
 

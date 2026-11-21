@@ -606,6 +606,97 @@ Lights: a MIDI track's pads as a synth's on Keys (every C in the track's
 colour, a held pad white), as a kit's on Drums (32 pads, Plus and Minus the
 next 16, the last pad white); MIDI Config and the track options keep the
 pads playing the track and light Back.
+## Looper
+
+Melodee's Looper (melodee-sample's `docs/LOOPER.md`) on Shift + Step 12,
+where the Move prints no job (Kerem, 2026-11-20): four tempo-synced loops,
+L1-L4, each on a loop track of its own (a mix strip and a chain), there
+while the Looper is on. `docs/ui/looper.png` is the sheet
+(`src/ui/mockups_looper.cpp`); the screens draw with the same pieces
+(`src/ui/looper_view.*`), so the screen is the mockup. Kerem chose (the
+Decisions in [MOVE_CONTROLS.md](MOVE_CONTROLS.md)): a pad row a loop, Rec
+records the selected loop, the screens as drawn.
+
+![The Looper](ui/looper.png)
+
+- **Off**, Shift + Step 12 asks first: push turns it on, its memory (45 MB
+  a loop) made meanwhile (`MAKING MEMORY n/4`). Shift + Step 12 again, or
+  Back, goes back to Play; the loops play on.
+- **LOOPS**: the four as rows, L1 on top, as the track buttons and the pad
+  rows sit beside them: the tag (the selected one inverted), the state as a
+  word (ARM, REC, DUB, PLAY, STOP, FIT; REC and DUB inverted while they
+  write, ARM blinking), the waveform with the play head (a set take filling
+  as it runs), the length (`4B`, `FREE`; `@120` for one taken at another
+  tempo). The detail line: the loop's source, and its layers or the bar and
+  beat; `REC: FIT, DUB` on a loop at another tempo; `PLAY: COUNT-IN` while
+  one waits, stopped.
+- **Knobs** (LOOPS and the sheet): 1 source (Input, Input L, Input R, the
+  tracks there are, the other loops, Mix; between takes), 2 length (Free,
+  1, 2, 4, 8, 16 bars; before a take), 3 level, 4 feedback, 5 pan, 6 send,
+  7 quantize (Bar, Beat, Off), 8 after take (Play, Overdub, Stop); 7 and 8
+  are all four's. A touch shows one large (`KNOB` / n / the loop or `ALL`).
+- **MIX**, Shift + the wheel: the four strips (fader, meter, pan, M and
+  S); knobs 1-4 their levels, 5-8 their pans.
+- **Pads**: a row a loop, L1 the top row: record, close, overdub and play
+  (as Rec); play or stop on the boundary, again cancels (Shift: at once);
+  undo then redo the last overdub; held 0.6 s, clear. The audio thread
+  does their jobs in the cycle they were read. The right 16 keep playing
+  the selected track: a kit's bank of 16 (the last pad's), A01 bottom
+  left; a note track 16 notes up from C. Every pad goes through the pad
+  map (`src/app/pad_layout.h`), and in both layouts the loops sit on the
+  same pads: in **Rows** L1 is pads 25-28, L2 17-20, L3 9-12, L4 1-4, the
+  track's 16 the right half of each row; in **Banks** the left bank is the
+  loops (L1 13-16 down to L4 1-4, as the MPC numbers its pads) and the
+  right bank, 17-32, the track's 16 (`lights-rows`, `lights-banks` on the
+  sheet).
+- **Track buttons** are L1-L4: a tap picks the loop; Mute + one mutes it,
+  Shift + Mute + one solos it, Mute alone mutes the selected loop; held
+  with the Volume knob, its level (`VOL` / `L2` / `LOOP`). Held, they still
+  show the sixteen tracks, and a step picks the track the right 16 play.
+- **Rec** records the selected loop, as Ableton's Rec records the selected
+  track: record, close, overdub, play again; stopped, the take waits for
+  Play and starts on its downbeat; a loop at another tempo is fitted to the
+  tempo now first (FIT; Rec again cancels), then overdubs.
+- **The wheel** picks the loop; **its push** opens the loop's sheet,
+  MORE: play or stop on the next bar (or beat, or at once; CANCEL while one
+  waits), stop or play now (a take closes on its whole bars), commit to the
+  kit's next empty pad (`COMMIT TO A10`; `COMMIT + NOTE` also writes a note
+  at bar 1 as long as the loop and stops it), its send's bus, clear (asks),
+  Looper off (asks while loops hold audio: their files go too), and **IN
+  DELAY**: with a cable from the Move's output into its line in, push
+  measures the input's round trip (four clicks) and keeps it. The wheel
+  walks the sheet, push does, Back leaves it.
+- **Kept** with the project as `Projects/Move Loops/Loop N.wav` (24-bit
+  stereo at the loop's rate), written a moment after a loop changes and on
+  the way out (while the audio thread still runs); the next start reads
+  them back (a loop saved stopped comes back stopped). Commit writes
+  `Samples/Looper/L<n> Loop <m>.wav`.
+- **Input delay**: a loop recording the input writes it that far behind
+  its play head (`loop_latency` in `Move.settings`, device frames; 128, the
+  block the runtime adds, until measured). The simulated Move with a
+  300-frame cable measures 428, and a take then has its first click at
+  frame 3.
+
+Lights: a loop's record pad red recording (blinking armed), orange
+overdubbing, the loop's colour dim otherwise; its play / stop pad the
+loop's colour playing, white on the bar, dim stopped, blinking with a
+change waiting; undo light grey, redo dark grey; clear dim red, red while
+held. The track buttons L1-L4 in their colours (mint, yellow, purple, sky),
+the selected one bright, an empty one dark grey, muted grey, soloed blue.
+The steps: the selected loop across its length, its place white; a take
+running, the bar's sixteenths in red. Rec red while a loop records or
+overdubs, blinking while one is armed.
+
+| Screen | Rail | Subject | Detail |
+| --- | --- | --- | --- |
+| Looper off | `LOOP` / / `OFF` | `LOOPER`, four loops, 45 MB each | `PUSH: TURN ON` |
+| Loops | `LOOP` / loop / quantize | the four as rows | source; layers or bar and beat |
+| Mix | `MIX` / loop / `2/2` | the four strips | level in dB, send |
+| A knob touched | `KNOB` / n / loop or `ALL` | name, value, bar | |
+| The loop's sheet | `MORE` / loop / state | its jobs as a list | |
+| Clear | `CLR` / loop / state | the question | `PUSH YES`, `BACK NO` |
+| Looper off, loops held | `LOOP` / / `OFF` | the question | `PUSH YES`, `BACK NO` |
+| A loop's volume | `VOL` / loop / `LOOP` | its level in dB, a bar | |
 
 ## Screens in code
 

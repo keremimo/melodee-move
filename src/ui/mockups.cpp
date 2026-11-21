@@ -250,6 +250,7 @@ int write_mockups(const std::string& directory) {
     ok = write_mixer_mockups(directory) && ok;
     ok = mockup::write_sequencer_mockups(directory) && ok;
     ok = write_midi_mockups(directory) && ok;
+    ok = write_looper_mockups(directory) && ok;
     return ok ? 0 : 1;
 }
 

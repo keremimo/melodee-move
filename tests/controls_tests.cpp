@@ -413,6 +413,49 @@ void test_gestures() {
     }
 }
 
+// The Looper (Shift + Step 12): the Move's keys for the loop tracks, a pad row a loop.
+void test_looper() {
+    const Where looper {Screen::Looper, Track::Kit}, synth {Screen::Looper, Track::Synth};
+    CHECK(resolve({Screen::Play, Track::Kit}, use_of(Control::Step, Gesture::Press, held::shift, 11)) == Job::Looper);
+    CHECK(resolve(looper, use_of(Control::Step, Gesture::Press, held::shift, 11)) == Job::Looper); // again: back to Play
+    // The left 16: a loop's row, whatever the track; the right 16 play the track.
+    for (int pad : {0, 3, 8, 11, 16, 19, 24, 27}) {
+        CHECK_SAID(resolve(looper, use_of(Control::Pad, Gesture::Press, held::none, pad)) == Job::LoopPad, "pad " << pad);
+        CHECK_SAID(resolve(synth, use_of(Control::Pad, Gesture::Press, held::shift, pad)) == Job::LoopPadNow, "pad " << pad);
+        CHECK(!pad_sounds(looper, held::none, unsigned(pad)));
+    }
+    for (int pad : {4, 7, 12, 15, 20, 23, 28, 31}) {
+        CHECK(resolve(looper, use_of(Control::Pad, Gesture::Press, held::none, pad)) == Job::PlayPad);
+        CHECK(resolve(synth, use_of(Control::Pad, Gesture::Press, held::none, pad)) == Job::PlayNote);
+        CHECK(pad_sounds(looper, held::none, unsigned(pad)));
+    }
+    // The track buttons are L1-L4: select, level, mute, solo; held, still the sixteen tracks.
+    CHECK(resolve(looper, use_of(Control::TrackButton, Gesture::Tap, held::none, 1)) == Job::SelectLoop);
+    CHECK(resolve(looper, use_of(Control::TrackButton, Gesture::Hold, held::none, 1)) == Job::PeekTrack);
+    CHECK(resolve(looper, use_of(Control::Step, Gesture::Press, held::track, 5)) == Job::PickTrack);
+    CHECK(resolve(looper, use_of(Control::Volume, Gesture::Turn, held::track)) == Job::LoopLevel);
+    CHECK(resolve(looper, use_of(Control::Volume, Gesture::Turn)) == Job::MainVolume);
+    CHECK(resolve(looper, use_of(Control::Mute, Gesture::Tap)) == Job::MuteLoop);
+    CHECK(resolve(looper, use_of(Control::TrackButton, Gesture::Press, held::mute, 2)) == Job::MuteLoop);
+    CHECK(resolve(looper, use_of(Control::TrackButton, Gesture::Press, held::shift | held::mute, 2)) == Job::SoloLoop);
+    // Rec records the selected loop; the wheel picks, its push opens the sheet; Shift + turn the page.
+    CHECK(resolve(looper, use_of(Control::Rec)) == Job::LoopRecord);
+    CHECK(resolve({Screen::Play, Track::Kit}, use_of(Control::Rec)) == Job::Record);
+    CHECK(resolve(looper, use_of(Control::WheelTurn, Gesture::Turn)) == Job::PickLoop);
+    CHECK(resolve(looper, use_of(Control::WheelPush)) == Job::LoopSheet);
+    CHECK(resolve(looper, use_of(Control::WheelTurn, Gesture::Turn, held::shift)) == Job::Page);
+    CHECK(resolve(looper, use_of(Control::WheelPush, Gesture::Press, held::shift)) == Job::Nothing); // not Play's Sample Options
+    // The rest as on Play: transport, knobs, Back, Plus and Minus; the steps do nothing.
+    CHECK(resolve(looper, use_of(Control::Play)) == Job::PlayStop);
+    CHECK(resolve(looper, use_of(Control::Play, Gesture::Press, held::shift)) == Job::Restart);
+    CHECK(resolve(looper, use_of(Control::Knob, Gesture::Turn)) == Job::TurnKnob);
+    CHECK(resolve(looper, use_of(Control::KnobTouch)) == Job::ShowKnob);
+    CHECK(resolve(looper, use_of(Control::Back)) == Job::Back);
+    CHECK(resolve(synth, use_of(Control::Plus)) == Job::Octave);
+    CHECK(resolve(looper, use_of(Control::Step, Gesture::Tap, held::none, 3)) == Job::Nothing);
+    CHECK(resolve(looper, use_of(Control::Back, Gesture::Press, held::shift)) == Job::Quit);
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -423,6 +466,7 @@ int main(int argc, char** argv) {
     test_decisions();
     test_pads_sound();
     test_gestures();
+    test_looper();
     std::cout << "controls-tests: " << checks - failures << '/' << checks << " checks passed\n";
     return failures ? 1 : 0;
 }

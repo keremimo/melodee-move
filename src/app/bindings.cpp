@@ -15,6 +15,7 @@ namespace H = held;
 
 constexpr uint32_t step(int n) { return 1u << (n - 1); } // Step 1-16
 constexpr uint32_t right_16 = 0xf0f0f0f0u;                 // columns 5-8 of every row
+constexpr uint32_t left_16 = 0x0f0f0f0fu;                  // columns 1-4 of every row
 
 const char* const sequencer = "sequencer", * const sampling = "sampling", * const kit_depth = "kit depth",
                 * const instruments = "instruments", * const mixer = "mixer & effects", * const song = "song & export",
@@ -109,7 +110,7 @@ std::vector<Binding> make_table() {
         {"Shift + Step 9", S::Any, T::Any, H::shift, C::Step, G::Press, J::KeysAndScales, St::Wave2, instruments, step(9)},
         {"Shift + Step 10", S::Any, T::Any, H::shift, C::Step, G::Press, J::FullVelocity, St::Wave2, instruments, step(10)},
         {"Shift + Step 11", S::Any, T::Any, H::shift, C::Step, G::Press, J::Repeat, St::Done, "", step(11)},
-        {"Shift + Step 12", S::Any, T::Any, H::shift, C::Step, G::Press, J::Looper, St::Wave2, looper, step(12)},
+        {"Shift + Step 12", S::Any, T::Any, H::shift, C::Step, G::Press, J::Looper, St::Done, "", step(12)},
         {"Shift + Step 13", S::Any, T::Any, H::shift, C::Step, G::Press, J::Song, St::Wave2, song, step(13)},
         {"Shift + Step 14", S::Any, T::Any, H::shift, C::Step, G::Press, J::NewPattern, St::Done, "", step(14)},
         {"Shift + Step 15", S::Any, T::Any, H::shift, C::Step, G::Press, J::DoubleLoop, St::Done, "", step(15)},
@@ -253,6 +254,23 @@ std::vector<Binding> make_table() {
         {"Left or Right (Mixer)", S::Mixer, T::Any, H::none, C::Right, G::Press, J::MixerHalf, St::Done},
         {"Plus or Minus (Pad FX)", S::PadFx, T::Any, H::none, C::Plus, G::Press, J::PunchBank, St::Done},
         {"Plus or Minus (Pad FX)", S::PadFx, T::Any, H::none, C::Minus, G::Press, J::PunchBank, St::Done},
+
+        // The Looper (Shift + Step 12): a pad row and a track button a loop, L1 on top
+        {"Pad, left 16 (Looper)", S::Looper, T::Any, H::none, C::Pad, G::Press, J::LoopPad, St::Done, "", left_16},
+        {"Shift + Pad, left 16 (Looper)", S::Looper, T::Any, H::shift, C::Pad, G::Press, J::LoopPadNow, St::Done, "", left_16},
+        {"Pad, right 16 (Looper, kit)", S::Looper, T::Kit, H::none, C::Pad, G::Press, J::PlayPad, St::Done, "", right_16},
+        {"Pad, right 16 (Looper, synth)", S::Looper, T::Synth, H::none, C::Pad, G::Press, J::PlayNote, St::Done, "", right_16},
+        {"Track button (Looper)", S::Looper, T::Any, H::none, C::TrackButton, G::Tap, J::SelectLoop, St::Done},
+        {"Track button held + Volume knob (Looper)", S::Looper, T::Any, H::track, C::Volume, G::Turn, J::LoopLevel, St::Done},
+        {"Mute (Looper)", S::Looper, T::Any, H::none, C::Mute, G::Tap, J::MuteLoop, St::Done},
+        {"Mute held + Track button (Looper)", S::Looper, T::Any, H::mute, C::TrackButton, G::Press, J::MuteLoop, St::Done},
+        {"Shift + Mute held + Track button (Looper)", S::Looper, T::Any, H::shift | H::mute, C::TrackButton, G::Press, J::SoloLoop, St::Done},
+        {"Rec (Looper)", S::Looper, T::Any, H::none, C::Rec, G::Press, J::LoopRecord, St::Done},
+        {"Wheel turn (Looper)", S::Looper, T::Any, H::none, C::WheelTurn, G::Turn, J::PickLoop, St::Done},
+        {"Wheel push (Looper)", S::Looper, T::Any, H::none, C::WheelPush, G::Press, J::LoopSheet, St::Done},
+        {"Shift + Wheel turn (Looper)", S::Looper, T::Any, H::shift, C::WheelTurn, G::Turn, J::Page, St::Done},
+        {"Shift + Wheel push (Looper)", S::Looper, T::Any, H::shift, C::WheelPush, G::Press, J::Nothing, St::Free},
+        {"Step (Looper)", S::Looper, T::Any, H::none, C::Step, G::Tap, J::Nothing, St::Free},
     };
 }
 
@@ -309,7 +327,7 @@ const std::vector<Binding>& table() {
 
 Screen under(Screen screen) {
     switch (screen) {
-    case Screen::Loop: case Screen::Browser: case Screen::List: case Screen::Sampling: case Screen::Canvas: return Screen::Play;
+    case Screen::Loop: case Screen::Browser: case Screen::List: case Screen::Sampling: case Screen::Canvas: case Screen::Looper: return Screen::Play;
     case Screen::Mixer: case Screen::KnobFx: case Screen::PadFx: case Screen::Flex: return Screen::Play;
     case Screen::ToPads: return Screen::Chop;
     default: return screen;

@@ -45,6 +45,7 @@ enum class Screen : uint8_t {
     KnobFx,     // Shift + Step 4 again: Knob FX
     PadFx,      // and again: Pad FX, the pads as punches
     Flex,       // and again: Flex Beat
+    Looper,     // the Looper (Shift + Step 12) and its sheets: four loops, L1-L4
     Count
 };
 
@@ -106,7 +107,8 @@ constexpr uint16_t none = 0, shift = 1 << 0, track = 1 << 1, step = 1 << 2, pad 
     X(MuteStep) X(SoloStep) X(UnmuteAll) X(MixerPage) X(MixerHalf) X(OpenChain) X(BypassEffect) X(RemoveEffect) X(CopyEffect) \
     X(KnobFxChoose) X(KnobFxLoad) X(KnobFxAll) X(KnobFxTrack) X(KnobFxPad) X(Punch) X(PunchBank) X(KeepPunches) X(PunchOptions) \
     X(ClearKept) X(FlexPad) X(SoloPad) \
-    X(StepTrig) X(Fill) X(LaunchScene) X(SeqPages) X(Playhead) X(ChainPattern)
+    X(StepTrig) X(Fill) X(LaunchScene) X(SeqPages) X(Playhead) X(ChainPattern) \
+    X(LoopPad) X(LoopPadNow) X(SelectLoop) X(LoopLevel) X(MuteLoop) X(SoloLoop) X(LoopRecord) X(PickLoop) X(LoopSheet)
 
 enum class Job : uint8_t {
 #define MELODEE_JOB_ENUM(name) name,

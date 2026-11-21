@@ -44,6 +44,7 @@ public:
     void lights(move::Lights& lights, Clock::time_point now) override;              // MIDI thread
     void draw(juce::Graphics& g) override;                                          // screen thread
     void service() override;                                                        // service thread
+    void stopping() override;                                                       // service thread, the run ending
     std::string status() const override;
 
     // For tests and tools.
@@ -81,6 +82,7 @@ private:
     std::bitset<4> rows_down;           // the track buttons held
     Clock::time_point held_at {};       // since when
     unsigned volume_track = 0;          // whose volume is shown
+    int volume_loop = -1;               // on the Looper: the loop's (L1-L4), not a track's
     Clock::time_point volume_until {};  // a track's volume shown, for a moment
     bindings::Job last_job = bindings::Job::Nothing; // for the status line
     int touched = -1; // a touched knob, for a moment

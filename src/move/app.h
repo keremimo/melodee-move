@@ -96,6 +96,9 @@ public:
 
     // Service thread, every 10 ms: slow work (files, loading).
     virtual void service() {}
+    // Service thread, once, as the run ends (Shift + Back, a signal, its
+    // time) while the audio thread still runs: last writes that need it.
+    virtual void stopping() {}
     // Any thread: true once the app wants to quit.
     virtual bool finished() const { return false; }
     // Any thread: extra `key=value` fields for the status line.

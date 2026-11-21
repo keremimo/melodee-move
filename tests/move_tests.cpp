@@ -21,6 +21,7 @@
 #include "melodee/engine/engine_info.h"
 #include "melodee/engine/sampler.h"
 #include "melodee/model/scales.h"
+#include <atomic>
 #include <chrono>
 #include <filesystem>
 #include <cmath>
@@ -1412,6 +1413,253 @@ void test_kit_depth() {
     CHECK(play(1, 20) > to_s32(0.05f)); // slice 2, not C02
     press_button(melodee, Button::Back);
     CHECK(play(1, 20) == 0);            // C02 again: empty
+// A loop's field in the status line ("loop1=PLAY,len=88200,..."): the state, or a number after `key=`.
+std::string loop_field(const std::string& status, unsigned loop, const std::string& key = "") {
+    std::string tag = " loop" + std::to_string(loop) + "=";
+    auto at = status.find(tag);
+    if (at == std::string::npos) return {};
+    auto end = status.find(' ', at + 1);
+    std::string field = status.substr(at + tag.size(), end == std::string::npos ? std::string::npos : end - at - tag.size());
+    if (key.empty()) return field.substr(0, field.find(','));
+    auto k = field.find("," + key + "=");
+    if (k == std::string::npos) return {};
+    auto from = k + key.size() + 2;
+    return field.substr(from, field.find(',', from) - from);
+}
+
+// The audio thread, as the runtime runs it, for what waits on it (a loop held to be saved or committed).
+struct AudioThread {
+    app::MelodeeApp& app;
+    std::atomic<bool> running {true};
+    std::thread thread;
+    explicit AudioThread(app::MelodeeApp& melodee) : app(melodee), thread([this] {
+        AudioBlock in {}, out {};
+        while (running) { out.fill(0); app.render(in, out); std::this_thread::sleep_for(std::chrono::microseconds(300)); }
+    }) {}
+    ~AudioThread() { running = false; thread.join(); }
+};
+
+// The Looper's pads in both layouts (app/pad_layout.h): the loops by logical
+// number, on the same physical pads, beside the track buttons.
+void test_looper_pads() {
+    using app::LoopDesk;
+    using app::PadLayout;
+    for (PadLayout layout : {PadLayout::Rows, PadLayout::Banks})
+        for (unsigned physical = 0; physical < 32; ++physical) {
+            unsigned row = physical / 8, column = physical % 8;
+            auto at = LoopDesk::pad_at(app::logical_pad(uint8_t(physical), layout), layout);
+            if (column < 4) CHECK(at.loop == int(3 - row) && at.job == column && at.track < 0);
+            else CHECK(at.loop < 0 && at.track == int(row * 4 + column - 4));
+        }
+    for (unsigned loop = 0; loop < 4; ++loop)
+        for (unsigned job = 0; job < 4; ++job)
+            for (PadLayout layout : {PadLayout::Rows, PadLayout::Banks}) {
+                uint8_t logical = LoopDesk::loop_pad(loop, job, layout);
+                CHECK(app::physical_pad(logical, layout) == (3 - loop) * 8 + job);
+                auto at = LoopDesk::pad_at(logical, layout);
+                CHECK(at.loop == int(loop) && at.job == job);
+            }
+    // Rows: L1 is pads 25-28, L4 1-4; Banks: L1 13-16, L4 1-4, the track's 16 the right bank, 17-32.
+    CHECK(LoopDesk::loop_pad(0, 0, PadLayout::Rows) == 24 && LoopDesk::loop_pad(3, 3, PadLayout::Rows) == 3);
+    CHECK(LoopDesk::loop_pad(0, 0, PadLayout::Banks) == 12 && LoopDesk::loop_pad(3, 0, PadLayout::Banks) == 0);
+    CHECK(LoopDesk::track_pad(0, PadLayout::Banks) == 16 && LoopDesk::track_pad(15, PadLayout::Banks) == 31);
+    CHECK(LoopDesk::track_pad(0, PadLayout::Rows) == 4 && LoopDesk::track_pad(15, PadLayout::Rows) == 31);
+}
+
+void test_looper() {
+    // The Looper (docs/UI.md, "Looper"): Shift + Step 12 asks, the push turns
+    // it on and its memory is made; a loop's row of pads records in the cycle
+    // it was read; a take from the input through a 428-frame round trip
+    // lands on the beat once the round trip is set (and that far late
+    // without it); the loops are kept with the project and come back; Commit
+    // to pad (+ note); a clear pad held; off.
+    namespace fs = std::filesystem;
+    std::string folder = "build/test-samples", home = "build/test-home-looper";
+    fs::create_directories(folder);
+    fs::remove_all(home);
+    std::string loop_file = home + "/Projects/Move Loops/Loop 1.wav";
+    auto press = [](app::MelodeeApp& melodee, Button button) { press_button(melodee, button); };
+    constexpr unsigned round_trip = 428; // the simulated Move's with a 300-frame cable (build.sh's spike run)
+    uint32_t taken = 0;
+    {
+        app::MelodeeApp melodee(folder, home, "build/test-no-modules");
+        Session session;
+        melodee.attach(session);
+        melodee.audio_opened(AudioFormat {});
+        CHECK(melodee.restore_now().empty());
+        auto& studio = melodee.studio();
+        // A cable from the output into the input: what went out comes back round_trip frames later.
+        std::vector<int32_t> cable(2 * round_trip, 0);
+        size_t at = 0;
+        AudioBlock in {}, out {};
+        auto run = [&](int blocks) {
+            for (int block = 0; block < blocks; ++block) {
+                for (unsigned f = 0; f < 2 * audio_frames; ++f) in[f] = cable[(at + f) % cable.size()];
+                out.fill(0);
+                melodee.render(in, out);
+                for (unsigned f = 0; f < 2 * audio_frames; ++f) cable[(at + f) % cable.size()] = out[f];
+                at = (at + 2 * audio_frames) % cable.size();
+            }
+        };
+        with_shift(melodee, [&] { tap_step(melodee, 11); }); // Shift + Step 12
+        CHECK(has(melodee.status(), "page=looper ") && has(melodee.status(), "looper=off") && has(melodee.status(), "looper_page=off"));
+        press(melodee, Button::MainPush); // turns it on
+        for (int pass = 0; pass < 12; ++pass) { melodee.service(); run(1); }
+        CHECK(has(melodee.status(), "looper=on") && has(melodee.status(), "loop_memory=8") && has(melodee.status(), "looper_page=loops"));
+        // The pads: L1's record pad (the top row's first) arms it in the audio thread, the MIDI thread picks L1.
+        Lights lights;
+        melodee.lights(lights, App::Clock::now());
+        melodee.audio_event(make_event(0x90, pad_note(24), 100));
+        run(1);
+        CHECK(loop_field(melodee.status(), 1) == "ARM"); // stopped: waits for Play
+        melodee.audio_event(make_event(0x80, pad_note(24), 0));
+        melodee.audio_event(make_event(0x90, pad_note(24), 100)); // again: back to empty (an armed take cancelled)
+        run(1);
+        CHECK(loop_field(melodee.status(), 1) == "EMPTY");
+        // In the MPC banks the same pad is the left bank's 13, still L1's record pad.
+        app::set_pad_layout(app::PadLayout::Banks);
+        melodee.audio_event(make_event(0x80, pad_note(24), 0));
+        melodee.audio_event(make_event(0x90, pad_note(24), 100));
+        run(1);
+        CHECK(loop_field(melodee.status(), 1) == "ARM");
+        melodee.audio_event(make_event(0x80, pad_note(24), 0));
+        melodee.audio_event(make_event(0x90, pad_note(24), 100));
+        run(1);
+        CHECK(loop_field(melodee.status(), 1) == "EMPTY");
+        app::set_pad_layout(app::PadLayout::Rows);
+        // A bar from the input with the metronome on, the round trip set.
+        CHECK(studio.loops().remote("length 1 1") == "ok");
+        CHECK(studio.loops().remote("latency " + std::to_string(round_trip)) == "ok");
+        studio.set_click(true, 100);
+        press(melodee, Button::Rec); // Rec: records the selected loop (armed: stopped)
+        run(1);
+        CHECK(loop_field(melodee.status(), 1) == "ARM");
+        press(melodee, Button::Play);
+        for (int block = 0; block < 3000 && loop_field(melodee.status(), 1) != "PLAY"; ++block) run(1);
+        CHECK(loop_field(melodee.status(), 1) == "PLAY");
+        taken = uint32_t(std::stoul("0" + loop_field(melodee.status(), 1, "len")));
+        CHECK(taken > 80000 && taken < 96000); // one bar at 120 BPM: 88200 frames
+        // Where the bar's first click landed in the loop: on its first frame.
+        auto onset = [&] {
+            auto& looper = studio.host().looper();
+            for (int block = 0; block < 50 && !looper.hold(0); ++block) run(1);
+            int found = -1;
+            if (const float* left = looper.held_left(0))
+                for (uint32_t f = 0; f < looper.held_frames(0) && f < taken; ++f)
+                    if (std::fabs(left[f]) > 0.02f) { found = int(f); break; }
+            looper.release(0);
+            run(1);
+            return found < 0 ? found : found > int(taken) / 2 ? found - int(taken) : found;
+        };
+        int landed = onset();
+        std::cout << "looper: a click through a " << round_trip << "-frame round trip lands at frame " << landed << " (latency set)\n";
+        CHECK(landed >= -16 && landed <= 16);
+        // Without the round trip set, it lands that late (less nothing: the block is the looper's own).
+        CHECK(studio.loops().remote("clear 1") == "ok");
+        run(4);
+        CHECK(studio.loops().remote("latency 0") == "ok");
+        CHECK(studio.loops().remote("rec 1") == "ok");
+        for (int block = 0; block < 3000 && loop_field(melodee.status(), 1) != "PLAY"; ++block) run(1);
+        taken = uint32_t(std::stoul("0" + loop_field(melodee.status(), 1, "len")));
+        int late = onset();
+        std::cout << "looper: without it, at frame " << late << '\n';
+        CHECK(late >= int(round_trip) - 16 && late <= int(round_trip) + 16);
+        CHECK(studio.loops().remote("latency " + std::to_string(round_trip)) == "ok");
+        // Tempo follow: at 140 BPM the loop plays on stretched, its pitch kept; Rec fits it to the
+        // tempo now on the service thread, then overdubs; L1's undo pad takes the pass back, again redoes it.
+        studio.set_tempo(1400);
+        run(8);
+        CHECK(loop_field(melodee.status(), 1) == "PLAY" && loop_field(melodee.status(), 1, "tempo") == "1200");
+        press(melodee, Button::Rec);
+        for (int pass = 0; pass < 400 && loop_field(melodee.status(), 1, "len") == std::to_string(taken); ++pass) { melodee.service(); run(1); }
+        uint32_t fitted = uint32_t(std::stoul("0" + loop_field(melodee.status(), 1, "len")));
+        CHECK(fitted > 75400 && fitted < 75800); // 88200 x 120 / 140 = 75600
+        CHECK(loop_field(melodee.status(), 1, "tempo") == "1400");
+        for (int block = 0; block < 400 && loop_field(melodee.status(), 1) != "DUB"; ++block) run(1);
+        CHECK(loop_field(melodee.status(), 1) == "DUB");
+        run(200);
+        press(melodee, Button::Rec); // the overdub ends: its layer stays (counted from its punch in)
+        for (int block = 0; block < 400 && loop_field(melodee.status(), 1) != "PLAY"; ++block) run(1);
+        CHECK(loop_field(melodee.status(), 1) == "PLAY" && loop_field(melodee.status(), 1, "layers") == "2");
+        melodee.audio_event(make_event(0x90, pad_note(26), 100)); // undo, in the cycle it was read
+        melodee.audio_event(make_event(0x80, pad_note(26), 0));
+        for (int block = 0; block < 400 && loop_field(melodee.status(), 1, "layers") != "1"; ++block) run(1);
+        CHECK(loop_field(melodee.status(), 1, "layers") == "1");
+        melodee.audio_event(make_event(0x90, pad_note(26), 100)); // redo
+        melodee.audio_event(make_event(0x80, pad_note(26), 0));
+        for (int block = 0; block < 400 && loop_field(melodee.status(), 1, "layers") != "2"; ++block) run(1);
+        CHECK(loop_field(melodee.status(), 1, "layers") == "2");
+        taken = fitted;
+        // Kept with the project: Loop 1.wav beside it, its frames the loop's.
+        {
+            AudioThread audio(melodee);
+            CHECK(melodee.save_now().empty());
+            for (int pass = 0; pass < 50 && !fs::exists(loop_file); ++pass) { melodee.service(); std::this_thread::sleep_for(std::chrono::milliseconds(5)); }
+        }
+        CHECK(fs::exists(loop_file));
+        CHECK(fs::file_size(loop_file) > taken * 6); // 24-bit stereo
+        // Muted from the track buttons' place: Mute + Track 1.
+        melodee.surface(make_event(0xb0, button_cc(Button::Mute), 127));
+        press(melodee, Button::Row1);
+        melodee.surface(make_event(0xb0, button_cc(Button::Mute), 0));
+        CHECK(studio.loops().mix(0).mute);
+        press(melodee, Button::Mute); // the selected loop, L1: back on
+        CHECK(!studio.loops().mix(0).mute);
+        CHECK(melodee.save_now().empty());
+    }
+    {   // A new start: the loop comes back from its file, its length and tempo from the project.
+        app::MelodeeApp melodee(folder, home, "build/test-no-modules");
+        Session session;
+        melodee.attach(session);
+        melodee.audio_opened(AudioFormat {});
+        CHECK(melodee.restore_now().empty());
+        {
+            AudioThread audio(melodee);
+            for (int pass = 0; pass < 40 && loop_field(melodee.status(), 1, "len") != std::to_string(taken); ++pass) {
+                melodee.service();
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            }
+        }
+        CHECK(has(melodee.status(), "looper=on") && has(melodee.status(), "loop_latency=428"));
+        CHECK(loop_field(melodee.status(), 1, "len") == std::to_string(taken));
+        // Commit + note: onto the kit's next empty pad (A02 after A01), a note at bar 1, the loop stopped.
+        auto& studio = melodee.studio();
+        CHECK(studio.loops().commit(0, true));
+        {
+            AudioThread audio(melodee);
+            for (int pass = 0; pass < 100 && !has(melodee.status(), "samples=1 pads=1"); ++pass) {
+                melodee.service();
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            }
+        }
+        CHECK(has(melodee.status(), "samples=1 pads=1"));
+        CHECK(studio.current().pads[1].used());
+        CHECK(fs::exists(home + "/Samples/Looper/L1 Loop 1.wav"));
+        const auto& pattern = studio.patterns().at[0][studio.current().pattern];
+        CHECK(!pattern.events.empty() && pattern.events.front().key == melodee::sampler_first_note + 1 && pattern.events.front().tick == 0);
+        // A clear pad held 0.6 s clears L1 (L1's row, the fourth pad).
+        with_shift(melodee, [&] { tap_step(melodee, 11); });
+        Lights lights;
+        melodee.surface(make_event(0x90, pad_note(27), 100));
+        melodee.lights(lights, App::Clock::now() + std::chrono::milliseconds(300));
+        CHECK(studio.loops().clearing() == 0);
+        melodee.lights(lights, App::Clock::now() + std::chrono::milliseconds(700));
+        melodee.surface(make_event(0x80, pad_note(27), 0));
+        AudioBlock in {}, out {};
+        for (int block = 0; block < 4; ++block) { out.fill(0); melodee.render(in, out); }
+        CHECK(loop_field(melodee.status(), 1) == "EMPTY");
+        // Off: the loops' folder goes with the next save.
+        CHECK(studio.loops().remote("off") == "ok");
+        {
+            AudioThread audio(melodee);
+            CHECK(melodee.save_now().empty());
+            for (int pass = 0; pass < 20; ++pass) { melodee.service(); std::this_thread::sleep_for(std::chrono::milliseconds(2)); }
+        }
+        CHECK(has(melodee.status(), "looper=off"));
+        CHECK(!fs::exists(loop_file));
+        CHECK(studio.loops().remote("length 9 1").rfind("error", 0) == 0);
+        CHECK(studio.loops().remote("source 1 loop 1").rfind("error", 0) == 0);
+    }
 }
 
 int main() {
@@ -1432,6 +1680,8 @@ int main() {
     test_tracks();
     test_migration();
     test_kit_depth();
+    test_looper_pads();
+    test_looper();
     std::cout << "move-tests: " << checks - failures << " of " << checks << " checks passed\n";
     return failures ? 1 : 0;
 }

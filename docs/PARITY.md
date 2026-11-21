@@ -104,18 +104,18 @@ Kerem has checked it there. `n/a` rows have no box.
 
 | Feature | Status | Move controls | ✓ |
 | --- | --- | --- | --- |
-| **Looper on / off**: asks first; 45 MB a loop (MELODEE.md › Looper) | looper | Shift + Loop, or Places > Looper | [ ] |
-| **Four loops L1-L4** on loop tracks of their own, each with a mix strip and a chain of six (MELODEE.md › Looper) | looper | Row1-4 pick the loop while the Looper shows | [ ] |
-| **Loop states**: ARM, REC, DUB, PLAY, STOP, FIT; record → close → overdub ⇄ play (MELODEE.md › Looper) | looper | jogwheel push | [ ] |
-| **Loop settings**: length (Free, 1-16 bars), level, feedback, Quantize (Bar, Beat, Off), After take (Play, Overdub, Stop) (MELODEE.md › Looper) | looper | knobs 1-6 | [ ] |
-| **Loop pads**: record / overdub, play / stop on the boundary, undo, redo, held to clear (MELODEE.md › Looper, Pads) | looper | a row of pads a loop | [ ] |
-| **Loop sources**: Input, a track after its chain, another loop, Mix; each written behind the play head by its delay (MELODEE.md › Looper, Sources) | looper | knob (SOURCE); line in or mic; measure the Move's input delay | [ ] |
-| **Looper MIX**: level, pan, send, bus; mute and solo a loop (MELODEE.md › Looper) | looper | knobs; Mute + a loop's row | [ ] |
-| **MORE sheet**: Play / Stop on the boundary or at once, Clear (asks) (MELODEE.md › Looper) | looper | push sheet | [ ] |
-| **Commit to pad**: the loop onto the kit's next empty pad, with a note at bar 1 or not (MELODEE.md › Looper, Kept) | looper | push sheet | [ ] |
-| **Transport**: Play lines the loops up with bar 1, armed takes start on the downbeat after the count-in; Stop closes takes (MELODEE.md › Looper) | looper | Play | [ ] |
-| **Tempo follow**: a WSOLA stretch keeps the pitch; Fit renders the loop at the tempo now (MELODEE.md › Looper, Tempo) | looper | automatic; push fits | [ ] |
-| **Loops kept with the project** as `<project> Loops/Loop N.wav` (MELODEE.md › Looper, Kept) | looper | automatic | [ ] |
+| **Looper on / off**: asks first; 45 MB a loop (MELODEE.md › Looper) | done | Shift + Step 12 asks, push turns it on; off from the loop's sheet (asks while loops hold audio) | [ ] |
+| **Four loops L1-L4** on loop tracks of their own, each with a mix strip and a chain of six (MELODEE.md › Looper) | done | the track buttons are L1-L4 on the Looper; the chains are the engine's and the project's (effects into them with mixer & effects' FX pages) | [ ] |
+| **Loop states**: ARM, REC, DUB, PLAY, STOP, FIT; record → close → overdub ⇄ play (MELODEE.md › Looper) | done | Rec (the selected loop), or a loop's record pad | [ ] |
+| **Loop settings**: length (Free, 1-16 bars), level, feedback, Quantize (Bar, Beat, Off), After take (Play, Overdub, Stop) (MELODEE.md › Looper) | done | knobs 1-8 on the Looper: source, length, level, feedback, pan, send, quantize, after take | [ ] |
+| **Loop pads**: record / overdub, play / stop on the boundary, undo, redo, held to clear (MELODEE.md › Looper, Pads) | done | a pad row a loop, L1 on top, its four left pads (Rows: 25-28 to 1-4; Banks: the left bank, 13-16 to 1-4); the right 16 play the selected track | [ ] |
+| **Loop sources**: Input, a track after its chain, another loop, Mix; each written behind the play head by its delay (MELODEE.md › Looper, Sources) | done | knob 1: Input (line in or mic as the Move routes it), its left or right side, a track, another loop, Mix; the input's delay measured by the sheet's IN DELAY (428 frames on the simulated Move's 300-frame cable) | [ ] |
+| **Looper MIX**: level, pan, send, bus; mute and solo a loop (MELODEE.md › Looper) | done | Shift + the wheel: MIX, knobs 1-8; the bus on the sheet; Mute (+ Shift) + a track button; a track button held + the Volume knob | [ ] |
+| **MORE sheet**: Play / Stop on the boundary or at once, Clear (asks) (MELODEE.md › Looper) | done | the wheel's push: a list the wheel walks | [ ] |
+| **Commit to pad**: the loop onto the kit's next empty pad, with a note at bar 1 or not (MELODEE.md › Looper, Kept) | done | the sheet's COMMIT TO, COMMIT + NOTE | [ ] |
+| **Transport**: Play lines the loops up with bar 1, armed takes start on the downbeat after the count-in; Stop closes takes (MELODEE.md › Looper) | done | Play; the metronome clicking only while a loop records waits for the sequencer's Rec metronome | [ ] |
+| **Tempo follow**: a WSOLA stretch keeps the pitch; Fit renders the loop at the tempo now (MELODEE.md › Looper, Tempo) | done | automatic; Rec on a loop at another tempo fits it, then overdubs | [ ] |
+| **Loops kept with the project** as `<project> Loops/Loop N.wav` (MELODEE.md › Looper, Kept) | done | `Projects/Move Loops/Loop N.wav`, written as it autosaves and on the way out | [ ] |
 
 ## Sequencing
 
@@ -489,14 +489,14 @@ sections, each on Shift + Step n.
 
 | Status | Rows |
 | --- | --- |
-| `done` | 163 |
+| `done` | 175 |
 | `sequencer` | 4 |
 | `sampling` | 22 |
 | `kit depth` | 2 |
 | `instruments` | 25 |
 | `mixer & effects` | 2 |
 | `song & export` | 21 |
-| `looper` | 13 |
+| `looper` | 1 |
 | `MIDI & sync & undo & projects` | 30 |
 | `web page` | 11 |
 | `schwung` | 16 |
