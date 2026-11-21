@@ -10,6 +10,7 @@
 // deletes (docs/MOVE_CONTROLS.md, Decisions); a pad picks the pad a file
 // loads onto. Back goes up, then back to the places.
 #include "app/sampling.h"
+#include "app/pad_layout.h"
 #include "app/screens/common.h"
 #include <filesystem>
 
@@ -103,8 +104,9 @@ public:
         if (s.deletes != seen_deletes) { seen_deletes = s.deletes; list_folder(); landed(); }
         // The pad a file loads onto pulses (the Move's browser), the kit's in their colour.
         bool pulse = std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now().time_since_epoch()).count() / 300 % 2 == 0;
-        for (unsigned at = 0; at < pad_count; ++at)
-            lights.pad(at, at == studio.pad() ? (pulse ? colour::white : colour::dark_grey) : studio.current().pads[at].used() ? ui::track_colour(studio.track()).dim : colour::off);
+        for (unsigned at = 0; at < pad_count; ++at) // kit pad `at`, where the pad layout puts it
+            lights.pad(physical_pad(uint8_t(at), pad_layout()),
+                       at == studio.pad() ? (pulse ? colour::white : colour::dark_grey) : studio.current().pads[at].used() ? ui::track_colour(studio.track()).dim : colour::off);
         steps_playhead(studio, lights);
         for (auto button : {Button::Left, Button::Right, Button::Up, Button::Down, Button::Loop}) lights.button(button, 0);
         lights.button(Button::Menu, 0);

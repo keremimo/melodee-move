@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "app/studio.h"
+#include "app/pad_layout.h"
 #include "app/sampling.h"
 #include "app/screen.h"
 #include "melodee/engine/audio_player.h"
@@ -235,7 +236,7 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
             if (redirected < 0 && pads_quiet.load(std::memory_order_relaxed)) return; // another job (docs/MOVE_CONTROLS.md)
             int track = redirected >= 0 ? redirected : audio_track.load(std::memory_order_relaxed);
             auto kind = TrackKind((redirected >= 0 ? pads_kind : audio_kind).load(std::memory_order_relaxed));
-            int key = kind == TrackKind::Kit ? int(melodee::sampler_first_note + input.index)
+            int key = kind == TrackKind::Kit ? int(melodee::sampler_first_note + logical_pad(input.index, pad_layout())) // a kit pad by its number in the pad layout
                     : kind == TrackKind::Synth || kind == TrackKind::Keys || kind == TrackKind::Midi || kind == TrackKind::Plugin
                         ? note_for(input.index, (redirected >= 0 ? pads_octave : audio_octave).load(std::memory_order_relaxed)) : -1;
             if (key < 0) return;

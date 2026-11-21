@@ -13,6 +13,7 @@
 // options (Extract, Split, Merge, Remove all cuts). Back leaves Chop without
 // changing the pads.
 #include "app/sampling.h"
+#include "app/pad_layout.h"
 #include "app/screens/common.h"
 #include "melodee/shell/chop.h"
 #include <cmath>
@@ -76,8 +77,8 @@ public:
         using bindings::Job;
         if (job != Job::PlaySlice && manual_playing) stop_short(); // any other control: a manual take stops short
         switch (job) {
-        case Job::PlaySlice: {
-            unsigned n = bank * bank_size + unsigned(use.index);
+        case Job::PlaySlice: { // the pad's number in the pad layout is the slice's in the bank
+            unsigned n = bank * bank_size + logical_pad(uint8_t(use.index), pad_layout()) % bank_size;
             if (mode == ChopMode::Manual && manual_next >= 0) { manual_tap(n); return true; }
             if (n < slices.count) selected = n;
             return true;
@@ -95,7 +96,7 @@ public:
             play_slices();
             return true;
         case Job::PlayFromPart: play_part(unsigned(use.index)); return true;
-        case Job::RemoveCut: remove_cut(bank * bank_size + unsigned(use.index)); return true;
+        case Job::RemoveCut: remove_cut(bank * bank_size + logical_pad(uint8_t(use.index), pad_layout()) % bank_size); return true;
         case Job::ToPads: if (slices.count) studio.push("to-pads"); return true;
         case Job::SliceOptions: if (slices.count) studio.push("slice-options"); return true;
         case Job::LeaveChop: studio.close(); return true;
@@ -113,7 +114,7 @@ public:
             unsigned n = bank * bank_size + at;
             uint8_t shown = n < slices.count ? (n == selected && manual_next < 0 ? colour::white : n % 2 ? colour::brown_yellow : colour::orange) : colour::off;
             if (manual_next >= 0 && int(n) == manual_next) shown = pulse ? colour::red : colour::off; // it cuts next
-            lights.pad(at, shown);
+            lights.pad(physical_pad(uint8_t(at), pad_layout()), shown); // slice pad `at`, where the pad layout puts it
         }
         // The sample in 16 parts, lit where a cut falls.
         for (unsigned step = 0; step < step_count; ++step) {

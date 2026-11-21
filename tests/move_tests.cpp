@@ -16,6 +16,7 @@
 #include "app/canvas_page.h"
 #include <juce_core/juce_core.h>
 #include "app/melodee_app.h"
+#include "app/pad_layout.h"
 #include "app/project_store.h"
 #include "melodee/model/project_file.h"
 #include "melodee/engine/engine_info.h"
@@ -1646,6 +1647,64 @@ void test_audio_track() {
     }
 }
 
+void test_sampling_pad_layout() {
+    // Sampling and Chop by the pad's number in the pad layout (app/pad_layout.h):
+    // in Banks, the bottom row's fifth pad is B01 (the right bank's first), its
+    // second row's first A05; Audio Recall's next empty pad is in that order.
+    std::string folder = "build/test-samples", home = "build/test-home-layout", loop = folder + "/loop.wav";
+    std::filesystem::create_directories(folder);
+    std::filesystem::remove_all(home);
+    CHECK(write_test_loop(loop));
+    app::set_pad_layout(app::PadLayout::Banks);
+    {
+        app::MelodeeApp melodee(folder, home, "build/test-no-modules");
+        Session session;
+        melodee.attach(session);
+        melodee.audio_opened(AudioFormat {});
+        CHECK(melodee.restore_now().empty());
+        CHECK(melodee.load_now(loop, 0).empty());
+        Lights lights;
+        AudioBlock in {}, out {};
+        unsigned phase = 0;
+        auto blocks = [&](int count) {
+            for (int block = 0; block < count; ++block) {
+                for (unsigned f = 0; f < audio_frames; ++f, ++phase) in[2 * f] = in[2 * f + 1] = to_s32(0.5f * float(std::sin(6.2831853 * 330.0 * phase / 44100.0)));
+                out.fill(0);
+                melodee.render(in, out);
+                if (block % 8 == 0) melodee.lights(lights, App::Clock::now());
+            }
+        };
+        auto settle = [&] {
+            for (int n = 0; n < 200 && !has(melodee.status(), "rec=idle"); ++n) { melodee.service(); melodee.lights(lights, App::Clock::now()); }
+            for (int n = 0; n < 5; ++n) melodee.service();
+        };
+        press_button(melodee, Button::Sample);
+        tap_pad(melodee, 4); // physical bottom row, fifth: B01
+        blocks(150);
+        tap_pad(melodee, 8); // physical second row, first: A05, the take carried on onto it
+        blocks(150);
+        tap_pad(melodee, 8);
+        blocks(2);
+        settle();
+        CHECK(has(melodee.status(), "pad=A05 samples=2 pads=3") && has(melodee.status(), "last_take=TAKE 1"));
+        press_button(melodee, Button::Back);
+        with_shift(melodee, [&] { press_button(melodee, Button::Sample); }); // Audio Recall: the next empty after A05 is A06
+        settle();
+        for (int n = 0; n < 50 && !has(melodee.status(), "pad=A06"); ++n) melodee.service();
+        CHECK(has(melodee.status(), "pad=A06") && has(melodee.status(), "pads=4"));
+        press_button(melodee, Button::Back);
+        tap_pad(melodee, 0); // A01 again
+        open_chop(melodee);
+        melodee.surface(make_event(0xb0, uint8_t(knob_first_cc + 2), 1));
+        melodee.surface(make_event(0xb0, uint8_t(knob_first_cc + 2), 1)); // Regions, 16 slices
+        tap_pad(melodee, 4); // B01: slice 17 would be; 16 slices: the pad has none
+        CHECK(has(melodee.status(), "slices=16") && has(melodee.status(), "slice=1 "));
+        tap_pad(melodee, 9); // physical second row, second: A06, slice 6
+        CHECK(has(melodee.status(), "slice=6 "));
+    }
+    app::set_pad_layout(app::PadLayout::Rows);
+}
+
 } // namespace
 
 int main() {
@@ -1669,6 +1728,7 @@ int main() {
     test_sample_files();
     test_chop_depth();
     test_audio_track();
+    test_sampling_pad_layout();
     std::cout << "move-tests: " << checks - failures << " of " << checks << " checks passed\n";
     return failures ? 1 : 0;
 }

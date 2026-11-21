@@ -11,6 +11,7 @@
 // src/app/sampling.cpp's; Shift + Sampling (Audio Recall) is the "recall"
 // view at the end of this file.
 #include "app/sampling.h"
+#include "app/pad_layout.h"
 #include "app/screens/common.h"
 #include <cmath>
 
@@ -66,12 +67,18 @@ public:
         auto& s = sampling();
         auto now = Clock::now();
         switch (job) {
-        case Job::RecordPad:
-            pressed_at[size_t(use.index) % pad_count] = now;
+        case Job::RecordPad: { // the pad's number in the pad layout: the take's pads are kit pads
+            unsigned pad = logical_pad(uint8_t(use.index), pad_layout()) % pad_count;
+            pressed_at[pad] = now;
             done_until = {};
-            s.press_pad(unsigned(use.index));
+            s.press_pad(pad);
             return true;
-        case Job::RecordPadUp: s.release_pad(unsigned(use.index), now - pressed_at[size_t(use.index) % pad_count]); return true;
+        }
+        case Job::RecordPadUp: {
+            unsigned pad = logical_pad(uint8_t(use.index), pad_layout()) % pad_count;
+            s.release_pad(pad, now - pressed_at[pad]);
+            return true;
+        }
         case Job::SamplingMode:
             if (s.taking()) s.stop(); // Sampling while taking: the take ends; again, Sampling Mode is left
             else studio.close();
@@ -117,11 +124,11 @@ public:
             auto kind = studio.kind(source);
             auto source_colour = ui::track_colour(source).bright;
             for (unsigned at = 0; at < pad_count; ++at) {
-                if (kind == TrackKind::Kit) {
-                    lights.pad(at, studio.project().tracks[source].pads[at].used() ? source_colour : colour::off);
+                if (kind == TrackKind::Kit) { // kit pad `at`, where the pad layout puts it
+                    lights.pad(physical_pad(uint8_t(at), pad_layout()), studio.project().tracks[source].pads[at].used() ? source_colour : colour::off);
                     continue;
                 }
-                int note = studio.note_for(at, studio.octave(source));
+                int note = studio.note_for(at, studio.octave(source)); // a physical pad's note
                 lights.pad(at, note % 12 == 0 ? source_colour : natural(note) ? colour::dark_grey : colour::off);
             }
         } else {
@@ -132,7 +139,7 @@ public:
                 uint8_t shown = kit.pads[at].used() ? colour.dim : pink;
                 if (in_take != parts.end()) shown = in_take + 1 == parts.end() && pulse ? colour::off : colour::red; // the one taking pulses
                 if (in_take != parts.end() && in_take + 1 == parts.end() && !s.taking()) shown = colour::red;
-                lights.pad(at, shown);
+                lights.pad(physical_pad(uint8_t(at), pad_layout()), shown); // kit pad `at`, where the pad layout puts it
             }
         }
         steps_playhead(studio, lights);
@@ -374,7 +381,7 @@ public:
         const auto& kit = studio.current();
         auto colour = ui::track_colour(studio.track());
         for (unsigned at = 0; at < pad_count; ++at)
-            lights.pad(at, int(at) == s.recall_pad ? move::colour::white : kit.pads[at].used() ? colour.dim : move::colour::off);
+            lights.pad(physical_pad(uint8_t(at), pad_layout()), int(at) == s.recall_pad ? move::colour::white : kit.pads[at].used() ? colour.dim : move::colour::off);
         lights.button(move::Button::Back, move::white_dim);
     }
     void draw(juce::Graphics& g) override {
