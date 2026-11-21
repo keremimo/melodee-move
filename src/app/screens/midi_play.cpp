@@ -9,7 +9,7 @@
 // turned, it changes. The track's parameters are Melodee's MIDI engine's
 // (engine/midi_engine.h), so motion, undo and the file come with them.
 #include "app/pad_layout.h"
-#include "app/screens/common.h"
+#include "app/screens/note_pages.h"
 #include "melodee/engine/engine_info.h"
 #include "melodee/engine/midi_engine.h"
 #include "melodee/model/midi_track.h"
@@ -85,19 +85,9 @@ public:
             if (!slot_page()) return false;
             address_shown = use.index;
             return true;
-        case Job::Octave: {
-            int way = use.control == bindings::Control::Plus ? 1 : -1;
-            if (drums()) {
-                track.bank = uint8_t(std::clamp(int(track.bank) + way, 0, int(melodee::sampler_pads / 16) - 2));
-                studio.say("PADS " + pad_label(16u * track.bank) + "-" + pad_label(16u * track.bank + 31));
-            } else {
-                int octave = std::clamp(studio.octave(studio.track()) + way, lowest_octave, highest_octave);
-                studio.set_octave(studio.track(), octave);
-                studio.say("OCTAVE " + note_name(studio.note_for(0, octave)));
-            }
-            studio.changed();
+        case Job::Octave: // the octave, or Drums' 16 pads (note_pages.h)
+            studio.say(octave_or_bank(studio, use.control == bindings::Control::Plus ? 1 : -1, lowest_octave, highest_octave));
             return true;
-        }
         // The Device View: the track, its sound, its effects.
         case Job::Focus: focus = std::clamp(focus + (use.delta > 0 ? 1 : -1), 0, 3); return true;
         case Job::ShowFocus: studio.say(focus == 0 ? "MIDI TRACK" : focus == 1 ? "SOUND: " + sound_name() : "EFFECTS"); return true;
@@ -130,18 +120,7 @@ public:
 
     void lights(move::Lights& lights) override {
         using namespace move;
-        if (drums()) {
-            auto colour = ui::track_colour(studio.track());
-            const auto& track = studio.current();
-            auto layout = pad_layout();
-            for (unsigned logical = 0; logical < pad_count; ++logical) { // each drum pad lit where the layout puts it
-                unsigned at = physical_pad(uint8_t(logical), layout), pad = drum_pad(logical);
-                bool named = melodee::gm_drum_name(track.midi.drum_note[pad % melodee::sampler_pads]) != nullptr;
-                lights.pad(at, held[at] || pad == track.last_pad ? colour::white : named ? colour.bright : colour.dim);
-            }
-        } else {
-            note_pads(studio, lights, held, true);
-        }
+        key_pads(studio, lights, held, studio.current().last_pad); // Keys and Drums alike, as Keys & Scale lays them out
         steps_playhead(studio, lights);
         for (auto button : {Button::Left, Button::Right, Button::Loop, Button::Menu}) lights.button(button, 0);
         if (drums()) {

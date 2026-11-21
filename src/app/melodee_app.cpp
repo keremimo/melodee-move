@@ -8,6 +8,7 @@
 #include "app/sequencer.h"
 #include "app/song_desk.h"
 #include "ui/song_view.h"
+#include "app/screens/common.h"
 #include "move/display.h"
 #include "move/font.h"
 #include "ui/track_style.h"
@@ -225,6 +226,28 @@ bool MelodeeApp::global(bindings::Job job, const bindings::Use& use) {
             touched_until = Clock::now() + turn_linger;
         }
         return false;
+    // Melodee's instruments on the Move's own keys (docs/UI.md, "Instruments").
+    case Job::FullVelocity:
+        studio.set_full_velocity(!studio.full_velocity());
+        studio.say(studio.full_velocity() ? "FULL VELOCITY ON" : "FULL VELOCITY OFF");
+        return true;
+    case Job::ScaleStep: {
+        auto kind = studio.kind();
+        if (kind != TrackKind::Synth && kind != TrackKind::Keys && kind != TrackKind::Midi && kind != TrackKind::Plugin) return false;
+        if (keys_mode(studio.current()) == KeysMode::Prog) { // a progression's next or previous 16 chords
+            auto& track = studio.current();
+            track.bank = uint8_t(std::clamp(int(track.bank) + (use.control == bindings::Control::Plus ? 1 : -1), 0, int(keys_bank_count(track)) - 1));
+            studio.publish_pads();
+            studio.changed();
+            studio.say("CHORDS " + std::to_string(16 * track.bank + 1) + "-" + std::to_string(16 * track.bank + 32));
+            return true;
+        }
+        int shift = studio.key_shift(studio.track()) + (use.control == bindings::Control::Plus ? 1 : -1);
+        studio.set_key_shift(studio.track(), shift);
+        auto notes = pad_notes(studio.project(), studio.current(), 0, shift);
+        studio.say(notes.count ? "LOWEST " + screens::note_name(notes.keys[0]) : "KEY STEP");
+        return true;
+    }
     case Job::BackToPlay: studio.home(); return true;
     // Undo, as on the Move; held, Melodee's undo list.
     case Job::Undo: studio.say(studio.undo() ? "UNDO " + studio.last_step : "NOTHING TO UNDO"); return true;
@@ -416,6 +439,7 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point now) {
     studio.loops().tick(now); // a clear pad held long enough, the Looper's refusals, its loops kept
     settle();
     studio.sequencer().tick(now);
+    studio.publish_pads(); // the pads as the model has them now, for the audio thread (app/keys.h)
     // The track buttons: the selected track's bank, each its colour, the selected one bright.
     // Soloed blue, as on the Move; muted grey.
     unsigned first = ui::bank_of(studio.track()) * ui::tracks_a_bank;
@@ -464,7 +488,8 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point now) {
             const auto* row = bindings::find(at, use);
             if (!row) { use.gesture = bindings::Gesture::Tap; row = bindings::find(at, use); } // a tap's job (Shift + Step 16)
             bool works = row && row->status == bindings::Status::Done;
-            lights.step(step, !works ? colour::off : row->job == bindings::Job::Metronome && studio.click() ? colour::white : colour::light_grey);
+            bool on = (row && row->job == bindings::Job::Metronome && studio.click()) || (row && row->job == bindings::Job::FullVelocity && studio.full_velocity());
+            lights.step(step, !works ? colour::off : on ? colour::white : colour::light_grey);
         }
     }
 }

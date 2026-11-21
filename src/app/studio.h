@@ -9,6 +9,7 @@
 #include "app/projects.h"
 #include "ui/track_style.h"
 #include <functional>
+#include "app/keys.h"
 #include "app/module_host.h"
 #include "app/pad_layout.h"
 #include "app/project_store.h"
@@ -17,6 +18,8 @@
 #include "melodee/engine/auto_chop.h"
 #include "melodee/engine/engine_host.h"
 #include "melodee/engine/onsets.h"
+#include "melodee/engine/root_find.h"
+#include "melodee/shell/auto_sample.h"
 #include "melodee/engine/sample_data.h"
 #include "melodee/model/project.h"
 #include "melodee/shell/sample_cache.h"
@@ -58,6 +61,8 @@ enum class TrackKind : uint8_t { Empty, Kit, Synth, Keys, Midi, Audio, Plugin, C
 const char* kind_name(TrackKind kind); // "empty", "kit", "synth", ...
 const char* kind_tag(TrackKind kind);  // the rail's: "----", "KIT", "SYN", "KEYS", "MIDI", "AUD", "PLUG"
 
+struct Instrument; // app/instruments.h
+
 // A sample in memory, with what Chop needs found in it. A long one (over
 // ten seconds, up to six hours), or one memory has no room for, is not read
 // into memory: it is read from storage as it plays (`streamed`, Melodee's
@@ -71,6 +76,8 @@ struct Sample {
     unsigned hit_count = 0;
     melodee::BeatGrid beats;
     melodee::AutoRead autos;
+    std::shared_ptr<Instrument> instrument; // a multisampled instrument's (app/instruments.h): its zones and files
+    melodee::SampleRoot root;               // the note it holds (engine/root_find.h), found as it is read
 };
 // Reads a sound file and finds its hits, beats and what Auto reads. Slow
 // and allocating: never on the audio thread, never under the lock. As
@@ -151,6 +158,8 @@ constexpr unsigned pad_fade_ms[4] {60, 100, 150, 250};
 constexpr const char* show_styles[5] {"PULSE", "SWEEP", "CHASE", "RIPPLE", "LEVELS"};
 class SongDesk;
 class Sampling;
+class Landings;    // app/instruments.h
+class AutoSampler; // app/auto_sampler.h
 
 class Studio {
 public:
@@ -259,6 +268,10 @@ public:
     // A sample into the project's first free slot, offered to the engine: the slot, or -1 and why.
     int add_sample(std::unique_ptr<Sample> sample, std::string& error);
     const melodee::SampleData* sample_of_slot(unsigned slot) const;
+    // A keygroup track's sound (docs/UI.md, "Instruments"): an instrument or
+    // one sample on its pad 1, its files landing on a thread of their own.
+    std::string install_keys(std::unique_ptr<Sample> sample, unsigned track); // empty on success
+    const Sample* keys_sample(unsigned track) const { return sample_of(track, 0); }
     struct Job { std::string path; unsigned track, pad; bool keep = false; };
     std::vector<Job> jobs; // files to load (the service thread's)
     // A pad's region (or a layer's) written as a WAV, on the service thread
@@ -472,6 +485,53 @@ public:
     // MIDI thread: whether a pad pressed now stays quiet, its job another
     // than its sound (bindings::pad_sounds()); the audio thread reads it.
     void quiet_pads(bool quiet) { pads_quiet.store(quiet, std::memory_order_relaxed); }
+    // The selected track's pads as Keys & Scale lays them out (app/keys.h),
+    // to the audio thread: whenever the model may have changed (each lights
+    // pass, a track selected). Under `lock`.
+    void publish_pads();
+    // Shift + Step 10, the Move's Full Velocity: every pad at 127.
+    bool full_velocity() const { return full_level.load(std::memory_order_relaxed); }
+    void set_full_velocity(bool on) { full_level.store(on, std::memory_order_relaxed); publish_pads(); }
+    // Shift + Plus / Minus: a note track's pads a note of the key up or down
+    // (Control Live's scale step); the Move's, not kept in the project.
+    int key_shift(unsigned track) const { return shifts[track % melodee::track_count]; }
+    // A note track's sound and playing (docs/UI.md, "Instruments"): the
+    // macro knobs of a module track (engine/macros.h: FILTER -100..100, ECHO
+    // and SPACE 0..100), its mod wheel (0..127) and pitch bend (-64..63, not
+    // kept), Keys & Scale (the project's key and scale, the track's mode,
+    // rows and transpose), CHORD, a progression (Prog) and a chord stored
+    // into it. Under `lock`; each sends what the engine needs.
+    void set_macro(unsigned track, unsigned slot, int value);
+    void set_wheel(unsigned track, int value);
+    void set_bend(unsigned track, int value);
+    void set_key(unsigned root, unsigned scale);
+    void set_keys(unsigned track, KeysMode mode, bool fourths);
+    void set_transpose(unsigned track, int semitones);
+    void changed_playing(unsigned track); // a CHORD or arp field set on the track: the pads and the engine follow
+    std::string load_progression(unsigned track, const std::string& path); // empty on success
+    std::vector<std::string> progressions() const;                        // every .progression, Melodee's own first
+    // The keys held (lowest first, as many as were held) as chord `index` of
+    // the track's progression, saved: into the file it came from when that
+    // is Melodee's own, else as a new "Mine N". Empty on success.
+    std::string store_chord(unsigned track, unsigned index, const std::vector<int>& keys);
+    std::string progressions_folder() const; // <home>/Progressions: Melodee's own
+    // The auto sampler (app/auto_sampler.h) on a module track: the check,
+    // then (`sample`) the program, which goes on the first empty track as a
+    // keygroup track with the module track's patterns and mix. Empty on
+    // success (started).
+    std::string auto_sample(unsigned track, const melodee::AutoSampleSettings& settings, bool sample);
+    AutoSampler& auto_sampler() { return *sampler; }
+    std::string keygroups_folder() const; // <home>/Samples/Keygroups, as Melodee keeps them
+    int auto_sampled = -1;                // the track the last program went on
+    // `melodee-autosample` as Melodee takes it (MELODEE.md, Print and freeze):
+    // "TRACK [LOW-HIGH] [step N] [layers N] [hold S] [tail S] [pre|post]
+    // [loop] [raw|peak] [check]". What it started, or why not.
+    std::string autosample_command(const std::string& arguments);
+    std::string instruments_status() const; // " keys=... auto=..." for the status line
+    // The arp of a note track (Melodee's Stage ARP, the Move's Repeat and Arp),
+    // its settings taken from the track and sent to the engine.
+    void send_arp(unsigned track);
+    void set_key_shift(unsigned track, int shift) { shifts[track % melodee::track_count] = int8_t(std::clamp(shift, -24, 24)); publish_pads(); }
 
     // ---------------------------------------------------------- the mix and effects, under `lock`
     // What the mix keeps beside the project (mixing.h: the effect copied,
@@ -536,6 +596,9 @@ private:
     void apply_step(const Step& step, bool forward); // what an undo or redo changed, told to the engine and the modules
     void forward();                        // audio thread: the ring into the host
     void apply_track(unsigned track);      // the engine's track made whole again from the project's (TrackLoad)
+    void sync_keyed_roots();               // a keygroup of one sample plays from its note (KeyedRoot)
+    std::array<int16_t, melodee::track_count> keyed_sent {};
+    unsigned free_slot() const;
     void setup_modules();                  // a ModuleTrack for each Schwung track of the project, offered
     ModuleTrack& make_module_track(unsigned track);
     void drop_module_track(unsigned track);
@@ -594,8 +657,8 @@ private:
     // A kit's: the lower bank in view, 16 Pitches on, its pad and each pitch's semitones.
     std::atomic<int> audio_first {0}, audio_levels_pad {0}; // the first kit pad in view
     std::array<uint8_t, melodee::track_count> pad_nudge {}; // Shift + Plus / Minus: 0, 4, 8 or 12 pads past the bank's first
-    // Shift + Step 10, the Move's Full Velocity: every pad at 127 (move-instruments
-    // declares the same member and its job; keep one at the merge).
+    // Shift + Step 10, the Move's Full Velocity: every pad at 127 (full_velocity(); the
+    // kit's sends and a note track's pads read it on the audio thread).
     std::atomic<bool> full_level {false};
     std::atomic<bool> audio_pitches {false}, audio_slices {false};
     std::array<std::atomic<int>, 16> audio_semitones {};
@@ -612,7 +675,20 @@ private:
     std::atomic<int> pads_track {-1}, pads_kind {0}, pads_octave {0};
     std::atomic<bool> speaker_quiet {false};
     std::unique_ptr<Sampling> sampler_shell;
-    struct Went { int track = -1, key = -1, how = 0; };
+    struct Went {
+        int track = -1, key = -1, how = 0; // a kit's: how 1 Note Repeat, 2-3 the arp (audio_repeat)
+        PadMap::Route route = PadMap::Route::None; // a note track's: its notes, the arp's or Note Repeat's keys
+        uint8_t count = 0;
+        std::array<uint8_t, most_keys> keys {};
+    };
+    move::TripleBuffer<PadMap> pad_maps; // the MIDI thread's to write, the audio thread's to read
+    // (Full Velocity is `full_level`, above, as the kit's sends read it.)
+    std::array<int8_t, melodee::track_count> shifts {};
+    // Audio thread: a note track's pad. `quiet`: another job has the pads
+    // (bindings::pad_sounds()): its notes are worked out, not sent.
+    // `velocity`: Full Velocity's 127, else Setup's pad response (as a kit's pads have it).
+    void note_pad(const move::Input& input, Went& went, int track, int16_t velocity, bool quiet);
+    Went chord_held;                     // CHORD's hold: the chord sounding on (audio thread)
     std::atomic<uint8_t> pad_response {1}; // Settings::response, for the audio thread's velocity
     std::atomic<bool> pad_pressure {true};
     // Parking (rebuild()): the service thread asks, the audio thread parks
@@ -631,6 +707,11 @@ private:
     std::unique_ptr<SongDesk> arranger; // song_desk()
     // Last, so it goes first: it holds the samples and runners above.
     std::unique_ptr<melodee::EngineHost> engine;
+    // After it, so they end before it: the instruments' files landing, the
+    // auto sampler (its own module's instance).
+    std::unique_ptr<Landings> landings;
+    std::unique_ptr<AutoSampler> sampler;
+    void auto_sample_tick(); // service thread: a program made goes onto its track
 };
 
 } // namespace app

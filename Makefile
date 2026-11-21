@@ -17,6 +17,8 @@ MIDI_TESTS := build/midi-tests
 PAD_TESTS := build/pad-layout-tests
 # The pad layouts through the Move app: every pad job in both layouts.
 PADS_APP_TESTS := build/pads-app-tests
+# Melodee's instruments on the Move (src/app/instruments.*, keygroups, keys).
+INSTRUMENTS_TESTS := build/instruments-tests
 JUCE := build/deps/JUCE/modules
 # libjack is loaded at run time by the JACK host (src/move/jack_host.cpp), so
 # only its headers are needed here and the binary runs where there is no JACK.
@@ -67,6 +69,12 @@ MELODEE_SOURCES += $(MELODEE)/src/melodee/web/web_server.cpp $(MELODEE)/src/melo
 # (.incbin, found through -Wa,-I). What it asks of the sample library about
 # instrument files is the Move's: src/app/mpc3_shell.cpp.
 MELODEE_SOURCES += $(addprefix $(MELODEE)/src/melodee/shell/,mpc3_export.cpp xpm_write.cpp)
+# Melodee's instrument files (src/app/instruments.*): MPC programs (.xpm,
+# MPC 3's .xty and projects' keygroups), SoundFonts, DecentSampler presets,
+# MPC 3 progressions, and the .xpm the auto sampler writes (mpc_program,
+# mpc_project, mpc_wav_slices and xpm_write are listed above). Each reads or
+# writes its file alone, through JUCE's XML and JSON as on the MPC.
+MELODEE_SOURCES += $(addprefix $(MELODEE)/src/melodee/shell/,sf2_file.cpp dspreset_file.cpp progression_file.cpp)
 MELODEE_OBJECTS := $(patsubst $(MELODEE)/src/%.cpp,build/obj/melodee-sample/%.o,$(MELODEE_SOURCES))
 MELODEE_LIBRARY := build/melodee.a
 CPPFLAGS += $(MELODEE_INCLUDES)
@@ -108,7 +116,7 @@ $(WEB_TESTS): build/obj/tests/web_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QU
 FAKE_MODULE := build/test-modules/sound_generators/fake
 # And a stand-in audio effect, where Schwung keeps them (<id>/<id>.so).
 FAKE_FX := build/test-modules/audio_fx/fake-fx
-all: $(TARGET) $(TESTS) $(WEB_TESTS) $(SEQUENCER_TESTS) $(CONTROLS_TESTS) $(MIDI_TESTS) $(MIXER_TESTS) $(PAD_TESTS) $(PADS_APP_TESTS) $(FAKE_MODULE)/dsp.so $(FAKE_MODULE)/module.json $(FAKE_MODULE)/page.js \
+all: $(TARGET) $(TESTS) $(WEB_TESTS) $(SEQUENCER_TESTS) $(CONTROLS_TESTS) $(MIDI_TESTS) $(MIXER_TESTS) $(PAD_TESTS) $(PADS_APP_TESTS) $(INSTRUMENTS_TESTS) $(FAKE_MODULE)/dsp.so $(FAKE_MODULE)/module.json $(FAKE_MODULE)/page.js \
     $(FAKE_FX)/fake-fx.so $(FAKE_FX)/module.json
 $(FAKE_FX)/fake-fx.so: tests/fake_fx/fake-fx.c
 	@mkdir -p $(@D)
@@ -146,6 +154,8 @@ SONG_TESTS := build/song-tests
 all: $(SONG_TESTS)
 $(SONG_TESTS): build/obj/tests/song_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS) $(MELODEE_LIBRARY)
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
+$(INSTRUMENTS_TESTS): build/obj/tests/instruments_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS) $(MELODEE_LIBRARY)
+	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 $(CONTROLS_TESTS): build/obj/tests/controls_tests.o build/obj/app/bindings.o
 	$(CXX) -static-libstdc++ -static-libgcc $^ -pthread -o $@
 $(PAD_TESTS): build/obj/tests/pad_layout_tests.o build/obj/app/pad_layout.o
@@ -179,5 +189,5 @@ $(foreach m,$(MODULE_C),$(eval $(call c_module_rule,$(m))))
 juce: $(JUCE_OBJECTS)
 .PHONY: all clean juce
 clean:
-	rm -rf build/obj $(TARGET) $(TESTS) $(PROJECTS_TESTS) $(WEB_TESTS) $(SEQUENCER_TESTS) $(CONTROLS_TESTS) $(MIDI_TESTS) $(MIXER_TESTS) $(PAD_TESTS) $(PADS_APP_TESTS) $(SONG_TESTS)
+	rm -rf build/obj $(TARGET) $(TESTS) $(PROJECTS_TESTS) $(WEB_TESTS) $(SEQUENCER_TESTS) $(CONTROLS_TESTS) $(MIDI_TESTS) $(MIXER_TESTS) $(PAD_TESTS) $(PADS_APP_TESTS) $(SONG_TESTS) $(INSTRUMENTS_TESTS)
 -include $(shell find build/obj -name '*.d' 2>/dev/null)

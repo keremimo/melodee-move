@@ -8,6 +8,8 @@
 #include "app/seq_edit.h"
 #include "app/song_desk.h"
 #include "melodee/engine/audio_player.h"
+#include "app/auto_sampler.h"
+#include "app/instruments.h"
 #include "melodee/engine/engine_info.h"
 #include "melodee/model/scales.h"
 #include "melodee/shell/pad_gap.h"
@@ -201,6 +203,7 @@ std::unique_ptr<Sample> make_sample(const std::string& path, std::unique_ptr<mel
     melodee::make_overview(*sample->data, sample->overview);
     auto mono = melodee::model_mono(*sample->data);
     sample->hit_count = melodee::find_hits_in(mono, sample->hits, sample->beats, &sample->autos);
+    sample->root = melodee::find_root(mono); // the note it holds: a keygroup of it plays from there
     return sample;
 }
 
@@ -217,6 +220,7 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
     modules_root = modules_folder.empty() ? move_modules : std::move(modules_folder);
     catalog = scan_modules(modules_root);
     fx_catalog = scan_modules(modules_root, "audio_fx");
+    set_instrument_cache((fs::path(home_path) / "Cache" / "Instruments").string());
     pad_went.fill({});
     melodee::dsp::device_rate.store(44100.0f); // the Move's; audio_opened() says if it is not
     sampler_shell = std::make_unique<Sampling>(*this); // before the settings: its words are in Move.settings
@@ -250,6 +254,8 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
         // A new project, as the first scope had it: a kit on track 1, a
         // synth (no module yet) on track 2.
         copy_text(song->name, projects::name_of(path));
+        song->root = 0;  // C major, In-Key: the Move's own Keys & Scale for a new Set (its manual, 9.1)
+        song->scale = 0;
         song->tracks[0] = fresh_track(TrackKind::Kit, 0);
         song->tracks[1] = fresh_track(TrackKind::Synth, 1);
     } else {
@@ -276,6 +282,9 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
     // measured on the Move (docs/PARITY.md, mixer & effects).
     if (const char* workers = std::getenv("MELODEE_RENDER_THREADS"))
         engine->set_render_threads(unsigned(std::clamp(std::atoi(workers), 0, 3)));
+    landings = std::make_unique<Landings>(*engine);
+    sampler = std::make_unique<AutoSampler>();
+    keyed_sent.fill(INT16_MIN);
     engine->load(*song, *bank);
     for (unsigned t = 0; t < melodee::track_count; ++t)
         if (modules[t] && modules[t]->entry != melodee::no_plugin) engine->offer_plugin(modules[t]->entry, &modules[t]->runner);
@@ -296,6 +305,7 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
     audio_octave.store(octave(selected));
     refresh_pads();
     engine->watch_taps(kind(selected) == TrackKind::Kit ? int(selected) : -1); // the pads' flare
+    publish_pads(); // a note track's pads for the audio thread (app/keys.h)
 
     // Song, its exports and prints; the song to the engine, as the file has it.
     arranger = std::make_unique<SongDesk>(*this);
@@ -401,6 +411,15 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
             auto kind = TrackKind((redirected >= 0 ? pads_kind : audio_kind).load(std::memory_order_relaxed));
             int16_t velocity = int16_t(full_level.load(std::memory_order_relaxed) ? 127
                 : std::max(1, velocity_of(pad_response.load(std::memory_order_relaxed), input.value))); // Full Level, else Setup's pad response
+            // A note track's pads (app/keys.h): Keys & Scale's notes, a chord, the
+            // arp's or Note Repeat's keys, worked out and stamped there, quiet or
+            // not. The Looper's right 16 and Sampling's pads on another track
+            // play the notes below.
+            bool note_track = kind == TrackKind::Synth || kind == TrackKind::Keys || kind == TrackKind::Midi || kind == TrackKind::Plugin;
+            if (note_track && redirected < 0 && !(looping && at.track >= 0)) {
+                note_pad(input, went, track, velocity, pads_quiet.load(std::memory_order_relaxed));
+                return;
+            }
             int key = -1;
             int pitch_pad = -1, pitch_semitones = 0; // 16 Pitches: the last pad at a pitch
             if (kind == TrackKind::Kit && redirected >= 0) { // the source kit's pads by their number in the pad layout
@@ -425,11 +444,10 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
                 } else {
                     key = int(melodee::sampler_first_note + (bank + logical_pad(input.index, pad_layout())) % melodee::sampler_pads);
                 }
-            } else if (kind == TrackKind::Synth || kind == TrackKind::Keys || kind == TrackKind::Midi || kind == TrackKind::Plugin) {
+            } else if (note_track) {
                 key = note_for(input.index, (redirected >= 0 ? pads_octave : audio_octave).load(std::memory_order_relaxed));
             }
             if (looping && at.track >= 0) { // the track's 16 on the Looper: a kit's bank of 16, or 16 notes up from C
-                bool note_track = kind == TrackKind::Synth || kind == TrackKind::Keys || kind == TrackKind::Midi || kind == TrackKind::Plugin;
                 pitch_pad = -1;
                 key = kind == TrackKind::Kit ? int(melodee::sampler_first_note + unsigned(loop_desk->pads_bank.load(std::memory_order_relaxed)) * 16 + unsigned(at.track))
                     : note_track ? std::clamp(synth_base_note + 12 * audio_octave.load(std::memory_order_relaxed) + at.track, 0, 127) : -1;
@@ -457,12 +475,17 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
             went = {track, key, how};
             engine->send({how == 1 ? Type::RepeatKey : how >= 2 ? Type::ArpKey : Type::NoteOn, uint8_t(track), 0, uint16_t(key), velocity});
             stamp.sounded.store(true, std::memory_order_release);
+        } else if (went.track >= 0 && went.route != PadMap::Route::None) {
+            note_pad(input, went, went.track, 0, false); // a note track's keys let go as they went
         } else if (went.track >= 0) {
             if (went.how != 3) // a latched arp keeps the key (Melodee's Context::key())
                 engine->send({went.how == 1 ? Type::RepeatKey : went.how == 2 ? Type::ArpKey : Type::NoteOff, uint8_t(went.track), 0,
                               uint16_t(went.key), 0});
             went = {};
         }
+    } else if (input.kind == Kind::PadPressure && went.track >= 0 && went.route != PadMap::Route::None) {
+        if (pad_pressure.load(std::memory_order_relaxed)) // Setup's PRESSURE
+            for (unsigned k = 0; k < went.count; ++k) engine->send({Type::Pressure, uint8_t(went.track), 0, went.keys[k], int16_t(input.value)});
     } else if (input.kind == Kind::PadPressure && went.track >= 0 && went.key < 128 && pad_pressure.load(std::memory_order_relaxed)) {
         // Melodee's sampler takes no pressure; a note track's engine does.
         int redirected = pads_track.load(std::memory_order_relaxed);
@@ -507,6 +530,7 @@ int Studio::octave(unsigned t) const { return int(song->tracks[t % melodee::trac
 void Studio::set_octave(unsigned t, int value) {
     song->tracks[t % melodee::track_count].octave = int8_t(3 + value);
     if (t == selected) audio_octave.store(value, std::memory_order_relaxed);
+    publish_pads();
     changed();
 }
 
@@ -528,10 +552,12 @@ void Studio::select(unsigned t) {
     audio_octave.store(octave(t), std::memory_order_relaxed);
     refresh_pads();
     engine->watch_taps(kind(t) == TrackKind::Kit ? int(t) : -1); // the pads' flare
+    publish_pads();
     home();
 }
 
 void Studio::apply_track(unsigned t) {
+    keyed_sent[t % melodee::track_count] = INT16_MIN; // its keyed root sent again
     auto* pack = new melodee::TrackPack(t, song->tracks[t], bank->at[t]); // freed once the audio thread hands it back
     Command command {Type::TrackLoad, uint8_t(t)};
     command.track_pack = pack;
@@ -795,6 +821,7 @@ int Studio::add_sample(std::unique_ptr<Sample> sample, std::string& error) {
     copy_text(ref.name, sample->name);
     ref.frames = sample->data->model_frames();
     ref.streamed = sample->streamed;
+    ref.root = sample->root.found() ? int8_t(sample->root.pitch_class) : melodee::root_none;
     if (slot >= samples.size()) samples.resize(slot + 1);
     samples[slot] = std::move(sample);
     changed();
@@ -1375,7 +1402,7 @@ unsigned Studio::read_missing_samples() {
             opening_file = fs::path(file).filename().string();
         }
         std::string failed;
-        auto sample = read_sample(file, failed, &cache);
+        auto sample = read_any_sample(file, failed, &cache); // a sample, or an instrument (app/instruments.h)
         std::lock_guard<std::mutex> guard(lock);
         ++opening_samples_done;
         if (!sample) { ++missing; continue; }
@@ -1388,8 +1415,13 @@ unsigned Studio::read_missing_samples() {
             song->samples.edit(slot).streamed = sample->streamed;
             history.settle_sample(slot, song->samples[slot]); // read, not edited: no step
         }
+        if (song->samples[slot].root == melodee::root_unread) { // the note it holds, found as it is read
+            song->samples.edit(slot).root = sample->instrument || !sample->root.found() ? melodee::root_none : int8_t(sample->root.pitch_class);
+            history.settle_sample(slot, song->samples[slot]); // read, not edited: no step
+        }
         if (slot >= samples.size()) samples.resize(slot + 1);
         samples[slot] = std::move(sample);
+        if (samples[slot]->instrument) landings->start(*samples[slot]);
     }
     return missing;
 }
@@ -1637,14 +1669,20 @@ void Studio::service() {
         loading = !todo.empty();
     }
     for (const auto& job : todo) {
+        bool keys = false;
+        {
+            std::lock_guard<std::mutex> guard(lock);
+            keys = song->tracks[job.track % melodee::track_count].engine == EngineKind::Keygroup;
+        }
         std::string error;
-        auto sample = read_sample(job.path, error, &cache);
+        auto sample = keys ? read_any_sample(job.path, error, &cache) : read_sample(job.path, error, &cache);
         std::lock_guard<std::mutex> guard(lock);
         if (!sample) { say(upper(error).substr(0, 16)); continue; }
-        if (auto failed = install(std::move(sample), job.track, job.pad, job.keep); !failed.empty()) { say(failed); continue; }
+        auto failed = keys ? install_keys(std::move(sample), job.track) : install(std::move(sample), job.track, job.pad, job.keep);
+        if (!failed.empty()) { say(failed); continue; }
         char label[8];
         std::snprintf(label, sizeof label, "%c%02u", 'A' + int(job.pad / 16), job.pad % 16 + 1);
-        name_step(std::string("LOAD ") + label, int(job.track)); // a sample loaded is a step of its own
+        name_step(keys ? std::string("LOAD INSTRUMENT") : std::string("LOAD ") + label, int(job.track)); // a sample loaded is a step of its own
         close_step();
     }
     run_file_jobs();
@@ -1679,8 +1717,11 @@ void Studio::service() {
     }
     if (rebuild_now) rebuild();
     for (const auto& job : asked) run_project_job(job);
+    auto_sample_tick(); // a program the auto sampler made goes onto its track
     std::unique_lock<std::mutex> guard(lock);
     loading = false;
+    landings->reap();
+    sync_keyed_roots();
     // Autosave: three seconds after the last change, as on the MPC.
     auto now = Clock::now();
     if (dirty && now - changed_at >= autosave_idle && now >= retry_at) {
@@ -2102,6 +2143,8 @@ std::string Studio::open_project(const std::string& file, bool fresh) {
     bool copy = false;
     if (fresh) {
         copy_text(next->name, projects::name_of(file));
+        next->root = 0;  // C major, In-Key: the Move's own Keys & Scale for a new Set (its manual, 9.1)
+        next->scale = 0;
         next->tracks[0] = fresh_track(TrackKind::Kit, 0);
         next->tracks[1] = fresh_track(TrackKind::Synth, 1);
     } else if (melodee::is_mpc_project(file)) {
@@ -2421,6 +2464,7 @@ std::string Studio::status() const {
     }
     line += arranger->status();
     line += sampler_shell->status();
+    line += instruments_status();
     for (const auto& screen : screens) line += screen->status();
     line += seq->status();
     line += midi.status();

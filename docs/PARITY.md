@@ -78,16 +78,16 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Stage**: each track's home pages, B1 source, B2 how it plays, B3 where it goes (MELODEE.md › Playing) | done | Shift + the jogwheel: a kit's nine pad pages (TRIM, LAYERS, TUNE, AMP ENV, PLAY, CLOUD, MIX, FILTER, KIT FILT, docs/UI.md "Kits"), a module's pages; the Play screen's knobs first | [ ] |
 | **Synth presets**: walked, loaded a moment after the last turn (MELODEE.md › Playing, A synth) | done | jogwheel (Schwung modules) | [ ] |
 | **Synth EDIT**: the instrument's own parameters and page map (MELODEE.md › Playing, Edit) | done | knobs 1-8, Left / Right; push: the module's menu | [ ] |
-| **Macro knobs FILTER, ECHO, SPACE** on every plug-in track, saved, recorded as motion (MELODEE.md › Playing, A synth) | instruments | a page of knobs on module tracks | [ ] |
-| **ARP**: Up, Down, Up-down, Random, Order; rate 1/4-1/32T; octaves; gate; hold (MELODEE.md › Playing) | instruments | ARP page, knobs 1-6 | [ ] |
-| **CHORD**: a pad a chord of the scale; type, voicing, inversion, hold (MELODEE.md › Playing) | instruments | CHORD page, knobs 1-5 | [ ] |
+| **Macro knobs FILTER, ECHO, SPACE** on every plug-in track, saved, recorded as motion (MELODEE.md › Playing, A synth) | done | MACRO, a module track's first page (Shift + turn): FILTER, ECHO, SPACE on knobs 1-3, kept with the track; written as motion once Seq Record writes motion (sequencer) | [ ] |
+| **ARP**: Up, Down, Up-down, Random, Order; rate 1/4-1/32T; octaves; gate; hold (MELODEE.md › Playing) | done | ARP page (Shift + turn), knobs 1-6; Shift + Step 11's Arp styles with the sequencer's Repeat | [ ] |
+| **CHORD**: a pad a chord of the scale; type, voicing, inversion, hold (MELODEE.md › Playing) | done | CHORD page (Shift + turn), knobs 1-5 | [ ] |
 | **MIX → SENDS → FX pages** of a track: level, pan, send A, meter; four sends and returns; the chain's slot in hand (MELODEE.md › Playing) | done | the Device View's track item: knobs 1-6 level, pan, sends A-D, its meter and CPU share; its effects the next items; the returns on the Mixer | [ ] |
 | **Pads as notes** on a synth: rows of fourths, octave, pressure as poly aftertouch (MELODEE.md › Playing, Keys) | done | 32 pads; Up / Down the octave | [ ] |
-| **Keys**: root, scale, layout (Scale, Chromatic, Chords, Prog, Drums), transpose ±12, roots lit (MELODEE.md › Playing, Keys) | instruments | Keys page knobs; pad lights | [ ] |
-| **Project key and scale**, set from any track (MELODEE.md › Playing, Tempo) | instruments | tempo screen, knobs 4-5 | [ ] |
-| **Prog**: MPC 3 `.progression` files, a chord a pad (48 at most), key, voicing (MELODEE.md › Playing, Prog) | instruments | pads; jogwheel walks the progressions | [ ] |
-| **Chord builder**: held keys stored onto a pad, saved as Mine N (MELODEE.md › Playing, Prog) | instruments | Keys page: push stores | [ ] |
-| **Drums layout**: a drum plug-in's or MIDI drum machine's pads from note 36, voices named (MELODEE.md › Playing, Drums) | instruments | 32 pads are notes 36-67; Up / Down the bank | [ ] |
+| **Keys**: root, scale, layout (Scale, Chromatic, Chords, Prog, Drums), transpose ±12, roots lit (MELODEE.md › Playing, Keys) | done | Shift + Step 9, the Move's Keys & Scale: MODE (In-Key, Chromatic, Prog, Drums), ROWS, KEY, SCALE (the Move's 35), TRANSPOSE; Shift + Plus / Minus a note of the key; pad lights | [ ] |
+| **Project key and scale**, set from any track (MELODEE.md › Playing, Tempo) | done | Shift + Step 9 on any track (a kit: KEY and SCALE) | [ ] |
+| **Prog**: MPC 3 `.progression` files, a chord a pad (48 at most), key, voicing (MELODEE.md › Playing, Prog) | done | Keys & Scale, MODE Prog: PROG lists them (loaded as the wheel turns), VOICING, KEY SHIFT; 32 pads, Shift + Plus / Minus 16 more | [ ] |
+| **Chord builder**: held keys stored onto a pad, saved as Mine N (MELODEE.md › Playing, Prog) | done | Keys & Scale: pads held + push on STORE CHORD, then the pad it goes on | [ ] |
+| **Drums layout**: a drum plug-in's or MIDI drum machine's pads from note 36, voices named (MELODEE.md › Playing, Drums) | done | Keys & Scale, MODE Drums: 32 pads are notes 36-67, Plus / Minus 16 more; the drum hit named (General MIDI) | [ ] |
 | **Pads page**: the bank's pads each drawing its waveform (MELODEE.md › Playing, Pads) | n/a | 128 x 64 cannot show 32 waveforms; the pads light in their colours and the screen shows the last pad | — |
 | **Sounds**: a MIDI track's saved sounds (`.mlds`), favourites (MELODEE.md › Playing, Sounds) | done | the wheel's push on a MIDI track's sound: its own and the saved `.mlds` (Melodee/Sounds), loaded as the wheel turns; Shift held: save, star, show starred or recent | [ ] |
 | **16 Levels**: the last pad or note on every pad as Velocity, Filter, Tune, Scale or Zones; ends, octave; a MIDI keyboard plays the pad on every key (MELODEE.md › Playing, 16 Levels) | done | as the Move's 16 Pitches (Shift + Step 8): the last pad on the right 16 in the project's key (Melodee's Scale; Kerem, 2026-11-20), Plus / Minus the octave; the left 16 one bank. Velocity, Filter, Tune and Zones are not on the Move's Layout | [ ] |
@@ -95,8 +95,8 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Tempo**: BPM, swing, metronome level, metronome on / off (MELODEE.md › Playing, Tempo) | done | Shift + Step 5 / 6 / 7: tempo, metronome, groove, as on the Move | [ ] |
 | **Tap tempo, halve, double; metronome Rec** (clicks only while recording) (MELODEE.md › The panel; Playing, Tempo) | done | Tempo (Shift + Step 5): tap the steps, Left / Right halve, double; Workflow: Metronome Always / Rec only (Kerem, 2026-11-20) | [ ] |
 | **Track speed**: ×½, ×¾, ×1, ×1½, ×2 against the tempo (MELODEE.md › Playing, Tracks) | done | SEQ pages (Shift + Loop), PATTERN: SPD, knob 4 | [ ] |
-| **Keygroup track pages**: TRIM / ZONES, TUNE, AMP ENV, FILTER, FILT ENV, PLAY, ARP, CHORD (guide/instrument-and-midi-tracks.md) | instruments | Left / Right pages, knobs 1-8; Menu loads | [ ] |
-| **A keygroup of one sample** played from the note found in it (guide/instrument-and-midi-tracks.md) | instruments | pads as keys | [ ] |
+| **Keygroup track pages**: TRIM / ZONES, TUNE, AMP ENV, FILTER, FILT ENV, PLAY, ARP, CHORD (guide/instrument-and-midi-tracks.md) | done | Shift + turn: ZONES or TRIM, PLAY (TUNE in it), AMP ENV, FILTER (FILT ENV in it), ARP, CHORD; knobs 1-8; the wheel's push on the instrument loads | [ ] |
+| **A keygroup of one sample** played from the note found in it (guide/instrument-and-midi-tracks.md) | done | pads as keys, from the note found in it | [ ] |
 | **Audio track INPUT**: source, monitor, gain; armed by Seq Record, one pass of the pattern recorded (guide/audio-tracks.md) | done | Sampling on an audio track opens INPUT (the wheel, knobs 1-3; the source MIC or LINE as the jack has it); Rec arms, Play records one pass | [ ] |
 | **Audio track takes**: CLIP (level, start, end), FADES (in, out, reverse), WARP (Stretch, Repitch, BPM, semi); kept in `<project> Audio` (guide/audio-tracks.md) | done | the audio track's Play screen: CLIP knobs 1-6 (with the fades and reverse), Shift + the wheel WARP knobs 1-4; takes held in memory once read | [ ] |
 
@@ -184,11 +184,11 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Deep freeze**: the track's plug-ins unloaded too; thawing restores their state (MELODEE.md › Print and freeze) | done | PRINT: DEEP FREEZE (the wheel); the module let go once the print plays, thawed as it was | [ ] |
 | **Unfreeze and edit**: at once, prints kept; an edit asks first; unchanged patterns keep their prints (MELODEE.md › Print and freeze) | done | PRINT: UNFREEZE; an edit on a frozen track asks UNFREEZE TRACK N?; unchanged patterns keep their prints | [ ] |
 | **Print host**: faster than real time on a spare core, lowest priority, into `<project> Prints` (MELODEE.md › Print and freeze) | done | automatic: SCHED_IDLE on the last core, a second instance of the module, into `<project> Prints` | [ ] |
-| **Auto sample a plug-in** into an MPC keygroup program (`.xpm`, `.xty`) on a new keygroup track (MELODEE.md › Print and freeze, Auto sample) | instruments | Shift + Step 11 on a module track | [ ] |
-| **Auto sample check**: drums, mono and glide, accent, velocity layers, takes, splits, sustain and loops, release fit (MELODEE.md › Print and freeze) | instruments | automatic | [ ] |
-| **AUTO SAMPLE sheet**: KEYS (low, high, step), NOTE (layers, hold, tail), SOUND (tap, loop, level) (MELODEE.md › Print and freeze) | instruments | knobs 1-8 and a second page | [ ] |
-| **Auto sample an external instrument** on a MIDI track, heard at the input (MELODEE.md › Print and freeze, External instruments) | instruments | Shift + Step 11 on a MIDI track; USB MIDI out, line in | [ ] |
-| **Keygroup glide**: Mono, portamento, Legato, Mono Retrig (MELODEE.md › Print and freeze, Keygroup glide) | instruments | automatic | [ ] |
+| **Auto sample a plug-in** into an MPC keygroup program (`.xpm`, `.xty`) on a new keygroup track (MELODEE.md › Print and freeze, Auto sample) | done | AUTO SAMPLE, the last row of a module track's menu (Shift + push): the .xpm and its WAVs in Melodee/Samples/Keygroups. The .xty (MPC 3's track file) is not written on the Move: Melodee's writer (shell/mpc3_export) needs its sample library | [ ] |
+| **Auto sample check**: drums, mono and glide, accent, velocity layers, takes, splits, sustain and loops, release fit (MELODEE.md › Print and freeze) | done | automatic: drums, mono and glide, accent and velocity layers, takes, sustain and loops, hold, release fit; a split (two sounds side by side) is not found yet: such a module samples as one sound | [ ] |
+| **AUTO SAMPLE sheet**: KEYS (low, high, step), NOTE (layers, hold, tail), SOUND (tap, loop, level) (MELODEE.md › Print and freeze) | done | knobs 1-8 LOW, HIGH, STEP, LAYERS, HOLD, TAIL, TAP, LOOP; Shift + turn: LEVEL; push samples, Back stops | [ ] |
+| **Auto sample an external instrument** on a MIDI track, heard at the input (MELODEE.md › Print and freeze, External instruments) | instruments | not yet: it needs MIDI out over USB (MIDI & sync) and the line in heard by the sampler; the check and the sampling take any note source (app/auto_sampler.h NoteSource) | [ ] |
+| **Keygroup glide**: Mono, portamento, Legato, Mono Retrig (MELODEE.md › Print and freeze, Keygroup glide) | done | automatic: an MPC program's Mono, Portamento, Legato and Mono Retrig reach Melodee's sampler | [ ] |
 | **Delete from storage**: a file, folder, program or plug-in; what the project plays is refused (MELODEE.md › Print and freeze, Deleting) | done | Delete on the Load page, asked first; in Melodee's folder and the Move's User Library (Kerem), never the Core Library; a program with its `_[TrackData]`; plug-ins are Schwung's | [ ] |
 
 ## Sampler
@@ -203,11 +203,11 @@ Kerem has checked it there. `n/a` rows have no box.
 | **PREVIEW**: each file plays as the cursor lands on it, streamed (MELODEE.md › Sampler, Samples) | done | as the wheel lands (Kerem); on or off on Sampling's settings page; read whole (30 s at most) before it plays, not streamed | [ ] |
 | **Load onto a chosen pad** (the MPC: Shift + pad onto the next empty one) (MELODEE.md › Sampler, Samples) | done | Load page: a pad picks the pad it loads onto (pulsing), as the Move's browser | [ ] |
 | **STARRED and RECENT**: star a file; the last 16 loaded (MELODEE.md › Sampler, Samples) | done | Load page: Shift + push stars (Kerem); STARRED and RECENT lead the places; `Starred.txt`, `Recent.txt` in Melodee's folder | [ ] |
-| **SFZ instruments**: zones, round robin, layers, release samples, crossfades, keyswitches (MELODEE.md › Sampler) | instruments | Menu (load) | [ ] |
-| **MPC keygroup programs** `.xpm`, and MPC 3 programs `.xty` (MELODEE.md › Sampler) | instruments | Menu (load) | [ ] |
-| **EXS24 instruments** `.exs` (MELODEE.md › Sampler) | instruments | Menu (load) | [ ] |
-| **SoundFonts** `.sf2`, presets listed as a folder (MELODEE.md › Sampler) | instruments | Menu (load) | [ ] |
-| **DecentSampler presets** `.dspreset` (MELODEE.md › Sampler) | instruments | Menu (load) | [ ] |
+| **SFZ instruments**: zones, round robin, layers, release samples, crossfades, keyswitches (MELODEE.md › Sampler) | done | the instrument browser: the wheel's push on a keygroup's instrument; streamed from storage | [ ] |
+| **MPC keygroup programs** `.xpm`, and MPC 3 programs `.xty` (MELODEE.md › Sampler) | done | the instrument browser; streamed from storage | [ ] |
+| **EXS24 instruments** `.exs` (MELODEE.md › Sampler) | done | the instrument browser; streamed from storage | [ ] |
+| **SoundFonts** `.sf2`, presets listed as a folder (MELODEE.md › Sampler) | done | the instrument browser, an .sf2 a folder of its presets; its sounds laid out in Melodee/Cache and read in place | [ ] |
+| **DecentSampler presets** `.dspreset` (MELODEE.md › Sampler) | done | the instrument browser; streamed from storage | [ ] |
 | **An instrument on a kit pad**: its zones by key and velocity; ZONES page, zone tune and level trims (ZTRM) (MELODEE.md › Sampler, SFZ) | kit depth | not yet: an instrument reaches a pad by the instruments' loading of SFZ, programs and SoundFonts (`instruments` rows); ZONES (TRIM's place on such a pad, docs/ui/kit.png) is built once it can | [ ] |
 | **MPC drum programs**: LOAD KIT sheet, the whole kit or banks, layers, pad colours (MELODEE.md › Sampler) | done | the browser lists them tagged KIT; push: LOAD KIT (whole kit, or a program bank into each kit bank, LOAD BANKS); pads of 2-4 layers take them as their own, more (an instrument) wait for the instruments' loading | [ ] |
 | **MPC expansions** `.xpn`: installed into Expansions; program previews (MELODEE.md › Sampler) | done | Load page: push installs into Samples/Expansions/<title>, then opens it; a program's `[Previews]` file plays as the wheel lands (its programs load with kit depth and instruments) | [ ] |
@@ -240,7 +240,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **To Pads PATTERN**: a note for each slice into the pattern (MELODEE.md › Sampler, Chop) | sequencer | Not yet on the sheet: To Pads is sampling's Chop (screens/chop.cpp); Sequencer::slices_to_pattern() lays the notes, tested, for its PATTERN choice | [ ] |
 | **Slices kept with the sample** (in its WAV on the MPC; here in the project, its own `MVCH` section, so the Move's library is never written) (MELODEE.md › Sampler, Chop) | done | automatic | [ ] |
 | **Zero Snap and 2 ms edge fades** on every cut (MELODEE.md › Sampler, Chop) | done | automatic | [ ] |
-| **A sample's note** found as it loads: a pitch, or a chord's root (MELODEE.md › Sampler) | instruments | automatic | [ ] |
+| **A sample's note** found as it loads: a pitch, or a chord's root (MELODEE.md › Sampler) | done | automatic, every sample read (kept in the project) | [ ] |
 | **Trim Sample**: the region into a new file, the pad onto all of it (MELODEE.md › Sampler) | done | Sample Options (Shift + push on the pad): TRIM (Shift + Step 13 is the Move-free Song) | [ ] |
 | **Save Sample** under a name (MELODEE.md › Sampler) | done | Sample Options: SAVE SAMPLE, its name on the pad keyboard | [ ] |
 | **Input Config**: source, rec length (Free, Seq, 1-16 bars), threshold, gain, Post / Pre FX, monitor Off / Auto / On, Rec Input FX (MELODEE.md › Sampler) | done | Sampling: the wheel walks SOURCE, GAIN, MONITOR, START, LENGTH, TAP (Post / Pre FX), knobs 1-6; the source as the jack has it (Kerem). Rec Input FX waits for Knob FX (mixer & effects) | [ ] |
@@ -277,8 +277,8 @@ Kerem has checked it there. `n/a` rows have no box.
 | --- | --- | --- | --- |
 | **The fader follows the pot turned last**, PIN keeps it (MELODEE.md › Fader) | n/a | no fader; every value has a knob on its page | — |
 | **Fader page**: what it follows, favourites, stock targets (Pad Volume to Kit Volume) (MELODEE.md › Fader) | n/a | no fader; the pad pages' knobs hold those values; Shift + Step 9 goes to Note Repeat | — |
-| **Mod wheel** from the panel (MELODEE.md › Fader) | instruments | a knob on module tracks, or pad pressure | [ ] |
-| **Pitch bend** from the panel, back to the middle when let go (MELODEE.md › Fader) | instruments | a knob that springs back when let go (touch) | [ ] |
+| **Mod wheel** from the panel (MELODEE.md › Fader) | done | MACRO's MOD, knob 4 on a module track | [ ] |
+| **Pitch bend** from the panel, back to the middle when let go (MELODEE.md › Fader) | done | MACRO's BEND, knob 5, back to the middle when the knob is let go | [ ] |
 | **Fader takeover**: Pickup, Scaled, Instant (MELODEE.md › Fader) | n/a | relative knobs have nothing to pick up | — |
 | **The fader's lane and light**: Seq Record writes it, Erase + fader clears it; its light shows its value (MELODEE.md › Fader) | n/a | no fader; knobs record motion (Sequencing) | — |
 
@@ -425,7 +425,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **`melodee-looper`** (MELODEE.md › Remote) | looper | a command over SSH | [ ] |
 | **`melodee-midi`**: a message into the input; panic (MELODEE.md › Remote) | done | `melodee-move --ctl 'melodee-midi HEX...'` and `--ctl 'melodee-midi panic'`, the runtime's control socket, over SSH | [ ] |
 | **`melodee-print`, `melodee-freeze`, `melodee-unfreeze`** (MELODEE.md › Print and freeze) | song & export | Printer::command() answers them (tested); waits for the Move's remote channel (melodee-press, MIDI & sync & undo & projects) | [ ] |
-| **`melodee-autosample`** (MELODEE.md › Print and freeze) | instruments | a command over SSH | [ ] |
+| **`melodee-autosample`** (MELODEE.md › Print and freeze) | instruments | its words are read (Studio::autosample_command, as Melodee takes them); the command over SSH waits for the runtime's remote channel (MIDI & sync & undo & projects: `melodee-move --ctl`) | [ ] |
 | **`melodee-usb-input`** (MELODEE.md › Remote) | n/a | no USB audio | — |
 | **`card-share`** (MELODEE.md › Remote) | n/a | no card | — |
 | **Page previews** `--melodee-preview` (MELODEE.md › Previews) | done | `--melodee-previews`, `--ui-mockups` | [ ] |
@@ -481,7 +481,7 @@ sections, each on Shift + Step n.
 | **Bank lights** A-H (MELODEE.md › Lights) | n/a | no bank lights; the rail names the bank | — |
 | **Level meters**: five lights a side, -24.1 to -0.1 dBFS; the input on Record (MELODEE.md › Lights) | done | no meter lights: the Volume knob touched (the Move's VU meter), marks at -24, -12, -6, -3, 0; the Mixer's strips; the input's is Sampling's | [ ] |
 | **Kit pad lights**: the selected pad Full, a sample Dim, empty dark, muted Faint red, a flare as it sounds; five rungs that keep each colour's hue (MELODEE.md › Pad lights) | done | pad lights: dim in the pad's colour, bright while it sounds, the last pad white, muted dark grey (the Move's dim white), empty off (Kerem, 2026-11-20) | [ ] |
-| **Key lights**: the key's roots in the track's colour, its other notes Dim, out of the key Faint (MELODEE.md › Pad lights) | instruments | pad lights | [ ] |
+| **Key lights**: the key's roots in the track's colour, its other notes Dim, out of the key Faint (MELODEE.md › Pad lights) | done | pad lights as the Move's Keys & Scale: roots in the track's colour, the key light grey, the rest dark | [ ] |
 | **Pad lights and Pad fade settings**; the Tap Tempo flash (MELODEE.md › Project and system, LIGHTS) | done | Setup > LIGHTS: pad lights (colour, white, off), pad fade (kept for kit depth's flares), brightness; the Tap Tempo flash is the sequencer's tap tempo | [ ] |
 | **Light show**: Pulse, Sweep, Chase, Ripple, Levels, in time with the tempo (MELODEE.md › Light show) | done | Setup > LIGHTS (Kerem: no key): Pulse, Sweep, Chase, Ripple, Levels in time with the tempo, on Play screens; a pad pressed flashes white | [ ] |
 
@@ -489,11 +489,11 @@ sections, each on Shift + Step n.
 
 | Status | Rows |
 | --- | --- |
-| `done` | 242 |
+| `done` | 265 |
 | `sequencer` | 4 |
 | `sampling` | 0 |
 | `kit depth` | 2 |
-| `instruments` | 25 |
+| `instruments` | 2 |
 | `mixer & effects` | 2 |
 | `song & export` | 2 |
 | `looper` | 1 |

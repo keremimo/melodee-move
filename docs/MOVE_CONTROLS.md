@@ -107,6 +107,7 @@ after Schwung) differ for some buttons:
 | Sampling's input | **The jack decides.** The Move has one input, the mic with no cable and the line in with one (CC 114): SOURCE offers MIC, or LINE, LINE L, LINE R, then RESAMPLE and TRACK n; a hardware source follows the jack as a cable goes in or out, and the mic picked with the speaker on turns Monitor off (no howl). |
 | Browser: preview, star, delete | **Each file plays as the wheel lands on it**, as the Move's browser auditions (PREVIEW on or off on Sampling's settings page); **Shift + push stars or unstars** it (Melodee's Shift + B3); **Delete asks, then deletes** the file or folder: in Melodee's folder and the Move's User Library (My Samples, Recordings, as Move Manager may), never the Core Library or what the project plays. |
 | Sampling and Chop's free controls | As docs/ui/sampling.png draws them: **Shift + turn in Sampling, its SAMPLING settings** (Melodee's Settings rows); **Shift + push in Chop, slice options** (Extract, Split, Merge, Remove all cuts); **Shift + turn in Chop, the cut from hit to hit**; **Plus and Minus in Chop, slices 33-64**. |
+| Instruments | **The instruments mockups are built as drawn** (`docs/ui/instruments.png`). **AUTO SAMPLE is a row at the end of a module track's menu (Shift + push)**, not Shift + Step 11, which stays the Move's Repeat and Arp; the Arp styles there turn Melodee's arpeggiator on. **Keys & Scale (Shift + Step 9) lists the Move's scales** in Ableton's order (Live 12's and Push 3's 35, kept in Melodee's scale table after its own 13 so the MPC opens them: melodee-sample branch `move-scales`). **MACRO (FILTER, ECHO, SPACE, MOD, BEND) is a module track's first page** (Shift + turn). |
 
 Followed from the rule without a choice: Left and Right become the
 pattern's bars, so pages move to Shift + turn; in Typing, Back deletes a
@@ -136,7 +137,7 @@ Session (a row a track of the bank, a column a pattern) and the Overview.
 | Control | On the Move | In Melodee | Status |
 | --- | --- | --- | --- |
 | Pad (Play, kit) | Plays the Drum Rack's pad (the left 16), by velocity | Plays the kit pad and makes it the last pad; 32 pads, two banks of 16 | done |
-| Pad (Play, synth) | Plays notes, In-Key or Chromatic, in octaves or 4ths (Shift + Step 9) | Plays the module's notes in rows of fourths, C2 bottom left; the other layouts with Keys & Scales | done |
+| Pad (Play, synth) | Plays notes, In-Key or Chromatic, in octaves or 4ths (Shift + Step 9) | Plays the track's notes as Keys & Scale lays them out (In-Key in octaves at first, C2 bottom left), with Melodee's Prog and Drums, CHORD's chords and the arp | done |
 | Pad, right 16 (16 Pitches) | The selected drum pad's sample at 16 pitches of the key and scale | The last pad up the project's key from its own note (Melodee's 16 Levels Scale), from the audio thread in the cycle it was read | done |
 | Pad pressure | Polyphonic aftertouch (Drift, Wavetable) | Polyphonic aftertouch to the Schwung module; a kit pad's pressure waits for its job | done |
 | Shift + Pad (Play, kit) | No job (Control Live's Drum mode: selects a pad without playing it) | Makes the pad the last pad without sounding it (the MPC's Sample held + pad) | done |
@@ -219,8 +220,8 @@ while Shift is held.
 | Shift + Step 6 | Metronome on or off | The same (today a push on the Tempo screen) | done |
 | Shift + Step 7 | Groove: triplet sixteenth swing, 0-100 % and beyond | Swing (today knob 2 on the Tempo screen) | done |
 | Shift + Step 8 | Layout: 16 Pitches on or off (drums) | 16 Pitches on the right 16 pads, the left 16 one bank of the kit as the MPC lays it | done |
-| Shift + Step 9 | Keys & Scales: In-Key or Chromatic, octaves or 4ths, key, scale | The project's key and scale, a synth's layout | wave 2: instruments |
-| Shift + Step 10 | Full Velocity on or off | Full Level | wave 2: instruments |
+| Shift + Step 9 | Keys & Scales: In-Key or Chromatic, octaves or 4ths, key, scale | Keys & Scale: the project's key and scale (the Move's scales), a note track's mode (In-Key, Chromatic, Prog, Drums), rows, transpose; Prog's progression; STORE CHORD | done |
+| Shift + Step 10 | Full Velocity on or off | Full Level: every pad at 127; its step bright while Shift is held | done |
 | Shift + Step 11 | Repeat and the Arpeggiator (rate; Repeat, Up, Down, Random) | Note Repeat and Arp | done |
 | Shift + Step 12 | No job | The Looper; on it, back to Play | done |
 | Shift + Step 13 | No job | Song; again on Song, back | done |
@@ -298,6 +299,7 @@ while Shift is held.
 | Wheel turn (list) | Moves through a menu; turns a value | The same | done |
 | Shift + Wheel turn (list) | Fine (tempo, groove) | Fine | done |
 | Wheel push (list) | Opens an entry, switches it, confirms | The same | done |
+| Pad held + Wheel push (list) | No job | As the push alone; on Keys & Scale's STORE CHORD the pads held are the chord stored | done |
 | Wheel long push | Confirms a factory reset | Melodee never resets the Move | none |
 | Wheel turn (Chop) | Slicing Mode: the number of slices | The chop's amount: slices, beat division, threshold | done |
 | Wheel push (Chop) | Confirms the slices onto a new Drum Rack | To Pads: Poly, Mono, Thru, Kit | done |
@@ -383,7 +385,7 @@ while Shift is held.
 | Plus or Minus (Play, synth) | The octave | The same | done |
 | Plus or Minus (Play, kit) | No job without 16 Pitches (Control Live's Drum mode: the next or previous 16 pads) | The next or previous 16 pads of the kit's 8 banks | done |
 | Plus or Minus (16 Pitches) | The pitches' octave | The same | done |
-| Shift + Plus or Minus (Play, synth) | No job (Control Live: a scale degree) | The pads a note of the key up or down (a semitone on Chromatic); a note track's, not kept | wave 2: instruments |
+| Shift + Plus or Minus (Play, synth) | No job (Control Live: a scale degree) | The pads a note of the key up or down (a semitone on Chromatic); a note track's, not kept | done |
 | Shift + Plus or Minus (Play, kit) | No job (Control Live: four pads) | The kit's pads in view four pads up or down (with 16 Pitches, the left bank's); the bank they start in kept with the kit | done |
 | Plus or Minus (Session) | No job (Control Live: the session ring a scene) | The bank of four tracks | done |
 | Plus or Minus (Chop) | No job | Slices 33-64 | done |
@@ -474,7 +476,7 @@ Not checked by the tests: they follow from the screens.
 | Light | On the Move | In Melodee | Status |
 | --- | --- | --- | --- |
 | Pads, a kit | The Drum Rack's pads in their colours; a muted pad dim white | The two banks in view: each pad dim in its colour (COLOUR, or the track's), bright while it sounds; the last one white; muted dark grey; empty off | done |
-| Pads, a synth | Roots in the track's colour, the scale's notes light grey, the rest dark | Every C in the track's colour, the other naturals dim; scales with Keys & Scales | done |
+| Pads, a synth | Roots in the track's colour, the scale's notes light grey, the rest dark | The same on every note track (a synth, a keygroup, MIDI), as Keys & Scale lays them out; Prog: chords dim, the file's root chord bright; Drums: dim, the last hit bright; a held pad white | done |
 | Pads, 16 Pitches | The right 16: roots in the track's colour, the scale light grey | The same | done |
 | Pads, Session | Clips in the track's colour; the selected one pulsing white; one waiting to start pulsing green, one about to stop pulsing in its colour | The same for patterns | done |
 | Pads, Overview | Sets in their colours, the selected one pulsing; an empty slot dark, white when selected | The same for projects; folders grey | done |

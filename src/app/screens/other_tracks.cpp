@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // The Play screens of the tracks whose own screens come later (docs/PARITY.md,
-// wave 2): a keygroup, another host's plug-in, and an empty track (a MIDI
-// track's is screens/midi_play.cpp, an audio track's sampling's:
-// screens/audio_track.cpp). Each plays: a keygroup's and a plug-in's pads
-// are notes as a synth track's (Up / Down the octave). An empty track says
-// how to make one.
-#include "app/screens/common.h"
+// wave 2): another host's plug-in and an empty track (a keygroup's is
+// screens/keys_play.cpp, a MIDI track's screens/midi_play.cpp, an audio
+// track's sampling's screens/audio_track.cpp). A plug-in's pads are notes as
+// Keys & Scale lays them out (Up / Down the octave). An empty track says how
+// to make one.
+#include "app/screens/note_pages.h"
 #include "melodee/engine/engine_info.h"
 
 namespace app::screens {
@@ -24,12 +24,7 @@ public:
     bool job(bindings::Job job, const bindings::Use& use) override {
         using bindings::Job;
         switch (job) {
-        case Job::Octave: {
-            int octave = std::clamp(studio.octave(studio.track()) + (use.control == bindings::Control::Plus ? 1 : -1), lowest_octave, highest_octave);
-            studio.set_octave(studio.track(), octave);
-            studio.say("OCTAVE " + note_name(studio.note_for(0, octave)));
-            return true;
-        }
+        case Job::Octave: studio.say(octave_or_bank(studio, use.control == bindings::Control::Plus ? 1 : -1, lowest_octave, highest_octave)); return true;
         case Job::PlayNote: case Job::TurnKnob: case Job::TurnKnobFine: return true;
         default: return false;
         }
@@ -37,7 +32,7 @@ public:
 
     void lights(move::Lights& lights) override {
         using namespace move;
-        note_pads(studio, lights, held, true);
+        key_pads(studio, lights, held); // as Keys & Scale lays them out (app/keys.h)
         steps_playhead(studio, lights);
         int octave = studio.octave(studio.track());
         for (auto button : {Button::Left, Button::Right, Button::Loop, Button::Menu, Button::Back}) lights.button(button, 0);
@@ -46,22 +41,9 @@ public:
     }
 
 protected:
-    std::string lowest() const { return note_name(studio.note_for(0, studio.octave(studio.track()))); }
+    std::string lowest() const { return lowest_note(studio); }
     std::string name() const { return upper(studio.current().name).substr(0, 16); }
     std::array<bool, pad_count> held {};
-};
-
-class KeysPlay final : public NoteTrack {
-public:
-    using NoteTrack::NoteTrack;
-    void draw(juce::Graphics& g) override {
-        ui::rail(g, "KEYS", track_number(studio), lowest());
-        move::draw_text(g, ui::content_x + 1, 1, name());
-        const auto& pad = studio.current().pads[0];
-        bool loaded = pad.used() && studio.project().samples[pad.sample].path[0];
-        move::draw_text_centred(g, ui::content_x, 22, ui::content_width, loaded ? upper(studio.project().samples[pad.sample].name).substr(0, 16) : "NO INSTRUMENT");
-        ui::detail(g, "KEYGROUP", bar_beat(studio));
-    }
 };
 
 class PluginPlay final : public NoteTrack {
@@ -97,7 +79,6 @@ public:
     }
 };
 
-RegisterScreen keys("keys-play", make<KeysPlay>, {}, kind_bit(TrackKind::Keys));
 RegisterScreen plugin("plugin-play", make<PluginPlay>, {}, kind_bit(TrackKind::Plugin));
 RegisterScreen empty("empty-play", make<EmptyPlay>, {}, kind_bit(TrackKind::Empty));
 

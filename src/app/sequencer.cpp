@@ -660,6 +660,8 @@ void Sequencer::route_pads() {
     // The audio thread sends the pads' keys to Note Repeat (1), the arp (2), the arp latched (3: no let-go sent,
     // as Melodee's Context::key()), else as notes (0); Repeat before the arp.
     studio.pads_repeat(track.repeat ? 1 : track.arp ? (track.arp_latch ? 3 : 2) : 0);
+    // A note track's pads route through its pad map (app/keys.h: Repeat, the arp or its notes), published again.
+    studio.publish_pads();
 }
 
 // ---------------------------------------------------------------- Capture (Melodee's Recall)

@@ -12,7 +12,7 @@
 // list; Back goes up, then closes it. A page the module draws itself runs as
 // Schwung runs it (canvas_page.h): push to enter it, then the wheel and its
 // push are the page's, Back goes up and out.
-#include "app/screens/common.h"
+#include "app/screens/note_pages.h"
 #include "app/screens/device_fx.h"
 #include <juce_core/juce_core.h>
 #include <limits>
@@ -42,7 +42,11 @@ public:
     }
 
     void input(const move::Input& input) override {
-        if (input.kind == move::Input::Kind::Pad && input.index < pad_count) held[input.index] = input.pressed;
+        if (input.kind == move::Input::Kind::Pad && input.index < pad_count) {
+            held[input.index] = input.pressed;
+            if (input.pressed) last_pad = int(input.index);
+        }
+        if (input.kind == move::Input::Kind::Touch && input.index == bend_knob) bend_touched = input.pressed; // BEND: let go, it goes back
         fx.input(input);
     }
 
@@ -59,15 +63,11 @@ public:
         if (device && focus == 0 && fx.mix_job(studio.track(), job, use)) return true;
         switch (job) {
         case Job::PlayNote: return true; // its sound went from the audio thread
-        case Job::TurnKnob: turn(*track, unsigned(use.index), use.delta, false); return true;
-        case Job::TurnKnobFine: turn(*track, unsigned(use.index), use.delta, true); return true;
-        case Job::Octave: {
-            int way = use.control == bindings::Control::Plus ? 1 : -1;
-            int octave = std::clamp(studio.octave(studio.track()) + way, lowest_octave, highest_octave);
-            studio.set_octave(studio.track(), octave);
-            studio.say("OCTAVE " + note_name(studio.note_for(0, octave)));
+        case Job::TurnKnob: case Job::TurnKnobFine:
+            if (NotePage* page = melodee_page()) { note_page_turn(studio, studio.track(), *page, unsigned(use.index), use.delta); return true; }
+            turn(*track, unsigned(use.index), use.delta, job == Job::TurnKnobFine);
             return true;
-        }
+        case Job::Octave: studio.say(octave_or_bank(studio, use.control == bindings::Control::Plus ? 1 : -1, lowest_octave, highest_octave)); return true;
         // The Device View.
         case Job::Focus: focus = std::clamp(focus + (use.delta > 0 ? 1 : -1), 0, 1 + int(effects.size())); return true;
         case Job::ShowFocus: studio.say(item(*track, focus)); return true;
@@ -120,7 +120,8 @@ public:
     void lights(move::Lights& lights) override {
         using namespace move;
         auto* track = studio.module_track();
-        note_pads(studio, lights, held, track && track->module);
+        if (track && track->module) key_pads(studio, lights, held); // as Keys & Scale lays them out (app/keys.h)
+        else for (unsigned at = 0; at < pad_count; ++at) lights.pad(at, move::colour::off);
         steps_playhead(studio, lights);
         int octave = studio.octave(studio.track());
         // Left / Right (bars), Loop (Loop Mode) and Note/Session (Patterns) wait for wave 2.
@@ -128,6 +129,8 @@ public:
         lights.button(Button::Up, octave < highest_octave ? white_dim : 0);
         lights.button(Button::Down, octave > lowest_octave ? white_dim : 0);
         lights.button(Button::Back, track && (browsing || track->menu_open || track->canvas_entered || track->canvas_open >= 0) ? white_dim : 0);
+        // MACRO's BEND goes back to the middle when its knob is let go, as a pitch wheel does.
+        if (!bend_touched && studio.current().bend != 0) studio.set_bend(studio.track(), 0);
     }
 
     void draw(juce::Graphics& g) override {
@@ -148,10 +151,19 @@ public:
         if (studio.desk.show_effects) { focus = 2; studio.desk.show_effects = false; } // from the Mixer's push
         focus = std::min(focus, 1 + int(effects.size()));
         ui::rail(g, upper(module.info().abbrev).substr(0, 4), track_number(studio),
-                 focus == 0 ? "MIX" : focus >= 2 ? fx.rail_bottom(effects[size_t(focus - 2)]) : std::to_string(track->page + 1) + "/" + std::to_string(module.pages.size()));
+                 focus == 0 ? "MIX" : focus >= 2 ? fx.rail_bottom(effects[size_t(focus - 2)]) : std::to_string(position(*track) + 1) + "/" + std::to_string(module.pages.size() + 3));
         fx.draw_row(g, item(*track, 0), item(*track, 1), effects, focus);
         if (focus == 0) { fx.draw_mix(g, studio.track()); return; }
         if (focus >= 2) { fx.draw(g, effects[size_t(focus - 2)]); return; }
+        if (NotePage* own = melodee_page()) { // MACRO, ARP, CHORD (screens/note_pages.h)
+            std::string right = *own == NotePage::Macro ? lowest_note(studio) : note_page_right(studio, studio.track(), *own);
+            draw_note_page(g, studio, studio.track(), *own, right);
+            if (*own != NotePage::Macro) { auto [left, more] = note_page_detail(studio, studio.track(), *own); ui::detail(g, left, more); return; }
+            char number[16];
+            std::snprintf(number, sizeof number, "%03d", std::clamp(module.preset + 1, 0, 999));
+            ui::detail(g, upper(module.preset_name.empty() ? module.info().name : module.preset_name).substr(0, 12), module.preset_param.empty() ? bar_beat(studio) : number);
+            return;
+        }
         std::string title = upper(page ? page->name : module.info().name).substr(0, 12), lowest = note_name(studio.note_for(0, studio.octave(studio.track())));
         move::draw_text(g, ui::content_x + 1, 11, title);
         move::draw_text(g, ui::width - int(lowest.size()) * move::glyph_advance, 11, lowest); // the bottom-left pad's note
@@ -164,6 +176,10 @@ public:
             }
         ui::knob_cells(g, ui::content(21, ui::subject_height - 21), names, values);
         auto where = bar_beat(studio);
+        if (keys_mode(studio.current()) == KeysMode::Drums && last_pad >= 0) { // the drum hit last, named
+            auto drum = pad_notes(studio.project(), studio.current(), unsigned(last_pad));
+            if (drum.count) { ui::detail(g, drum_name(drum.keys[0]).substr(0, 16)); return; }
+        }
         if (!module.preset_param.empty()) {
             char number[16];
             std::snprintf(number, sizeof number, "%03d", std::clamp(module.preset + 1, 0, 999));
@@ -172,6 +188,7 @@ public:
     }
 
     Knob knob(unsigned which) const override {
+        if (const NotePage* own = const_cast<SynthPlay*>(this)->melodee_page()) return note_page_knob(studio, studio.track(), *own, which);
         auto* track = const_cast<Studio&>(studio).module_track();
         if (track && track->module && !browsing && !track->menu_open && shown_canvas(*track) < 0) {
             if (focus == 0) return fx.mix_knob(studio.track(), which);
@@ -202,6 +219,31 @@ private:
     int focus = 1;          // the Device View's item the wheel is on: 0 the module (its mix), 1 its preset, 2 on its effects
     DeviceFx fx {studio};
     bool browsing = false;  // its presets, the wheel walking them
+    // Melodee's own pages around the module's (Kerem, 2026-11-20): MACRO first, ARP and CHORD last. Each track's:
+    // 0 the module's page (ModuleTrack::page), 1 MACRO (where a track opens), 2 ARP, 3 CHORD.
+    std::array<uint8_t, melodee::track_count> own_page = filled(1);
+    static std::array<uint8_t, melodee::track_count> filled(uint8_t v) { std::array<uint8_t, melodee::track_count> a {}; a.fill(v); return a; }
+    static constexpr unsigned bend_knob = 4;
+    int last_pad = -1; // Drums: the drum hit last, named
+    bool bend_touched = false;
+    NotePage* melodee_page() {
+        static NotePage pages[] {NotePage::Macro, NotePage::Macro, NotePage::Arp, NotePage::Chord};
+        auto* track = studio.module_track();
+        if (!track || !track->module || track->menu_open || browsing || track->canvas_open >= 0) return nullptr;
+        if (focus != 1) return nullptr; // the Device View on the module (0: the track's mix, 2 on: its effects, device_fx.h)
+        uint8_t at = own_page[studio.track()];
+        return at ? &pages[at] : nullptr;
+    }
+    // The page as Shift + the wheel counts them: MACRO, the module's, ARP, CHORD.
+    unsigned position(const ModuleTrack& track) const {
+        unsigned pages = track.module ? unsigned(track.module->pages.size()) : 0;
+        switch (own_page[studio.track()]) {
+        case 1: return 0;
+        case 2: return pages + 1;
+        case 3: return pages + 2;
+        default: return track.page + 1;
+        }
+    }
 
     std::string item(ModuleTrack& track, int which) const {
         switch (which) {
@@ -230,6 +272,7 @@ private:
     // The module's own page on screen, else -1.
     int shown_canvas(const ModuleTrack& track) const {
         if (!track.module || studio.top() != this) return -1;
+        if (own_page[studio.track()] && track.canvas_open < 0 && !track.menu_open) return -1; // MACRO, ARP, CHORD
         auto valid = [&](int index) { return index >= 0 && index < int(track.canvas_pages.size()) ? index : -1; };
         if (track.canvas_open >= 0) return valid(track.canvas_open);
         if (track.menu_open || track.page >= track.module->pages.size()) return -1;
@@ -260,10 +303,16 @@ private:
     }
 
     void page_by(ModuleTrack& track, int way) {
-        if (!track.module || track.module->pages.empty()) return;
-        track.page = unsigned(std::clamp(int(track.page) + way, 0, int(track.module->pages.size()) - 1));
+        if (!track.module) return;
+        const int pages = int(track.module->pages.size());
+        int at = std::clamp(int(position(track)) + way, 0, pages + 2);
+        auto& own = own_page[studio.track()];
+        if (at == 0) own = 1;
+        else if (at == pages + 1) own = 2;
+        else if (at == pages + 2) own = 3;
+        else { own = 0; track.page = unsigned(at - 1); }
         track.canvas_entered = false;
-        refresh();
+        if (!own) refresh(); // the module's knobs asked for: Melodee's own pages ask it nothing
     }
 
     void preset_by(ModuleTrack& track, int way) {
@@ -285,7 +334,7 @@ private:
 
     // ---- the module's menu
     struct MenuRow {
-        enum class Kind : uint8_t { Preset, Param, Level, Item, Canvas } kind = Kind::Param;
+        enum class Kind : uint8_t { Preset, Param, Level, Item, Canvas, AutoSample } kind = Kind::Param;
         std::string key, label;
         int index = 0; // an Item's
     };
@@ -314,8 +363,10 @@ private:
                 if (page.level == module.level_index(at->id))
                     for (const auto& key : page.knobs)
                         if (const ModuleParam* param = const_cast<LoadedModule&>(module).param(key)) rows.push_back({Kind::Param, key, param->label.empty() ? param->name : param->label});
-        if (at->id == "root") // the module's own pages, last
+        if (at->id == "root") { // the module's own pages, then Melodee's auto sampler (Kerem, 2026-11-20), last
             for (size_t n = 0; n < module.canvases.size(); ++n) rows.push_back({Kind::Canvas, module.canvases[n].key, module.canvases[n].name, int(n)});
+            if (!module.source) rows.push_back({Kind::AutoSample, "", "AUTO SAMPLE"});
+        }
         return rows;
     }
 
@@ -340,7 +391,8 @@ private:
             return fit(upper(row.label), param ? upper(param->shown()) : "?");
         }
         case Kind::Level:
-        case Kind::Canvas: return upper(row.label).substr(0, width - 2) + " >";
+        case Kind::Canvas:
+        case Kind::AutoSample: return upper(row.label).substr(0, width - 2) + " >";
         case Kind::Item: {
             const ModuleParam* chosen = module.param(row.key);
             bool current = chosen && std::lround(chosen->value) == row.index;
@@ -420,6 +472,11 @@ private:
             break;
         }
         case MenuRow::Kind::Level: enter_level(track, row.key); break;
+        case MenuRow::Kind::AutoSample: // the AUTO SAMPLE sheet, over Play
+            track.menu_open = false;
+            track.menu_editing = false;
+            studio.open("auto-sample");
+            break;
         case MenuRow::Kind::Item: {
             if (ModuleParam* chosen = module.param(row.key)) chosen->value = row.index;
             studio.synth_set(track, row.key, std::to_string(row.index));

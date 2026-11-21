@@ -255,6 +255,7 @@ int write_mockups(const std::string& directory) {
     ok = write_projects_mockups(directory) && ok;
     ok = write_song_mockups(directory) && ok;
     ok = write_sampling_mockups(directory) && ok;
+    ok = write_instruments_mockups(directory) && ok;
     return ok ? 0 : 1;
 }
 
