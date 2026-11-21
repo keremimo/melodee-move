@@ -232,10 +232,10 @@ std::vector<Screen> sequencer_screens() {
             move::draw_text(g, content_x + 2, 28, "REPLACE THEM?");
             detail(g, "PUSH YES", "BACK NO");
         }},
-        {"scene", "SESSION, PUSH: SEQUENCE 3 (A COLUMN)", [](juce::Graphics& g) {
+        {"scene", "SESSION, PUSH: SEQUENCE 3; PADS CHAIN MORE", [](juce::Graphics& g) {
             rail(g, "SCNE", "3", "");
             title(g, "SEQUENCE 3", "VERSE");
-            value_cells(g, content(11, 40), {"BPM", "", "", "", "", "", "", ""}, {"98.0", "", "", "", "", "", "", ""});
+            value_cells(g, content(11, 40), {"BPM", "NAM", "", "", "", "", "", ""}, {"98.0", "VERS", "", "", "", "", "", ""});
             move::draw_text(g, content_x + 2, 33, "PATTERN 3 OF EACH");
             move::draw_text(g, content_x + 2, 42, "TRACK, NEXT BAR");
             detail(g, "PUSH: LAUNCH");

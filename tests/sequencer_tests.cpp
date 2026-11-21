@@ -614,8 +614,13 @@ void test_screens(app::MelodeeApp& melodee) {
     h.button(Button::MainPush);
     CHECK(has(h.status(), "page=scene") && has(h.status(), "job=LaunchScene"));
     h.knob(0, -200);
+    h.knob(1, 1);
+    h.knob(1, 1); // a ready name, a detent each: Verse
+    CHECK(std::string(melodee.studio().project().scenes[seqr.number(0)].name) == "Verse");
+    h.pad(3); // another column: a chain of sequences
+    CHECK(has(h.status(), "scene_chain=2"));
     h.button(Button::MainPush);
-    CHECK(has(h.status(), "page=session"));
+    CHECK(has(h.status(), "page=session") && melodee.studio().project().tracks[0].chain_count == 2);
     // Note/Session again: Play. Held: a peek until it is let go.
     h.button(Button::Menu);
     CHECK(has(h.status(), "page=kit-play"));
@@ -661,6 +666,95 @@ void test_screens(app::MelodeeApp& melodee) {
     seqr.launch(0, 0);
 }
 
+extern "C" int schwung_move_info(void* out, size_t capacity);
+
+void test_more(app::MelodeeApp& melodee) {
+    Hands h {melodee};
+    auto& seqr = melodee.studio().sequencer();
+    melodee.studio().select_pad(0);
+    seqr.launch(0, 30);
+    auto& p = seqr.pattern(0, 30);
+    p = melodee::Pattern {};
+    seq::set_length(p, 2 * 384, 128 * 384);
+    // Tap tempo on Tempo (Shift + Step 5): the steps tapped half a second apart, 120 BPM; Left halves, Right doubles.
+    h.with(Button::Shift, [&] { h.step(4); });
+    CHECK(has(h.status(), "page=tempo"));
+    for (int n = 0; n < 3; ++n) { h.step(n); if (n < 2) std::this_thread::sleep_for(std::chrono::milliseconds(500)); }
+    unsigned tapped = melodee.studio().tempo();
+    CHECK_SAID(tapped >= 1100 && tapped <= 1250, tapped);
+    h.button(Button::Left);
+    CHECK(melodee.studio().tempo() == tapped / 2);
+    h.button(Button::Right);
+    CHECK(melodee.studio().tempo() == tapped / 2 * 2);
+    h.button(Button::Back);
+    melodee.studio().set_tempo(1200);
+    // The metronome on Rec only (Workflow): on, it clicks only while recording.
+    seqr.workflow.click_rec_only = true;
+    melodee.studio().set_click(true, 70);
+    CHECK(has(h.status(), "click_heard=0"));
+    // The modules hear the transport (get_clock_status, schwung_move_info).
+    h.button(Button::Play);
+    h.render(40);
+    uint8_t info[272] {};
+    CHECK(schwung_move_info(info, sizeof info) == 1 && info[13] == 1);
+    h.button(Button::Rec);
+    h.render(2);
+    CHECK(has(h.status(), "rec=1") && has(h.status(), "click_heard=1"));
+    // A knob turned while recording: written as Motion where the playhead is (14.2).
+    h.render(30);
+    h.knob(7, -5);
+    unsigned cutoff = melodee::motion_pad_param(melodee::PadParam::FilterCutoff);
+    CHECK(p.lane_points(cutoff, 0) >= 1);
+    // Note Repeat while recording: the repeats written as they play.
+    seqr.set_repeat(0, true, 0, 4);
+    size_t before = p.events.size();
+    h.pad_down(0);
+    h.render(400);
+    h.pad_up(0);
+    h.render(2);
+    h.lights();
+    CHECK_SAID(p.events.size() >= before + 3, p.events.size() - before);
+    seqr.set_repeat(0, false, 0, 4);
+    h.button(Button::Rec);
+    h.render(2);
+    CHECK(has(h.status(), "rec=0") && has(h.status(), "click_heard=0"));
+    h.button(Button::Play);
+    h.render(2);
+    CHECK(schwung_move_info(info, sizeof info) == 1 && info[13] == 0);
+    seqr.workflow.click_rec_only = false;
+    melodee.studio().set_click(false, 70);
+    // Roll's jobs: a key's notes marked, a step inserted, the velocities ramped.
+    p = melodee::Pattern {};
+    p.add(note(0, 36, 100));
+    p.add(note(48, 36, 100));
+    p.add(note(96, 38, 100));
+    seqr.sync(0, 30);
+    h.with(Button::Shift, [&] { h.button(Button::Loop); });
+    h.with(Button::Shift, [&] { for (int n = 0; n < 9; ++n) h.wheel(-1); h.wheel(1); h.wheel(1); }); // the pages open where they were left: back to ROLL
+    CHECK(has(h.status(), "seq_page_name=ROLL roll_focus=0"));
+    auto roll_job = [&](int row) {
+        h.button(Button::MainPush);
+        for (int n = 0; n < 20; ++n) h.wheel(-1);
+        for (int n = 0; n < row; ++n) h.wheel(1);
+        h.button(Button::MainPush);
+    };
+    roll_job(12); // MARK THE KEY: A01's two
+    CHECK(has(h.status(), "marks=2"));
+    roll_job(14); // RAMP DOWN over them
+    CHECK(p.events[0].velocity == 100 && p.events[1].velocity == 50);
+    roll_job(15); // INSERT STEP at the focus's: everything a step later
+    CHECK(p.events[0].tick == 24 && p.events[2].tick == 120);
+    h.button(Button::Delete); // the note in focus erased
+    CHECK(p.events.size() == 2);
+    h.button(Button::Back);
+    // To Pads PATTERN (for Chop's sheet): a note a slice, where it falls.
+    seqr.slices_to_pattern(4, {0, 1000, 3000}, 4000);
+    auto at = seq::notes_in(p, {0, p.length}, 40);
+    CHECK(at.size() == 1 && seq::notes_in(p, {0, p.length}, 41).size() == 1 && seq::notes_in(p, {0, p.length}, 42).size() == 1);
+    CHECK(p.events[seq::notes_in(p, {0, p.length}, 42)[0]].tick == p.length * 3 / 4);
+    seqr.launch(0, 0);
+}
+
 void test_app() {
     std::string home = "build/test-home-sequencer";
     std::filesystem::remove_all(home);
@@ -678,6 +772,7 @@ void test_app() {
     test_fill_and_repeat(melodee);
     test_pages(melodee);
     test_screens(melodee);
+    test_more(melodee);
     // The Workflow settings and loops come back with the Move's settings.
     melodee.studio().sequencer().workflow.quantize = 60;
     melodee.studio().sequencer().workflow.count_in = false;

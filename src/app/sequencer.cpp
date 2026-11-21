@@ -917,6 +917,22 @@ void Sequencer::entry_erase() {
     sync(studio.track(), number(studio.track()));
 }
 
+void Sequencer::slices_to_pattern(unsigned first_pad, const std::vector<uint32_t>& starts, uint32_t frames) {
+    auto& p = pattern();
+    if (!frames || starts.empty()) return;
+    for (size_t k = 0; k < starts.size(); ++k) seq::clear_lane(p, uint8_t(melodee::sampler_first_note + first_pad + k));
+    for (size_t k = 0; k < starts.size(); ++k) {
+        uint32_t next = k + 1 < starts.size() ? starts[k + 1] : frames;
+        melodee::Event e;
+        e.tick = uint32_t(uint64_t(starts[k]) * p.length / frames);
+        e.length = uint16_t(std::clamp<uint64_t>(uint64_t(next - std::min(next, starts[k])) * p.length / frames, 1, 65535));
+        e.key = uint8_t(melodee::sampler_first_note + first_pad + k);
+        p.add(e);
+    }
+    p.free = false;
+    sync(studio.track(), number(studio.track()));
+}
+
 void Sequencer::move_playhead(int steps) {
     auto& p = pattern();
     unsigned t = studio.track();
@@ -1299,9 +1315,9 @@ bool Sequencer::setting_line(const std::string& line) {
 std::string Sequencer::status() const {
     const auto& p = const_cast<Sequencer*>(this)->pattern();
     char text[256];
-    std::snprintf(text, sizeof text, " seq_pattern=%u seq_bars=%u seq_notes=%zu seq_page=%u rec=%d count_in=%d capture=%u held_step=%d fill=%d",
+    std::snprintf(text, sizeof text, " seq_pattern=%u seq_bars=%u seq_notes=%zu seq_page=%u rec=%d count_in=%d capture=%u held_step=%d fill=%d click_heard=%d",
                   number(studio.track()) + 1, seq::bars_of(p, bar_ticks()), p.events.size(), page() + 1, int(rec), int(counting_in()),
-                  unsigned(ring->written - capture_since), held_step(), int(fill_on));
+                  unsigned(ring->written - capture_since), held_step(), int(fill_on), int(click_now));
     return text;
 }
 

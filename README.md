@@ -35,8 +35,17 @@ Three parts so far:
   Step 6 the metronome on or off (the jogwheel its level), Shift + Step 7
   the groove. A track button held with the Volume knob sets that track's
   volume; Mute mutes the selected track, Mute + a track button that one,
-  Shift + Mute + a track button solos it. Editing patterns comes next
-  (docs/PARITY.md, sequencer); a project from the MPC plays its patterns.
+  Shift + Mute + a track button solos it.
+- **The sequencer** (docs/UI.md, Sequencer), on the Move's own keys:
+  the steps are the pattern's bar (a tap a note, a step held its velocity,
+  length, transpose, nudge, a knob a lock, push Melodee's TRIG: chance,
+  conditions, ratchets, accent, slide, tie); Loop is Loop Mode (the bars,
+  the loop); Note/Session the Patterns grid (launch, chains, copy, delete,
+  sequences); Rec Seq Record with its count-in and a free length; Capture
+  Melodee's Recall; Shift + Step 3 Workflow, 11 Repeat, 14 a new pattern,
+  15 double, 16 quantize; Loop held Fill; Shift + Loop Melodee's SEQ pages
+  (Pattern, step entry, Roll, Motion, MOD, macros, feel, follow actions,
+  lanes and Euclid). A project from the MPC plays and edits its patterns.
 - **Play** (a kit track): the last pad's sample. Knobs 1-8: tune, level, pan, start, end,
   attack, decay, cutoff (Shift: finer). Touch a knob to see it large.
 - **Load** (the wheel's push on the pad, the Move's Device View): WAV,
@@ -101,8 +110,9 @@ Three parts so far:
   is folded into one file on the first start; the old side files stay as
   `*.migrated`.
 
-Not yet: more than one project, editing patterns, samples over 60 seconds,
-Record, Capture, Schwung's effects, mixer pages; docs/PARITY.md has the rest.
+Not yet: more than one project, samples over 60 seconds, Record, Schwung's
+effects, mixer pages, locks and Motion on a Schwung module's own
+parameters; docs/PARITY.md has the rest.
 
 ### How a Schwung module is hosted
 
@@ -194,10 +204,10 @@ the tap's click and the sound in the waveform is what you hear.
 | --- | --- |
 | `src/move/` | move-base. `app.h` the `App` interface (sample-base's hooks plus `audio_event`); `runtime.*` the threads; `host.*` what a host shares with them; `spi_host.cpp`, `spi_device.*`, `spi_protocol.*` the Move's device and a simulated one; `jack_host.cpp` the JACK host (libjack loaded at run time); `audio.h` blocks and the reblocker; `controls.*`, `lights.*`, `display.*`, `font.*`, `latency.h`, `tools.*` |
 | `src/ui/` | the interface kit for the Rail design (docs/UI.md), and its mockups (`--ui-mockups DIR`) |
-| `src/app/` | Melodee on the Move: `melodee_app.*` the app (thin: what every screen shares), `studio.*` Melodee's `Project` and `EngineHost` and what the screens share, `screen.*` a screen and the registry, `screens/` one file a screen, `project_store.*` the project file, `schwung_api.h` and `module_host.*` Schwung's modules (behind Melodee's `PluginRunner`), `canvas_page.*` their own pages' scripts in QuickJS, `module_probe.*` trying them, `previews.*` its screens offline |
+| `src/app/` | Melodee on the Move: `melodee_app.*` the app (thin: what every screen shares), `studio.*` Melodee's `Project` and `EngineHost` and what the screens share, `sequencer.*` and `seq_edit.*` the sequencer, `screen.*` a screen and the registry, `screens/` one file a screen, `project_store.*` the project file, `schwung_api.h` and `module_host.*` Schwung's modules (behind Melodee's `PluginRunner`), `canvas_page.*` their own pages' scripts in QuickJS, `module_probe.*` trying them, `previews.*` its screens offline |
 | `src/spike/` | the spike app |
 | `module/` | the Schwung standalone tool: `module.json`, `standalone` |
-| `tests/` | unit tests, the device host against the simulated Move, and `fake_module/`, a stand-in Schwung module |
+| `tests/` | unit tests, the device host against the simulated Move, the sequencer (`sequencer_tests.cpp`), and `fake_module/`, a stand-in Schwung module |
 | `tools/` | build image, packaging, deploy and probe scripts |
 
 ## Build

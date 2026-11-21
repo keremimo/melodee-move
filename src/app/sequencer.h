@@ -154,6 +154,10 @@ public:
     uint8_t entry_chance = 100;
     void entry_rest();              // on without writing
     void entry_erase();             // back a step, taking it out
+    // To Pads PATTERN (Melodee's Chop): a note for each slice on `first_pad`
+    // on, where it falls in the sample (`starts`, frames of `frames`), over
+    // the pattern's length; the pattern's notes on those pads first go.
+    void slices_to_pattern(unsigned first_pad, const std::vector<uint32_t>& starts, uint32_t frames);
     // The playhead by Q (Session's wheel, Melodee's Shift + wheel): playing,
     // it jumps; stopped, Play continues from it.
     void move_playhead(int steps);

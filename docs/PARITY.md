@@ -91,10 +91,10 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Pads page**: the bank's pads each drawing its waveform (MELODEE.md › Playing, Pads) | n/a | 128 x 64 cannot show 32 waveforms; the pads light in their colours and the screen shows the last pad | — |
 | **Sounds**: a MIDI track's saved sounds (`.mlds`), favourites (MELODEE.md › Playing, Sounds) | MIDI & sync & undo & projects | Menu (load) on a MIDI track | [ ] |
 | **16 Levels**: the last pad or note on every pad as Velocity, Filter, Tune, Scale or Zones; ends, octave; a MIDI keyboard plays the pad on every key (MELODEE.md › Playing, 16 Levels) | kit depth | Places > 16 Levels; the levels over the pads; knobs type and ends | [ ] |
-| **Note Repeat**: 1/4-1/64 and triplets, swung, pressure as velocity, written under Seq Record (MELODEE.md › Playing, Note Repeat) | sequencer | Shift + Step 9 (the MPC's Fader page); the rate to settle | [ ] |
+| **Note Repeat**: 1/4-1/64 and triplets, swung, pressure as velocity, written under Seq Record (MELODEE.md › Playing, Note Repeat) | done | Shift + Step 11: on, its screen (style Repeat / arp Up, Down, Random; rate 1/4-1/64T; pressure as velocity); again off; repeats written under Rec | [ ] |
 | **Tempo**: BPM, swing, metronome level, metronome on / off (MELODEE.md › Playing, Tempo) | done | Shift + Step 5 / 6 / 7: tempo, metronome, groove, as on the Move | [ ] |
-| **Tap tempo, halve, double; metronome Rec** (clicks only while recording) (MELODEE.md › The panel; Playing, Tempo) | sequencer | tempo screen: tap a step; Left / Right halve, double; push cycles Off / On / Rec | [ ] |
-| **Track speed**: ×½, ×¾, ×1, ×1½, ×2 against the tempo (MELODEE.md › Playing, Tracks) | sequencer | a knob on the Mixer or Patterns page | [ ] |
+| **Tap tempo, halve, double; metronome Rec** (clicks only while recording) (MELODEE.md › The panel; Playing, Tempo) | done | Tempo (Shift + Step 5): tap the steps, Left / Right halve, double; Workflow: Metronome Always / Rec only (Kerem, 2026-11-20) | [ ] |
+| **Track speed**: ×½, ×¾, ×1, ×1½, ×2 against the tempo (MELODEE.md › Playing, Tracks) | done | SEQ pages (Shift + Loop), PATTERN: SPD, knob 4 | [ ] |
 | **Keygroup track pages**: TRIM / ZONES, TUNE, AMP ENV, FILTER, FILT ENV, PLAY, ARP, CHORD (guide/instrument-and-midi-tracks.md) | instruments | Left / Right pages, knobs 1-8; Menu loads | [ ] |
 | **A keygroup of one sample** played from the note found in it (guide/instrument-and-midi-tracks.md) | instruments | pads as keys | [ ] |
 | **Audio track INPUT**: source, monitor, gain; armed by Seq Record, one pass of the pattern recorded (guide/audio-tracks.md) | sampling | Sample on an audio track; Rec arms; line in or mic | [ ] |
@@ -121,45 +121,45 @@ Kerem has checked it there. `n/a` rows have no box.
 
 | Feature | Status | Move controls | ✓ |
 | --- | --- | --- | --- |
-| **Patterns as note lists**: tick (96 a quarter), length, key, velocity, chance, accent, slide, tie, ratchet (MELODEE.md › Sequencing) | sequencer | steps; Places > Roll | [ ] |
-| **128 patterns a track** in banks (MELODEE.md › Sequencing) | sequencer | pattern layer: 32 a bank, Up / Down | [ ] |
-| **Pattern length, Q, time signature**: 1-128 bars, Q 1/4-1/64 with triplets, 1/4-15/16 (MELODEE.md › Sequencing, Patterns) | sequencer | Patterns page knobs | [ ] |
+| **Patterns as note lists**: tick (96 a quarter), length, key, velocity, chance, accent, slide, tie, ratchet (MELODEE.md › Sequencing) | done | the steps; a step held + push: TRIG knobs; SEQ pages' Roll | [ ] |
+| **128 patterns a track** in banks (MELODEE.md › Sequencing) | done | Session (Note/Session): eight a page, Left / Right over all 128; Shift + Step 14 the next empty | [ ] |
+| **Pattern length, Q, time signature**: 1-128 bars, Q 1/4-1/64 with triplets, 1/4-15/16 (MELODEE.md › Sequencing, Patterns) | done | Loop held + wheel (Shift: sixteenths); Loop Mode; SEQ pages' PATTERN; Workflow: Step Grid, Time Sig | [ ] |
 | **Swing** 50-75 % (MELODEE.md › Sequencing) | done | Shift + Step 7: the Move's groove | [ ] |
-| **Free length**: an empty pattern grows a bar at a time as it is recorded (MELODEE.md › Sequencing) | sequencer | Rec | [ ] |
-| **Launch a pattern**: at the next bar, at once when stopped; an empty one as long as the one playing (MELODEE.md › Sequencing, Seq held) | sequencer | pattern layer: a pad | [ ] |
-| **Pattern chains**: up to eight patterns, each played once, round again (CHAN) (MELODEE.md › Sequencing, Seq held) | sequencer | pattern layer: several pads in one hold | [ ] |
-| **Copy and clear patterns**, across banks; clearing asks (MELODEE.md › Sequencing, Seq held) | sequencer | pattern layer: Copy + pad, then a pad; Delete + pad | [ ] |
-| **Patterns page**: cells as the pads sit, NEXT, follow arrows, the other tracks' dots, progress (MELODEE.md › Sequencing, Patterns) | sequencer | Places > Sequence | [ ] |
-| **Playhead by Q and Continue** from it (Shift + wheel, Shift + Play) (MELODEE.md › Sequencing, Patterns) | sequencer | jogwheel on Patterns; Continue to settle (Play is a toggle) | [ ] |
-| **Variations** into the next empty pattern: Thinner, Busier, Humanised, Reversed, Octave up and down (VARY) (MELODEE.md › Sequencing, Patterns) | sequencer | Patterns: HERE > Vary; knob 1 the amount | [ ] |
-| **Sequences and sequence chains**: pattern n of every track, a name and tempo of its own; several in one hold (SCNE) (MELODEE.md › Sequencing, Sequences) | sequencer | Places > Sequence: Sequences; a pad launches | [ ] |
-| **Follow actions**: Next, Previous, Any, Again, Stop; after 1-64 bars or plays; chance; OR (FOLW) (MELODEE.md › Sequencing) | sequencer | Patterns' FOLLOW page, knobs 1-4 | [ ] |
-| **BPM per pattern** (MELODEE.md › Sequencing, Patterns) | sequencer | tempo screen: a setting | [ ] |
-| **Seq Record**: armed, then Play; at once while playing; overdub; notes at the tick heard; a take is one undo (MELODEE.md › Sequencing) | sequencer | Rec | [ ] |
-| **Count-In**: a bar of clicks before recording (MELODEE.md › Shift + pads) | sequencer | Shift + Step 4 | [ ] |
-| **Rec Quantize**: notes land on the pattern's Q (MELODEE.md › Sequencing, Seq Record) | sequencer | Shift + Step 10 | [ ] |
-| **Fill**: FILL conditions play while held (MELODEE.md › The panel, Play) | sequencer | to settle: a button held while playing | [ ] |
-| **Chance and trig conditions**: ALWAYS, n:m, FILL, FIRST, PRE, NEI and their NOTs (COND) (MELODEE.md › Sequencing) | sequencer | step held: knobs | [ ] |
-| **Ratchets**: 1-8 hits, velocity ramp, pitch ramp on a kit pad (RTCH) (MELODEE.md › Sequencing) | sequencer | step held: TRIG knobs | [ ] |
-| **Accent, Slide, Tie**: about 4 dB louder; a glide of 60 ms; legato; CC 84 and CC 68 to synths (MELODEE.md › Sequencing, Roll) | sequencer | step held: knobs; Roll's note sheet | [ ] |
-| **Step Edit, STEPS**: the 16 steps of a bar for one pad or note, lit by velocity, the playhead; Tie and Insert (MELODEE.md › Sequencing, Step Edit) | sequencer | the 16 steps; Left / Right the bar; a pad picks the lane; HERE: Tie, Insert | [ ] |
-| **Step Edit, PLAY**: pads write at the caret; REST, ERASE; length, velocity, chance (MELODEE.md › Sequencing, Step Edit) | sequencer | Places > Step Edit; jogwheel the caret | [ ] |
-| **Parameter locks**: hold a step, turn a knob (MELODEE.md › Sequencing, Step Edit) | sequencer | step held + knobs 1-8 | [ ] |
-| **Lane length**: a kit pad's lane loops on its own, polymeter (LANE) (MELODEE.md › Sequencing, Step Edit) | sequencer | a knob on the steps page | [ ] |
-| **Euclid**: hits, steps 1-64, rotation on a lane (EUCL) (MELODEE.md › Sequencing, Step Edit) | sequencer | EUCLID knobs on the steps page | [ ] |
-| **Spare steps**: a step written past the end makes the pattern longer (MELODEE.md › Sequencing, Step Edit) | sequencer | Right past the last bar, then a step | [ ] |
-| **Roll**: notes at their ticks over the bars; the note in focus with length, velocity, chance, nudge (MELODEE.md › Sequencing, Roll) | sequencer | Places > Roll; jogwheel; knobs | [ ] |
-| **Roll marks and jobs**: mark notes; move by Q or a row, mute, ratchet, velocities and ramp, pull to the grid, octave; split, legato, reverse, the arp as notes, loop the bars in view (MELODEE.md › Sequencing, Roll) | sequencer | Shift + jogwheel marks; knobs; HERE | [ ] |
-| **Copy notes**: marked notes pasted at the cursor; a key's notes onto another; a step onto another (MELODEE.md › Across every page, Copy) | sequencer | Copy | [ ] |
-| **Erase notes**: a pad's notes while playing, a key's notes, the note in focus (MELODEE.md › Across every page, Erase) | sequencer | Delete + pad; Delete | [ ] |
-| **Motion**: knob moves recorded in each pattern, 8192 points, lanes reset at the pattern's start; a lane cleared (MELODEE.md › Sequencing, Motion) | sequencer | Rec + knob turns; Places > Motion; Delete + knob | [ ] |
-| **Mix in Motion**: level, pan, sends, master chain and returns recorded (MELODEE.md › Sequencing) | sequencer | Rec + mixer knobs | [ ] |
-| **MOD**: eight modulators, an LFO (seven shapes, free or synced) or a follower, up to four lanes each (MODS) (MELODEE.md › Sequencing) | sequencer | Places > Motion, MOD; knobs | [ ] |
-| **Macros**: eight, each one knob over up to eight lanes (MACR) (MELODEE.md › Sequencing, MOD) | sequencer | MOD page, MACRO; knobs | [ ] |
-| **A pattern's feel**: STRENGTH, SWING, HUMANIZE, HUMAN VEL, GROOVE from another pattern (FEEL) (MELODEE.md › Sequencing) | sequencer | Time Correct page knobs | [ ] |
-| **Time Correct**: heard live, no commit; ALL lays the feel on the other patterns (MELODEE.md › Sequencing) | sequencer | Shift + Step 14 | [ ] |
-| **Half Seq, Double Seq, Half Speed, Double Speed** (MELODEE.md › Sequencing) | sequencer | Shift + Step 2, 3, 6, 7 | [ ] |
-| **Recall**: every note played is kept; the last phrase into empty patterns, one undo (MELODEE.md › Sequencing, Recall) | sequencer | Shift + Capture | [ ] |
+| **Free length**: an empty pattern grows a bar at a time as it is recorded (MELODEE.md › Sequencing) | done | Rec on an empty pattern: it grows a bar at a time; Workflow's Max Length | [ ] |
+| **Launch a pattern**: at the next bar, at once when stopped; an empty one as long as the one playing (MELODEE.md › Sequencing, Seq held) | done | Session: a pad | [ ] |
+| **Pattern chains**: up to eight patterns, each played once, round again (CHAN) (MELODEE.md › Sequencing, Seq held) | done | Session: a pad held, then more of its row | [ ] |
+| **Copy and clear patterns**, across banks; clearing asks (MELODEE.md › Sequencing, Seq held) | done | Session: Copy + pad, then a pad (asks before replacing); Delete + pad clears at once, as the Move (17.1.4); Copy, Delete on Play | [ ] |
+| **Patterns page**: cells as the pads sit, NEXT, follow arrows, the other tracks' dots, progress (MELODEE.md › Sequencing, Patterns) | done | Session: cells as the pads sit, queued dashed, follow arrows, the bank's four tracks, progress under the playing one | [ ] |
+| **Playhead by Q and Continue** from it (Shift + wheel, Shift + Play) (MELODEE.md › Sequencing, Patterns) | done | Session: the wheel moves it by Q; stopped, Play continues there (Shift + Play stays the Move's restart) | [ ] |
+| **Variations** into the next empty pattern: Thinner, Busier, Humanised, Reversed, Octave up and down (VARY) (MELODEE.md › Sequencing, Patterns) | done | SEQ pages' PATTERN: push, the variations; knob 1 the amount | [ ] |
+| **Sequences and sequence chains**: pattern n of every track, a name and tempo of its own; several in one hold (SCNE) (MELODEE.md › Sequencing, Sequences) | done | Session: push, the column's sheet: knob 1 its tempo, knob 2 a ready name; pads of other columns chain sequences; push launches | [ ] |
+| **Follow actions**: Next, Previous, Any, Again, Stop; after 1-64 bars or plays; chance; OR (FOLW) (MELODEE.md › Sequencing) | done | SEQ pages' FOLLOW: knobs 1-5; push: the column | [ ] |
+| **BPM per pattern** (MELODEE.md › Sequencing, Patterns) | done | SEQ pages' PATTERN: BPM; Workflow: BPM/Pattern on | [ ] |
+| **Seq Record**: armed, then Play; at once while playing; overdub; notes at the tick heard; a take is one undo (MELODEE.md › Sequencing) | done | Rec (14.1): from stopped a count-in and the take, playing at once; overdub; the tick the pad was heard (the audio thread stamps it). One undo a take: MIDI & sync & undo & projects' undo | [ ] |
+| **Count-In**: a bar of clicks before recording (MELODEE.md › Shift + pads) | done | Workflow (Shift + Step 3): Count-In, as on the Move (13.3) | [ ] |
+| **Rec Quantize**: notes land on the pattern's Q (MELODEE.md › Sequencing, Seq Record) | done | Workflow (Shift + Step 3): Rec Quantize | [ ] |
+| **Fill**: FILL conditions play while held (MELODEE.md › The panel, Play) | done | Loop held while playing (Kerem, 2026-11-20) | [ ] |
+| **Chance and trig conditions**: ALWAYS, n:m, FILL, FIRST, PRE, NEI and their NOTs (COND) (MELODEE.md › Sequencing) | done | a step held + push: TRIG, knobs 1-2 | [ ] |
+| **Ratchets**: 1-8 hits, velocity ramp, pitch ramp on a kit pad (RTCH) (MELODEE.md › Sequencing) | done | a step held + push: TRIG, knobs 3-5; Roll: RTC | [ ] |
+| **Accent, Slide, Tie**: about 4 dB louder; a glide of 60 ms; legato; CC 84 and CC 68 to synths (MELODEE.md › Sequencing, Roll) | done | a step held + push: TRIG, knobs 6-8 | [ ] |
+| **Step Edit, STEPS**: the 16 steps of a bar for one pad or note, lit by velocity, the playhead; Tie and Insert (MELODEE.md › Sequencing, Step Edit) | done | the Move's steps: a bar of the last pad's lane (a kit) or of the notes, the playhead green; Left / Right the bar; TIE on TRIG; Insert on Roll's push | [ ] |
+| **Step Edit, PLAY**: pads write at the caret; REST, ERASE; length, velocity, chance (MELODEE.md › Sequencing, Step Edit) | done | SEQ pages' ENTRY: pads write at the caret (the wheel), push a rest, Delete back; knobs length, velocity, chance | [ ] |
+| **Parameter locks**: hold a step, turn a knob (MELODEE.md › Sequencing, Step Edit) | sequencer | a step held + a knob (the Move's per-step automation): a kit pad's values and the mix's lanes. Not yet on a Schwung module's own parameters: they are not engine lanes, and need a module motion player | [ ] |
+| **Lane length**: a kit pad's lane loops on its own, polymeter (LANE) (MELODEE.md › Sequencing, Step Edit) | done | SEQ pages' LANE: knob 1 | [ ] |
+| **Euclid**: hits, steps 1-64, rotation on a lane (EUCL) (MELODEE.md › Sequencing, Step Edit) | done | SEQ pages' LANE: knobs 2-4, push lays it | [ ] |
+| **Spare steps**: a step written past the end makes the pattern longer (MELODEE.md › Sequencing, Step Edit) | done | Right past the last bar, then a step | [ ] |
+| **Roll**: notes at their ticks over the bars; the note in focus with length, velocity, chance, nudge (MELODEE.md › Sequencing, Roll) | done | SEQ pages' ROLL: the wheel the note, knobs 1-8 | [ ] |
+| **Roll marks and jobs**: mark notes; move by Q or a row, mute, ratchet, velocities and ramp, pull to the grid, octave; split, legato, reverse, the arp as notes, loop the bars in view (MELODEE.md › Sequencing, Roll) | done | SEQ pages' ROLL: push, the jobs (marks, mute, pull to grid, legato, split, reverse, arp as notes, loop the bar, ramps, insert); knobs move by Q (MOV) or a row (KEY), octave, ratchet | [ ] |
+| **Copy notes**: marked notes pasted at the cursor; a key's notes onto another; a step onto another (MELODEE.md › Across every page, Copy) | done | Roll: Copy the marked notes, Copy again pastes at the focus; MARK THE KEY then KEY moves a key's notes; Copy + a step, then a step | [ ] |
+| **Erase notes**: a pad's notes while playing, a key's notes, the note in focus (MELODEE.md › Across every page, Erase) | done | Delete + pad (a kit); Roll: MARK THE KEY, Delete; Delete on Roll the note in focus | [ ] |
+| **Motion**: knob moves recorded in each pattern, 8192 points, lanes reset at the pattern's start; a lane cleared (MELODEE.md › Sequencing, Motion) | sequencer | Rec + knob turns (14.2) on a kit's pages and the track's level; Delete + knob touch clears, Mute + touch off and on; SEQ pages' MOTION. Not yet a Schwung module's parameters (as Parameter locks) | [ ] |
+| **Mix in Motion**: level, pan, sends, master chain and returns recorded (MELODEE.md › Sequencing) | mixer & effects | the track's level done (track button + Volume knob while recording); pan, sends, master chain and returns come with the mixer's pages: their knobs name their lanes (Screen::knob_lane) and Rec writes them | [ ] |
+| **MOD**: eight modulators, an LFO (seven shapes, free or synced) or a follower, up to four lanes each (MODS) (MELODEE.md › Sequencing) | done | SEQ pages' MOD: the wheel the modulator, knobs kind, shape, rate, sync, depth, target, low, high; push the target slot | [ ] |
+| **Macros**: eight, each one knob over up to eight lanes (MACR) (MELODEE.md › Sequencing, MOD) | done | SEQ pages' MACROS: a knob each; push: the lanes the last one moves | [ ] |
+| **A pattern's feel**: STRENGTH, SWING, HUMANIZE, HUMAN VEL, GROOVE from another pattern (FEEL) (MELODEE.md › Sequencing) | done | SEQ pages' FEEL: knobs 1-6 | [ ] |
+| **Time Correct**: heard live, no commit; ALL lays the feel on the other patterns (MELODEE.md › Sequencing) | done | SEQ pages' FEEL (heard live), push: ALL; Shift + Step 16 is the Move's Quantize (it rewrites the notes, Workflow's amount) | [ ] |
+| **Half Seq, Double Seq, Half Speed, Double Speed** (MELODEE.md › Sequencing) | done | Shift + Step 15 doubles (the Move's); SEQ pages' PATTERN push: Half Seq, Double Seq, Half Speed, Double Speed | [ ] |
+| **Recall**: every note played is kept; the last phrase into empty patterns, one undo (MELODEE.md › Sequencing, Recall) | done | Capture (14.3): every track's last phrase into its next empty pattern, playing; from stopped three tempos on the wheel; Shift + Capture clears | [ ] |
 | **Song**: a lane per track, clips of patterns, markers, loop brace, cursor; play from the cursor (MELODEE.md › Sequencing, Song) | song & export | Shift + Step 12; jogwheel by the bar; knobs zoom, pattern, length | [ ] |
 | **Song clip jobs**: place, duplicate, mute, own pattern, open notes, split, delete, repeat to a marker, loop its bars (MELODEE.md › Sequencing, Song) | song & export | push sheet; Copy, Delete, Loop | [ ] |
 | **Markers**: add, name, jump (MELODEE.md › Sequencing, Song) | song & export | push sheet; Up / Down jump | [ ] |
@@ -237,7 +237,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **CLEAN**: cut on the sample's drums stem (MELODEE.md › Sampler, Chop) | schwung | Schwung's separator writes the stems as files: Load the drums stem and Chop it | — |
 | **To Pads**: Poly, Mono, Thru (MELODEE.md › Sampler, Chop) | done | Chop: push; jogwheel | [ ] |
 | **To Pads KIT**: a pad a sound (MELODEE.md › Sampler, Chop) | sampling | To Pads sheet | [ ] |
-| **To Pads PATTERN**: a note for each slice into the pattern (MELODEE.md › Sampler, Chop) | sequencer | To Pads sheet | [ ] |
+| **To Pads PATTERN**: a note for each slice into the pattern (MELODEE.md › Sampler, Chop) | sequencer | Not yet on the sheet: To Pads is sampling's Chop (screens/chop.cpp); Sequencer::slices_to_pattern() lays the notes, tested, for its PATTERN choice | [ ] |
 | **Slices kept with the sample** (in its WAV on the MPC; here in the project, its own `MVCH` section, so the Move's library is never written) (MELODEE.md › Sampler, Chop) | done | automatic | [ ] |
 | **Zero Snap and 2 ms edge fades** on every cut (MELODEE.md › Sampler, Chop) | done | automatic | [ ] |
 | **A sample's note** found as it loads: a pitch, or a chord's root (MELODEE.md › Sampler) | instruments | automatic | [ ] |
@@ -344,7 +344,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | --- | --- | --- | --- |
 | **Screen grammar and header**: a glyph and two words, back on B1, the verb on B3, sheets as cards, where you are always shown (MELODEE.md › Across every page) | done | the Rail (UI.md): rail, subject, detail line, sheets | [ ] |
 | **Questions before a loss**: one sheet, what goes, whether undo brings it back (MELODEE.md › Across every page) | MIDI & sync & undo & projects | push yes, Back no | [ ] |
-| **Place bar**: the bars of the pattern playing, how far it has played, coloured by state (MELODEE.md › Across every page) | sequencer | step lights (the playhead); a bar on the rail | [ ] |
+| **Place bar**: the bars of the pattern playing, how far it has played, coloured by state (MELODEE.md › Across every page) | done | the steps' playhead (green), Loop Mode's bars, Session's progress | [ ] |
 | **Mute mode**: pads mute kit pads or tracks, Shift + pad solos, Shift + Mute unmutes all; kit pad mutes saved (MELODEE.md › Across every page) | mixer & effects | Mute (a tap latches, a hold lasts) + pad; Shift + Mute | [ ] |
 | **Mute and solo tracks** from the overview (MELODEE.md › Pad lights, Tracks) | mixer & effects | track button held + Mute + step | [ ] |
 | **Erase a kit pad**, stopped (MELODEE.md › Across every page, Erase) | kit depth | Delete + pad | [ ] |
@@ -389,7 +389,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Presets**: programs with names; CLAP preset files in folders (MELODEE.md › Plug-ins, Presets) | done | a Schwung module's presets on the jogwheel | [ ] |
 | **Drum machine plug-ins**: voices named, the pads to Drums (MELODEE.md › Plug-ins, Drum machines) | done | Schwung's drum modules (9w9) from note 36: Down an octave | [ ] |
 | **Plug-in effects** on track, bus, master and loop chains (MELODEE.md › Plug-ins, An effect) | mixer & effects | Schwung's audio effect modules on track, bus and master chains | [ ] |
-| **Transport to plug-ins**: playing, position, tempo, time signature; TRANSPORT off (MELODEE.md › Plug-ins, Transport) | sequencer | `schwung_move_info()` and `get_bpm()`: the tempo now; playing and the place to come | [ ] |
+| **Transport to plug-ins**: playing, position, tempo, time signature; TRANSPORT off (MELODEE.md › Plug-ins, Transport) | done | get_clock_status(), get_beat_position() and schwung_move_info(): playing, song beats, time signature, the tempo | [ ] |
 | **Plugin Data** as the plug-ins' home folder (MELODEE.md › Plug-ins) | schwung | covered by Schwung's modules, the Move's plug-ins | — |
 | **Neural Amp Modeler and TONE3000**: models and IRs from Plugin Data; capture size kept (MELODEE.md › Plug-ins) | schwung | covered by Schwung's modules, the Move's plug-ins | — |
 | **Open MPC's rate bridge** for 48 and 96 kHz (MELODEE.md › Plug-ins) | n/a | the Move runs at 44.1 kHz, Open MPC's own rate | — |
@@ -489,12 +489,12 @@ sections, each on Shift + Step n.
 
 | Status | Rows |
 | --- | --- |
-| `done` | 55 |
-| `sequencer` | 44 |
+| `done` | 95 |
+| `sequencer` | 3 |
 | `sampling` | 22 |
 | `kit depth` | 27 |
 | `instruments` | 25 |
-| `mixer & effects` | 22 |
+| `mixer & effects` | 23 |
 | `song & export` | 21 |
 | `looper` | 13 |
 | `MIDI & sync & undo & projects` | 54 |
@@ -518,7 +518,7 @@ tempo) touches, and where each stands now.
 | --- | --- | --- | --- | --- |
 | **Play** | start / stop (20) | plays and stops the patterns | done | [ ] |
 | **Shift + Play** | retrigger the playing clips from their start (17.1.5) | nothing yet: the bindings table | MIDI & sync & undo & projects | [ ] |
-| **Rec** | record into the selected track's clip, after a count-in (14.1) | Seq Record | sequencer | [ ] |
+| **Rec** | record into the selected track's clip, after a count-in (14.1) | Seq Record, its count-in from stopped | done | [ ] |
 | **Track button** | select the track (20) | selects one of the bank's four of sixteen | done | [ ] |
 | **Track button held** (an unselected one) | look at that track without selecting it (20) | selects it on the press; held, the sixteen, the steps pick (free on the Move) | MOVE_CONTROLS.md decides | [ ] |
 | **Track button + Volume knob** | that track's volume, in dB (16.2) | the same (`VOL`) | done | [ ] |
@@ -530,7 +530,7 @@ tempo) touches, and where each stands now.
 | **Shift + Step 5** | Tempo: the wheel, Shift + wheel finer, push confirms (10.1) | the same | done | [ ] |
 | **Shift + Step 6** | Metronome on / off (10.3) | the same; the wheel its level | done | [ ] |
 | **Shift + Step 7** | Groove, 0 % to 100 % triplet sixteenths and past (10.2) | the same, as Melodee's swing 50-75 % | done | [ ] |
-| **Shift + Step 3** | Workflow settings: count-in (13, 14.1.1) | with Rec | sequencer | [ ] |
+| **Shift + Step 3** | Workflow settings: count-in (13, 14.1.1) | Workflow: quantize, step grid, count-in, Rec Quantize, time signature, max length, metronome, BPM per pattern | done | [ ] |
 | **Shift + Steps 1, 2, 8-11, 15, 16** | Set overview, Setup, 16 Pitches, Keys & Scale, full velocity, Repeat / Arp, double loop, quantize (20) | not yet | MOVE_CONTROLS.md decides | [ ] |
 | **Note / Session toggle** ("Menu", CC 50) | switch Note and Session; held, a peek (5, 17) | Load (samples, modules) | MOVE_CONTROLS.md decides | [ ] |
 | **Loop** | Loop mode: the steps are bars (12.1) | Chop | MOVE_CONTROLS.md decides | [ ] |

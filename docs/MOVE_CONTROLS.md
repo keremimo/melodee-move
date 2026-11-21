@@ -352,8 +352,10 @@ input to a `bindings::Gestures`, looks each use up with `bindings::find()`
 (the screen on top's `screen_kind()`, the track's kind) and does its job:
 the app's own (the track buttons, transport, the Volume knob, mute and
 solo, typing), else the job of the screen on top (`Screen::job()`), else
-that of the track's Play screen under it, else it opens the screen whose
-`Trigger` names the job (Tempo, Metronome, Groove). Screens never read
+that of the track's Play screen under it, else the sequencer's
+(`src/app/sequencer.*`: the steps, bars and patterns, Rec, Capture), else
+it opens the screen whose `Trigger` names the job (Tempo, Metronome,
+Groove, Workflow, Repeat, Loop Mode, Session, the SEQ pages). Screens never read
 buttons; `Screen::input()` only shows what is held. Holds come due in
 `lights()`. The audio thread keeps a pad quiet while `pad_sounds()` says it
 has another job (`Studio::quiet_pads()`).
@@ -390,4 +392,5 @@ long, double, used as a modifier) has tests of its own.
 ## Mockups
 
 `build/melodee-move --ui-mockups DIR` draws the screens this map moves or
-adds (`src/ui/mockups_controls.cpp`): `docs/ui/controls.png`.
+adds (`src/ui/mockups_controls.cpp`): `docs/ui/controls.png`; the
+sequencer's (`src/ui/mockups_sequencer.cpp`): `docs/ui/sequencer.png`.

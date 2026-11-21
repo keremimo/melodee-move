@@ -186,6 +186,117 @@ Chop), Kerem decides with that map. `docs/ui/tracks.png` is the sheet
 | Metronome (Shift + Step 6) | `MET` | `ON` or `OFF` large, its level | `PUSH: OK` |
 | Groove (Shift + Step 7) | `GRV` | the groove in % large | `PUSH: OK` |
 
+## Sequencer
+
+Melodee's sequencer on the Move's own keys (Ableton's manual: Step
+Sequencing 11, Loop Mode 12, Workflow 13, Recording 14, Capture 14.3,
+Session 17), Melodee's patterns underneath (96 ticks a quarter, 128 a
+track); its own pages on Shift + Loop, which the Move leaves free (Kerem,
+2026-11-20). `docs/ui/sequencer.png` is the sheet
+(`src/ui/mockups_sequencer.cpp`, drawn with `src/ui/seq_widgets.*`, which
+the screens draw with too); `build/melodee-move --melodee-previews DIR`
+draws the real screens into `DIR/sequencer/`.
+
+![The sequencer screens](ui/sequencer.png)
+
+- **The steps** are a bar of the selected pattern (a page of sixteen; twelve
+  on a triplet Q), as on the Move: a tap puts the last pad's note on the
+  step (a kit: the steps are that pad's lane; a note track: the notes held,
+  else the last), a tap again clears it. White with a note, the track's
+  colour dim where empty, brighter under a long note, grey past the loop,
+  the playhead green. Left / Right the bar (Shift: sixteen bars); a step
+  past the end makes the pattern longer (Melodee's spare steps).
+- **A step held** shows its card (`STEP` / step / bar): the note, its
+  velocity large, its length and nudge in steps, Melodee's marks on it
+  (accent, condition, ratchet, chance, slide, tie, locks). Held with the
+  Volume knob its velocity, the wheel its length, a later step its length up
+  to it, Plus / Minus a semitone (long: an octave; a kit pad's pitch),
+  Left / Right a tenth of a step (Shift: a tick; long: a step), a pad that
+  pad's note in or out. **A knob** writes a lock of that knob's lane on the
+  step (the Move's per-step automation; `LOCK` / step), its range red on
+  the steps. **Push** turns the knobs to **TRIG** (Kerem, 2026-11-20):
+  chance, condition, ratchet, ramp, pitch ramp, accent, slide, tie; push
+  again, back to the locks.
+- **Loop** (Loop Mode, `LOOP` / bars / `BARS`): the pattern's bars as
+  blocks, the steps its bars (the selected one white, the loop's in the
+  track's colour, the bar playing pulsing). A step selects the bar (Note
+  Mode's steps show it after), a step held + another the loop between them
+  (from bar 1, the pattern's length; from a later bar an editor's loop), a
+  double press a one-bar loop; a bar held takes the wheel, the Volume knob,
+  Plus / Minus, Left / Right and a pad for its notes; Copy + a bar, then
+  another; Delete + a bar. **Loop held + the wheel** is the length (Shift:
+  sixteenths) on any screen. **Loop held 0.4 s while playing** is Fill.
+- **Note/Session** (Session, `PATT` / pattern / page): a row of pads a track
+  of the bank in view (the first on top), a column a pattern number, eight
+  at a time (Left / Right; Plus / Minus the bank). Patterns with notes in
+  the track's colour dim, playing bright, waiting for the bar green
+  (blinking), about to stop blinking in its colour, the selected one
+  pulsing white; on the screen the same cells as the pads sit, a follow
+  action's arrow, the playing one's progress. A pad launches (the next bar
+  while playing, at once stopped); a pad held and others of its row tapped
+  chain them; Copy + a pad, then another, asks before replacing; Delete + a
+  pad clears it at once (17.1.4). The wheel moves the playhead by Q
+  (stopped: Play continues there); its push opens the column's sheet
+  (`SCNE`): knob 1 its tempo, knob 2 a ready name, pads of other columns
+  chain sequences, push launches. Held, Note/Session peeks.
+- **Rec**: from stopped a bar's count-in (`REC` / `CNT`, the beat large,
+  Rec flashing), then the take from the top; while playing at once. Notes
+  land at the tick the pad was heard (the audio thread stamps it), with Rec
+  Quantize on the pattern's Q; overdub; an empty pattern is free and grows a
+  bar at a time (`REC` / bars, `FREE`), the take ending at the end of the
+  bar playing. Knob turns while recording are written as Motion. Rec again
+  or Stop ends the take.
+- **Capture** (Melodee's Recall): every track's last phrase into its next
+  empty pattern, launched; played stopped, the transport starts and three
+  tempos the phrase fits come up (`CAP` / BPM; the wheel picks). Lit while
+  there is something to keep; Shift + Capture clears it, as do Play, Stop
+  and a track change.
+- **Shift + Step 3, Workflow** (`WORK`): quantize amount, step grid (the
+  pattern's Q), count-in, Rec Quantize, time signature, a free take's
+  longest, the metronome Always or on Rec only, BPM per pattern. **Shift +
+  Step 11, Repeat** (`RPT`): Note Repeat on and its screen (style Repeat or
+  the arp's Up, Down, Random on a note track; the rate large; pressure as
+  velocity), again off. **Shift + Step 14** the next empty pattern, **15**
+  twice as long, **16** the Move's Quantize (a tap, Workflow's amount; held
+  + a pad, that pad's lane). **Tempo** (Shift + Step 5): the steps tap the
+  tempo, Left / Right halve and double it.
+- **Shift + Loop, Melodee's SEQ pages** (Shift + the wheel the page; the
+  rail names it and says `n/9`): **PATTERN** (length, Q, signature, the
+  track's speed, this pattern's BPM, free; push: Half and Double Seq and
+  Speed, Thinner, Busier, Humanised, Reversed, an octave up or down into the
+  next empty pattern, knob 1 the amount), **ENTRY** (Melodee's Step Edit
+  PLAY: pads write at the caret, which moves on as they are let go; the
+  wheel the caret, push a rest, Delete back a step), **ROLL** (the notes
+  over the bar, the wheel the note in focus; knobs its length, velocity,
+  chance, nudge, ratchet, octave, place by Q, key; push the jobs: marks,
+  mute, pull to the grid, legato, split, reverse, the arp as notes, loop
+  the bar, ramps, insert and delete a step; Copy the marked notes and Copy
+  again to paste; Delete erases), **MOTION** (the pattern's lanes; push
+  off or on, Delete clears), **MOD** (eight modulators: kind, shape, rate,
+  sync, depth, target, its range), **MACROS** (eight, a knob each; push the
+  lanes), **FEEL** (Time Correct heard live: strength, swing, humanize,
+  velocity, a groove from another pattern, its amount; push lays it on the
+  track's others), **FOLLOW** (the follow action; push puts it on the
+  column), **LANE** (a kit pad's own lane length; Euclid's hits, steps,
+  rotation; push lays it).
+
+| Screen | Rail | Subject | Detail |
+| --- | --- | --- | --- |
+| A step held | `STEP` / step / bar | the note, velocity large, length, nudge, marks | `PUSH: TRIG`, locks |
+| A step held + a knob | `LOCK` / step / pad | the lane's name on the step, its value, a bar | `DELETE+TOUCH: CLR` |
+| A step held, TRIG | `TRIG` / step / bar | eight cells: chance, condition, ratchet, ramps, accent, slide, tie | `PUSH: LOCKS` |
+| Loop Mode | `LOOP` / bars / `BARS` | the bars as blocks, the loop framed | bar, loop |
+| Loop held + wheel | `LOOP` / bars / `BARS` | the length large | `SHIFT: 1/16S` |
+| Session | `PATT` / pattern / page | four tracks' eight cells | track, pattern |
+| A chain in the making | `CHN` / track / `TRK` | the chain large | `A TAP ENDS IT` |
+| A column's sheet | `SCNE` / pattern | tempo, name | `PUSH: LAUNCH` |
+| Count-in | `REC`, the dot / `CNT` | the beat large, the beats | pattern |
+| A free take | `REC` / bars / `BARS` | the bars growing | bar and beat |
+| Capture | `CAP` / bars or BPM | the notes kept, or three tempos | pattern |
+| Workflow | `WORK` / / `SEQ` | eight settings | |
+| Repeat | `RPT` / `ON` | the rate large, style, rate, pressure | |
+| SEQ pages | the page's tag / pattern / `n/9` | a title, eight cells or the page's picture | the push's job |
+
 ## Screens in code
 
 Each screen is a file of its own in `src/app/screens/`, a `Screen`
@@ -235,7 +346,10 @@ hold the code to it. In short:
   slices in alternating colours, the selected one white, and in a manual take
   the pad that cuts next blinking red; on a module track every C in the
   track's colour, the other naturals dim, a held pad white.
-- **Steps**: in Chop, the parts where a cut falls; the playhead while playing.
+- **Steps**: in Chop, the parts where a cut falls; on Play the pattern's
+  bar (white notes, the track's colour dim where empty, brighter under a
+  long note, grey past the loop, the playhead green, a held step's locks
+  red); in Loop Mode its bars.
 - **Track buttons**: the bank's four, each its track's colour, dim; the
   selected one bright; an empty one dark.
 - **Steps, a track button held**: the sixteen tracks, each its colour, the

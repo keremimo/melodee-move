@@ -50,7 +50,12 @@ class SeqPages final : public Screen {
 public:
     using Screen::Screen;
     bindings::Screen screen_kind() const override { return bindings::Screen::Play; }
-    void enter() override { set_entry(); }
+    void enter() override { // the page left last, as Melodee's hub reopens it; Roll on the pattern's first note
+        set_entry();
+        focus = 0;
+        marks.clear();
+        clipboard.clear();
+    }
     void leave() override { studio.sequencer().entry = false; }
 
     bool job(Job job, const bindings::Use& use) override {
@@ -644,7 +649,8 @@ public:
 private:
     int row = 0;
     const std::vector<std::string> names {"MARK NOTE", "MARK THE BAR", "CLEAR MARKS", "MUTE", "PULL TO GRID", "LEGATO", "SPLIT", "REVERSE",
-                                          "ARP AS NOTES", "LOOP THE BAR", "LOOP OFF", "ERASE"};
+                                          "ARP AS NOTES", "LOOP THE BAR", "LOOP OFF", "ERASE", "MARK THE KEY", "RAMP UP", "RAMP DOWN",
+                                          "INSERT STEP", "DELETE STEP"};
     void act() {
         auto* pages = pages_of(studio);
         if (!pages) return;
@@ -661,6 +667,24 @@ private:
                 if (p.events[n].tick / bar == p.events[size_t(focus)].tick / bar) pages->marks.insert(n);
             return;
         case 2: pages->marks.clear(); return;
+        case 12: // a key's notes, to copy onto another (Copy, then KEY) or erase
+            if (!any) return;
+            for (size_t n = 0; n < p.events.size(); ++n)
+                if (p.events[n].key == p.events[size_t(focus)].key) pages->marks.insert(n);
+            return;
+        case 15: case 16: { // Melodee's Insert: the notes from the focus's step on one step later (or earlier, the step's own gone)
+            if (!any) return;
+            uint32_t q = p.q(), from = p.events[size_t(focus)].tick / q * q;
+            if (row == 16) seq::clear_span(p, {from, from + q}, -1);
+            for (auto& e : p.events)
+                if (e.tick >= from + (row == 16 ? q : 0)) e.tick = row == 15 ? e.tick + q : e.tick - q;
+            if (row == 15) seq::set_length(p, std::max(p.length, p.events.empty() ? p.length : p.events.back().tick + 1), studio.project().max_length());
+            p.sort();
+            pages->marks.clear();
+            pages->edited();
+            studio.say(names[size_t(row)]);
+            return;
+        }
         case 9: { // the bar in view loops (Melodee's: loop the bars in view)
             if (!any) return;
             unsigned b = p.events[size_t(focus)].tick / bar;
@@ -695,6 +719,8 @@ private:
             break;
         }
         case 11: notes.clear(); break;
+        case 13: melodee::ramp_events(notes, 50); break;
+        case 14: melodee::ramp_events(notes, -50); break;
         default: break;
         }
         melodee::put_events(p, notes);

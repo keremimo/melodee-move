@@ -159,6 +159,7 @@ public:
     }
     std::string status() const override { return " session_first=" + std::to_string(first + 1); }
 
+    unsigned first_shown() const { return first; }
     // For the copy question.
     int copied_track = -1, copied = -1;
     unsigned target_track = 0, target = 0;
@@ -226,27 +227,54 @@ public:
 };
 
 // The wheel's push in Session: the selected pattern's column on every track
-// (Melodee's sequence), its tempo on knob 1; push launches, Back leaves.
+// (Melodee's sequence). Knob 1 its tempo, knob 2 its name (Melodee's ready
+// names); pads of other columns tapped here chain the sequences (each played
+// once, round again); push launches, Back leaves.
 class Scene final : public Screen {
 public:
     using Screen::Screen;
     bindings::Screen screen_kind() const override { return bindings::Screen::List; }
+    void enter() override { chain.clear(); }
     bool job(Job job, const bindings::Use& use) override {
         auto& seq = studio.sequencer();
         unsigned n = seq.number(studio.track());
+        auto* session = dynamic_cast<Session*>(studio.screen("session"));
         switch (job) {
         case Job::ListPush:
-            seq.launch_scene(n);
+            if (chain.size() >= 2) {
+                for (unsigned t = 0; t < melodee::track_count; ++t) {
+                    if (!studio.project().tracks[t].used()) continue;
+                    bool any = t == studio.track();
+                    for (auto k : chain) any = any || !seq.pattern(t, k).empty();
+                    if (any) seq.chain(t, chain);
+                }
+                studio.say("SEQUENCES " + chain_text());
+            } else {
+                seq.launch_scene(n);
+                studio.say("SEQUENCE " + std::to_string(n + 1));
+            }
             studio.close();
-            studio.say("SEQUENCE " + std::to_string(n + 1));
             return true;
-        case Job::TurnKnob: case Job::TurnKnobFine: if (use.index == 0) seq.set_scene_tempo(n, use.delta); return true;
+        case Job::PlayPad: case Job::PlayNote: case Job::PlayPitch: { // a column: chained after the selected one
+            unsigned column = (session ? session->first_shown() : n / 8 * 8) + move::pad_column(unsigned(use.index));
+            if (chain.empty()) chain.push_back(uint8_t(n));
+            if (chain.size() < melodee::max_chain) chain.push_back(uint8_t(column));
+            return true;
+        }
+        case Job::TurnKnob: case Job::TurnKnobFine:
+            if (use.index == 0) seq.set_scene_tempo(n, use.delta);
+            if (use.index == 1) name(n, use.delta);
+            return true;
         case Job::ListTurn: seq.set_scene_tempo(n, use.delta); return true;
         case Job::Back: studio.close(); return true;
         default: return false;
         }
     }
-    void lights(move::Lights& lights) override { lights.button(move::Button::Back, move::white_dim); }
+    void lights(move::Lights& lights) override {
+        auto* session = studio.screen("session");
+        if (session) session->lights(lights); // the grid, its columns to chain
+        lights.button(move::Button::Back, move::white_dim);
+    }
     void draw(juce::Graphics& g) override {
         unsigned n = studio.sequencer().number(studio.track());
         const auto& scene = studio.project().scenes[n];
@@ -255,15 +283,36 @@ public:
         char tempo[16];
         if (scene.tempo) std::snprintf(tempo, sizeof tempo, "%u.%u", scene.tempo / 10, scene.tempo % 10);
         else std::snprintf(tempo, sizeof tempo, "--");
-        ui::seq::value_cells(g, ui::content(11, 40), {"BPM", "", "", "", "", "", "", ""}, {tempo, "", "", "", "", "", "", ""});
-        move::draw_text(g, ui::content_x + 2, 33, "PATTERN " + std::to_string(n + 1) + " OF EACH");
-        move::draw_text(g, ui::content_x + 2, 42, "TRACK, NEXT BAR");
+        ui::seq::value_cells(g, ui::content(11, 40), {"BPM", "NAM", "", "", "", "", "", ""}, {tempo, scene.name[0] ? upper(scene.name).substr(0, 4) : "-", "", "", "", "", "", ""});
+        if (chain.size() >= 2) move::draw_text(g, ui::content_x + 2, 33, "CHAIN " + chain_text());
+        else move::draw_text(g, ui::content_x + 2, 33, "PATTERN " + std::to_string(n + 1) + " OF EACH");
+        move::draw_text(g, ui::content_x + 2, 42, chain.size() >= 2 ? "EACH ONCE, ROUND" : "TRACK, NEXT BAR");
         ui::detail(g, "PUSH: LAUNCH");
     }
     Knob knob(unsigned which) const override {
+        const auto& scene = studio.project().scenes[studio.sequencer().number(studio.track())];
+        if (which == 1) return {"SEQUENCE NAME", scene.name[0] ? upper(scene.name) : "NONE", 0.0f};
         if (which) return {};
-        unsigned tempo = studio.project().scenes[studio.sequencer().number(studio.track())].tempo;
-        return {"SEQUENCE TEMPO", tempo ? std::to_string(tempo / 10) + "." + std::to_string(tempo % 10) : "NONE", tempo / 3000.0f};
+        return {"SEQUENCE TEMPO", scene.tempo ? std::to_string(scene.tempo / 10) + "." + std::to_string(scene.tempo % 10) : "NONE", scene.tempo / 3000.0f};
+    }
+    std::string status() const override { return " scene_chain=" + std::to_string(chain.size()); }
+
+private:
+    std::vector<uint8_t> chain;
+    // Melodee's ready names for a sequence (its markers').
+    void name(unsigned n, int delta) {
+        static const char* const names[] {"", "Intro", "Verse", "Pre", "Chorus", "Bridge", "Break", "Build", "Drop", "Outro", "A", "B", "C", "D"};
+        constexpr int count = int(sizeof names / sizeof names[0]);
+        auto& scene = studio.project().scenes[n];
+        int at = 0;
+        for (int k = 0; k < count; ++k) if (std::string(scene.name) == names[k]) at = k;
+        scene.set_name(names[std::clamp(at + (delta > 0 ? 1 : -1), 0, count - 1)]);
+        studio.changed();
+    }
+    std::string chain_text() const {
+        std::string text;
+        for (auto k : chain) text += (text.empty() ? "" : ">") + std::to_string(k + 1);
+        return text;
     }
 };
 
