@@ -3,6 +3,7 @@
 // is loaded when this host starts, not linked, so the same binary runs on
 // Ableton's firmware, which has no JACK at all.
 #include "move/host.h"
+#include "move/memory.h"
 #include <jack/jack.h>
 #include <jack/midiport.h>
 #include <dlfcn.h>
@@ -31,6 +32,7 @@ struct Jack {
     void* library = nullptr;
     Jack() {
         library = dlopen("libjack.so.0", RTLD_NOW | RTLD_LOCAL);
+        if (library) pin_loaded_code();
         if (!library) throw std::runtime_error("libjack.so.0 not found; the JACK host needs it");
 #define LOAD(function) \
         function = reinterpret_cast<decltype(function)>(dlsym(library, #function)); \
@@ -138,6 +140,7 @@ private:
     }
 
     int process(jack_nframes_t frames) {
+        if (!stack_ready) { prefault_stack(); stack_ready = true; } // JACK's thread: its stack touched once
         uint64_t began = monotonic_ns();
         bool arrived = false;
         uint64_t pads_before = session.pad_events.load(std::memory_order_relaxed);
@@ -233,6 +236,7 @@ private:
     std::unique_ptr<Reblocker> reblocker = std::make_unique<Reblocker>();
     jack_nframes_t period = 0;
     bool display_pending = false;
+    bool stack_ready = false; // JACK's process thread only
     std::atomic<bool> gone {false};
 };
 

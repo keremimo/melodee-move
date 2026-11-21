@@ -9,6 +9,7 @@
 //
 // so a pad read in one exchange sounds in the audio sent with the next.
 #include "move/host.h"
+#include "move/memory.h"
 #include "move/realtime.h"
 #include "move/spi_device.h"
 #include "move/spi_protocol.h"
@@ -95,6 +96,7 @@ private:
     }
 
     void run() {
+        prefault_stack();
         become_realtime();
         uint8_t* page = device->page();
         reset_surface(page);

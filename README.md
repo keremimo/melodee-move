@@ -422,7 +422,7 @@ the tap's click and the sound in the waveform is what you hear.
 
 | Folder | What it holds |
 | --- | --- |
-| `src/move/` | move-base. `app.h` the `App` interface (sample-base's hooks plus `audio_event`); `runtime.*` the threads; `host.*` what a host shares with them; `spi_host.cpp`, `spi_device.*`, `spi_protocol.*` the Move's device and a simulated one; `jack_host.cpp` the JACK host (libjack loaded at run time); `audio.h` blocks and the reblocker; `controls.*`, `lights.*`, `display.*`, `font.*`, `latency.h`, `tools.*`; `realtime.*` the helper asked for realtime, `speech.*` and `schwung_tts.h` Schwung's speech |
+| `src/move/` | move-base. `app.h` the `App` interface (sample-base's hooks plus `audio_event`); `runtime.*` the threads; `host.*` what a host shares with them; `spi_host.cpp`, `spi_device.*`, `spi_protocol.*` the Move's device and a simulated one; `jack_host.cpp` the JACK host (libjack loaded at run time); `audio.h` blocks and the reblocker; `controls.*`, `lights.*`, `display.*`, `font.*`, `latency.h`, `tools.*`; `realtime.*` the helper asked for realtime, `memory.*` memory locked as it is touched, `speech.*` and `schwung_tts.h` Schwung's speech |
 | `src/ui/` | the interface kit for the Rail design (docs/UI.md), and its mockups (`--ui-mockups DIR`) |
 | `src/web/` | Melodee's web page: `http.*` the server, `pairing.*` who may use it (the USB cable, or a code), `web_page.*` its answers and Melodee's folder, `web_layer.*` the page around the app (the screen's frames, its screens on the Move, Shift + Capture), `screens.*` those screens, `web_bundle.*` and `static/` the page itself |
 | `src/app/` | Melodee on the Move: `melodee_app.*` the app (thin: what every screen shares), `studio.*` Melodee's `Project` and `EngineHost` and what the screens share, `sequencer.*` and `seq_edit.*` the sequencer, `screen.*` a screen and the registry, `screens/` one file a screen, `project_store.*` the project file, `schwung_api.h` and `module_host.*` Schwung's modules (behind Melodee's `PluginRunner`), `canvas_page.*` their own pages' scripts in QuickJS, `module_probe.*` trying them, `previews.*` its screens offline |
@@ -674,6 +674,15 @@ card. The report stays in `.local/probe/`.
   recorded two bars each, at once, from the input, the mix, Track 1 and L1,
   and all four played: the cycle's work 115 µs on average, 237-254 at most
   (54/205 with the Looper off), `late=1` throughout (the one at the start).
+- Memory locked as it is touched (`src/move/memory.*`, 2026-11-21): a
+  5-minute stereo WAV loaded onto a pad, streamed from the card. Locked with
+  `MCL_FUTURE` as before, the pager's room for it was all made at once:
+  Melodee 102 MB larger on loading, before a note (the whole sample as
+  floats), and none of it ever given back. With `MCL_ONFAULT`, nothing on
+  loading; 8 MB after 20 s of it playing; `stream_late=0`, `pager_late=0`,
+  `late=1` (the one at the start), with the Looper's four loops playing
+  beside it too. Schwung modules' code is locked as they load and each
+  rendering thread's stack touched first, so neither faults in mid-block.
 - Sampling, in the simulated Move: a take of Melodee's own mix (RESAMPLE)
   with the kit played through the pads onto A06, written to
   `Samples/Recorded`, and Audio Recall onto A07 (`./build.sh`); the unit

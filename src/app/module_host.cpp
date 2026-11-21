@@ -2,6 +2,7 @@
 #include "app/module_host.h"
 #include <juce_core/juce_core.h>
 #include <dlfcn.h>
+#include "move/memory.h"
 #include <algorithm>
 #include <cctype>
 #include <chrono>
@@ -229,6 +230,7 @@ std::unique_ptr<LoadedModule> LoadedModule::load(const ModuleInfo& info, std::st
     if (info.api != 2) { error = "needs Schwung's v2 API"; return nullptr; }
     void* library = dlopen(info.dsp.c_str(), RTLD_NOW | RTLD_LOCAL);
     if (!library) { error = dlerror(); return nullptr; }
+    move::pin_loaded_code(); // its code in memory before the audio thread calls it
     // Never closed: a module may have started threads of its own.
     auto init = reinterpret_cast<move_plugin_init_v2_fn>(dlsym(library, schwung::init_v2_symbol));
     if (!init) { error = "no move_plugin_init_v2"; return nullptr; }
@@ -251,6 +253,7 @@ std::unique_ptr<LoadedModule> LoadedModule::load_audio_fx(const ModuleInfo& info
     if (info.api != 2) { error = "needs Schwung's v2 API"; return nullptr; }
     void* library = dlopen(info.dsp.c_str(), RTLD_NOW | RTLD_LOCAL);
     if (!library) { error = dlerror(); return nullptr; }
+    move::pin_loaded_code(); // its code in memory before the audio thread calls it
     // Never closed, as a synth's library.
     auto init = reinterpret_cast<move_audio_fx_init_v2_fn>(dlsym(library, schwung::audio_fx_init_v2_symbol));
     if (!init) { error = "no move_audio_fx_init_v2"; return nullptr; }
@@ -655,6 +658,7 @@ bool SynthPlayer::apply() {
 }
 
 void SynthPlayer::work() {
+    move::prefault_stack(); // it renders ahead of the audio thread: no page faulted in mid-block
     on_audio_thread = true;
     while (!stopping.load(std::memory_order_relaxed)) {
         if (player.load(std::memory_order_acquire) != source_thread_plays || !apply()) {

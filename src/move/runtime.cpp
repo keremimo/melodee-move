@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "move/runtime.h"
+#include "move/memory.h"
 #include "move/remote.h"
 #include <cstring>
 #include "move/display.h"
@@ -88,13 +89,14 @@ int run_app(App& app, const RunOptions& options) {
     std::signal(SIGTERM, on_signal);
     std::signal(SIGHUP, on_signal);  // the SSH session it was started from went away
     std::signal(SIGPIPE, SIG_IGN);   // a closed terminal or socket is an error to ignore, not a reason to die
-    if (mlockall(MCL_CURRENT | MCL_FUTURE)) std::cerr << "melodee-move: mlockall failed; pages may fault in the audio thread\n";
+    const std::string locked = lock_memory();
+    if (locked != "onfault" && locked != "all") std::cerr << "melodee-move: " << locked << "; pages may fault in the audio thread\n";
 
     Session session;
     app.attach(session);
     auto host = make_host(app, session, options);
     host->start();
-    std::cerr << "melodee-move: running on " << host->name() << " at " << session.rate << " Hz; Shift + Back quits\n";
+    std::cerr << "melodee-move: running on " << host->name() << " at " << session.rate << " Hz, memory locked " << locked << "; Shift + Back quits\n";
 
     std::atomic<bool> running {true}, quit {false};
 
