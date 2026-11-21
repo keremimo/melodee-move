@@ -42,6 +42,8 @@ Run `./build.sh quick` (build, unit tests) while working and `./build.sh`
 (also self-test, previews, the simulated Move, packages, crush) before a
 merge to main. On a Move: `tools/deploy-stock.sh HOST` or
 `tools/install-schwung-tool.sh HOST`; `tools/probe-stock.sh HOST` reads one.
+A release for Schwung's module catalog is `tools/release.sh` on a commit
+(README.md, "Release"); it tags, pushes and publishes nothing.
 
 ## Credit
 

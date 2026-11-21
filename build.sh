@@ -43,6 +43,19 @@ MELODEE_SAMPLE=${MELODEE_SAMPLE:-../melodee-sample}
     exit 1
 }
 echo "melodee-sample: $(git -C "$MELODEE_SAMPLE" describe --always --dirty 2>/dev/null || echo unknown)"
+# What the packages say they were built from (SOURCE.txt, tools/bundle.sh):
+# each checkout's commit, "-dirty" when it has changes, and the commit's
+# time for the files in the catalog's asset. tools/release.sh passes a
+# release's own.
+commit_of() {
+    commit=$(git -C "$1" rev-parse HEAD 2> /dev/null) || { echo unknown; return; }
+    [ -z "$(git -C "$1" status --porcelain 2> /dev/null)" ] || commit="$commit-dirty"
+    echo "$commit"
+}
+MELODEE_MOVE_COMMIT=${MELODEE_MOVE_COMMIT:-$(commit_of .)}
+MELODEE_SAMPLE_COMMIT=${MELODEE_SAMPLE_COMMIT:-$(commit_of "$MELODEE_SAMPLE")}
+SAMPLE_BASE_COMMIT=${SAMPLE_BASE_COMMIT:-$(commit_of "$MELODEE_SAMPLE/base")}
+MELODEE_MOVE_EPOCH=${MELODEE_MOVE_EPOCH:-$(git log -1 --format=%ct 2> /dev/null || date +%s)}
 docker build --quiet --platform linux/arm64 -t melodee-move-builder tools > /dev/null
 PREVIEWS=${MELODEE_PREVIEWS:-../melodee-sample/build/melodee-preview}
 MOUNT=""
@@ -53,4 +66,6 @@ CCACHE=${MELODEE_CCACHE:-$HOME/.cache/melodee-move/ccache}
 mkdir -p "$CCACHE"
 # shellcheck disable=SC2086
 docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE" && pwd):/melodee:ro" -e MELODEE=/melodee \
+    -e MELODEE_MOVE_COMMIT="$MELODEE_MOVE_COMMIT" -e MELODEE_SAMPLE_COMMIT="$MELODEE_SAMPLE_COMMIT" \
+    -e SAMPLE_BASE_COMMIT="$SAMPLE_BASE_COMMIT" -e MELODEE_MOVE_EPOCH="$MELODEE_MOVE_EPOCH" \
     -v "$CCACHE:/ccache" $MOUNT melodee-move-builder tools/check.sh "$MODE"

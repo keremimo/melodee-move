@@ -1,0 +1,90 @@
+{
+  "title": "Melodee",
+  "children": [
+    {
+      "title": "About",
+      "lines": [
+        "Melodee's sampler,",
+        "Chop and sequencer",
+        "on the Move, as its",
+        "own session: Move",
+        "stops while it runs",
+        "and comes back when",
+        "you quit.",
+        "",
+        "By Kerem Kilic",
+        "(Ellic Studio)."
+      ]
+    },
+    {
+      "title": "Start and Quit",
+      "lines": [
+        "Start: Tools menu,",
+        " Melodee.",
+        "",
+        "Quit: Shift + Back.",
+        "Save your Set first,",
+        "as for any quit of",
+        "Move.",
+        "",
+        "At power-on: press",
+        "Back while Loading",
+        "shows and pick",
+        "Melodee. Pick",
+        "Schwung the same way",
+        "to change it back."
+      ]
+    },
+    {
+      "title": "Main Keys",
+      "lines": [
+        "Shift+Step 1:",
+        " projects",
+        "Shift+Step 2: Setup",
+        "Shift+Step 4: Mixer",
+        "Shift+Step 5: tempo",
+        "Shift+Step 12:",
+        " Looper",
+        "Shift+Step 13: Song",
+        "Note/Session:",
+        " patterns grid",
+        "Loop: Loop Mode",
+        "Shift+Loop: SEQ",
+        " pages",
+        "Capture: Recall"
+      ]
+    },
+    {
+      "title": "Load and Chop",
+      "lines": [
+        "Wheel: the track's",
+        "items. Push opens",
+        "the browser: kits,",
+        "samples, Schwung",
+        "modules, presets.",
+        "",
+        "Chop: Shift + push",
+        "on a pad's sample,",
+        "then Chop."
+      ]
+    },
+    {
+      "title": "Web Page",
+      "lines": [
+        "Open move.local:8080",
+        "on a computer joined",
+        "to the Move. On",
+        "Wi-Fi it asks for",
+        "the code the Move",
+        "shows.",
+        "",
+        "Files: samples and",
+        "projects, kept in",
+        "/data/UserData/",
+        " Melodee. They stay",
+        " when Melodee is",
+        " removed."
+      ]
+    }
+  ]
+}

@@ -428,7 +428,7 @@ the tap's click and the sound in the waveform is what you hear.
 | `src/app/` | Melodee on the Move: `melodee_app.*` the app (thin: what every screen shares), `studio.*` Melodee's `Project` and `EngineHost` and what the screens share, `sequencer.*` and `seq_edit.*` the sequencer, `screen.*` a screen and the registry, `screens/` one file a screen, `project_store.*` the project file, `schwung_api.h` and `module_host.*` Schwung's modules (behind Melodee's `PluginRunner`), `canvas_page.*` their own pages' scripts in QuickJS, `module_probe.*` trying them, `previews.*` its screens offline |
 | `src/spike/` | the spike app |
 | `src/boot/` | `unblock_signals.c`: `module/boot-entry.sh` starts again through it, since MoveLauncher hands its children INT, USR1 and TERM blocked |
-| `module/` | the Schwung standalone tool: `module.json`, `standalone`, and `boot-entry.sh`, Melodee as a boot target of Schwung's boot selector |
+| `module/` | the Schwung standalone tool: `module.json`, `standalone`, `boot-entry.sh` (Melodee as a boot target of Schwung's boot selector), and `help.json`, its topics in Schwung's Help viewer |
 | `tests/` | unit tests, the device host against the simulated Move, the sequencer (`sequencer_tests.cpp`), `song_tests.cpp` (Song, exports, print and freeze, against the whole app), and `fake_module/`, a stand-in Schwung module |
 | `tools/` | build image, packaging, deploy and probe scripts |
 
@@ -456,7 +456,12 @@ the packages:
 
 - `dist/melodee-move/`: the binary, the libraries Ableton's firmware lacks,
   a launcher and `run-stock.sh`;
-- `dist/schwung-tool/melodee-move/`: the same as a Schwung standalone tool.
+- `dist/schwung-tool/melodee-move/`: the same as a Schwung standalone tool,
+  with the licences of all it carries (`licenses/`) and `SOURCE.txt`, the
+  commits it was built from;
+- `dist/melodee-move-module.tar.gz`: that tool as Schwung's module catalog
+  downloads it, its programs stripped, checked by `tools/check_package.py`
+  ([Release](#release)).
 
 When `../melodee-sample/build/melodee-preview` exists (or `MELODEE_PREVIEWS`
 names another folder) Melodee's pages are crushed to 128 x 64 in
@@ -473,6 +478,31 @@ another. JUCE's headers are precompiled (`src/pch.h`). The compiler is
 22.04's GCC 12, not its default GCC 11 (`tools/Dockerfile`): GCC 11 spends
 minutes at -O2 wherever Melodee's `Project` is made or its patterns reset,
 and a clean build takes 53 s instead of 226 s.
+
+## Release
+
+Schwung's module catalog (Schwung's `docs/MODULES.md`, "Publishing to the
+Module Catalog") lists a module by an entry in its `module-catalog.json`
+naming this repository and `melodee-move-module.tar.gz`. Schwung Manager
+reads `release.json` from this repository's main branch for the version and
+where to download it, unpacks the asset into
+`/data/UserData/schwung/modules/tools/melodee-move` (a merge, file by file:
+the log stays), and registers `module.json`'s boot target, never as the
+default. A release:
+
+1. `module/module.json`'s version, the same in `release.json` (its
+   `download_url` the release's asset), and its section in `CHANGELOG.md`;
+   committed.
+2. `tools/release.sh` builds it from that commit, never from the working
+   tree: the commit exported into `build/release/vX.Y.Z/src`, the full check
+   run there against melodee-sample, which must be clean and pushed (it and
+   sample-base are this build's source too). It leaves the asset, its
+   SHA-256, `release.json` and the release's notes in `build/release/vX.Y.Z/`,
+   and prints the tag and upload it would make.
+3. The tag `vX.Y.Z` on that commit, pushed with main, and a GitHub release
+   of it carrying the asset.
+
+The catalog's entry is made once; a new version needs only steps 1-3.
 
 ## Run on the Move
 
