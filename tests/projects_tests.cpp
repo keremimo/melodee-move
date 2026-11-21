@@ -6,6 +6,7 @@
 #include "app/melodee_app.h"
 #include "move/controls.h"
 #include "move/tools.h"
+#include <juce_core/juce_core.h>
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
@@ -437,11 +438,106 @@ void test_setup_and_tracks() {
 
 } // namespace
 
+// An MPC project (.xpj: gzip around the header lines and the JSON), as melodee-sample's tests/test_mpc_project.py
+// writes one: a drum track of `pads` instruments, sequence 2 with two notes on it; a keygroup track (MPC 3) if asked.
+std::string instrument_json(const std::string& file, int start, int end, bool one_shot = true, int low = -1, int high = -1, int root = -1) {
+    std::string zones = low >= 0 ? ",\"lowNote\":" + std::to_string(low) + ",\"highNote\":" + std::to_string(high) : "";
+    std::string rooted = root >= 0 ? ",\"rootNote\":" + std::to_string(root) : "";
+    return "{\"coarseTune\":0,\"fineTune\":0,\"monophonic\":true,\"whichMuteGroup\":0,\"loopLock\":true,\"warpEnable\":false,"
+           "\"bpmLock\":true,\"synthSection\":{\"ampEnvelope\":{\"Attack\":{\"value0\":0.0},\"Decay\":{\"value0\":0.05},"
+           "\"Sustain\":{\"value0\":1.0},\"Release\":{\"value0\":0.0},\"DecayFromEnd\":{\"value0\":true},\"OneShot\":{\"value0\":" +
+           std::string(one_shot ? "true" : "false") + "}},\"velocitySensitivity\":1.0,\"filterData\":{\"value0\":{\"filterType\":29,"
+           "\"filterCutoff\":1.0,\"filterResonance\":0.0,\"filterEnvelopeAmount\":0.0}}},\"mixable\":{\"volume\":0.7079457640647888,"
+           "\"pan\":0.5}" + zones + ",\"layersv\":[{\"active\":true,\"sampleFile\":\"" + file + "\",\"coarseTune\":0,\"fineTune\":0,"
+           "\"direction\":0,\"loopMode\":0,\"layerLoopModeOverridesSliceLoopMode\":true" + rooted + ",\"sliceInfo\":{\"Start\":" +
+           std::to_string(start) + ",\"End\":" + std::to_string(end) + ",\"LoopStart\":" + std::to_string(start) + ",\"LoopMode\":1}}]}";
+}
+std::string note_json(int time, int key) {
+    return "{\"time\":" + std::to_string(time) + ",\"type\":3,\"muted\":false,\"note\":{\"note\":" + std::to_string(key) +
+           ",\"velocity\":1.0,\"length\":240,\"probability\":100}}";
+}
+bool write_xpj(const std::string& path, bool keygroup) {
+    std::string pads = instrument_json("Kick.wav", 10, 90);
+    for (int n = 1; n < 128; ++n) pads += "," + instrument_json("", 0, 0);
+    std::string map;
+    for (int n = 0; n < 128; ++n) map += (n ? "," : "") + std::string("\"value") + std::to_string(n) + "\":" + std::to_string(36 + n);
+    std::string tracks = "{\"name\":\"Out 1/2\",\"program\":{\"type\":9}},{\"name\":\"Drum 001\",\"volume\":0.7079,\"mute\":false,"
+                         "\"program\":{\"type\":0,\"padNoteMap\":{\"noteForPad\":{" + map + "}},\"mixable\":{\"volume\":1.0,"
+                         "\"pan\":0.5,\"mute\":false,\"solo\":false},\"drum\":{\"instruments\":[" + pads + "]}}}";
+    std::string clips = "{\"key\":\"Drum 001\",\"value\":{\"eventList\":{\"events\":[" + note_json(0, 36) + "," + note_json(960, 37) + "]}}}";
+    if (keygroup) {
+        std::string zones = instrument_json("Low.wav", 0, 100, false, 0, 59, 49) + "," + instrument_json("High.wav", 0, 100, false, 60, 127, 73);
+        for (int n = 2; n < 128; ++n) zones += "," + instrument_json("", 0, 0);
+        tracks += ",{\"name\":\"Keys\",\"program\":{\"type\":1,\"mixable\":{\"volume\":0.7079457640647888,\"pan\":0.5},"
+                  "\"keygroup\":{\"numKeygroups\":2},\"drum\":{\"monophonic\":false,\"instruments\":[" + zones + "]}}}";
+        clips += ",{\"key\":\"Keys\",\"value\":{\"eventList\":{\"events\":[" + note_json(0, 64) + "," + note_json(480, 52) + "]}}}";
+    }
+    std::string sequence = "{\"name\":\"Sequence\",\"bpm\":105.0,\"lengthPulses\":7680,\"timeSignatureTrack\":{\"timeSignatures\":"
+                           "[{\"beatsPerBar\":4,\"beatLength\":960,\"barStart\":0}]},\"trackClipMaps\":[[" + clips + "]]}";
+    std::string json = "{\"data\":{\"version\":28,\"masterTempoEnabled\":false,\"masterTempo\":105.0,\"currentSequence\":1,"
+                       "\"tracks\":[" + tracks + "],\"sequences\":[{\"key\":1,\"value\":" + sequence + "}]}}";
+    std::string text = "ACVS\n1.3.0.12\nSerialisableProjectData\njson\nLinux\n" + json;
+    juce::File file(path);
+    file.deleteFile();
+    juce::FileOutputStream out(file);
+    if (!out.openedOk()) return false;
+    {
+        juce::GZIPCompressorOutputStream gzip(out, 6, juce::GZIPCompressorOutputStream::windowBitsGZIP);
+        gzip.write(text.data(), text.size());
+        gzip.flush();
+    }
+    return true;
+}
+
+// MPC Sample and MPC 3 projects open as a copy (Melodee's importer, compiled unchanged): a .mldp beside the .xpj, saved
+// soon, the .xpj untouched; its kit's samples from its _[ProjectData] folder, its notes, an MPC 3 keygroup track too.
+void test_mpc_projects() {
+    std::string folder = "build/test-samples", home = "build/test-home-mpc", projects = home + "/Projects";
+    std::filesystem::remove_all(home);
+    for (const char* name : {"Song", "Keys"}) {
+        std::string data = projects + "/" + name + "_[ProjectData]";
+        std::filesystem::create_directories(data);
+        CHECK(write_test_loop(data + "/Kick.wav") && write_test_loop(data + "/Low.wav") && write_test_loop(data + "/High.wav"));
+    }
+    CHECK(write_xpj(projects + "/Song.xpj", false) && write_xpj(projects + "/Keys.xpj", true));
+    auto bytes_of = [](const std::string& path) {
+        std::ifstream in(path, std::ios::binary);
+        return std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    };
+    const std::string song_before = bytes_of(projects + "/Song.xpj");
+    app::MelodeeApp melodee(folder, home);
+    Session session;
+    melodee.attach(session);
+    auto& studio = melodee.studio();
+    // The MPC Sample's: one drum track.
+    CHECK(studio.open_project(projects + "/Song.xpj").empty());
+    for (int pass = 0; pass < 20 && !has(melodee.status(), "loading=0"); ++pass) melodee.service();
+    melodee.service();
+    CHECK(has(melodee.status(), " project=Song ") && has(melodee.status(), "samples=1 "));
+    CHECK(studio.project_path() == projects + "/Song.mldp");
+    CHECK(studio.kind(0) == app::TrackKind::Kit && studio.project().tracks[0].pads[0].used());
+    CHECK(studio.patterns().at[0][1].events.size() == 2 && studio.project().tempo == 1050);
+    CHECK(melodee.save_now().empty() && std::filesystem::exists(projects + "/Song.mldp"));
+    CHECK(bytes_of(projects + "/Song.xpj") == song_before);
+    // An MPC 3 project with a keygroup track: a keygroup track here, its two zones, its notes.
+    CHECK(studio.open_project(projects + "/Keys.xpj").empty());
+    for (int pass = 0; pass < 20 && !has(melodee.status(), "loading=0"); ++pass) melodee.service();
+    melodee.service();
+    CHECK(has(melodee.status(), " project=Keys ") && studio.project_path() == projects + "/Keys.mldp");
+    CHECK(studio.kind(0) == app::TrackKind::Kit && studio.kind(1) == app::TrackKind::Keys);
+    CHECK(studio.patterns().at[1][1].events.size() == 2);
+    // Opened again: a second copy beside, the first kept.
+    CHECK(studio.open_project(projects + "/Song.xpj").empty());
+    melodee.service();
+    CHECK(studio.project_path() != projects + "/Song.mldp" && std::filesystem::exists(projects + "/Song.mldp"));
+}
+
 int main() {
     test_history();
     test_undo_app();
     test_projects();
     test_setup_and_tracks();
+    test_mpc_projects();
     std::cout << "projects-tests: " << checks - failures << "/" << checks << " checks passed\n";
     return failures ? 1 : 0;
 }
