@@ -39,27 +39,31 @@ Three parts so far:
   (docs/PARITY.md, sequencer); a project from the MPC plays its patterns.
 - **Play** (a kit track): the last pad's sample. Knobs 1-8: tune, level, pan, start, end,
   attack, decay, cutoff (Shift: finer). Touch a knob to see it large.
-- **Load** (Menu): WAV, AIFF, FLAC, Ogg and MP3 files onto the last pad,
+- **Load** (the wheel's push on the pad, the Move's Device View): WAV,
+  AIFF, FLAC, Ogg and MP3 files onto the last pad,
   read by Melodee's own `read_audio`. It opens on a list of places: My
   Samples, Recordings, Ableton's Core Library (`/data/CoreLibrary/Samples`)
   and all of `/data/UserData` (or only `--samples DIR`). The jogwheel picks,
   its push opens a place or folder or loads, Back goes up, then back to the
   places.
-- **Chop** (Loop): the last pad's sample, cut by Melodee's Auto, Beats,
-  Regions or Threshold (knob 3 the type, knob 4 the amount). The pads play
-  the slices, the steps show where the cuts fall, the jogwheel or Left /
-  Right picks a slice, knobs 1 and 2 move its start and end. Push the
+- **Chop** (Shift + the wheel's push on the pad: Sample Options, Chop, where
+  the Move has Slice): the last pad's sample, cut by Melodee's Auto, Beats,
+  Regions or Threshold (knob 3 the type, knob 4 or the jogwheel the amount).
+  The pads play the slices, the steps show where the cuts fall, the pads or
+  Left / Right pick a slice, knobs 1 and 2 move its start and end. Push the
   jogwheel for **To Pads** (Poly, Mono, Thru), onto the first empty pads.
-  Back or Loop leaves Chop without changing the pads.
+  Back leaves Chop without changing the pads.
 - **Synth** (a synth track, track 2 of a new project): one of Schwung's sound
   generators, the ones the Move's Schwung install has
   (`/data/UserData/schwung/modules/sound_generators`, or `--modules DIR`).
-  Menu lists them, the jogwheel's push loads one. Pads are notes in rows of
-  fourths, C2 at the bottom left; Up and Down move an octave (a drum module
+  The jogwheel walks the Device View (the module, its preset, its effects);
+  its push on the module lists them, and a push loads one. Pads are notes
+  in rows of fourths, C2 at the bottom left; Plus and Minus move an octave (a drum module
   such as 9w9 wants notes from 36: one octave down); pressure is polyphonic
   aftertouch. Knobs 1-8 are the module's page (from its `ui_hierarchy`, or
-  its parameters eight at a time), Left / Right its pages, the jogwheel its
-  presets. Push the jogwheel for the module's menu, as its `ui_hierarchy`
+  its parameters eight at a time), Shift + the jogwheel its pages; the
+  jogwheel's push on the preset browses its presets (loaded as the jogwheel
+  turns). Shift + push for the module's menu, as its `ui_hierarchy`
   lays it out: turn to a row; push a value to edit it with the jogwheel,
   push a level to open it (the knobs follow to its page), or a list (a bank,
   a soundfont, a table) to choose from; Back goes up, then closes the menu.
@@ -67,12 +71,12 @@ Three parts so far:
   search): the scripts Schwung runs for them (`browser.js`), run here in
   QuickJS, the engine Schwung uses, drawn in Schwung's own font
   (`/data/UserData/schwung/host/font.png`). Such a page is one of the
-  module's pages (Left / Right), or a row at the end of its menu. Push to
+  module's pages (Shift + the jogwheel), or a row at the end of its menu. Push to
   enter it: the jogwheel and its push are then the page's, Back goes up a
   level and finally out. When a page asks for text the pads are a keyboard
   (letters top-left to bottom-right, space, `-.'&`, backspace on the last
-  pad; Delete too), the steps `1234567890()/:,!`, Shift for capitals; push
-  is done, Back cancels. A file the page hands over (Webstream's download)
+  pad; Back or Delete, as on the Move), the steps `1234567890()/:,!`,
+  Shift for capitals; push is done, Back held cancels. A file the page hands over (Webstream's download)
   goes onto the first empty kit pad, to play and chop. An action such as
   play/pause or stop is a button: push its menu row, or turn its knob up.
   What a page keeps for itself (Webstream's provider, where its menus are)

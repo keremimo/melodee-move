@@ -61,6 +61,20 @@ inline int playing_step(const Studio& studio) {
     if (position < 0) position = int(studio.host().ticks());
     return int(unsigned(position) / melodee::sixteenth_ticks % move::step_count);
 }
+// The Device View's items along the top of the subject (docs/ui/controls.png):
+// the track, its sound, its two effects; the one the wheel is on inverted.
+inline void items(juce::Graphics& g, const std::array<std::string, 4>& names, int selected) {
+    int cell = ui::content_width / 4;
+    for (int n = 0; n < 4; ++n) {
+        int x = ui::content_x + n * cell;
+        g.setColour(juce::Colours::white);
+        if (n == selected) g.fillRect(x, 0, cell - 1, ui::header_height);
+        else g.fillRect(x, ui::header_height - 1, cell - 1, 1);
+        g.setColour(n == selected ? juce::Colours::black : juce::Colours::white);
+        move::draw_text_centred(g, x, 1, cell - 1, names[size_t(n)].substr(0, 4));
+    }
+    g.setColour(juce::Colours::white);
+}
 inline void steps_playhead(const Studio& studio, move::Lights& lights) {
     int step = playing_step(studio);
     for (unsigned n = 0; n < move::step_count; ++n) lights.step(n, int(n) == step ? move::colour::white : move::colour::off);

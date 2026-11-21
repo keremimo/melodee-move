@@ -39,6 +39,32 @@ int failures = 0, checks = 0;
 
 Input decode3(uint8_t a, uint8_t b, uint8_t c) { const uint8_t bytes[] {a, b, c}; return decode(bytes, 3); }
 
+// The Move's controls as a hand uses them (docs/MOVE_CONTROLS.md): a button
+// pressed and let go, Shift held around something, a pad or step tapped.
+void press_button(App& app, Button button) {
+    app.surface(make_event(0xb0, button_cc(button), 127));
+    app.surface(make_event(0xb0, button_cc(button), 0));
+}
+template <class Do> void with_shift(App& app, Do&& what) {
+    app.surface(make_event(0xb0, button_cc(Button::Shift), 127));
+    what();
+    app.surface(make_event(0xb0, button_cc(Button::Shift), 0));
+}
+void tap_pad(App& app, unsigned pad, uint8_t velocity = 100) {
+    app.surface(make_event(0x90, pad_note(pad), velocity));
+    app.surface(make_event(0x80, pad_note(pad), 0));
+}
+void tap_step(App& app, unsigned step) {
+    app.surface(make_event(0x90, step_note(step), 127));
+    app.surface(make_event(0x80, step_note(step), 0));
+}
+void turn_wheel(App& app, int detents) { app.surface(make_event(0xb0, main_knob_cc, uint8_t(detents < 0 ? 128 + detents : detents))); }
+// Chop: Shift + push on the pad's sample (Sample Options), its first row.
+void open_chop(App& app) {
+    with_shift(app, [&] { press_button(app, Button::MainPush); });
+    press_button(app, Button::MainPush);
+}
+
 void test_controls() {
     auto pad = decode3(0x9f, 68, 100);
     CHECK(pad.kind == Input::Kind::Pad && pad.index == 0 && pad.pressed && pad.value == 100);
@@ -418,15 +444,15 @@ void test_melodee_app() {
     CHECK(play(5, 40) == 0);                // an empty pad is silent
     CHECK(play(0, 40) > to_s32(0.1f));      // the loop sounds from pad A01
     CHECK(quiet());
-    melodee.surface(make_event(0xb0, button_cc(Button::Loop), 127)); // Chop
+    open_chop(melodee); // Shift + push: Sample Options, Chop
     unsigned slices = melodee.slice_count();
     CHECK(slices >= 4 && slices <= 64);
     CHECK(melodee.status().find("page=chop ") != std::string::npos);
     CHECK(play(1, 20) > to_s32(0.05f));     // pad 2 plays slice 2
     CHECK(quiet());
     CHECK(play(slices, 20) == 0);           // past the last slice: nothing
-    melodee.surface(make_event(0xb0, button_cc(Button::MainPush), 127)); // To Pads
-    melodee.surface(make_event(0xb0, button_cc(Button::MainPush), 127)); // Poly, onto the empty pads
+    press_button(melodee, Button::MainPush); // To Pads
+    press_button(melodee, Button::MainPush); // Poly, onto the empty pads
     CHECK(melodee.status().find("page=kit-play") != std::string::npos);
     CHECK(melodee.status().find("pad=A02") != std::string::npos); // the first empty pad after A01
     CHECK(play(1, 20) > to_s32(0.05f));     // A02 now holds slice 1
@@ -434,7 +460,7 @@ void test_melodee_app() {
     // Knob 1 tunes the last pad; touching it shows it; a turn of Regions' amount re-chops.
     melodee.surface(make_event(0xb0, knob_first_cc, 3));
     CHECK(melodee.status().find("page=kit-play") != std::string::npos);
-    melodee.surface(make_event(0xb0, button_cc(Button::Back), 127));
+    press_button(melodee, Button::Back);
     CHECK(melodee.load_now(folder + "/missing.wav", 3) != "");
 
     // An AIFF (much of the Move's Core Library), written by hand: a 220 Hz
@@ -471,7 +497,7 @@ void test_saving() {
     std::filesystem::create_directories(folder);
     std::filesystem::remove_all(home);
     CHECK(write_test_loop(loop) && write_test_loop(other));
-    auto press = [](app::MelodeeApp& melodee, Button button) { melodee.surface(make_event(0xb0, button_cc(button), 127)); };
+    auto press = [](app::MelodeeApp& melodee, Button button) { press_button(melodee, button); };
     unsigned chopped = 0;
     std::string project;
     {
@@ -482,8 +508,8 @@ void test_saving() {
         CHECK(first.restore_now().empty()); // no file yet: a new project
         CHECK(first.load_now(loop, 0).empty());
         CHECK(first.load_now(other, 20).empty());
-        first.surface(make_event(0x90, pad_note(0), 100)); // A01 again
-        press(first, Button::Loop);
+        tap_pad(first, 0); // A01 again
+        open_chop(first);
         first.surface(make_event(0xb0, uint8_t(knob_first_cc + 2), 1)); // type: Beats
         chopped = first.slice_count();
         CHECK(chopped > 1);
@@ -509,8 +535,8 @@ void test_saving() {
     int32_t peak = 0;
     for (int block = 0; block < 20; ++block) { out.fill(0); second.render(in, out); peak = std::max(peak, peak_of(out)); }
     CHECK(peak > to_s32(0.05f));
-    second.surface(make_event(0x90, pad_note(0), 100));
-    press(second, Button::Loop); // A01's chop as it was left: Beats, the same slices
+    tap_pad(second, 0);
+    open_chop(second); // A01's chop as it was left: Beats, the same slices
     CHECK(second.slice_count() == chopped && has(second.status(), "chop=Beats"));
     press(second, Button::Back);
     CHECK(second.save_now().empty());
@@ -776,13 +802,14 @@ void test_canvas_page() {
 }
 
 void test_synth_track() {
-    // The synth track in Melodee: Row 2; Menu lists the modules and the
-    // jogwheel's push loads one; pads play it; knobs and presets set it; it
-    // is saved beside the project and read back by the next start.
+    // The synth track in Melodee: Track 2; the wheel's push (on its preset,
+    // with no module yet) lists the modules and a push loads one; pads play
+    // it; knobs and presets set it; it is saved beside the project and read
+    // back by the next start.
     std::string folder = "build/test-samples", home = "build/test-home-synth", modules = "build/test-modules";
     std::filesystem::create_directories(folder);
     std::filesystem::remove_all(home);
-    auto press = [](app::MelodeeApp& melodee, Button button) { melodee.surface(make_event(0xb0, button_cc(button), 127)); };
+    auto press = [](app::MelodeeApp& melodee, Button button) { press_button(melodee, button); };
     auto loudest = [](app::MelodeeApp& melodee, int blocks) {
         AudioBlock in {}, out {};
         int32_t peak = 0;
@@ -798,7 +825,7 @@ void test_synth_track() {
         CHECK(melodee.restore_now().empty());
         press(melodee, Button::Row2);
         CHECK(has(melodee.status(), "track=2 kind=synth") && has(melodee.status(), "synth=-"));
-        press(melodee, Button::Menu);
+        press(melodee, Button::MainPush); // no module: the push lists them
         CHECK(has(melodee.status(), "page=load-modules"));
         press(melodee, Button::MainPush);
         melodee.service(); // loads it
@@ -808,24 +835,31 @@ void test_synth_track() {
         CHECK(loudest(melodee, 1) > to_s32(0.05f));
         melodee.audio_event(make_event(0x80, pad_note(0), 0));
         CHECK(loudest(melodee, 1) == 0);
-        // Loaded again: a new instance; the one before is let go and destroyed.
-        press(melodee, Button::Menu);
+        // Loaded again: the wheel to the module, its push, the list's push. A
+        // new instance; the one before is let go and destroyed.
+        turn_wheel(melodee, -1);
+        press(melodee, Button::MainPush);
+        CHECK(has(melodee.status(), "page=load-modules"));
         press(melodee, Button::MainPush);
         melodee.service();
         loudest(melodee, 1);
         melodee.service();
         CHECK(has(melodee.status(), "synth=fake"));
-        // The jogwheel: the next preset, which sets the level; the module's
-        // values asked for again and shown.
-        melodee.surface(make_event(0xb0, main_knob_cc, 1));
+        // The wheel to the preset, its push its presets, a turn the next one
+        // (loaded as it turns), which sets the level; the module's values
+        // asked for again and shown; push: done.
+        turn_wheel(melodee, 1);
+        press(melodee, Button::MainPush);
+        turn_wheel(melodee, 1);
+        press(melodee, Button::MainPush);
         loudest(melodee, 3);
         melodee.service();
         CHECK(melodee.synth_value("preset") == "1" && melodee.synth_value("level") == "0.1");
         melodee.surface(make_event(0xb0, knob_first_cc, 3)); // knob 1: level, up three
         CHECK(melodee.synth_value("level") == "0.13");
-        // The jogwheel's push: the module's menu. Root's rows: the preset,
-        // level, Waveform, Envelope >, Tables >.
-        press(melodee, Button::MainPush);
+        // Shift + the wheel's push: the module's menu. Root's rows: the
+        // preset, level, Waveform, Envelope >, Tables >.
+        with_shift(melodee, [&] { press(melodee, Button::MainPush); });
         CHECK(has(melodee.status(), "menu=root"));
         melodee.surface(make_event(0xb0, main_knob_cc, 2)); // Waveform
         press(melodee, Button::MainPush);                   // edit it
@@ -890,9 +924,8 @@ void test_synth_track() {
         second.audio_event(make_event(0x80, pad_note(0), 0));
         loudest(second, 1);
 
-        // The module's own page: Right to it, after Fake and Envelope.
-        press(second, Button::Right);
-        press(second, Button::Right);
+        // The module's own page: Shift + the wheel to it, after Fake and Envelope.
+        with_shift(second, [&] { turn_wheel(second, 1); turn_wheel(second, 1); });
         CHECK(has(second.status(), "canvas=browse entered=0"));
         std::this_thread::sleep_for(std::chrono::milliseconds(60)); // no audio thread: the page's reads go to the module directly
         juce::Image screen(juce::Image::ARGB, 128, 64, true);
@@ -907,10 +940,10 @@ void test_synth_track() {
         second.audio_event(make_event(0x90, pad_note(24), 100)); // a letter now, not a note
         CHECK(loudest(second, 1) == 0);
         second.audio_event(make_event(0x80, pad_note(24), 0));
-        press(second, Button::Delete);                         // "ab", given, less one: "a"
-        second.surface(make_event(0x90, pad_note(25), 100));   // b
-        second.surface(make_event(0x90, pad_note(26), 100));   // c
-        second.surface(make_event(0x90, step_note(0), 127));   // 1
+        press(second, Button::Back);                           // "ab", given, less one: "a" (the Move's Back deletes)
+        tap_pad(second, 25);                                   // b
+        tap_pad(second, 26);                                   // c
+        tap_step(second, 0);                                   // 1
         press(second, Button::MainPush);                       // done
         CHECK(has(second.status(), "typing=0"));
         loudest(second, 1); // the page's sets reach the module
@@ -1010,17 +1043,20 @@ void test_tracks() {
     }
     loudest(melodee, 1);
     CHECK(before > 10 && melodee.studio().host().ticks() < 3 && has(melodee.status(), "playing=1"));
+    loudest(melodee, 40);
+    {   // The same from the Move's keys: Shift + Play.
+        std::lock_guard<std::mutex> guard(melodee.studio().lock);
+        before = melodee.studio().host().ticks();
+    }
+    with_shift(melodee, [&] { press(melodee, Button::Play); });
+    loudest(melodee, 1);
+    CHECK(before > 10 && melodee.studio().host().ticks() < 3 && has(melodee.status(), "playing=1 ") && has(melodee.status(), "job=Restart"));
     press(melodee, Button::Play);
     loudest(melodee, 2);
     CHECK(has(melodee.status(), "playing=0"));
     // The Move's settings: Shift + Step 5 the tempo (the jogwheel two up, push
     // confirms); Shift + Step 6 the metronome on; Shift + Step 7 the groove.
-    auto shift_step = [&](unsigned n) {
-        session.shift = true;
-        melodee.surface(make_event(0x90, step_note(n), 127));
-        melodee.surface(make_event(0x80, step_note(n), 0));
-        session.shift = false;
-    };
+    auto shift_step = [&](unsigned n) { with_shift(melodee, [&] { tap_step(melodee, n); }); };
     shift_step(4);
     CHECK(has(melodee.status(), "page=tempo"));
     melodee.surface(make_event(0xb0, main_knob_cc, 2));
@@ -1033,10 +1069,8 @@ void test_tracks() {
     melodee.surface(make_event(0xb0, main_knob_cc, 3));
     press(melodee, Button::MainPush);
     CHECK(has(melodee.status(), "page=kit-play") && has(melodee.status(), "swing=53"));
-    // Shift + Play is the Move's (retrigger): it opens nothing.
-    session.shift = true;
-    press(melodee, Button::Play);
-    session.shift = false;
+    // Shift + Play is the Move's retrigger: stopped, it does nothing and opens nothing.
+    with_shift(melodee, [&] { press(melodee, Button::Play); });
     CHECK(has(melodee.status(), "page=kit-play") && has(melodee.status(), "playing=0"));
     // Mute alone: the selected track; Mute + a track button: that one; Shift + Mute + a track button: solo.
     press(melodee, Button::Mute);
@@ -1044,15 +1078,11 @@ void test_tracks() {
     press(melodee, Button::Mute);
     CHECK(has(melodee.status(), "mute=0 solo=0"));
     melodee.surface(make_event(0xb0, button_cc(Button::Mute), 127));
-    session.shift = true;
-    press(melodee, Button::Row1);
-    session.shift = false;
+    with_shift(melodee, [&] { press(melodee, Button::Row1); });
     melodee.surface(make_event(0xb0, button_cc(Button::Mute), 0));
     CHECK(has(melodee.status(), "track=1 kind=kit") && has(melodee.status(), "mute=0 solo=1"));
     melodee.surface(make_event(0xb0, button_cc(Button::Mute), 127));
-    session.shift = true;
-    press(melodee, Button::Row1);
-    session.shift = false;
+    with_shift(melodee, [&] { press(melodee, Button::Row1); });
     melodee.surface(make_event(0xb0, button_cc(Button::Mute), 0));
     CHECK(has(melodee.status(), "solo=0"));
     // A track button held, the Volume knob: that track's volume.

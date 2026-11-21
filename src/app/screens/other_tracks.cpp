@@ -17,20 +17,21 @@ public:
     using Screen::Screen;
     void enter() override { held.fill(false); }
 
-    bool surface(const move::Input& input) override {
-        using Kind = move::Input::Kind;
-        using move::Button;
-        if (input.kind == Kind::Pad) {
-            if (input.index < pad_count) held[input.index] = input.pressed;
-            return true;
-        }
-        if (input.kind == Kind::Button && input.pressed && (Button(input.index) == Button::Up || Button(input.index) == Button::Down)) {
-            int octave = std::clamp(studio.octave(studio.track()) + (Button(input.index) == Button::Up ? 1 : -1), lowest_octave, highest_octave);
+    void input(const move::Input& input) override {
+        if (input.kind == move::Input::Kind::Pad && input.index < pad_count) held[input.index] = input.pressed;
+    }
+    bool job(bindings::Job job, const bindings::Use& use) override {
+        using bindings::Job;
+        switch (job) {
+        case Job::Octave: {
+            int octave = std::clamp(studio.octave(studio.track()) + (use.control == bindings::Control::Plus ? 1 : -1), lowest_octave, highest_octave);
             studio.set_octave(studio.track(), octave);
             studio.say("OCTAVE " + note_name(studio.note_for(0, octave)));
             return true;
         }
-        return input.kind == Kind::Knob;
+        case Job::PlayNote: case Job::TurnKnob: case Job::TurnKnobFine: return true;
+        default: return false;
+        }
     }
 
     void lights(move::Lights& lights) override {
@@ -91,7 +92,7 @@ public:
 class AudioPlay final : public Screen {
 public:
     using Screen::Screen;
-    bool surface(const move::Input& input) override { return input.kind == move::Input::Kind::Pad || input.kind == move::Input::Kind::Knob; }
+    bool job(bindings::Job job, const bindings::Use&) override { return job == bindings::Job::TurnKnob || job == bindings::Job::TurnKnobFine; }
     void lights(move::Lights& lights) override {
         for (unsigned at = 0; at < pad_count; ++at) lights.pad(at, move::colour::off);
         steps_playhead(studio, lights);
@@ -109,12 +110,9 @@ public:
 class EmptyPlay final : public Screen {
 public:
     using Screen::Screen;
-    bool surface(const move::Input& input) override {
-        if (input.kind == move::Input::Kind::Button && input.pressed && move::Button(input.index) == move::Button::MainPush) {
-            studio.open("new-track");
-            return true;
-        }
-        return input.kind == move::Input::Kind::Pad || input.kind == move::Input::Kind::Knob;
+    bool job(bindings::Job job, const bindings::Use&) override {
+        if (job == bindings::Job::OpenBrowser) { studio.open("new-track"); return true; } // the browser's top: the track types
+        return job == bindings::Job::TurnKnob || job == bindings::Job::TurnKnobFine;
     }
     void lights(move::Lights& lights) override {
         for (unsigned at = 0; at < pad_count; ++at) lights.pad(at, move::colour::off);

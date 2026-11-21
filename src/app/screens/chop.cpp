@@ -47,28 +47,20 @@ public:
         sounding = false;
     }
 
-    bool surface(const move::Input& input) override {
-        using Kind = move::Input::Kind;
-        using move::Button;
-        switch (input.kind) {
-        case Kind::Pad:
-            if (input.pressed && input.index < slices.count) selected = input.index;
+    bindings::Screen screen_kind() const override { return bindings::Screen::Chop; }
+    bool job(bindings::Job job, const bindings::Use& use) override {
+        using bindings::Job;
+        switch (job) {
+        case Job::PlaySlice:
+            if (unsigned(use.index) < slices.count) selected = unsigned(use.index);
             return true;
-        case Kind::Knob: turn(input.index, input.delta); return true;
-        case Kind::MainKnob:
-            if (slices.count) selected = unsigned(std::clamp(int(selected) + input.delta, 0, int(slices.count) - 1));
+        case Job::TurnKnob: case Job::TurnKnobFine: turn(unsigned(use.index), use.delta); return true;
+        case Job::ChopAmount: turn(3, use.delta); return true; // the wheel: the amount, as the Move's the number of slices
+        case Job::SliceStep:
+            if (slices.count) selected = unsigned(std::clamp(int(selected) + (use.control == bindings::Control::Left ? -1 : 1), 0, int(slices.count) - 1));
             return true;
-        case Kind::Button: {
-            if (!input.pressed) return false;
-            auto button = Button(input.index);
-            if (button == Button::Loop || button == Button::Back) { studio.close(); return true; }
-            if (button == Button::MainPush) { if (slices.count) studio.push("to-pads"); return true; }
-            if (button == Button::Left || button == Button::Right) {
-                if (slices.count) selected = unsigned(std::clamp(int(selected) + (button == Button::Left ? -1 : 1), 0, int(slices.count) - 1));
-                return true;
-            }
-            return false;
-        }
+        case Job::ToPads: if (slices.count) studio.push("to-pads"); return true;
+        case Job::LeaveChop: studio.close(); return true;
         default: return false;
         }
     }
@@ -89,8 +81,8 @@ public:
         lights.button(Button::Right, white_dim);
         lights.button(Button::Up, 0);
         lights.button(Button::Down, 0);
-        lights.button(Button::Loop, white_bright);
-        lights.button(Button::Menu, white_dim);
+        lights.button(Button::Loop, 0);
+        lights.button(Button::Menu, 0);
         lights.button(Button::Back, white_dim);
     }
 
@@ -274,17 +266,16 @@ public:
     using Screen::Screen;
     Chop& chop() const { return static_cast<Chop&>(*studio.screen("chop")); }
 
-    bool surface(const move::Input& input) override {
-        using Kind = move::Input::Kind;
-        using move::Button;
-        if (input.kind == Kind::MainKnob) { how = std::clamp(how + input.delta, 0, 2); return true; }
-        if (input.kind == Kind::Pad || input.kind == Kind::Knob) return true;
-        if (input.kind != Kind::Button || !input.pressed) return false;
-        auto button = Button(input.index);
-        if (button == Button::MainPush) { chop().to_pads(how); return true; }
-        if (button == Button::Back) { studio.close(); return true; }
-        if (button == Button::Loop) { studio.home(); return true; }
-        return false;
+    bindings::Screen screen_kind() const override { return bindings::Screen::ToPads; }
+    bool job(bindings::Job job, const bindings::Use& use) override {
+        using bindings::Job;
+        switch (job) {
+        case Job::ToPadsChoose: how = std::clamp(how + use.delta, 0, 2); return true;
+        case Job::ToPadsPlace: chop().to_pads(how); return true;
+        case Job::Back: studio.close(); return true;
+        case Job::PlaySlice: case Job::TurnKnob: case Job::TurnKnobFine: return true; // the slices sound; nothing changes
+        default: return false;
+        }
     }
     void lights(move::Lights& lights) override { chop().lights(lights); }
     void draw(juce::Graphics& g) override {
@@ -302,7 +293,7 @@ private:
     int how = 0;
 };
 
-RegisterScreen chop("chop", make<Chop>, {{move::Button::Loop, false, kind_bit(TrackKind::Kit)}});
+RegisterScreen chop("chop", make<Chop>); // from Sample Options (Shift + push on a kit pad's sample)
 RegisterScreen to_pads("to-pads", make<ToPads>);
 
 } // namespace

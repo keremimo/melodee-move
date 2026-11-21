@@ -221,6 +221,7 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
         if (input.pressed) {
             went = {};
             if (pads_typing.load(std::memory_order_relaxed)) return; // a letter, not a note
+            if (pads_quiet.load(std::memory_order_relaxed)) return;  // another job (docs/MOVE_CONTROLS.md)
             int track = audio_track.load(std::memory_order_relaxed);
             auto kind = TrackKind(audio_kind.load(std::memory_order_relaxed));
             int key = kind == TrackKind::Kit ? int(melodee::sampler_first_note + input.index)

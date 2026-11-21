@@ -35,16 +35,15 @@ void beat_steps(const Studio& studio, move::Lights& lights) {
 class Setting : public Screen {
 public:
     using Screen::Screen;
-    bool surface(const move::Input& input) override {
-        using Kind = move::Input::Kind;
-        using move::Button;
-        if (input.kind == Kind::MainKnob) { turn(input.delta); return true; }
-        if (input.kind == Kind::Knob) { if (input.index == 0) turn(input.delta); return true; }
-        if (input.kind == Kind::Button && input.pressed && (Button(input.index) == Button::MainPush || Button(input.index) == Button::Back)) {
-            studio.close();
-            return true;
+    bindings::Screen screen_kind() const override { return bindings::Screen::List; }
+    bool job(bindings::Job job, const bindings::Use& use) override {
+        using bindings::Job;
+        switch (job) {
+        case Job::ListTurn: case Job::ListTurnFine: turn(use.delta); return true; // Shift: finer, as turn() reads
+        case Job::TurnKnob: case Job::TurnKnobFine: if (use.index == 0) turn(use.delta); return true;
+        case Job::ListPush: case Job::Back: studio.close(); return true;
+        default: return false;
         }
-        return false;
     }
     void lights(move::Lights& lights) override { beat_steps(studio, lights); }
 
@@ -122,9 +121,9 @@ private:
     void turn(int delta) override { studio.set_swing(unsigned(std::clamp(int(studio.project().swing) + delta, 50, 75))); }
 };
 
-RegisterScreen tempo("tempo", make<Tempo>);
-RegisterScreen metronome("metronome", make<Metronome>);
-RegisterScreen groove("groove", make<Groove>);
+RegisterScreen tempo("tempo", make<Tempo>, {{bindings::Job::Tempo}});             // Shift + Step 5
+RegisterScreen metronome("metronome", make<Metronome>, {{bindings::Job::Metronome}}); // Shift + Step 6 (the app turns it on or off)
+RegisterScreen groove("groove", make<Groove>, {{bindings::Job::Groove}});          // Shift + Step 7
 
 } // namespace
 } // namespace app::screens

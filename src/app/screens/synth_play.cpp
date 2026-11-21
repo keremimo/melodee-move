@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // A synth track's Play screen: one of Schwung's sound generators (README,
-// "How a Schwung module is hosted"). Pads are notes in rows of fourths, C2 at
-// the bottom left; Up and Down move an octave; pressure is polyphonic
-// aftertouch. Knobs 1-8 are the module's page (its ui_hierarchy, or its
-// parameters eight at a time), Left / Right its pages, the jogwheel its
-// presets. Push the jogwheel for the module's menu: turn to a row, push to
-// edit a value or open a level or a list; Back goes up, then closes it. A
-// page the module draws itself runs as Schwung runs it (canvas_page.h):
-// push to enter it, then the jogwheel and its push are the page's, Back goes
-// up and out.
+// "How a Schwung module is hosted"), as the Move's Device View
+// (docs/MOVE_CONTROLS.md). Along the top its items, the module, its preset,
+// FX1, FX2: the wheel walks them, its push opens the one it is on (the
+// module: Load modules; the preset: its presets, loaded as the wheel turns,
+// push or Back done). Pads are notes in rows of fourths, C2 at the bottom
+// left; Plus and Minus move an octave; pressure is polyphonic aftertouch.
+// Knobs 1-8 are the module's page (its ui_hierarchy, or its parameters
+// eight at a time), Shift + the wheel its pages. Shift + push opens the
+// module's menu: turn to a row, push to edit a value or open a level or a
+// list; Back goes up, then closes it. A page the module draws itself runs as
+// Schwung runs it (canvas_page.h): push to enter it, then the wheel and its
+// push are the page's, Back goes up and out.
 #include "app/screens/common.h"
 #include <juce_core/juce_core.h>
 #include <limits>
@@ -26,56 +29,80 @@ class SynthPlay final : public Screen {
 public:
     using Screen::Screen;
 
-    void enter() override { held.fill(false); refresh(); }
+    void enter() override { held.fill(false); browsing = false; refresh(); }
 
-    bool surface(const move::Input& input) override {
-        using Kind = move::Input::Kind;
-        using move::Button;
+    bindings::Screen screen_kind() const override {
+        auto* track = const_cast<Studio&>(studio).module_track();
+        if (!track || !track->module) return bindings::Screen::Play;
+        if (browsing) return bindings::Screen::Browser;
+        if (shown_canvas(*track) >= 0) return bindings::Screen::Canvas;
+        if (track->menu_open) return bindings::Screen::List;
+        return bindings::Screen::Play;
+    }
+
+    void input(const move::Input& input) override {
+        if (input.kind == move::Input::Kind::Pad && input.index < pad_count) held[input.index] = input.pressed;
+    }
+
+    bool job(bindings::Job job, const bindings::Use& use) override {
+        using bindings::Job;
         auto* track = studio.module_track();
         if (!track) return false;
-        switch (input.kind) {
-        case Kind::Pad:
-            if (input.index < pad_count) held[input.index] = input.pressed;
+        switch (job) {
+        case Job::PlayNote: return true; // its sound went from the audio thread
+        case Job::TurnKnob: turn(*track, unsigned(use.index), use.delta, false); return true;
+        case Job::TurnKnobFine: turn(*track, unsigned(use.index), use.delta, true); return true;
+        case Job::Octave: {
+            int way = use.control == bindings::Control::Plus ? 1 : -1;
+            int octave = std::clamp(studio.octave(studio.track()) + way, lowest_octave, highest_octave);
+            studio.set_octave(studio.track(), octave);
+            studio.say("OCTAVE " + note_name(studio.note_for(0, octave)));
             return true;
-        case Kind::Knob: turn(*track, input.index, input.delta, studio.shift); return true;
-        case Kind::MainKnob:
-            if (shown_canvas(*track) >= 0 && track->canvas_entered) canvas_jog(*track, input.delta);
-            else if (track->menu_open) menu_turn(*track, input.delta, studio.shift);
-            else preset_by(*track, input.delta);
-            return true;
-        case Kind::Button: break;
-        default: return false;
         }
-        if (!input.pressed) return false;
-        auto button = Button(input.index);
-        if (int shown = shown_canvas(*track); shown >= 0 && (button == Button::MainPush || button == Button::Back)) {
+        // The Device View.
+        case Job::Focus: focus = std::clamp(focus + (use.delta > 0 ? 1 : -1), 0, 3); return true;
+        case Job::ShowFocus: studio.say(item(*track, focus)); return true;
+        case Job::OpenBrowser:
+            if (focus >= 2) studio.say("EFFECTS: NOT YET");
+            else if (focus == 1 && track->module && !track->module->preset_param.empty()) browsing = true;
+            else studio.open("load-modules");
+            return true;
+        case Job::ModuleMenu:
+            if (!track->module) studio.open("load-modules");
+            else if (!track->menu_open) open_menu(*track);
+            return true;
+        case Job::Page: page_by(*track, use.delta > 0 ? 1 : -1); return true;
+        // Its presets, loaded as the wheel turns.
+        case Job::BrowseTurn: preset_by(*track, use.delta); return true;
+        case Job::BrowsePush: browsing = false; return true;
+        // Its menu.
+        case Job::ListTurn: menu_turn(*track, use.delta, false); return true;
+        case Job::ListTurnFine: menu_turn(*track, use.delta, true); return true;
+        case Job::ListPush: menu_push(*track); return true;
+        case Job::Back:
+            if (browsing) { browsing = false; return true; }
+            if (track->menu_open) { menu_back(*track); return true; }
+            return false;
+        // Its own page.
+        case Job::CanvasTurn:
+            if (track->canvas_entered) canvas_jog(*track, use.delta);
+            return true;
+        case Job::CanvasPush: {
+            int shown = shown_canvas(*track);
+            if (shown < 0) return false;
             CanvasPage* canvas = track->canvas_pages[size_t(shown)].get();
-            if (button == Button::MainPush) {
-                if (!track->canvas_entered) track->canvas_entered = true; // the entering push is the host's
-                else if (canvas) canvas->midi(0xb0, move::button_cc(Button::MainPush), 127);
-            } else if (!(track->canvas_entered && canvas && canvas->back())) { // at its top: leave it
+            if (!track->canvas_entered) track->canvas_entered = true; // the entering push is the host's
+            else if (canvas) canvas->midi(0xb0, move::button_cc(move::Button::MainPush), 127);
+            return true;
+        }
+        case Job::CanvasBack: {
+            int shown = shown_canvas(*track);
+            if (shown < 0) return false;
+            CanvasPage* canvas = track->canvas_pages[size_t(shown)].get();
+            if (!(track->canvas_entered && canvas && canvas->back())) { // at its top: leave it
                 track->canvas_entered = false;
                 track->canvas_open = -1;
             }
-            return true;
-        }
-        switch (button) {
-        case Button::Back:
-            if (!track->menu_open) return false;
-            menu_back(*track);
-            return true;
-        case Button::MainPush:
-            if (track->menu_open) menu_push(*track);
-            else open_menu(*track);
-            return true;
-        case Button::Loop: studio.say("CHOP: KIT ONLY"); return true;
-        case Button::Left:
-        case Button::Right: page_by(*track, button == Button::Left ? -1 : 1); return true;
-        case Button::Up:
-        case Button::Down: {
-            int octave = std::clamp(studio.octave(studio.track()) + (button == Button::Up ? 1 : -1), lowest_octave, highest_octave);
-            studio.set_octave(studio.track(), octave);
-            studio.say("OCTAVE " + note_name(studio.note_for(0, octave)));
             return true;
         }
         default: return false;
@@ -87,15 +114,12 @@ public:
         auto* track = studio.module_track();
         note_pads(studio, lights, held, track && track->module);
         steps_playhead(studio, lights);
-        bool paged = track && track->module && track->module->pages.size() > 1;
         int octave = studio.octave(studio.track());
-        lights.button(Button::Left, paged && track->page > 0 ? white_dim : 0);
-        lights.button(Button::Right, paged && track->page + 1 < track->module->pages.size() ? white_dim : 0);
+        // Left / Right (bars), Loop (Loop Mode) and Note/Session (Patterns) wait for wave 2.
+        for (auto button : {Button::Left, Button::Right, Button::Loop, Button::Menu}) lights.button(button, 0);
         lights.button(Button::Up, octave < highest_octave ? white_dim : 0);
         lights.button(Button::Down, octave > lowest_octave ? white_dim : 0);
-        lights.button(Button::Loop, 0);
-        lights.button(Button::Menu, white_dim);
-        lights.button(Button::Back, track && (track->menu_open || track->canvas_entered || track->canvas_open >= 0) ? white_dim : 0);
+        lights.button(Button::Back, track && (browsing || track->menu_open || track->canvas_entered || track->canvas_open >= 0) ? white_dim : 0);
     }
 
     void draw(juce::Graphics& g) override {
@@ -103,18 +127,20 @@ public:
         if (!track || !track->module) {
             ui::rail(g, "SYN", track_number(studio), note_name(studio.note_for(0, studio.octave(studio.track()))));
             move::draw_text_centred(g, ui::content_x, 18, ui::content_width, track && (track->loading || !track->job.empty()) ? "LOADING" : "NO SYNTH", 2);
-            ui::detail(g, track && !track->saved.module.empty() ? upper(track->saved.module + " MISSING").substr(0, 16) : "MENU: MODULES");
+            ui::detail(g, track && !track->saved.module.empty() ? upper(track->saved.module + " MISSING").substr(0, 16) : "PUSH: MODULES");
             return;
         }
         if (int shown = shown_canvas(*track); shown >= 0) { draw_canvas(g, *track, shown); return; }
         if (track->menu_open) { draw_menu(g, *track); return; }
+        if (browsing) { draw_presets(g, *track); return; }
         auto& module = *track->module;
         // The rail as docs/UI.md has a module's page: module, track, page.
         const ModulePage* page = track->page < module.pages.size() ? &module.pages[track->page] : nullptr;
         ui::rail(g, upper(module.info().abbrev).substr(0, 4), track_number(studio), std::to_string(track->page + 1) + "/" + std::to_string(module.pages.size()));
+        items(g, {item(*track, 0), item(*track, 1), item(*track, 2), item(*track, 3)}, focus);
         std::string title = upper(page ? page->name : module.info().name).substr(0, 12), lowest = note_name(studio.note_for(0, studio.octave(studio.track())));
-        move::draw_text(g, ui::content_x + 1, 1, title);
-        move::draw_text(g, ui::width - int(lowest.size()) * move::glyph_advance, 1, lowest); // the bottom-left pad's note
+        move::draw_text(g, ui::content_x + 1, 11, title);
+        move::draw_text(g, ui::width - int(lowest.size()) * move::glyph_advance, 11, lowest); // the bottom-left pad's note
         std::array<std::string, 8> names;
         std::array<float, 8> values {};
         for (unsigned n = 0; page && n < page->knobs.size() && n < 8; ++n)
@@ -122,7 +148,7 @@ public:
                 names[n] = cell_name(*param);
                 values[n] = float(param->fraction());
             }
-        ui::knob_cells(g, ui::content(11, ui::subject_height - 11), names, values);
+        ui::knob_cells(g, ui::content(21, ui::subject_height - 21), names, values);
         auto where = bar_beat(studio);
         if (!module.preset_param.empty()) {
             char number[16];
@@ -154,6 +180,33 @@ public:
     }
 
 private:
+    int focus = 1;          // the Device View's item the wheel is on: 0 the module, 1 its preset, 2-3 the effects
+    bool browsing = false;  // its presets, the wheel walking them
+
+    std::string item(ModuleTrack& track, int which) const {
+        switch (which) {
+        case 0: return track.module ? upper(track.module->info().abbrev).substr(0, 4) : "SYN";
+        case 1: {
+            if (!track.module || track.module->preset_param.empty()) return "----";
+            char number[8];
+            std::snprintf(number, sizeof number, "%03d", std::clamp(track.module->preset + 1, 0, 999));
+            return number;
+        }
+        default: return "FX" + std::to_string(which - 1);
+        }
+    }
+
+    void draw_presets(juce::Graphics& g, ModuleTrack& track) {
+        auto& module = *track.module;
+        ui::rail(g, "LOAD", track_number(studio), "PRST");
+        char number[8];
+        std::snprintf(number, sizeof number, "%03d", std::clamp(module.preset + 1, 0, 999));
+        move::draw_text(g, ui::content_x + 2, 4, number, 3);
+        std::string name = upper(module.preset_name.empty() ? "PRESET" : module.preset_name);
+        move::draw_text(g, ui::content_x + 2, 30, name.substr(0, 16), name.size() <= 8 ? 2 : 1);
+        ui::detail(g, upper(module.info().abbrev).substr(0, 6), "PUSH: OK");
+    }
+
     // The module's own page on screen, else -1.
     int shown_canvas(const ModuleTrack& track) const {
         if (!track.module || studio.top() != this) return -1;

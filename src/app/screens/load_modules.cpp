@@ -18,19 +18,14 @@ public:
         cursor = std::clamp(cursor, 0, std::max(0, int(studio.catalog.size()) - 1));
     }
 
-    bool surface(const move::Input& input) override {
-        using Kind = move::Input::Kind;
-        using move::Button;
-        if (input.kind == Kind::MainKnob) {
-            cursor = std::clamp(cursor + input.delta, 0, std::max(0, int(studio.catalog.size()) - 1));
-            return true;
-        }
-        if (input.kind == Kind::Knob) return true;
-        if (input.kind != Kind::Button || !input.pressed) return false;
-        switch (Button(input.index)) {
-        case Button::Menu:
-        case Button::Back: studio.close(); return true;
-        case Button::MainPush:
+    bindings::Screen screen_kind() const override { return bindings::Screen::Browser; }
+    bool job(bindings::Job job, const bindings::Use& use) override {
+        using bindings::Job;
+        switch (job) {
+        case Job::BrowseTurn: cursor = std::clamp(cursor + use.delta, 0, std::max(0, int(studio.catalog.size()) - 1)); return true;
+        case Job::TurnKnob: case Job::TurnKnobFine: return true;
+        case Job::Back: studio.close(); return true;
+        case Job::BrowsePush:
             if (cursor < int(studio.catalog.size())) {
                 const auto& choice = studio.catalog[size_t(cursor)];
                 auto* track = studio.module_track();
@@ -47,7 +42,7 @@ public:
         for (unsigned at = 0; at < pad_count; ++at) lights.pad(at, colour::off);
         steps_playhead(studio, lights);
         for (auto button : {Button::Left, Button::Right, Button::Up, Button::Down, Button::Loop}) lights.button(button, 0);
-        lights.button(Button::Menu, white_bright);
+        lights.button(Button::Menu, 0);
         lights.button(Button::Back, white_dim);
     }
 
@@ -73,7 +68,7 @@ private:
     int cursor = 0;
 };
 
-RegisterScreen registered("load-modules", make<LoadModules>, {{move::Button::Menu, false, kind_bit(TrackKind::Synth)}});
+RegisterScreen registered("load-modules", make<LoadModules>); // the wheel's push on a synth's module (the Device View)
 
 } // namespace
 } // namespace app::screens

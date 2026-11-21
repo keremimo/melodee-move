@@ -244,6 +244,7 @@ int write_mockups(const std::string& directory) {
         ok = write_png(sheet(set.title, set.subtitle, set.screens, set.panels), file) && ok;
         std::cout << file.getFullPathName() << '\n';
     }
+    ok = write_controls_mockups(directory) && ok;
     return ok ? 0 : 1;
 }
 

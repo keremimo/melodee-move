@@ -16,6 +16,9 @@
 namespace ui {
 
 int write_mockups(const std::string& directory);
+// The screens and lights docs/MOVE_CONTROLS.md moves or adds: controls.png
+// and controls/ (mockups_controls.cpp).
+bool write_controls_mockups(const std::string& directory);
 
 namespace mockup {
 

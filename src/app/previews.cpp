@@ -46,15 +46,20 @@ int write_previews(const std::string& directory, const std::string& modules) {
     move::Session session;
     melodee.attach(session);
     melodee.audio_opened(move::AudioFormat {});
-    auto press = [&](move::Button button) {
-        auto event = move::make_event(0xbf, move::button_cc(button), 127);
-        move::track_input(session, event.input);
-        melodee.surface(event);
-    };
     auto send = [&](uint8_t status, uint8_t number, uint8_t value) {
         auto event = move::make_event(status, number, value);
         move::track_input(session, event.input);
         melodee.surface(event);
+    };
+    // A button pressed and let go, as a hand does (docs/MOVE_CONTROLS.md).
+    auto press = [&](move::Button button) {
+        send(0xbf, move::button_cc(button), 127);
+        send(0xbf, move::button_cc(button), 0);
+    };
+    auto shifted = [&](move::Button button) {
+        send(0xbf, move::button_cc(move::Button::Shift), 127);
+        press(button);
+        send(0xbf, move::button_cc(move::Button::Shift), 0);
     };
     bool ok = save(melodee, folder, "empty");
     if (!melodee.load_now(loop, 0).empty()) return 1;
@@ -63,14 +68,16 @@ int write_previews(const std::string& directory, const std::string& modules) {
     send(0xbf, move::knob_first_cc, 2);
     ok = save(melodee, folder, "touch") && ok;
     send(0x9f, 0, 0);
-    press(move::Button::Menu);
+    press(move::Button::MainPush); // the Device View's pad: Load
     ok = save(melodee, folder, "load") && ok;
-    press(move::Button::Menu);
+    press(move::Button::Back);
     // Clear the touch's moment before the next screens.
     melodee.surface(move::make_event(0x9f, 0, 0));
     std::this_thread::sleep_for(std::chrono::milliseconds(700));
-    press(move::Button::Loop);
-    send(0xbf, move::main_knob_cc, 6);
+    shifted(move::Button::MainPush); // Sample Options
+    ok = save(melodee, folder, "sample-options") && ok;
+    press(move::Button::MainPush);   // Chop
+    for (int n = 0; n < 6; ++n) press(move::Button::Right);
     ok = save(melodee, folder, "chop") && ok;
     press(move::Button::MainPush);
     ok = save(melodee, folder, "to-pads") && ok;
@@ -81,7 +88,7 @@ int write_previews(const std::string& directory, const std::string& modules) {
     press(move::Button::Back);
     press(move::Button::Back);
     send(0xbf, move::button_cc(move::Button::Row1), 127);
-    std::this_thread::sleep_for(std::chrono::milliseconds(250));
+    std::this_thread::sleep_for(std::chrono::milliseconds(450)); // held: the sixteen
     ok = save(melodee, folder, "tracks") && ok;
     send(0xbf, move::master_knob_cc, 127);
     ok = save(melodee, folder, "track-volume") && ok;
@@ -111,9 +118,9 @@ int write_previews(const std::string& directory, const std::string& modules) {
     press(move::Button::Back);
     press(move::Button::Row2);
     ok = save(melodee, folder, "synth-empty") && ok;
-    press(move::Button::Menu);
+    press(move::Button::MainPush); // no module yet: the push lists them
     ok = save(melodee, folder, "synth-modules") && ok;
-    press(move::Button::Menu);
+    press(move::Button::Back);
     std::string first;
     for (const auto& info : scan_modules(modules))
         if (info.api == 2) { first = info.id; break; }
@@ -123,9 +130,9 @@ int write_previews(const std::string& directory, const std::string& modules) {
     send(0x9f, 1, 127); // touch knob 2
     ok = save(melodee, folder, "synth-touch") && ok;
     send(0x9f, 1, 0);
-    // Its menu (the jogwheel's push), a value being edited, a list to choose from.
+    // Its menu (Shift + the wheel's push), a value being edited, a list to choose from.
     std::this_thread::sleep_for(std::chrono::milliseconds(700));
-    press(move::Button::MainPush);
+    shifted(move::Button::MainPush);
     send(0xbf, move::main_knob_cc, 2);
     ok = save(melodee, folder, "synth-menu") && ok;
     press(move::Button::MainPush);
