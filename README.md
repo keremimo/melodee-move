@@ -79,6 +79,9 @@ Three parts so far:
   Shift for capitals; push is done, Back held cancels. A file the page hands over (Webstream's download)
   goes onto the first empty kit pad, to play and chop. An action such as
   play/pause or stop is a button: push its menu row, or turn its knob up.
+  What a page keeps for itself (Webstream's provider, where its menus are)
+  is saved with the module and comes back on the next start; using a page
+  counts as a change, saved three seconds on.
 - The master knob is the volume; Shift + Back goes back to Move.
 - **Saving**: the whole project is one Melodee project file,
   `/data/UserData/Melodee/Projects/Move.mldp` (`--home` moves the folder),
@@ -319,7 +322,16 @@ card. The report stays in `.local/probe/`.
   wait. A pad still sounds in the block after the exchange it was read in:
   this is CPU time, not delay. Resident memory 48 MB before, 222 MB after
   (the engine host's buffers for Record, Audio Recall, renders and the
-  Looper). Neither is measured on a Move yet.
+  Looper).
+- On a Move (Ableton's firmware 4.1), the same project played by hand (a kit
+  of 21 samples, webstream on the synth track), the first scope's build
+  then this one: the cycle's own work 9-10 µs on average, 27 at most, before;
+  66-69 µs, 191 at most, after (2.4 % and 6.6 % of the 2902 µs block); a pad
+  from read to rendered 19 µs, 42 at most, before; 81-110 µs, 193 at most,
+  after; 3 late exchanges in 20,690 before, 3 in 31,024 after (225 pads);
+  resident memory 85 MB before, 259 MB after, with 1.1 GB left free. The
+  first start folded the first scope's project into one file, as
+  intended.
 - The package runs on a bare Ubuntu 22.04 (Ableton's glibc) with only its
   own libraries.
 - The JACK host against a dummy JACK server, earlier; the scripts' signal
@@ -357,9 +369,13 @@ to be designed again for this screen.
 
 ## Next
 
-- On a Move: the sixteen tracks' cycle time and pad time (`process_us`,
-  `pad_us`, `late` in the status line) and memory (`free -m` while it runs),
-  against the first scope's numbers above.
+- The engine host made lighter, on melodee-sample's branch
+  `engine-skip-empty-tracks` (until it is merged, build with
+  `MELODEE_SAMPLE` set to a checkout of it): an empty track's buffers are no
+  longer cleared every block, and a silent Pad FX punch records its history
+  a block at a time. In the simulated Move the cycle's work went from 87-114
+  µs to 16-19 µs with the first alone and 14-19 µs with both (three runs
+  each); not measured on a Move yet.
 - The latency meter on a Move (LATENCY page, jogwheel push), against
   Ableton's firmware and Schwung.
 - Wave 2, from docs/PARITY.md: sequencer, sampling, kit depth, instruments,

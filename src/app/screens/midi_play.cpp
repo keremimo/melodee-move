@@ -8,6 +8,7 @@
 // sends (Kerem, 2026-11-20: the Move's second parameter): touched, it shows;
 // turned, it changes. The track's parameters are Melodee's MIDI engine's
 // (engine/midi_engine.h), so motion, undo and the file come with them.
+#include "app/pad_layout.h"
 #include "app/screens/common.h"
 #include "melodee/engine/engine_info.h"
 #include "melodee/engine/midi_engine.h"
@@ -62,8 +63,9 @@ public:
 
     void input(const move::Input& input) override {
         if (input.kind == move::Input::Kind::Pad && input.index < pad_count) {
-            held[input.index] = input.pressed;
-            if (input.pressed && drums()) studio.current().last_pad = uint8_t(drum_pad(input.index)); // the map's pad NOTE edits
+            held[input.index] = input.pressed; // physical: as lit
+            // The pad by its number in the chosen layout (app/pad_layout.h): the map's pad NOTE edits.
+            if (input.pressed && drums()) studio.current().last_pad = uint8_t(drum_pad(logical_pad(uint8_t(input.index), pad_layout())));
         }
         if (input.kind == move::Input::Kind::Touch && !input.pressed && int(input.index) == address_shown) address_shown = -1;
     }
@@ -131,8 +133,9 @@ public:
         if (drums()) {
             auto colour = ui::track_colour(studio.track());
             const auto& track = studio.current();
-            for (unsigned at = 0; at < pad_count; ++at) {
-                unsigned pad = drum_pad(at);
+            auto layout = pad_layout();
+            for (unsigned logical = 0; logical < pad_count; ++logical) { // each drum pad lit where the layout puts it
+                unsigned at = physical_pad(uint8_t(logical), layout), pad = drum_pad(logical);
                 bool named = melodee::gm_drum_name(track.midi.drum_note[pad % melodee::sampler_pads]) != nullptr;
                 lights.pad(at, held[at] || pad == track.last_pad ? colour::white : named ? colour.bright : colour.dim);
             }
@@ -188,7 +191,7 @@ private:
 
     bool slot_page() const { return page >= Cc1 && page <= Cc3; }
     bool drums() const { return studio.current().layout == melodee::PadLayout::Drums; }
-    unsigned drum_pad(unsigned at) const { return (16u * studio.current().bank + at) % melodee::sampler_pads; }
+    unsigned drum_pad(unsigned logical) const { return (16u * studio.current().bank + logical) % melodee::sampler_pads; } // the bank's, by logical pad
     int slot_of(unsigned n) const { return (page - Cc1) * 8 + int(n); }
     int slot_address(unsigned n) const { return studio.current().params[size_t(mt::slot_address(slot_of(n)))]; }
     std::string sound_name() const { return studio.current().preset == 0 ? "MIDI" : "SND"; }
