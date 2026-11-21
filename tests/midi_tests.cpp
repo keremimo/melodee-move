@@ -513,9 +513,10 @@ void test_screens() {
     { std::lock_guard<std::mutex> hold(studio.lock); CHECK(studio.current().params[mt::Program] == 12); }
     hand.press(Button::Back);
     CHECK(has(*rig.melodee, "page=midi-play"));
-    // Shift + track button 1 (track 1 of the bank): selected, its options; MIDI IN 5.
+    // Shift + track button 1 (track 1 of the bank): its options (move-projects'), MIDI IN 5.
     hand.shift([&] { hand.press(Button::Row1); });
-    CHECK(has(*rig.melodee, "page=track-options") && has(*rig.melodee, "track=1 "));
+    CHECK(has(*rig.melodee, "page=track-options") && has(*rig.melodee, "options_track=1 "));
+    hand.wheel(2); // past COLOUR and NAME
     hand.press(Button::MainPush);
     hand.wheel(5);
     snap(*rig.melodee, "track-options");
@@ -528,8 +529,8 @@ void test_screens() {
         std::lock_guard<std::mutex> hold(studio.lock);
         CHECK(studio.project().tracks[0].midi_channel == 5 && studio.midi.track_out[0] == 9 && studio.midi.out_channel(studio, 0) == 9);
     }
-    hand.press(Button::Back);
-    CHECK(has(*rig.melodee, "page=kit-play"));
+    hand.press(Button::Back); // the track that was selected stays so: its Play
+    CHECK(has(*rig.melodee, "page=midi-play"));
     // Shift + Step 2: Setup (move-projects'); its MIDI row: MIDI Config. SYNC IN to CLOCK; PANIC.
     hand.shift([&] { hand.step(1); });
     CHECK(has(*rig.melodee, "page=setup"));
@@ -553,7 +554,7 @@ void test_screens() {
     hand.press(Button::Back);
     CHECK(has(*rig.melodee, "page=setup"));
     hand.press(Button::Back);
-    CHECK(has(*rig.melodee, "page=kit-play"));
+    CHECK(has(*rig.melodee, "page=midi-play"));
     // Tempo while MIDI clock leads: the tempo heard.
     uint64_t at = now_ns();
     rig.in_message({0xfa}, at);
