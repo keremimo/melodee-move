@@ -1413,6 +1413,8 @@ void test_kit_depth() {
     CHECK(play(1, 20) > to_s32(0.05f)); // slice 2, not C02
     press_button(melodee, Button::Back);
     CHECK(play(1, 20) == 0);            // C02 again: empty
+}
+
 // A loop's field in the status line ("loop1=PLAY,len=88200,..."): the state, or a number after `key=`.
 std::string loop_field(const std::string& status, unsigned loop, const std::string& key = "") {
     std::string tag = " loop" + std::to_string(loop) + "=";
