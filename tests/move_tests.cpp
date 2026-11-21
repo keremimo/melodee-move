@@ -1624,6 +1624,16 @@ void test_looper() {
         }
         CHECK(has(melodee.status(), "looper=on") && has(melodee.status(), "loop_latency=428"));
         CHECK(loop_field(melodee.status(), 1, "len") == std::to_string(taken));
+        // Another project swapped in (here the same one again): its loops are read from its folder anew.
+        {
+            AudioThread audio(melodee);
+            {
+                std::lock_guard<std::mutex> guard(melodee.studio().lock);
+                melodee.studio().loops().reopen();
+            }
+            for (int pass = 0; pass < 20; ++pass) { melodee.service(); std::this_thread::sleep_for(std::chrono::milliseconds(5)); }
+        }
+        CHECK(loop_field(melodee.status(), 1, "len") == std::to_string(taken) && has(melodee.status(), "loop_selected=1"));
         // Commit + note: onto the kit's next empty pad (A02 after A01), a note at bar 1, the loop stopped.
         auto& studio = melodee.studio();
         CHECK(studio.loops().commit(0, true));

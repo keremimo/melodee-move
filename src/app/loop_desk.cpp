@@ -68,6 +68,26 @@ LoopDesk::LoopDesk(Studio& owner) : studio(owner) {
     const auto& lp = studio.project().looper;
     for (unsigned n = 0; n < loops; ++n)
         if (lp.on && lp.loops[n].frames) load_mask |= uint8_t(1u << n);
+    written_dir = loop_dir();
+}
+
+void LoopDesk::reopen() {
+    clear_loop = -1;
+    commits.clear();             // their pads were the project before's
+    files = {};                  // written by flush() before the swap, or never
+    files_due = false;
+    seen = {};
+    edits = {};
+    written = {};
+    adopting = {};
+    was_stopped = {};
+    selected = 0;
+    load_mask = 0;
+    const auto& lp = studio.project().looper;
+    for (unsigned n = 0; n < loops; ++n)
+        if (lp.on && lp.loops[n].frames) load_mask |= uint8_t(1u << n);
+    written_dir = loop_dir();
+    loaded = false;              // the next service pass reads them
 }
 
 melodee::Looper& LoopDesk::looper() { return studio.host().looper(); }
@@ -323,6 +343,7 @@ void LoopDesk::keep_values() {
     auto& lp = studio.project().looper;
     FileJob job;
     job.dir = loop_dir();
+    bool moved = job.dir != written_dir; // a Save As or a rename: every loop into the new folder
     for (unsigned n = 0; n < loops; ++n) {
         auto v = view(n);
         observe(n, v); // whatever tick() has not seen yet
@@ -343,7 +364,7 @@ void LoopDesk::keep_values() {
         l.tempo = v.tempo;
         l.layers = v.layers;
         l.stopped = v.state == S::Stopped;
-        if (edits[n] != written[n]) { job.write |= bit; job.edits[n] = edits[n]; }
+        if (moved || edits[n] != written[n]) { job.write |= bit; job.edits[n] = edits[n]; }
     }
     if (job.write || job.remove || files_due) {
         files = std::move(job);
@@ -547,11 +568,10 @@ void LoopDesk::write_files(FileJob job, std::chrono::milliseconds wait) {
     }
     // No loops left: no folder either.
     if (job.remove == (1u << loops) - 1 && fs::is_directory(job.dir, error) && fs::is_empty(job.dir, error)) fs::remove(job.dir, error);
-    if (retry) {
-        std::lock_guard<std::mutex> guard(studio.lock);
-        if (!files_due) { files = job; files.write = retry; files.remove = 0; files_due = true; }
-        else files.write |= uint8_t(retry & ~files.remove);
-    }
+    std::lock_guard<std::mutex> guard(studio.lock);
+    if (!retry) { written_dir = job.dir; return; } // its files all there
+    if (!files_due) { files = job; files.write = retry; files.remove = 0; files_due = true; }
+    else files.write |= uint8_t(retry & ~files.remove);
 }
 
 void LoopDesk::run_commit(const CommitJob& job) {
