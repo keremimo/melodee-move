@@ -93,7 +93,11 @@ A pad's job comes from its number in the layout chosen in Setup > PADS >
 LAYOUT (Rows or Banks, the decision above; `src/app/pad_layout.h`): "pad
 n", "the right 16" and "slice n" below are in that layout's numbering. The
 bindings table matches pads by where they lie (16 Pitches' right 4x4), the
-screens and the audio thread turn the pad into its number.
+screens and the audio thread turn the pad into its number; `audio_event()`
+does it once for every note a pad plays or writes (Seq Record, Capture,
+Repeat, the arp go through the track and key it works out). The Move's
+grids stay where they lie in both layouts until Kerem says otherwise:
+Session (a row a track of the bank, a column a pattern) and the Overview.
 
 | Control | On the Move | In Melodee | Status |
 | --- | --- | --- | --- |
