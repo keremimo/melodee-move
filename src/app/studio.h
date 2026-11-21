@@ -268,6 +268,7 @@ private:
     void release_chain_fx(const melodee::Chain& chain); // its Schwung effects let go (a track deleted)
     void copy_chain_fx(melodee::Chain& chain);          // each its own instance (a track copied)
     std::string write(std::vector<uint8_t> bytes, std::string settings_text);
+    SynthFile module_state(unsigned track) const; // a Schwung track's module as it is now: values, preset, its pages' state
     std::vector<uint8_t> project_bytes() const;
     std::string settings_text() const;
     uint8_t free_plugin_entry() const;

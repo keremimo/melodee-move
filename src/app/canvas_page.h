@@ -44,6 +44,9 @@ public:
         std::function<void(const std::string& key, const std::string& value)> set;
         std::function<void(const std::string& title, const std::string& initial)> text_entry;
         std::function<void(const std::string& path)> open_file;
+        // After each gesture the page was given (a turn, a push, Back, the
+        // keyboard's answer): what it keeps in ctx.state may have changed.
+        std::function<void()> changed;
     };
     // Reads and starts `script`. Null with `error` set when it cannot.
     static std::unique_ptr<CanvasPage> load(const std::string& script, Host host, std::string& error);
@@ -54,6 +57,14 @@ public:
     void midi(uint8_t status, uint8_t number, uint8_t value);
     bool back();
     void text_entered(const std::string& text, bool cancelled);
+
+    // What the page keeps in ctx.state (a provider picked, where its menus
+    // are), as JSON, to save with the module; empty when there is nothing
+    // or it cannot be written as JSON. restore_state() puts a saved one's
+    // properties back onto ctx.state (the same object the page holds), as
+    // the page left them; anything not JSON is ignored.
+    std::string saved_state() const;
+    void restore_state(const std::string& json);
 
     // The screen as the last draw left it, for tests.
     bool pixel(int x, int y) const { return x >= 0 && x < width && y >= 0 && y < height && screen[size_t(y * width + x)]; }
