@@ -668,6 +668,12 @@ card. The report stays in `.local/probe/`.
   32-56 µs on average, against 25-43 with it off in the same busy
   container; a pad from read to rendered 27-61 µs (15-41 off); resident
   memory 389 MB against 219 (its eight 22.5 MB buffers).
+- The Looper on a Move (2026-11-21, a new project of two tracks, driven
+  over `--ctl`): turned on, Melodee went from 247 to 419 MB resident and
+  the Move's used memory from 324 to 497 MB of 1849 (1290 available). L1-L4
+  recorded two bars each, at once, from the input, the mix, Track 1 and L1,
+  and all four played: the cycle's work 115 µs on average, 237-254 at most
+  (54/205 with the Looper off), `late=1` throughout (the one at the start).
 - Sampling, in the simulated Move: a take of Melodee's own mix (RESAMPLE)
   with the kit played through the pads onto A06, written to
   `Samples/Recorded`, and Audio Recall onto A07 (`./build.sh`); the unit
@@ -752,11 +758,10 @@ to be designed again for this screen.
 
 ## Next
 
-- The engine host made lighter, on melodee-sample's branch
-  `engine-skip-empty-tracks` (until it is merged, build with
-  `MELODEE_SAMPLE` set to a checkout of it): an empty track's buffers are no
-  longer cleared every block, and a silent Pad FX punch records its history
-  a block at a time. In the simulated Move the cycle's work went from 87-114
+- The engine host made lighter still. melodee-sample's
+  `engine-skip-empty-tracks`, now in its main, took the first step: an empty
+  track's buffers are no longer cleared every block, and a silent Pad FX
+  punch records its history a block at a time. In the simulated Move the cycle's work went from 87-114
   µs to 16-19 µs with the first alone and 14-19 µs with both (three runs
   each). On a Move it is less: the engine host alone, timed on the Move's
   own CPU, 53.3 µs a block before and 37.6 after for a kit and a synth
@@ -767,12 +772,13 @@ to be designed again for this screen.
   host's fixed work a block (the Looper, the input, the mix); melodee-sample
   is the place to lighten it further.
 - The latency meter on a Move (LATENCY page, jogwheel push), against
-  Ableton's firmware and Schwung.
-- The Looper on a Move: memory (`free -m`) with it on; IN DELAY with a
-  cable from the headphone output into the line in (the number it keeps,
-  against the spike's LATENCY page); a take from the line in played back
-  against the metronome; L1-L4 together from tracks, the mix and the input
-  while sixteen tracks play (`process_us`, `late`).
+  Ableton's firmware and Schwung, with a cable from the headphone output
+  into the line in: the speaker into the microphone heard none of 80
+  clicks (2026-11-21, nothing plugged in).
+- The Looper on a Move, what is left: IN DELAY with that cable (the number
+  it keeps, against the spike's LATENCY page); a take from the line in
+  played back against the metronome; L1-L4 together while sixteen tracks
+  play (`process_us`, `late`).
 - Wave 2, from docs/PARITY.md: sequencer, sampling, kit depth, instruments,
   mixer & effects, song & export, looper, MIDI & sync & undo & projects.
 
