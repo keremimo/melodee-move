@@ -356,6 +356,13 @@ void test_record(app::MelodeeApp& melodee) {
     h.render(30);
     h.pad(5);
     CHECK(p.events.size() == 2);
+    // Another track ends the take, playback going on (14.1); Capture starts afresh (14.3).
+    h.button(Button::Row2);
+    h.render(2);
+    CHECK(has(h.status(), "rec=0") && has(h.status(), "playing=1") && has(h.status(), "capture=0"));
+    h.button(Button::Row1);
+    h.button(Button::Rec);
+    h.render(2);
     // Stop ends the take with the transport (14.1).
     h.button(Button::Play);
     h.render(2);

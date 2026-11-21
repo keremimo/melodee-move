@@ -1049,8 +1049,11 @@ void Sequencer::tick(Clock::time_point now) {
         was_playing = playing;
     }
     if (studio.track() != last_track) {
-        // Track select clears Capture (14.3); the pads repeat on the track they play.
+        // Another track: Seq Record stops, playback goes on (14.1); Capture starts afresh (14.3); the pads
+        // repeat on the track they play.
         last_track = studio.track();
+        if (rec || rec_waiting) record(false);
+        clear_capture();
         const auto& track = studio.current();
         studio.pads_repeat(track.repeat ? 1 : track.arp ? 2 : 0);
         keys_down.clear();
