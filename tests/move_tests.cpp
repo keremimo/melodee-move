@@ -1581,6 +1581,73 @@ void test_synth_track() {
     CHECK(back.module.empty());
 }
 
+void test_user_presets() {
+    // My Presets on a module's pages, Schwung's files shared: Save As (a
+    // taken name gets a number), the Preset row marks an edit "* name", the
+    // list loads one, Delete asks first. MELODEE_SCHWUNG_PRESETS keeps the
+    // tests' own.
+    const std::string presets = "build/test-presets", home = "build/test-home-presets";
+    std::filesystem::remove_all(presets);
+    std::filesystem::remove_all(home);
+    setenv("MELODEE_SCHWUNG_PRESETS", presets.c_str(), 1);
+    app::MelodeeApp melodee("build/test-samples", home, "build/test-modules");
+    Session session;
+    melodee.attach(session);
+    melodee.audio_opened(AudioFormat {});
+    CHECK(melodee.restore_now().empty());
+    press_button(melodee, Button::Row2);
+    press_button(melodee, Button::MainPush);
+    press_button(melodee, Button::MainPush);
+    melodee.service();
+    CHECK(has(melodee.status(), "synth=fake"));
+    auto& studio = melodee.studio();
+    const app::Studio::PagesTarget target {1, melodee::no_plugin};
+    {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        studio.save_user_preset_as(target, "Bright", false);
+        studio.save_user_preset_as(target, "Bright", false); // taken: Bright 2
+    }
+    CHECK(std::filesystem::exists(presets + "/fake/Bright.json") && std::filesystem::exists(presets + "/fake/Bright 2.json"));
+    std::ifstream in(presets + "/fake/Bright.json");
+    std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    CHECK(has(text, "\"module\": \"fake\"") || has(text, "\"module\":\"fake\""));
+    CHECK(has(text, "\"level\"") && has(text, "\"version\""));
+    // An edit after: the Preset row says so.
+    melodee.surface(make_event(0xb0, knob_first_cc, 10)); // level up ten
+    press_button(melodee, Button::MainPush);
+    frames(melodee, 8);
+    to_page(melodee, "My Presets");
+    auto rows = [&] {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        auto* pages = studio.pages_of(target);
+        return pages ? pages->view().menu.rows : std::vector<app::ModuleView::Row> {};
+    };
+    frames(melodee, 2);
+    auto mine = rows();
+    CHECK(mine.size() == 4 && mine[0].label == "Preset" && mine[0].value == "* Bright 2" && mine[3].label == "Delete");
+    // The list: the first, loaded; back on the pages, the level as saved.
+    press_button(melodee, Button::MainPush); // into the page
+    frames(melodee, 1);
+    press_button(melodee, Button::MainPush); // Preset: the list
+    CHECK(has(melodee.status(), "page=module-presets") && has(melodee.status(), "presets=2 preset_cursor=1"));
+    turn_wheel(melodee, -1);
+    press_button(melodee, Button::MainPush);
+    frames(melodee, 3);
+    CHECK(has(melodee.status(), "page=module-pages"));
+    CHECK(melodee.synth_value("level") == "0.5");
+    frames(melodee, 2);
+    mine = rows();
+    CHECK(!mine.empty() && mine[0].value == "Bright");
+    // Delete: its row, a question, yes.
+    turn_wheel(melodee, 3);
+    frames(melodee, 1);
+    press_button(melodee, Button::MainPush);
+    CHECK(has(melodee.status(), "page=question"));
+    press_button(melodee, Button::MainPush);
+    CHECK(!std::filesystem::exists(presets + "/fake/Bright.json") && std::filesystem::exists(presets + "/fake/Bright 2.json"));
+    unsetenv("MELODEE_SCHWUNG_PRESETS");
+}
+
 void test_module_replace() {
     // Another module over the one loaded asks first; a hand off the wheel
     // (or a knob) and back on is no answer, the push still says yes.
@@ -3038,6 +3105,7 @@ int main() {
     test_canvas_page();
     test_synth_track();
     test_module_replace();
+    test_user_presets();
     test_tracks();
     test_step_icons();
     test_migration();

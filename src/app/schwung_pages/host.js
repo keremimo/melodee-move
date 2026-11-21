@@ -197,8 +197,18 @@ function menuEntered() {
 }
 
 // Pages Melodee adds after the module's, as Schwung adds My Presets and Module.
+// When Melodee's answer changes (a preset saved, loaded, edited: "* name"),
+// the controller is asked to take them again, as Schwung's host does after a
+// Save (refreshTrailing).
+let trailingText = null;
 function trailingMenus() {
-    try { return JSON.parse((ctx && ctx.getParam("melodee:trailing")) || "[]"); } catch (e) { return []; }
+    trailingText = (ctx && ctx.getParam("melodee:trailing")) || "[]";
+    try { return JSON.parse(trailingText); } catch (e) { return []; }
+}
+function refreshTrailingIfChanged() {
+    if (!controller || trailingText === null || typeof controller.refreshTrailing !== "function") return;
+    const now = (ctx && ctx.getParam("melodee:trailing")) || "[]";
+    if (now !== trailingText) controller.refreshTrailing();
 }
 
 function ensure() {
@@ -452,6 +462,7 @@ globalThis.canvas_overlay = {
         ctx = c;
         ensure();
         if (controller) {
+            refreshTrailingIfChanged();
             tick();
             const canvas = opened || (controller.page && controller.page.canvas) || null;
             if (canvas && info && info.height > 0)

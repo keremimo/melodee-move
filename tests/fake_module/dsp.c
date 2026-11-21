@@ -97,6 +97,12 @@ static void set_param(void *instance, const char *key, const char *val) {
     else if (!strcmp(key, "table")) fake->table = atoi(val);
     else if (!strcmp(key, "searched")) snprintf(fake->searched, sizeof fake->searched, "%s", val);
     else if (!strcmp(key, "stall")) usleep((useconds_t)atoi(val) * 1000); /* a module slow to set: milliseconds */
+    else if (!strcmp(key, "state")) { /* its whole state, as a user preset keeps it: {"level":..,"wave":..,"table":..} */
+        const char *at;
+        if ((at = strstr(val, "\"level\":"))) fake->level = (float)atof(at + 8);
+        if ((at = strstr(val, "\"wave\":"))) fake->wave = atoi(at + 7);
+        if ((at = strstr(val, "\"table\":"))) fake->table = atoi(at + 8);
+    }
 }
 
 typedef int (*move_info_fn)(void *out, size_t cap);
@@ -110,6 +116,7 @@ static int get_param(void *instance, const char *key, char *buf, int buf_len) {
     if (!strcmp(key, "preset")) return snprintf(buf, (size_t)buf_len, "%d", fake->preset);
     if (!strcmp(key, "table")) return snprintf(buf, (size_t)buf_len, "%d", fake->table);
     if (!strcmp(key, "searched")) return snprintf(buf, (size_t)buf_len, "%s", fake->searched);
+    if (!strcmp(key, "state")) return snprintf(buf, (size_t)buf_len, "{\"level\":%g,\"wave\":%d,\"table\":%d}", fake->level, fake->wave, fake->table);
     if (!strcmp(key, "table_list")) return snprintf(buf, (size_t)buf_len, "[{\"index\":0,\"label\":\"Sine\"},{\"index\":1,\"label\":\"Saw\"},{\"index\":2,\"label\":\"Organ\"}]");
     if (!strcmp(key, "preset_count")) return snprintf(buf, (size_t)buf_len, "10");
     if (!strcmp(key, "preset_name")) return snprintf(buf, (size_t)buf_len, "Fake %d", fake->preset);

@@ -12,6 +12,7 @@
 #include "app/keys.h"
 #include "app/module_host.h"
 #include "app/schwung_pages.h"
+#include "app/user_presets.h"
 #include "app/pad_layout.h"
 #include "app/project_store.h"
 #include "move/app.h"
@@ -116,7 +117,9 @@ struct ModuleTrack {
     std::unique_ptr<LoadedModule> module;
     std::vector<std::unique_ptr<LoadedModule>> leaving;
     std::vector<std::unique_ptr<CanvasPage>> canvas_pages; // one a module->canvases, null where its script failed
-    std::unique_ptr<SchwungPages> schwung_pages;           // its pages drawn by Schwung's own code; null: Melodee draws them
+    std::unique_ptr<SchwungPages> schwung_pages;           // its pages by Schwung's own code (schwung_pages.h)
+    std::string user_preset;        // the user preset loaded or saved last (user_presets.h); empty: none
+    bool user_preset_dirty = false; // a value set since
     SynthFile saved;            // as the project file has it: kept while the module is missing
     std::string job;            // a module to load (the service thread's)
     bool job_restores = false;  // set as `saved` has it (a project opened, a track copied)
@@ -338,6 +341,11 @@ public:
     std::string pages_trailing(PagesTarget target, bool instrument);
     void pages_action(PagesTarget target, const std::string& action);
     void remove_module(PagesTarget target); // Remove Module: the synth's module (the track stays, empty) or the effect
+    // My Presets (user_presets.h), on a synth's module: one loaded (its state
+    // set, every value asked again), the current one saved over, or saved
+    // under a new name (a number on where it is taken).
+    void load_user_preset(PagesTarget target, const UserPreset& preset);
+    void save_user_preset_as(PagesTarget target, const std::string& name, bool overwrite);
     std::vector<ModuleInfo> catalog;
     std::string modules_root;
     void rescan_modules();
