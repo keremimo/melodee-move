@@ -152,6 +152,14 @@ bool MelodeeApp::global(bindings::Job job, const bindings::Use& use) {
     case Job::ScaleStep: {
         auto kind = studio.kind();
         if (kind != TrackKind::Synth && kind != TrackKind::Keys && kind != TrackKind::Midi && kind != TrackKind::Plugin) return false;
+        if (keys_mode(studio.current()) == KeysMode::Prog) { // a progression's next or previous 16 chords
+            auto& track = studio.current();
+            track.bank = uint8_t(std::clamp(int(track.bank) + (use.control == bindings::Control::Plus ? 1 : -1), 0, int(keys_bank_count(track)) - 1));
+            studio.publish_pads();
+            studio.changed();
+            studio.say("CHORDS " + std::to_string(16 * track.bank + 1) + "-" + std::to_string(16 * track.bank + 32));
+            return true;
+        }
         int shift = studio.key_shift(studio.track()) + (use.control == bindings::Control::Plus ? 1 : -1);
         studio.set_key_shift(studio.track(), shift);
         auto notes = pad_notes(studio.project(), studio.current(), 0, shift);

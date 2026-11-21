@@ -24,12 +24,7 @@ public:
     bool job(bindings::Job job, const bindings::Use& use) override {
         using bindings::Job;
         switch (job) {
-        case Job::Octave: {
-            int octave = std::clamp(studio.octave(studio.track()) + (use.control == bindings::Control::Plus ? 1 : -1), lowest_octave, highest_octave);
-            studio.set_octave(studio.track(), octave);
-            studio.say("OCTAVE " + note_name(studio.note_for(0, octave)));
-            return true;
-        }
+        case Job::Octave: studio.say(octave_or_bank(studio, use.control == bindings::Control::Plus ? 1 : -1, lowest_octave, highest_octave)); return true;
         case Job::PlayNote: case Job::TurnKnob: case Job::TurnKnobFine: return true;
         default: return false;
         }

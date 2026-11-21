@@ -40,22 +40,7 @@ public:
         case Job::PlayNote: return true; // its sound went from the audio thread
         case Job::TurnKnob: turn(unsigned(use.index), use.delta, false); return true;
         case Job::TurnKnobFine: turn(unsigned(use.index), use.delta, true); return true;
-        case Job::Octave: {
-            int way = use.control == bindings::Control::Plus ? 1 : -1;
-            auto& track = studio.current();
-            if (keys_mode(track) == KeysMode::Drums) { // 16 pads, as a kit's
-                track.bank = uint8_t(std::clamp(int(track.bank) + way, 0, int(keys_bank_count(track)) - 1));
-                studio.publish_pads();
-                studio.say("DRUMS FROM " + std::to_string(pad_notes(studio.project(), track, 0).keys[0]));
-                studio.changed();
-                return true;
-            }
-            int octave = std::clamp(studio.octave(studio.track()) + way, lowest_octave, highest_octave);
-            studio.set_octave(studio.track(), octave);
-            studio.publish_pads();
-            studio.say("LOWEST " + lowest_note(studio));
-            return true;
-        }
+        case Job::Octave: studio.say(octave_or_bank(studio, use.control == bindings::Control::Plus ? 1 : -1, lowest_octave, highest_octave)); return true;
         case Job::Focus: focus = std::clamp(focus + (use.delta > 0 ? 1 : -1), 0, 3); return true;
         case Job::ShowFocus: studio.say(item(focus)); return true;
         case Job::OpenBrowser:
@@ -122,6 +107,10 @@ public:
             values[n] = k.fraction;
         }
         ui::knob_cells(g, ui::content(20, ui::subject_height - 20), names, values);
+        if (keys_mode(studio.current()) == KeysMode::Drums && last_pad >= 0) { // the drum hit last, named
+            auto drum = pad_notes(studio.project(), studio.current(), unsigned(last_pad));
+            if (drum.count) { ui::detail(g, drum_name(drum.keys[0]).substr(0, 16)); return; }
+        }
         ui::detail(g, detail_left(*sample), page == Page::Play ? (sound.mono ? "MONO" : "POLY") : "");
     }
 

@@ -4,6 +4,7 @@
 #include "melodee/engine/arp.h"
 #include "melodee/engine/macros.h"
 #include "melodee/model/chords.h"
+#include "melodee/model/midi_track.h"
 
 // The pages every note track's Play screen has (docs/UI.md, "Instruments"):
 // MACRO on a module track (Melodee's FILTER, ECHO and SPACE, the mod wheel,
@@ -130,6 +131,28 @@ inline std::string note_page_right(const Studio& studio, unsigned t, NotePage pa
     }
     default: return {};
     }
+}
+
+// Plus / Minus on a note track: the octave, as the Move's; on Drums, 16 pads
+// (as a kit's banks). What it did, to say.
+inline std::string octave_or_bank(Studio& studio, int way, int lowest_octave, int highest_octave) {
+    auto& track = studio.current();
+    if (keys_mode(track) == KeysMode::Drums) {
+        track.bank = uint8_t(std::clamp(int(track.bank) + way, 0, int(keys_bank_count(track)) - 1));
+        studio.publish_pads();
+        studio.changed();
+        auto first = pad_notes(studio.project(), track, 0);
+        return "DRUMS FROM " + std::to_string(first.count ? first.keys[0] : 36);
+    }
+    studio.set_octave(studio.track(), std::clamp(studio.octave(studio.track()) + way, lowest_octave, highest_octave));
+    auto first = pad_notes(studio.project(), track, 0, studio.key_shift(studio.track()));
+    return "LOWEST " + (first.count ? note_name(first.keys[0]) : std::string("--"));
+}
+
+// A drum's name on Drums: a MIDI track's General MIDI one, else its note.
+inline std::string drum_name(int key) {
+    const char* name = melodee::gm_drum_name(unsigned(key));
+    return std::to_string(key) + " " + upper(name ? name : note_name(key));
 }
 
 // The rows of fourths' lowest note, or a drum's, for the rail.

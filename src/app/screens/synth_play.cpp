@@ -41,7 +41,10 @@ public:
     }
 
     void input(const move::Input& input) override {
-        if (input.kind == move::Input::Kind::Pad && input.index < pad_count) held[input.index] = input.pressed;
+        if (input.kind == move::Input::Kind::Pad && input.index < pad_count) {
+            held[input.index] = input.pressed;
+            if (input.pressed) last_pad = int(input.index);
+        }
         if (input.kind == move::Input::Kind::Touch && input.index == bend_knob) bend_touched = input.pressed; // BEND: let go, it goes back
     }
 
@@ -55,13 +58,7 @@ public:
             if (NotePage* page = melodee_page()) { note_page_turn(studio, studio.track(), *page, unsigned(use.index), use.delta); return true; }
             turn(*track, unsigned(use.index), use.delta, job == Job::TurnKnobFine);
             return true;
-        case Job::Octave: {
-            int way = use.control == bindings::Control::Plus ? 1 : -1;
-            int octave = std::clamp(studio.octave(studio.track()) + way, lowest_octave, highest_octave);
-            studio.set_octave(studio.track(), octave);
-            studio.say("OCTAVE " + note_name(studio.note_for(0, octave)));
-            return true;
-        }
+        case Job::Octave: studio.say(octave_or_bank(studio, use.control == bindings::Control::Plus ? 1 : -1, lowest_octave, highest_octave)); return true;
         // The Device View.
         case Job::Focus: focus = std::clamp(focus + (use.delta > 0 ? 1 : -1), 0, 3); return true;
         case Job::ShowFocus: studio.say(item(*track, focus)); return true;
@@ -162,6 +159,10 @@ public:
             }
         ui::knob_cells(g, ui::content(21, ui::subject_height - 21), names, values);
         auto where = bar_beat(studio);
+        if (keys_mode(studio.current()) == KeysMode::Drums && last_pad >= 0) { // the drum hit last, named
+            auto drum = pad_notes(studio.project(), studio.current(), unsigned(last_pad));
+            if (drum.count) { ui::detail(g, drum_name(drum.keys[0]).substr(0, 16)); return; }
+        }
         if (!module.preset_param.empty()) {
             char number[16];
             std::snprintf(number, sizeof number, "%03d", std::clamp(module.preset + 1, 0, 999));
@@ -200,6 +201,7 @@ private:
     std::array<uint8_t, melodee::track_count> own_page = filled(1);
     static std::array<uint8_t, melodee::track_count> filled(uint8_t v) { std::array<uint8_t, melodee::track_count> a {}; a.fill(v); return a; }
     static constexpr unsigned bend_knob = 4;
+    int last_pad = -1; // Drums: the drum hit last, named
     bool bend_touched = false;
     NotePage* melodee_page() {
         static NotePage pages[] {NotePage::Macro, NotePage::Macro, NotePage::Arp, NotePage::Chord};

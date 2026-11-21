@@ -662,6 +662,20 @@ void test_screens() {
     }
     button(Button::Back); // out of Keys & Scale
     CHECK(has(melodee.status(), "page=keys-play"));
+    // Prog: Shift + Plus the next 16 chords; Drums: Plus the next 16 drums.
+    shifted([&] { button(Button::Up); });
+    {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        CHECK(studio.project().tracks[2].bank == 1);
+        studio.set_keys(2, app::KeysMode::Drums, false);
+        studio.current().bank = 0;
+    }
+    button(Button::Up);
+    {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        CHECK(studio.project().tracks[2].bank == 1 && app::pad_notes(studio.project(), studio.current(), 0).keys[0] == 52);
+        studio.set_keys(2, app::KeysMode::InKey, false);
+    }
     // A module track: MACRO first; knob 1 the FILTER macro. Then its menu's AUTO SAMPLE, the check, sampling, the new track.
     {
         std::lock_guard<std::mutex> guard(studio.lock);
