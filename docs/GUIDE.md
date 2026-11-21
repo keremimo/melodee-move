@@ -9,8 +9,13 @@ page carries it too.
 
 - **From Schwung's Tools menu**: Tools > Melodee. Ableton's app stops while
   Melodee runs and comes back when it ends.
-- **Shift + Back**: back to Move. Save your Set before starting Melodee, as
-  for any quit of Move.
+- **At power-on**, if you choose it: while the Move shows **Loading ...
+  press Back to change**, press **Back**, turn the jogwheel to **Melodee**
+  and press it. The Move starts in Melodee at every power-on from then on;
+  choose **Schwung** the same way to change it back. Schwung Manager's
+  **Boot** page (http://move.local:7700/boot) does the same from a browser.
+- **Shift + Back**: back to Move, also when the Move started in Melodee.
+  Save your Set before starting Melodee, as for any quit of Move.
 - **Master knob**: the volume, kept from one start to the next.
 
 ## The web page

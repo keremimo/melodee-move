@@ -5,5 +5,6 @@
     "description": "Melodee's sampler and Chop on the Move's 32 pads, with the Move to itself",
     "author": "Kerem Kilic (Ellic Studio)",
     "component_type": "tool",
-    "standalone": true
+    "standalone": true,
+    "boot_target": { "name": "Melodee", "exec": "boot-entry.sh" }
 }

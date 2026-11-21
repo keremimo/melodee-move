@@ -53,6 +53,14 @@ move::Backend backend_named(const std::string& name) {
 } // namespace
 
 int main(int argc, char** argv) {
+    // A blocked signal stays blocked through exec, and whoever started
+    // melodee-move may have blocked some: the Move's MoveLauncher blocks
+    // INT, USR1 and TERM, so started at power-on (module/boot-entry.sh)
+    // Melodee would never hear a stop. None is blocked here, and the threads
+    // started from here on inherit that.
+    sigset_t none;
+    sigemptyset(&none);
+    pthread_sigmask(SIG_SETMASK, &none, nullptr);
     // A write to a closed pipe or socket is an error to its writer, not the
     // end of the process: Schwung's modules stream (webstream, radiogarden)
     // and one dying stream must not take Melodee with it.

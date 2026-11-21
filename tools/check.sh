@@ -92,6 +92,7 @@ lane mixer build/mixer-tests
 lane pad_layout build/pad-layout-tests
 lane web_tests build/web-tests
 lane instruments build/instruments-tests
+lane boot_entry sh tests/boot_entry_test.sh
 lanes
 if [ "$MODE" = quick ]; then
     phase "quick: done"

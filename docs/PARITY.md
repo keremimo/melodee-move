@@ -452,10 +452,10 @@ Kerem has checked it there. `n/a` rows have no box.
 
 | Feature | Status | Move controls | ✓ |
 | --- | --- | --- | --- |
-| **Install and start** (the MPC: autorun on the card, `device.py install-sd`) (MELODEE.md › Installing) | done | Schwung's Tools menu, or `tools/deploy-stock.sh` over SSH | [ ] |
+| **Install and start** (the MPC: autorun on the card, `device.py install-sd`) (MELODEE.md › Installing) | done | Schwung's Tools menu; at power-on as a boot target of Schwung's boot selector (the user's choice: its power-on picker, or Schwung Manager's Boot page); or `tools/deploy-stock.sh` over SSH | [ ] |
 | **Firmware check**: starts only on MPC firmware 1.3.0.12 (README › Requirements) | n/a | not an MPC | — |
 | **Back to the stock app**: Exit's MPC APP (MELODEE.md › Project and system, Exit) | done | Shift + Back; Ableton's app comes back however the run ends | [ ] |
-| **Recovery**: the stock app back after a crash (MELODEE.md › Threads and data) | done | `run-stock.sh`; a reboot is always stock | [ ] |
+| **Recovery**: the stock app back after a crash (MELODEE.md › Threads and data) | done | `run-stock.sh`; started at power-on, a crash goes to Schwung; the 2 s boot window always reaches Schwung or stock | [ ] |
 | **Power off** from the Exit sheet (MELODEE.md › Project and system, Exit) | n/a | the Move's own power button; Melodee saves on the way out | — |
 | **Updates from the card**: a signed zip at the card's top (MELODEE.md › Updates from the card) | n/a | no card; updates come through the web page | — |
 | **Update sheet**: Update to vX?, LATER / INSTALL, its steps, the previous version kept to fall back to (MELODEE.md › Updates from the card) | schwung | no update of its own: Schwung updates melodee-move (Kerem, 2026-11-20) | [ ] |

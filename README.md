@@ -427,7 +427,8 @@ the tap's click and the sound in the waveform is what you hear.
 | `src/web/` | Melodee's web page: `http.*` the server, `pairing.*` who may use it (the USB cable, or a code), `web_page.*` its answers and Melodee's folder, `web_layer.*` the page around the app (the screen's frames, its screens on the Move, Shift + Capture), `screens.*` those screens, `web_bundle.*` and `static/` the page itself |
 | `src/app/` | Melodee on the Move: `melodee_app.*` the app (thin: what every screen shares), `studio.*` Melodee's `Project` and `EngineHost` and what the screens share, `sequencer.*` and `seq_edit.*` the sequencer, `screen.*` a screen and the registry, `screens/` one file a screen, `project_store.*` the project file, `schwung_api.h` and `module_host.*` Schwung's modules (behind Melodee's `PluginRunner`), `canvas_page.*` their own pages' scripts in QuickJS, `module_probe.*` trying them, `previews.*` its screens offline |
 | `src/spike/` | the spike app |
-| `module/` | the Schwung standalone tool: `module.json`, `standalone` |
+| `src/boot/` | `unblock_signals.c`: `module/boot-entry.sh` starts again through it, since MoveLauncher hands its children INT, USR1 and TERM blocked |
+| `module/` | the Schwung standalone tool: `module.json`, `standalone`, and `boot-entry.sh`, Melodee as a boot target of Schwung's boot selector |
 | `tests/` | unit tests, the device host against the simulated Move, the sequencer (`sequencer_tests.cpp`), `song_tests.cpp` (Song, exports, print and freeze, against the whole app), and `fake_module/`, a stand-in Schwung module |
 | `tools/` | build image, packaging, deploy and probe scripts |
 
@@ -487,6 +488,21 @@ and starts Move again when Shift + Back ends it. Output goes to
 user, which may not take realtime priority (`realtime=no` in the log); run
 over SSH for realtime. `--remove` takes the tool out again.
 
+**At power-on** (Schwung 1.9 or later, which has a boot selector): the
+install registers Melodee as a boot target (`/data/UserData/boot-targets/melodee-move`),
+one more row in Schwung's choice of what the Move starts in. It never
+makes Melodee the start: that stays the user's choice, in Schwung. At
+power-on Schwung shows `Loading <name> - press Back to change` for 2 s;
+Back opens its picker, and the row chosen there is what the Move starts in
+from then on. Schwung Manager's Boot page (http://move.local:7700/boot)
+sets the same. Started this way Melodee is the `ableton` user, as from the
+Tools menu (`realtime=no`). Shift + Back, or a crash, goes to Schwung, and
+a Move restarted before the next power-on (after a Tools menu run,
+Melodee's too) stays Schwung: `module/boot-entry.sh` starts Melodee only
+as a power-on's first start of Move (its own mark and Schwung's control
+block in `/dev/shm` say otherwise). The 2 s window at each power-on is
+always the way back to Schwung or stock Move.
+
 **Over SSH, as root**:
 
 ```sh
@@ -497,7 +513,7 @@ It copies the package to `/data/UserData/melodee-move` and runs it in your
 terminal: Ableton's app is stopped as the Move's own shutdown stops it, the
 spike runs with realtime priority, and Ableton's app comes back however it
 ends (Shift + Back, Ctrl-C, the connection dropping, a crash; a reboot
-always comes back to stock). As with any quit of Move, save your Set first.
+always comes back to what the Move starts in). As with any quit of Move, save your Set first.
 `tools/stop-stock.sh move.local` ends a run from another terminal, as Shift
 + Back would. The SSH session always has a terminal on the Move (`ssh -tt`),
 so a run started from a script or a background task ends when that is

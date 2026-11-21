@@ -37,7 +37,9 @@ fi
 cp -R "$OUT/bin" "$OUT/lib" "$OUT/licenses" "$TOOL/"
 [ -d "$OUT/kmod" ] && cp -R "$OUT/kmod" "$TOOL/"
 cp "$OUT/usb-audio.sh" "$TOOL/"
-cp module/module.json module/standalone "$TOOL/"
-chmod 755 "$OUT/melodee-move" "$OUT/run-stock.sh" "$OUT/usb-audio.sh" "$TOOL/usb-audio.sh" "$TOOL/standalone" \
-    "$OUT/bin/melodee-move" "$TOOL/bin/melodee-move"
+cp module/module.json module/standalone module/boot-entry.sh "$TOOL/"
+# Power-on's entry (module/boot-entry.sh) starts again through it.
+cp build/unblock-signals "$TOOL/bin/"
+chmod 755 "$OUT/melodee-move" "$OUT/run-stock.sh" "$OUT/usb-audio.sh" "$TOOL/usb-audio.sh" "$TOOL/standalone" "$TOOL/boot-entry.sh" \
+    "$OUT/bin/melodee-move" "$TOOL/bin/melodee-move" "$TOOL/bin/unblock-signals"
 echo "bundle: $OUT ($(ls "$OUT/lib" | wc -l) libraries$([ -d "$OUT/kmod" ] && echo ', USB audio modules')), $TOOL"

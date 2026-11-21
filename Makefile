@@ -118,6 +118,13 @@ FAKE_MODULE := build/test-modules/sound_generators/fake
 FAKE_FX := build/test-modules/audio_fx/fake-fx
 all: $(TARGET) $(TESTS) $(WEB_TESTS) $(SEQUENCER_TESTS) $(CONTROLS_TESTS) $(MIDI_TESTS) $(MIXER_TESTS) $(PAD_TESTS) $(PADS_APP_TESTS) $(INSTRUMENTS_TESTS) $(FAKE_MODULE)/dsp.so $(FAKE_MODULE)/module.json $(FAKE_MODULE)/page.js \
     $(FAKE_FX)/fake-fx.so $(FAKE_FX)/module.json
+# Run by module/boot-entry.sh at power-on: a command with no signal blocked
+# (src/boot/unblock_signals.c).
+UNBLOCK_SIGNALS := build/unblock-signals
+all: $(UNBLOCK_SIGNALS)
+$(UNBLOCK_SIGNALS): src/boot/unblock_signals.c
+	@mkdir -p $(@D)
+	$(CC) -O2 -Wall -Wextra -Werror $< -o $@
 $(FAKE_FX)/fake-fx.so: tests/fake_fx/fake-fx.c
 	@mkdir -p $(@D)
 	$(CC) -O2 -fPIC -shared -Wall -Wextra -Werror $< -o $@
@@ -209,5 +216,5 @@ $(foreach m,$(MODULE_C),$(eval $(call c_module_rule,$(m))))
 juce: $(JUCE_OBJECTS)
 .PHONY: all clean juce
 clean:
-	rm -rf build/obj build/pch $(TARGET) $(TESTS) $(PROJECTS_TESTS) $(WEB_TESTS) $(SEQUENCER_TESTS) $(CONTROLS_TESTS) $(MIDI_TESTS) $(MIXER_TESTS) $(PAD_TESTS) $(PADS_APP_TESTS) $(SONG_TESTS) $(INSTRUMENTS_TESTS)
+	rm -rf build/obj build/pch $(TARGET) $(UNBLOCK_SIGNALS) $(TESTS) $(PROJECTS_TESTS) $(WEB_TESTS) $(SEQUENCER_TESTS) $(CONTROLS_TESTS) $(MIDI_TESTS) $(MIXER_TESTS) $(PAD_TESTS) $(PADS_APP_TESTS) $(SONG_TESTS) $(INSTRUMENTS_TESTS)
 -include $(shell find build/obj -name '*.d' 2>/dev/null)
