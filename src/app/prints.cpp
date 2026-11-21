@@ -179,10 +179,10 @@ std::string Printer::start(Job job) {
         shown.freeze = work->job.freeze;
         shown.count = uint16_t(work->job.patterns.size());
         waiting = std::move(work);
+        cancelled.store(false); // before the thread can take it: a cancel() of the last job calls this one off never
         job_waiting = true;
         active.store(true, std::memory_order_release); // busy from here until the print thread is done with it
     }
-    cancelled.store(false);
     wake.notify_all();
     return {};
 }
