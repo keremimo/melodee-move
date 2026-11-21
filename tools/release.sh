@@ -9,9 +9,11 @@
 # Manager reads from main) must name it and its asset, and CHANGELOG.md must
 # have its section. REF is exported (git archive) into
 # build/release/vX.Y.Z/src with the pinned dependencies copied beside it, and
-# the full check (./build.sh) runs there against melodee-sample as it is
-# checked out: clean, and its commit and sample-base's on their origins,
-# since they are the release's source too (SOURCE.txt in the asset). Left in
+# the full check (./build.sh) runs there against melodee-sample exported the
+# same way, at a commit on its origin (MELODEE_SAMPLE_REF, by default
+# origin/main) with the sample-base that commit names: they are the
+# release's source too (SOURCE.txt in the asset), and the checkout beside
+# this one may be on any branch, with work of its own. Left in
 # build/release/vX.Y.Z/:
 #
 #   melodee-move-module.tar.gz          the asset the catalog downloads
@@ -43,16 +45,18 @@ esac
 REPO=$(echo "$URL" | cut -d/ -f4-5)
 git show "$COMMIT:CHANGELOG.md" | grep -q "^## $VERSION " || die "CHANGELOG.md has no \"## $VERSION\" section"
 
-# melodee-sample and its sample-base: clean, and on their origins.
-MELODEE_SAMPLE=$(cd "${MELODEE_SAMPLE:-../melodee-sample}" && pwd)
-source_of() {
-    [ -z "$(git -C "$1" status --porcelain)" ] || die "$1 has changes: a release is built from commits"
-    git -C "$1" fetch --quiet origin || die "cannot reach $1's origin to see that its commit is there"
-    [ -n "$(git -C "$1" branch -r --contains HEAD)" ] || die "$1's $(git -C "$1" rev-parse --short HEAD) is not on its origin"
-    git -C "$1" rev-parse HEAD
+# melodee-sample and its sample-base: commits on their origins.
+CHECKOUT=$(cd "${MELODEE_SAMPLE:-../melodee-sample}" && pwd)
+published() { # published REPOSITORY COMMIT
+    git -C "$1" fetch --quiet origin || die "cannot reach $1's origin to see what is there"
+    [ -n "$(git -C "$1" branch -r --contains "$2" 2> /dev/null)" ] || die "$1's $2 is not on its origin"
 }
-MELODEE_SAMPLE_COMMIT=$(source_of "$MELODEE_SAMPLE")
-SAMPLE_BASE_COMMIT=$(source_of "$MELODEE_SAMPLE/base")
+git -C "$CHECKOUT" fetch --quiet origin || die "cannot reach $CHECKOUT's origin"
+MELODEE_SAMPLE_COMMIT=$(git -C "$CHECKOUT" rev-parse --verify --quiet "${MELODEE_SAMPLE_REF:-origin/main}^{commit}") ||
+    die "melodee-sample has no ${MELODEE_SAMPLE_REF:-origin/main}"
+published "$CHECKOUT" "$MELODEE_SAMPLE_COMMIT"
+SAMPLE_BASE_COMMIT=$(git -C "$CHECKOUT" rev-parse "$MELODEE_SAMPLE_COMMIT:base")
+published "$CHECKOUT/base" "$SAMPLE_BASE_COMMIT"
 EPOCH=$(git log -1 --format=%ct "$COMMIT")
 
 OUT=build/release/$TAG
@@ -65,12 +69,13 @@ git archive "$COMMIT" | tar -x -C "$OUT/src"
 if [ -d build/deps ]; then
     cp -Rc build/deps "$OUT/src/build/" 2> /dev/null || cp -R build/deps "$OUT/src/build/"
 fi
+MELODEE_SAMPLE=$(pwd)/$OUT/melodee-sample
+mkdir -p "$MELODEE_SAMPLE/base"
+git -C "$CHECKOUT" archive "$MELODEE_SAMPLE_COMMIT" | tar -x -C "$MELODEE_SAMPLE"
+git -C "$CHECKOUT/base" archive "$SAMPLE_BASE_COMMIT" | tar -x -C "$MELODEE_SAMPLE/base"
 (cd "$OUT/src" && MELODEE_SAMPLE="$MELODEE_SAMPLE" MELODEE_MOVE_COMMIT="$COMMIT" \
     MELODEE_SAMPLE_COMMIT="$MELODEE_SAMPLE_COMMIT" SAMPLE_BASE_COMMIT="$SAMPLE_BASE_COMMIT" \
     MELODEE_MOVE_EPOCH="$EPOCH" ./build.sh)
-# Another session may have moved melodee-sample during the build.
-[ "$(git -C "$MELODEE_SAMPLE" rev-parse HEAD)" = "$MELODEE_SAMPLE_COMMIT" ] && [ -z "$(git -C "$MELODEE_SAMPLE" status --porcelain)" ] \
-    || die "melodee-sample changed during the build; run again"
 
 cp "$OUT/src/dist/$ASSET" "$OUT/"
 SHA256=$(shasum -a 256 "$OUT/$ASSET" | cut -d' ' -f1)

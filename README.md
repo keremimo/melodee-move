@@ -495,8 +495,10 @@ default. A release:
    committed.
 2. `tools/release.sh` builds it from that commit, never from the working
    tree: the commit exported into `build/release/vX.Y.Z/src`, the full check
-   run there against melodee-sample, which must be clean and pushed (it and
-   sample-base are this build's source too). It leaves the asset, its
+   run there against melodee-sample exported the same way at a commit on
+   GitHub (`MELODEE_SAMPLE_REF`, by default `origin/main`) with the
+   sample-base it names (they are this build's source too), whatever the
+   checkout beside this one is on. It leaves the asset, its
    SHA-256, `release.json` and the release's notes in `build/release/vX.Y.Z/`,
    and prints the tag and upload it would make.
 3. The tag `vX.Y.Z` on that commit, pushed with main, and a GitHub release
