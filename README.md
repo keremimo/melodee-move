@@ -79,6 +79,22 @@ Three parts so far:
   Shift for capitals; push is done, Back held cancels. A file the page hands over (Webstream's download)
   goes onto the first empty kit pad, to play and chop. An action such as
   play/pause or stop is a button: push its menu row, or turn its knob up.
+- **Effects and the mix** (docs/UI.md, "Mixer and effects"; mockups in
+  `docs/ui/mixer.png`): Melodee's 41 effects and Schwung's audio effects
+  (`/data/UserData/schwung/modules/audio_fx`, loaded as Schwung's Signal
+  Chain loads them: `<id>/<id>.so` through its audio_fx v2 API, played in
+  place on the audio thread) in Melodee's chains, six on each track, four
+  on each kit pad, six on each of the buses A-D and on the master before
+  its compressor. On Play the wheel walks them as the Move walks a Track
+  Preset's devices, the knobs following; push the browser, Shift + push the
+  effect's options; Mute, Delete or Copy held + push bypasses, removes or
+  copies it. The track item's knobs are its level, pan and four sends.
+  **Shift + Step 4** opens the Mixer (eight tracks' levels, pans or sends on
+  the knobs, Left / Right the other eight, the steps the sixteen tracks,
+  MAIN the returns and the compressor; the push a bus's or the master's
+  chain); again Knob FX, Pad FX (the pads as punches, from the audio
+  thread), Flex Beat. Mute held + a kit pad mutes it, Shift + Mute alone
+  lets every mute go; touching the Volume knob shows the main meter.
 - The master knob is the volume; Shift + Back goes back to Move.
 - **Saving**: the whole project is one Melodee project file,
   `/data/UserData/Melodee/Projects/Move.mldp` (`--home` moves the folder),
@@ -102,7 +118,7 @@ Three parts so far:
   `*.migrated`.
 
 Not yet: more than one project, editing patterns, samples over 60 seconds,
-Record, Capture, Schwung's effects, mixer pages; docs/PARITY.md has the rest.
+Record, Capture; docs/PARITY.md has the rest.
 
 ### How a Schwung module is hosted
 
@@ -307,6 +323,20 @@ card. The report stays in `.local/probe/`.
   this is CPU time, not delay. Resident memory 48 MB before, 222 MB after
   (the engine host's buffers for Record, Audio Recall, renders and the
   Looper). Neither is measured on a Move yet.
+- The mix and effects (`build/mixer-tests`): effects heard in a track's,
+  a pad's, a bus's and the master's chains, bypass, move, copy and paste,
+  KEY, sends and returns, pad mutes and solo, the compressor and its
+  sidechain, Knob FX, punches and Flex Beat from the audio thread, KEEP, a
+  stand-in Schwung audio effect (`tests/fake_fx`) loaded, heard, set, copied
+  with its track, all saved and opened again; and every new key through
+  the app. The cycle with busy chains, in the simulated Move (Docker on a
+  Mac shared with other builds, not realtime: its peaks are the
+  container's): sixteen kit tracks each playing a loop, 69-114 µs a cycle
+  on average with no effects; with six effects on every track (two holding
+  delay memory), six on every bus (every track sending into all four), six
+  on the master, the compressor and Knob FX over every track (126 effects),
+  471-849 µs. Melodee's render workers (`MELODEE_RENDER_THREADS=2`) made it
+  slower there (784-1516 µs); they stay off until measured on a Move.
 - The package runs on a bare Ubuntu 22.04 (Ableton's glibc) with only its
   own libraries.
 - The JACK host against a dummy JACK server, earlier; the scripts' signal
