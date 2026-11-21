@@ -126,7 +126,8 @@ public:
         }
         ui::knob_cells(g, ui::content(21, 32), names, values);
         float seconds = settings.seconds_expected();
-        ui::detail(g, seconds > 0 ? std::to_string(int(seconds / 60.0f + 0.5f)) + " MIN" : "PUSH: GO", megabytes());
+        std::string time = seconds <= 0 ? "PUSH: GO" : seconds < 60 ? std::to_string(int(seconds + 0.5f)) + " S" : std::to_string(int(seconds / 60.0f + 0.5f)) + " MIN";
+        ui::detail(g, time, megabytes());
     }
 
     Knob knob(unsigned n) const override {
@@ -168,7 +169,7 @@ private:
 
     std::string module_name() const {
         auto* module = const_cast<Studio&>(studio).module_track(track);
-        return module && module->module ? upper(module->module->info().name).substr(0, 10) : "";
+        return module && module->module ? upper(module->module->info().abbrev).substr(0, 6) : ""; // room for BACK: NO
     }
     std::string megabytes() const {
         double frames = 0;
