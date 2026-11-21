@@ -3,6 +3,7 @@
 // undo & projects" rows that are this area's): the history alone, then
 // through the Move app with the Move's own keys.
 #include "app/history.h"
+#include "app/new_project.h"
 #include "app/melodee_app.h"
 #include "move/controls.h"
 #include "move/tools.h"
@@ -48,7 +49,7 @@ void later(App& app, std::chrono::milliseconds by) {
 // ---------------------------------------------------------------- the history alone
 
 void test_history() {
-    auto project = std::make_unique<melodee::Project>();
+    auto project = app::new_project();
     auto bank = std::make_unique<melodee::PatternBank>();
     app::MoveExtras extras;
     project->tracks[0].engine = melodee::EngineKind::Sampler;
@@ -452,7 +453,7 @@ void test_setup_and_tracks() {
 // USB submixes (docs/USB_AUDIO.md): each track's and bus's, kept in the
 // Move's section where it is not the default, read back, undone.
 void test_usb_submixes() {
-    auto project = std::make_unique<melodee::Project>();
+    auto project = app::new_project();
     auto bank = std::make_unique<melodee::PatternBank>();
     app::PluginStates none;
     app::MoveExtras extras;
@@ -469,7 +470,7 @@ void test_usb_submixes() {
     std::string text(bytes.begin(), bytes.end());
     CHECK(text.find("\nusb 2 0\n") != std::string::npos && text.find("\nusb 10 5\n") != std::string::npos &&
           text.find("\nusb_bus 1 8\n") != std::string::npos && text.find("\nusb 0 ") == std::string::npos);
-    auto back = std::make_unique<melodee::Project>();
+    auto back = app::new_project();
     auto back_bank = std::make_unique<melodee::PatternBank>();
     app::MoveExtras read;
     read.usb_submix.fill(7);

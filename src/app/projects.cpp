@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "app/projects.h"
+#include "app/new_project.h"
 #include "app/project_store.h"
 #include <algorithm>
 #include <filesystem>
@@ -84,7 +85,7 @@ bool read_facts(const std::string& path, Entry& entry) {
         return true;
     }
     if (ends_with(lower(path), ".xpj")) { entry.kind = Entry::Kind::Mpc; return true; }
-    auto project = std::make_unique<melodee::Project>();
+    auto project = app::new_project();
     auto bank = std::make_unique<melodee::PatternBank>();
     PluginStates states;
     MoveExtras extras;

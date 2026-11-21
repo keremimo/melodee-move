@@ -7,6 +7,7 @@
 // effect (tests/fake_fx) loaded, heard, set, copied with its track; all of
 // it saved and opened again.
 #include "app/melodee_app.h"
+#include "app/new_project.h"
 #include "app/mixing.h"
 #include "app/pad_layout.h"
 #include "app/project_store.h"
@@ -738,7 +739,7 @@ void test_layouts(Rig& rig) {
 void write_bench_project(const std::string& home, const std::string& loop, bool busy) {
     std::filesystem::remove_all(home);
     std::filesystem::create_directories(home + "/Projects");
-    auto project = std::make_unique<melodee::Project>();
+    auto project = app::new_project();
     auto patterns = std::make_unique<melodee::PatternBank>();
     auto& ref = project->samples.edit(0);
     std::snprintf(ref.path, sizeof ref.path, "%s", loop.c_str());

@@ -173,12 +173,26 @@ $(MELODEE_LIBRARY): $(MELODEE_OBJECTS)
 build/obj/melodee-sample/%.o: $(MELODEE)/src/%.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Wa,-I$(MELODEE) -w -c $< -o $@
-build/obj/tests/%.o: tests/%.cpp
+# JUCE's headers precompiled (src/pch.h), given to every file of ours. The
+# copy beside the .gch is what GCC reads instead if the .gch will not do,
+# and -Winvalid-pch (an error here) says so. Files linked without JUCE (the
+# light tests' own) go without: juce_core.h leaves a link check in each file
+# it is in. -fpch-preprocess lets ccache cache what uses it.
+PCH := build/pch/pch.h
+PCH_FLAGS = -include $(PCH) -Winvalid-pch -fpch-preprocess
+LIGHT_OBJECTS := build/obj/app/bindings.o build/obj/app/pad_layout.o build/obj/move/usb_audio.o \
+    build/obj/tests/controls_tests.o build/obj/tests/pad_layout_tests.o build/obj/tests/usb_tests.o
+$(LIGHT_OBJECTS): PCH_FLAGS :=
+$(PCH).gch: src/pch.h
+	@mkdir -p $(@D) build/obj/pch
+	cp $< $(PCH)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(WARNINGS) -MF build/obj/pch/pch.d -MT $@ -x c++-header $(PCH) -o $@
+build/obj/tests/%.o: tests/%.cpp $(PCH).gch
 	@mkdir -p $(@D)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(WARNINGS) -c $< -o $@
-build/obj/%.o: src/%.cpp
+	$(CXX) $(CPPFLAGS) $(PCH_FLAGS) $(CXXFLAGS) $(WARNINGS) -c $< -o $@
+build/obj/%.o: src/%.cpp $(PCH).gch
 	@mkdir -p $(@D)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(WARNINGS) -c $< -o $@
+	$(CXX) $(CPPFLAGS) $(PCH_FLAGS) $(CXXFLAGS) $(WARNINGS) -c $< -o $@
 define module_rule
 build/obj/juce/$(notdir $(1:.cpp=.o)): $(1)
 	@mkdir -p $$(@D)
@@ -195,5 +209,5 @@ $(foreach m,$(MODULE_C),$(eval $(call c_module_rule,$(m))))
 juce: $(JUCE_OBJECTS)
 .PHONY: all clean juce
 clean:
-	rm -rf build/obj $(TARGET) $(TESTS) $(PROJECTS_TESTS) $(WEB_TESTS) $(SEQUENCER_TESTS) $(CONTROLS_TESTS) $(MIDI_TESTS) $(MIXER_TESTS) $(PAD_TESTS) $(PADS_APP_TESTS) $(SONG_TESTS) $(INSTRUMENTS_TESTS)
+	rm -rf build/obj build/pch $(TARGET) $(TESTS) $(PROJECTS_TESTS) $(WEB_TESTS) $(SEQUENCER_TESTS) $(CONTROLS_TESTS) $(MIDI_TESTS) $(MIXER_TESTS) $(PAD_TESTS) $(PADS_APP_TESTS) $(SONG_TESTS) $(INSTRUMENTS_TESTS)
 -include $(shell find build/obj -name '*.d' 2>/dev/null)

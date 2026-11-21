@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #pragma once
+#include "move/usb_limits.h"
 #include "dsp/frame_ring.h" // sample-base's, through melodee-sample's base/ (MELODEE_INCLUDES)
 #include <array>
 #include <atomic>
@@ -23,8 +24,6 @@
 // has no Playback Rate control to say the computer records: the device's
 // buffer draining says it instead, and 250 ms without room says it stopped.
 namespace move {
-
-constexpr unsigned usb_channels = 18, usb_submixes = 8, usb_block_frames = 128;
 
 enum class UsbState : uint8_t { Stopped, Missing, Waiting, Running, Failed };
 const char* usb_state_name(UsbState state);

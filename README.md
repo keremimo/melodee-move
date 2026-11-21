@@ -454,6 +454,17 @@ When `../melodee-sample/build/melodee-preview` exists (or `MELODEE_PREVIEWS`
 names another folder) Melodee's pages are crushed to 128 x 64 in
 `build/crushed/`.
 
+`./build.sh quick` is the build and the unit tests alone, for while you
+work; the whole `./build.sh` before a merge to main. `tools/check.sh` (run
+in the image) does the work: `make` on every core, the tests and runs side
+by side where they share no folder (each lane's output in
+`build/check/`). Compiles go through ccache, its cache shared by every
+checkout and worktree on the machine (`~/.cache/melodee-move/ccache`, or
+`MELODEE_CCACHE`), so a source compiled in one is not compiled again in
+another. JUCE's headers are precompiled (`src/pch.h`), and a new Melodee
+`Project` is built in one file only (`src/app/new_project.cpp`): its
+constructor alone costs GCC -O2 about 90 s wherever it is inlined.
+
 ## Run on the Move
 
 **From Schwung's Tools menu** (Schwung installed, root SSH to the Move):

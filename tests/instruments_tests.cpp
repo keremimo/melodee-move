@@ -4,6 +4,7 @@
 // their files landed and read in place, a sample's note found, a keygroup
 // track playing them from the pads.
 #include "app/auto_sampler.h"
+#include "app/new_project.h"
 #include "app/instruments.h"
 #include "app/pad_layout.h"
 #include "app/melodee_app.h"
@@ -339,7 +340,7 @@ void test_keygroup_track() {
 
 void test_keys() {
     // The Move's Keys & Scale on 32 pads (app/keys.h), C major, the bottom-left pad C2 (48).
-    auto project = std::make_unique<melodee::Project>();
+    auto project = app::new_project();
     project->root = 0;
     project->scale = 0; // Major
     auto& track = project->tracks[1];

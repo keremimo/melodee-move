@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "app/history.h"
+#include "app/new_project.h"
 #include <algorithm>
 #include <cstring>
 
@@ -13,7 +14,7 @@ struct Layout {
 };
 const Layout& layout() {
     static const Layout at = [] {
-        auto p = std::make_unique<Project>();
+        auto p = app::new_project();
         auto offset = [&](const void* field) { return size_t(static_cast<const char*>(field) - reinterpret_cast<const char*>(p.get())); };
         Layout l;
         l.samples = offset(&p->samples);
@@ -82,7 +83,7 @@ bool tempo_byte(size_t at) {
     return (at >= l.tempo && at < l.tempo + sizeof(Project::tempo)) || (at >= l.swing && at < l.swing + sizeof(Project::swing));
 }
 
-History::History() : base(std::make_unique<Project>()), base_bank(std::make_unique<melodee::PatternBank>()) {}
+History::History() : base(app::new_project()), base_bank(std::make_unique<melodee::PatternBank>()) {}
 History::~History() = default;
 
 void History::take(const Live& now) {

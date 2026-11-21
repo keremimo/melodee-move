@@ -35,9 +35,14 @@ and `jackd -d move` on poundhard-armbian (`jack`), and the apps on it
   sample-base; never edit their files from here.
 - Four-space indentation, `SPDX-License-Identifier: AGPL-3.0-only` headers,
   Conventional Commits.
+- A new `melodee::Project` comes from `app::new_project()`
+  (`src/app/new_project.h`), never `std::make_unique<melodee::Project>()` or
+  a default-constructed one: its inlined constructor costs GCC about 90 s
+  of compiling in each file that has one. Copying one is cheap.
 
-Run `./build.sh` (build, unit tests, self-test, previews, the simulated
-Move, packages, crush). On a Move: `tools/deploy-stock.sh HOST` or
+Run `./build.sh quick` (build, unit tests) while working and `./build.sh`
+(also self-test, previews, the simulated Move, packages, crush) before a
+merge to main. On a Move: `tools/deploy-stock.sh HOST` or
 `tools/install-schwung-tool.sh HOST`; `tools/probe-stock.sh HOST` reads one.
 
 ## Credit

@@ -2,6 +2,7 @@
 // Unit tests for the Move runtime's pure parts: control decoding, lights,
 // the screen format, the crush, the reblocker and the hand-off queues.
 #include "move/audio.h"
+#include "app/new_project.h"
 #include "move/controls.h"
 #include "move/display.h"
 #include "move/font.h"
@@ -590,7 +591,7 @@ void test_saving() {
     // The file is Melodee's own project: track 1 the kit, its two samples by
     // path (the missing one kept), A01's chop in CHOP.
     {
-        auto project = std::make_unique<melodee::Project>();
+        auto project = app::new_project();
         auto patterns = std::make_unique<melodee::PatternBank>();
         app::PluginStates states;
         CHECK(app::read_project_file(home + "/Projects/Move.mldp", *project, *patterns, states).empty());
@@ -1022,7 +1023,7 @@ void test_synth_track() {
     }
     // The module's state, in its PLUG entry of the project.
     auto saved_state = [](const std::string& file) {
-        auto read = std::make_unique<melodee::Project>();
+        auto read = app::new_project();
         auto patterns = std::make_unique<melodee::PatternBank>();
         app::PluginStates states;
         app::SynthFile synth;
@@ -1211,7 +1212,7 @@ void test_tracks() {
     std::filesystem::create_directories(home + "/Projects");
     CHECK(write_test_loop(loop));
     {   // A Melodee project, as the MPC would leave it: a kit on track 1, A01 the loop, four steps on A01 in pattern 1.
-        auto project = std::make_unique<melodee::Project>();
+        auto project = app::new_project();
         auto patterns = std::make_unique<melodee::PatternBank>();
         melodee::load_sound(project->tracks[0], melodee::EngineKind::Sampler, 0);
         project->tracks[0].pads[0].sample = 0;
@@ -1413,7 +1414,7 @@ void test_tracks() {
     CHECK(has(melodee.status(), "page=empty-play"));
     CHECK(melodee.save_now().empty());
     // Saved whole: the three kits, the pattern, the tempo.
-    auto project = std::make_unique<melodee::Project>();
+    auto project = app::new_project();
     auto patterns = std::make_unique<melodee::PatternBank>();
     app::PluginStates states;
     CHECK(app::read_project_file(home + "/Projects/Move.mldp", *project, *patterns, states).empty());
@@ -1485,7 +1486,7 @@ void test_migration() {
     std::filesystem::create_directories(home + "/Projects");
     CHECK(write_test_loop(loop));
     {
-        auto project = std::make_unique<melodee::Project>();
+        auto project = app::new_project();
         auto patterns = std::make_unique<melodee::PatternBank>();
         melodee::load_sound(project->tracks[0], melodee::EngineKind::Sampler, 0);
         project->tracks[0].pads[0].sample = 0;
@@ -1509,7 +1510,7 @@ void test_migration() {
         CHECK(!std::filesystem::exists(path + ".synth") && std::filesystem::exists(path + ".synth.migrated"));
         CHECK(!std::filesystem::exists(path + ".chops") && std::filesystem::exists(path + ".chops.migrated"));
     }
-    auto project = std::make_unique<melodee::Project>();
+    auto project = app::new_project();
     auto patterns = std::make_unique<melodee::PatternBank>();
     app::PluginStates states;
     CHECK(app::read_project_file(path, *project, *patterns, states).empty());

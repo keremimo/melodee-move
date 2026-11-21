@@ -7,6 +7,7 @@
 // opened frozen again. The tests drive the audio thread themselves (render)
 // and the service thread (service), as the runtime would.
 #include "app/exports.h"
+#include "app/new_project.h"
 #include "app/melodee_app.h"
 #include "app/pad_layout.h"
 #include "app/prints.h"
@@ -52,7 +53,7 @@ int32_t peak_of(const AudioBlock& block) {
 void write_project(const std::string& home, const std::string& loop) {
     fs::remove_all(home);
     fs::create_directories(home + "/Projects");
-    auto project = std::make_unique<melodee::Project>();
+    auto project = app::new_project();
     auto patterns = std::make_unique<melodee::PatternBank>();
     std::snprintf(project->name, sizeof project->name, "Tune");
     for (unsigned t = 0; t < 2; ++t) {

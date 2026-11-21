@@ -13,6 +13,7 @@
 // Save Sample (the pad's region, named) and Save Bank for the two banks in
 // view (Samples/Banks/<name>.mldb), which the browser lists tagged BANK.
 #include "app/screens/kit_common.h"
+#include "app/new_project.h"
 #include "melodee/shell/mpc_program.h"
 #include "melodee/shell/project_kits.h"
 #include <filesystem>
@@ -30,7 +31,7 @@ public:
 
     void enter() override {
         cursor = 0;
-        program = std::make_unique<melodee::Project>();
+        program = app::new_project();
         std::ifstream in(studio.program_path, std::ios::binary);
         std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
         melodee::MpcImport report;

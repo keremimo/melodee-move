@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "app/studio.h"
+#include "app/new_project.h"
 #include "app/pad_layout.h"
 #include "app/prints.h"
 #include "app/sampling.h"
 #include "app/screen.h"
 #include "app/usb_submix.h"
+#include "move/usb_audio.h"
 #include "app/sequencer.h"
 #include "app/seq_edit.h"
 #include "app/song_desk.h"
@@ -227,7 +229,8 @@ std::unique_ptr<Sample> make_sample(const std::string& path, std::unique_ptr<mel
 // ---------------------------------------------------------------- start and end
 
 Studio::Studio(std::string library_folder, std::string home_folder, std::string modules_folder)
-    : library(std::move(library_folder)), song(std::make_unique<melodee::Project>()), bank(std::make_unique<melodee::PatternBank>()) {
+    : library(std::move(library_folder)), song(app::new_project()), bank(std::make_unique<melodee::PatternBank>()) {
+    usb = std::make_unique<move::UsbAudioOut>(move::gadget_pcm());
     seq = std::make_unique<Sequencer>(*this);
     std::error_code error;
     home_path = std::move(home_folder);
@@ -259,7 +262,7 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
         // Unreadable: kept aside, never written over.
         std::rename(path.c_str(), (path + ".unreadable").c_str());
         std::fprintf(stderr, "melodee-move: %s unreadable (%s), kept as .unreadable\n", path.c_str(), failed.c_str());
-        song = std::make_unique<melodee::Project>();
+        song = app::new_project();
         bank = std::make_unique<melodee::PatternBank>();
         states = {};
         move_extras = {};
@@ -1350,6 +1353,12 @@ void Studio::volume_changed() {
 // second): until then, and on a Move without it, nothing runs. Each stem's
 // submix goes to the audio thread whenever the project's differs from what
 // it has: an edit, an undo, another project, a track moved.
+void Studio::use_usb_out(std::unique_ptr<move::UsbAudioOut> out) {
+    usb->stop();
+    usb = std::move(out);
+    usb_started = true;
+}
+
 void Studio::usb_service() {
     auto now = Clock::now();
     if (!usb_started && now >= usb_looked) {
@@ -2243,7 +2252,7 @@ std::string Studio::open_project(const std::string& file, bool fresh) {
         }
     }
     // The next one read, outside the lock.
-    auto next = std::make_unique<melodee::Project>();
+    auto next = app::new_project();
     auto next_bank = std::make_unique<melodee::PatternBank>();
     PluginStates states;
     MoveExtras next_extras;
@@ -2331,7 +2340,7 @@ std::string Studio::open_project(const std::string& file, bool fresh) {
 }
 
 std::string Studio::load_kit(const std::string& file) {
-    auto other = std::make_unique<melodee::Project>();
+    auto other = app::new_project();
     auto other_bank = std::make_unique<melodee::PatternBank>();
     PluginStates states;
     if (melodee::is_mpc_project(file)) {
@@ -2496,7 +2505,7 @@ void Studio::run_project_job(const ProjectJob& job) {
             if (open_one) { move_extras.colour = job.colour; name_step("COLOUR"); close_step(); changed(); }
         }
         if (!open_one) { // another project's file: read, coloured, written whole
-            auto other = std::make_unique<melodee::Project>();
+            auto other = app::new_project();
             auto other_bank = std::make_unique<melodee::PatternBank>();
             PluginStates states;
             MoveExtras extras_there;

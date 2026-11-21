@@ -11,6 +11,7 @@
 // as Shift + Back). No FEATURES (Basic or Full): the Move is always Full.
 // Every setting is the same for every project, kept in Move.settings.
 #include "app/screens/common.h"
+#include "move/usb_audio.h"
 #include "ui/system_draw.h"
 #include <sys/statvfs.h>
 

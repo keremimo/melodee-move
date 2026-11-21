@@ -15,12 +15,11 @@
 #include "app/project_store.h"
 #include "move/app.h"
 #include "move/queues.h"
-#include "move/usb_audio.h"
+#include "move/usb_limits.h"
 #include "melodee/engine/auto_chop.h"
 #include "melodee/engine/engine_host.h"
 #include "melodee/engine/onsets.h"
 #include "melodee/engine/root_find.h"
-#include "melodee/shell/auto_sample.h"
 #include "melodee/engine/sample_data.h"
 #include "melodee/model/project.h"
 #include "melodee/shell/sample_cache.h"
@@ -52,6 +51,9 @@
 //   block's first frame: no thread, queue or block in between.
 // - Samples and modules are offered to the host under the lock too, and
 //   handed back to be freed off the audio thread.
+namespace melodee { struct AutoSampleSettings; } // melodee/shell/auto_sample.h
+namespace move { class UsbAudioOut; }           // move/usb_audio.h
+
 namespace app {
 
 constexpr unsigned pad_count = 32; // the Move's pads: on a kit, two of its eight banks (Studio::pad_bank())
@@ -389,7 +391,7 @@ public:
     // one of its own (a stand-in PCM, driven a cycle at a time) before the
     // audio thread runs; it is never started here.
     move::UsbAudioOut& usb_out() { return *usb; }
-    void use_usb_out(std::unique_ptr<move::UsbAudioOut> out) { usb->stop(); usb = std::move(out); usb_started = true; }
+    void use_usb_out(std::unique_ptr<move::UsbAudioOut> out);
     std::string last_step; // the step undone or redone last, for the status line
     unsigned step_us = 0, step_us_peak = 0; // the last close's time and the longest (MIDI thread)
 
@@ -713,7 +715,7 @@ private:
     // the gadget's sound card is there; each stem's submix for the audio
     // thread, copied from the project by the service thread; the audio
     // thread's taps, submixes and full-volume mix.
-    std::unique_ptr<move::UsbAudioOut> usb = std::make_unique<move::UsbAudioOut>(move::gadget_pcm());
+    std::unique_ptr<move::UsbAudioOut> usb;        // the gadget's writer (made in the constructor)
     bool usb_started = false;                      // service thread
     Clock::time_point usb_looked {};               // service thread: /proc/asound looked for
     std::array<std::atomic<uint8_t>, usb_stems> usb_route {};

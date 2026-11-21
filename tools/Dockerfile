@@ -6,7 +6,7 @@
 FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    g++ make git ca-certificates pkg-config python3 \
+    g++ make ccache git ca-certificates pkg-config python3 \
     libjack-jackd2-dev libfreetype-dev libfontconfig-dev \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /work
