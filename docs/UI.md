@@ -335,8 +335,7 @@ hold the code to it. In short:
 
 - The pad pages' exact contents.
 - A module track's note layout: settled, the Move's Keys & Scale
-  ("Instruments"). Whether In-Key scales in the pads' MPC Banks layout go up
-  the scale in pad order or in fourths inside each bank waits for Kerem's
-  pick (move-pad-layout).
+  ("Instruments"); in the pads' two MPC Banks, In-Key and Chromatic run up
+  in pad order, 1-16 then 17-32 (Kerem's reading (a), `pad_layout.h`).
 - Realtime priority when Schwung launches melodee-move as `ableton`: a
   small root helper, as EvilGenius uses, or not.
