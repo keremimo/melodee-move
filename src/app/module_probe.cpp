@@ -34,12 +34,18 @@ void probe_pages(LoadedModule& module, const std::string& pictures) {
         auto page = CanvasPage::load(canvas.script, host, error);
         if (!page) { std::printf("    page %s FAILED: %s\n", canvas.key.c_str(), error.c_str()); continue; }
         auto draw = [&](const char* moment) {
+            CanvasPage::Frame frame;
+            frame.key = canvas.key;
+            for (const auto& one : module.pages)
+                if (one.canvas >= 0 && module.canvases[size_t(one.canvas)].key == canvas.key) { frame.keys = one.knobs; break; }
             std::map<std::string, std::string> values;
+            for (const auto& key : frame.keys)
+                if (!key.empty()) values[key] = module.get_now(key);
             for (const auto& key : canvas.extra_keys) values[key] = module.get_now(key);
             juce::Image screen(juce::Image::ARGB, CanvasPage::width, CanvasPage::height, true);
             {
                 juce::Graphics g(screen);
-                page->draw(g, values);
+                page->draw(g, values, frame);
             }
             auto path = pictures + "/" + module.info().id + "-" + canvas.key + "-" + moment + ".png";
             if (save_screen(screen, path)) std::printf("    page %s: %s\n", canvas.key.c_str(), path.c_str());
@@ -75,7 +81,7 @@ int probe_modules(const std::string& root, const std::string& pictures) {
         if (!module->preset_param.empty()) std::printf(", %d presets (%s)", module->preset_count, module->preset_name.c_str());
         std::printf("\n");
         if (!pictures.empty()) probe_pages(*module, pictures);
-        for (size_t n = 0; n < module->pages.size() && n < 3; ++n) {
+        for (size_t n = 0; n < module->pages.size(); ++n) {
             std::printf("    %-12s", module->pages[n].name.c_str());
             for (const auto& key : module->pages[n].knobs) {
                 const ModuleParam* param = module->param(key);

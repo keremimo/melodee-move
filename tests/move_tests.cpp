@@ -702,6 +702,50 @@ void test_module_macros() {
 }
 
 
+void test_module_pages_shown() {
+    // A drawn page a deeper level lists sits with that level, before its
+    // knobs (page_first), carrying them; visible_if hides levels, drawn
+    // pages and knobs as the gating value moves (Schimera's modes); a
+    // string the hierarchy lists is never a knob.
+    const std::string root = "build/test-modules-shown";
+    const std::string dir = root + "/sound_generators/voice";
+    std::filesystem::create_directories(dir);
+    std::filesystem::copy_file("build/test-modules/sound_generators/fake/dsp.so", dir + "/dsp.so", std::filesystem::copy_options::overwrite_existing);
+    std::filesystem::copy_file("tests/fake_module/page.js", dir + "/page.js", std::filesystem::copy_options::overwrite_existing);
+    std::ofstream(dir + "/module.json") << R"({"id": "voice", "name": "Voice", "abbrev": "VOX", "api_version": 2,
+      "component_type": "sound_generator", "dsp": "dsp.so", "capabilities": {"midi_in": true,
+      "chain_params": [
+        {"key": "level", "name": "Level", "type": "float", "min": 0, "max": 1},
+        {"key": "wave", "name": "Wave", "type": "enum", "options": ["Sine", "Square"]},
+        {"key": "voices", "name": "Voices", "type": "int", "min": 1, "max": 8},
+        {"key": "words", "name": "Words", "type": "string"},
+        {"key": "pic", "name": "Pic", "type": "canvas", "canvas_script": "page.js", "as_page": true, "page_first": true}],
+      "ui_hierarchy": {"levels": {
+        "root": {"name": "Voice", "params": [{"level": "a", "label": "A"}, {"level": "b", "label": "B"}]},
+        "a": {"name": "A", "knobs": ["level", "words", "voices"],
+              "params": [{"key": "pic", "visible_if": {"param": "wave", "equals": "Square"}}, "level", {"key": "words"},
+                         {"key": "voices", "visible_if": {"param": "wave", "equals": "Sine"}}]},
+        "b": {"name": "B", "knobs": ["wave"], "params": ["wave"], "visible_if": {"param": "wave", "equals": 0}}}}}})";
+    auto found = app::scan_modules(root);
+    CHECK(found.size() == 1);
+    if (found.empty()) return;
+    std::string error;
+    auto loaded = app::LoadedModule::load(found[0], error);
+    CHECK(loaded && error.empty());
+    if (!loaded) return;
+    CHECK(!loaded->param("words") && !loaded->param("pic"));
+    CHECK(loaded->pages.size() == 3 && loaded->pages[0].canvas == 0 && loaded->pages[0].level == 1 && loaded->pages[1].name == "A"
+          && loaded->pages[2].name == "B");
+    CHECK((loaded->pages[0].knobs == std::vector<std::string> {"level", "words", "voices"}));
+    auto* wave = loaded->param("wave");
+    CHECK(wave && wave->value == 1); // Square, as the fake module starts
+    CHECK(loaded->page_shown(0) && loaded->page_shown(1) && !loaded->page_shown(2));
+    CHECK((loaded->page_knobs(1) == std::vector<std::string> {"level", "words"})); // voices closed up
+    if (wave) wave->value = 0;                                                     // Sine
+    CHECK(!loaded->page_shown(0) && loaded->page_shown(1) && loaded->page_shown(2));
+    CHECK((loaded->page_knobs(1) == std::vector<std::string> {"level", "words", "voices"}));
+}
+
 void test_schwung_modules() {
     // Schwung's module API, against the tests' stand-in module
     // (tests/fake_module, built into build/test-modules by the Makefile).
@@ -958,6 +1002,31 @@ void test_canvas_page() {
     CHECK(!app::CanvasPage::load("build/test-pages/broken.js", host, error) && !error.empty());
     CHECK(!app::CanvasPage::load("build/test-pages/none.js", host, error) && has(error, "canvas_overlay"));
     CHECK(!app::CanvasPage::load("build/test-pages/missing.js", host, error));
+    // What a draw is told, as Schwung's shadow UI tells it: one script draws
+    // several pages and tells them apart by the key (Schimera's four), lays
+    // itself out from ctx.width and ctx.height, and is given its knobs.
+    std::ofstream("build/test-pages/frame.js")
+        << "globalThis.canvas_overlay = { drawPage(ctx, o) {\n"
+           "  if (o.key !== 'shape') return;\n"
+           "  ctx.setParam('seen', [o.key, o.width, o.height, ctx.width, ctx.height, o.keys.join('|'), o.values.jaw, o.base.jaw, o.touched].join(','));\n"
+           "  ctx.setPixel(ctx.width - 1, ctx.height - 1, 1);\n"
+           "} };\n";
+    calls.sets.clear();
+    auto framed = app::CanvasPage::load("build/test-pages/frame.js", host, error);
+    CHECK(framed != nullptr);
+    if (framed) {
+        juce::Graphics g(screen);
+        app::CanvasPage::Frame frame;
+        frame.key = "line";
+        framed->draw(g, {}, frame);
+        CHECK(calls.sets.empty() && !framed->pixel(127, 63)); // another page's key: it draws nothing
+        frame.key = "shape";
+        frame.keys = {"jaw", "lips"};
+        frame.height = 47;
+        framed->draw(g, {{"jaw", "0.25"}}, frame);
+        CHECK((calls.sets == std::vector<std::string> {"seen=shape,128,47,128,47,jaw|lips,0.25,0.25,-1"}));
+        CHECK(framed->pixel(127, 46) && !framed->pixel(127, 63));
+    }
 }
 
 void test_synth_track() {
@@ -2630,6 +2699,7 @@ int main() {
     test_main_volume();
     test_module_macros();
     test_schwung_modules();
+    test_module_pages_shown();
     test_canvas_page();
     test_synth_track();
     test_module_replace();

@@ -152,12 +152,14 @@ public:
         if (track->menu_open) { draw_menu(g, *track); return; }
         if (browsing) { draw_presets(g, *track); return; }
         auto& module = *track->module;
+        settle(*track); // a page its visible_if hides now (a mode turned): the nearest shown
         // The rail as docs/UI.md has a module's page: module, track, page.
         const ModulePage* page = track->page < module.pages.size() ? &module.pages[track->page] : nullptr;
+        auto knobs = module.page_knobs(track->page);
         auto effects = fx.track_items();
         focus = std::min(focus, 1 + int(effects.size()));
         ui::rail(g, upper(module.info().abbrev).substr(0, 4), track_number(studio),
-                 focus == 0 ? "MIX" : focus >= 2 ? fx.rail_bottom(effects[size_t(focus - 2)]) : std::to_string(position(*track) + 1) + "/" + std::to_string(module.pages.size() + 2));
+                 focus == 0 ? "MIX" : focus >= 2 ? fx.rail_bottom(effects[size_t(focus - 2)]) : std::to_string(position(*track) + 1) + "/" + std::to_string(shown_pages(*track).size() + 2));
         fx.draw_row(g, item(*track, 0), item(*track, 1), effects, focus);
         if (focus == 0) { fx.draw_mix(g, studio.track()); return; }
         if (focus >= 2) { fx.draw(g, effects[size_t(focus - 2)]); return; }
@@ -172,8 +174,8 @@ public:
         move::draw_text(g, ui::width - int(lowest.size()) * move::glyph_advance, 11, lowest); // the bottom-left pad's note
         std::array<std::string, 8> names;
         std::array<float, 8> values {};
-        for (unsigned n = 0; page && n < page->knobs.size() && n < 8; ++n)
-            if (const ModuleParam* param = module.param(page->knobs[n])) {
+        for (unsigned n = 0; page && n < knobs.size() && n < 8; ++n)
+            if (const ModuleParam* param = module.param(knobs[n])) {
                 names[n] = cell_name(*param);
                 values[n] = float(param->fraction());
             }
@@ -209,7 +211,7 @@ public:
             if (focus >= 2) return size_t(focus - 2) < effects.size() ? fx.knob(effects[size_t(focus - 2)], which) : Knob {};
         }
         if (!track || !track->module || track->page >= track->module->pages.size()) return {};
-        const auto& keys = track->module->pages[track->page].knobs;
+        auto keys = track->module->page_knobs(track->page);
         if (which >= keys.size()) return {};
         const ModuleParam* param = track->module->param(keys[which]);
         if (!param) return {};
@@ -246,9 +248,28 @@ private:
     }
     // The page as Shift + the wheel counts them: the module's, ARP, CHORD.
     unsigned position(const ModuleTrack& track) const {
-        unsigned pages = track.module ? unsigned(track.module->pages.size()) : 0;
+        auto shown = shown_pages(track);
         uint8_t own = own_page[studio.track()];
-        return own ? pages + own - 1 : track.page;
+        if (own) return unsigned(shown.size()) + own - 1;
+        return unsigned(std::count_if(shown.begin(), shown.end(), [&](size_t n) { return n < track.page; }));
+    }
+    // The module's pages its visible_if shows now, in order.
+    std::vector<size_t> shown_pages(const ModuleTrack& track) const {
+        std::vector<size_t> shown;
+        if (track.module)
+            for (size_t n = 0; n < track.module->pages.size(); ++n)
+                if (track.module->page_shown(n)) shown.push_back(n);
+        return shown;
+    }
+    // Off a page hidden now: the next shown, else the one before, else stay.
+    void settle(ModuleTrack& track) {
+        if (!track.module || track.module->page_shown(track.page)) return;
+        auto shown = shown_pages(track);
+        if (shown.empty()) return;
+        auto next = std::find_if(shown.begin(), shown.end(), [&](size_t n) { return n > track.page; });
+        track.page = unsigned(next != shown.end() ? *next : shown.back());
+        track.canvas_entered = false;
+        refresh();
     }
 
     std::string item(ModuleTrack& track, int which) const {
@@ -291,12 +312,13 @@ private:
     void refresh() {
         auto* track = studio.module_track();
         if (!track || !track->module || track->page >= track->module->pages.size()) return;
-        for (const auto& key : track->module->pages[track->page].knobs) track->player.ask(key);
+        for (const auto& key : track->module->page_knobs(track->page))
+            if (!key.empty()) track->player.ask(key);
     }
 
     void turn(ModuleTrack& track, unsigned which, int delta, bool fine) {
         if (!track.module || track.page >= track.module->pages.size()) return;
-        const auto& keys = track.module->pages[track.page].knobs;
+        auto keys = track.module->page_knobs(track.page);
         if (which >= keys.size()) return;
         if (keys[which] == track.module->preset_param) { preset_by(track, delta); return; }
         ModuleParam* param = track.module->param(keys[which]);
@@ -312,10 +334,11 @@ private:
 
     void page_by(ModuleTrack& track, int way) {
         if (!track.module) return;
-        const int pages = int(track.module->pages.size());
+        auto shown = shown_pages(track); // the pages visible_if hides are passed over
+        const int pages = int(shown.size());
         int at = std::clamp(int(position(track)) + way, 0, pages + 1);
         auto& own = own_page[studio.track()];
-        if (at < pages) { own = 0; track.page = unsigned(at); }
+        if (at < pages) { own = 0; track.page = unsigned(shown[size_t(at)]); }
         else own = uint8_t(at - pages + 1);
         track.canvas_entered = false;
         if (!own) refresh(); // the module's knobs asked for: Melodee's own pages ask it nothing
@@ -362,9 +385,10 @@ private:
             return -1;
         };
         for (const auto& item : at->items) {
+            if (!module.shown(item.shown_if)) continue; // its visible_if fails now
             if (item.kind == MenuItem::Kind::Level) {
                 const ModuleLevel* to = module.level(item.key);
-                if (to) rows.push_back({Kind::Level, item.key, item.label.empty() ? to->name : item.label});
+                if (to && module.level_shown(module.level_index(item.key))) rows.push_back({Kind::Level, item.key, item.label.empty() ? to->name : item.label});
                 continue;
             }
             if (int n = canvas_of(item.key); n >= 0) { // its own page, where the level lists it (Webstream's Browse)
@@ -568,9 +592,20 @@ private:
             ui::detail(g, "SEE THE LOG");
             return;
         }
+        // As Schwung hands it: which page, its knobs and their values with
+        // the extra keys', and the band above Melodee's own rows.
+        CanvasPage::Frame frame;
+        frame.key = about.key;
+        frame.height = 47;
+        for (size_t n = 0; n < module.pages.size(); ++n)
+            if (module.pages[n].canvas == index) { frame.keys = module.page_knobs(n); break; }
+        // A knob's value is the one Melodee keeps; only one the module moves
+        // itself, and the extra keys, cost a read (one audio block each).
         std::map<std::string, std::string> values;
+        for (const auto& key : frame.keys)
+            if (const ModuleParam* param = const_cast<LoadedModule&>(module).param(key)) values[key] = param->live ? studio.module_get(track, key) : param->text();
         for (const auto& key : about.extra_keys) values[key] = studio.module_get(track, key);
-        canvas->draw(g, values);
+        canvas->draw(g, values, frame);
         // Below the page: whose it is, and what the jogwheel's push does.
         g.setColour(juce::Colours::black);
         g.fillRect(0, 47, ui::width, ui::height - 47);

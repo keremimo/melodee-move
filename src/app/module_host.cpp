@@ -94,6 +94,31 @@ std::string lower(std::string text) {
     return text;
 }
 
+// A `visible_if` as Schwung's planner reads it; none: always shown.
+ShownIf shown_if_from(const juce::var& entry) {
+    ShownIf rule;
+    const auto& given = field(entry, "visible_if");
+    if (!given.isObject()) return rule;
+    rule.param = text_of(field(given, "param"));
+    using Test = ShownIf::Test;
+    const std::pair<const char*, Test> tests[] {
+        {"equals", Test::Equals}, {"not_equals", Test::NotEquals}, {"gt", Test::Greater}, {"greater_than", Test::Greater},
+        {"greater", Test::Greater}, {"lt", Test::Less}, {"smaller_than", Test::Less}, {"smaller", Test::Less},
+        {"truthy", Test::Truthy}, {"falsey", Test::Falsy}, {"falsy", Test::Falsy},
+    };
+    for (const auto& [name, test] : tests)
+        if (has(given, name)) {
+            const auto& value = field(given, name);
+            rule.test = test;
+            rule.value = value.isBool() ? (bool(value) ? "1" : "0") : text_of(value);
+            if ((test == Test::Truthy || test == Test::Falsy) && value.isBool() && !bool(value))
+                rule.test = test == Test::Truthy ? Test::Falsy : Test::Truthy; // "truthy": false
+            break;
+        }
+    if (rule.param.empty()) rule.test = Test::Always;
+    return rule;
+}
+
 bool param_from(const juce::var& entry, ModuleParam& out) {
     if (!entry.isObject()) return false;
     out = {};
@@ -101,6 +126,7 @@ bool param_from(const juce::var& entry, ModuleParam& out) {
     if (out.key.empty()) return false;
     out.name = has(entry, "name") ? text_of(field(entry, "name")) : has(entry, "label") ? text_of(field(entry, "label")) : out.key;
     out.short_name = text_of(field(entry, "short_name"));
+    out.live = bool(field(entry, "live"));
     auto type = lower(text_of(field(entry, "type")));
     if (type == "enum") out.kind = ModuleParam::Kind::Enum;
     else if (type == "int" || type == "integer" || type == "bool" || type == "boolean" || type == "toggle") out.kind = ModuleParam::Kind::Int;
@@ -296,6 +322,63 @@ ModuleParam* LoadedModule::param(const std::string& key) {
     return nullptr;
 }
 
+const ModuleParam* LoadedModule::param(const std::string& key) const {
+    for (const auto& p : params) if (p.key == key) return &p;
+    return nullptr;
+}
+
+bool LoadedModule::shown(const ShownIf& rule) const {
+    using Test = ShownIf::Test;
+    if (rule.test == Test::Always) return true;
+    const ModuleParam* p = param(rule.param);
+    if (!p) return true; // a value Melodee does not hold: shown, as Schwung fails open
+    if (rule.test == Test::Truthy) return std::abs(p->value) > 1e-9;
+    if (rule.test == Test::Falsy) return std::abs(p->value) <= 1e-9;
+    char* end = nullptr;
+    double number = std::strtod(rule.value.c_str(), &end);
+    bool numeric = !rule.value.empty() && end && *end == '\0';
+    if (numeric) {
+        switch (rule.test) {
+        case Test::Equals: return std::abs(p->value - number) < 1e-6;
+        case Test::NotEquals: return std::abs(p->value - number) >= 1e-6;
+        case Test::Greater: return p->value > number;
+        case Test::Less: return p->value < number;
+        default: return true;
+        }
+    }
+    // A name: an option's ("On"), or the value as the module takes it.
+    auto index = size_t(std::max(0L, std::lround(p->value)));
+    std::string now = p->kind == ModuleParam::Kind::Enum && index < p->options.size() ? p->options[index] : p->text();
+    bool same = lower(now) == lower(rule.value);
+    if (rule.test == Test::Equals) return same;
+    if (rule.test == Test::NotEquals) return !same;
+    return true;
+}
+
+bool LoadedModule::level_shown(size_t index) const { return index >= levels.size() || shown(levels[index].shown_if); }
+
+bool LoadedModule::key_shown(size_t index, const std::string& key) const {
+    if (index >= levels.size()) return true;
+    for (const auto& item : levels[index].items)
+        if (item.kind == MenuItem::Kind::Param && item.key == key) return shown(item.shown_if);
+    return true;
+}
+
+bool LoadedModule::page_shown(size_t n) const {
+    if (n >= pages.size()) return false;
+    const auto& page = pages[n];
+    if (!level_shown(page.level)) return false;
+    return page.canvas < 0 || size_t(page.canvas) >= canvases.size() || key_shown(page.level, canvases[size_t(page.canvas)].key);
+}
+
+std::vector<std::string> LoadedModule::page_knobs(size_t n) const {
+    std::vector<std::string> keys;
+    if (n >= pages.size()) return keys;
+    for (const auto& key : pages[n].knobs)
+        if (key.empty() || key_shown(pages[n].level, key)) keys.push_back(key); // a hole stays; a hidden key closes up
+    return keys;
+}
+
 const ModuleLevel* LoadedModule::level(const std::string& id) const {
     for (const auto& one : levels) if (one.id == id) return &one;
     return nullptr;
@@ -316,9 +399,14 @@ void LoadedModule::read_parameters() {
     if (!hierarchy.isObject()) hierarchy = field(capabilities, "ui_hierarchy");
 
     std::map<std::string, std::string> max_params;
+    std::vector<std::string> no_values; // declared, and not a knob's (a string, a file path): never a plain 0-1
     auto describe = [&](const juce::var& entry) {
         ModuleParam p;
-        if (!param_from(entry, p) || param(p.key)) return;
+        if (!param_from(entry, p)) {
+            if (has(entry, "key")) no_values.push_back(text_of(field(entry, "key")));
+            return;
+        }
+        if (param(p.key)) return;
         if (has(entry, "max_param")) max_params[p.key] = text_of(field(entry, "max_param"));
         params.push_back(std::move(p));
     };
@@ -363,11 +451,13 @@ void LoadedModule::read_parameters() {
             made.items_param = text_of(field(entry, "items_param"));
             made.select_param = text_of(field(entry, "select_param"));
             made.navigate_to = text_of(field(entry, "navigate_to"));
+            made.shown_if = shown_if_from(entry);
             for (const auto* chooser : {&made.list_param, &made.count_param, &made.name_param, &made.items_param, &made.select_param})
                 if (!chooser->empty()) selectors.push_back(*chooser);
             if (auto* items = field(entry, "params").getArray())
                 for (const auto& item : *items) {
                     MenuItem added;
+                    if (!item.isString()) added.shown_if = shown_if_from(item);
                     if (item.isString()) added.key = text_of(item);
                     else if (has(item, "level")) {
                         added.kind = MenuItem::Kind::Level;
@@ -376,7 +466,9 @@ void LoadedModule::read_parameters() {
                     } else if (has(item, "key")) {
                         added.key = text_of(field(item, "key"));
                         added.label = has(item, "label") ? text_of(field(item, "label")) : std::string();
-                        describe(item); // its metadata may be here rather than in chain_params
+                        bool drawn = std::any_of(canvases.begin(), canvases.end(), [&](const ModuleCanvas& canvas) { return canvas.key == added.key; });
+                        bool no_value = std::find(no_values.begin(), no_values.end(), added.key) != no_values.end();
+                        if (!drawn && !no_value) describe(item); // its metadata may be here rather than in chain_params; a page, a string are no value
                         if (has(item, "short_name")) labels[added.key + "\n"] = text_of(field(item, "short_name"));
                     } else continue;
                     if (added.key.empty()) continue;
@@ -424,22 +516,39 @@ void LoadedModule::read_parameters() {
             pages.push_back(std::move(page));
         }
     }
-    // A page the module draws: with the root level's knobs, first where it
-    // asks to be.
+    // A page the module draws (Schwung's docs/CANVAS_PAGES.md): it belongs
+    // to the level that lists it, else to root, and carries that level's
+    // knobs. Root's go first of all with `page_first`, else last (Webstream's
+    // Browse, Radio Garden's); a deeper level's go before its knob pages with
+    // `page_first` (Schimera's Line, Lyrics, Mouth), else after them.
+    // Several a level keep the order chain_params gives them.
     for (size_t n = 0; n < canvases.size(); ++n) {
         if (!canvases[n].as_page) continue;
+        size_t owner = 0;
+        for (size_t at = 0; at < levels.size(); ++at)
+            if (std::any_of(levels[at].items.begin(), levels[at].items.end(),
+                            [&](const MenuItem& item) { return item.kind == MenuItem::Kind::Param && item.key == canvases[n].key; })) {
+                owner = at;
+                break;
+            }
         ModulePage page;
         page.name = canvases[n].name;
         page.canvas = int(n);
+        page.level = owner;
         for (const auto& [index, knobs] : knob_lists)
-            if (index == 0) page.knobs.assign(knobs.begin(), knobs.begin() + long(std::min<size_t>(knobs.size(), 8)));
-        if (canvases[n].page_first) pages.insert(pages.begin(), std::move(page));
-        else pages.push_back(std::move(page));
+            if (index == owner) page.knobs.assign(knobs.begin(), knobs.begin() + long(std::min<size_t>(knobs.size(), 8)));
+        auto mine = [&](const ModulePage& one) { return one.level == owner; };
+        auto first = std::find_if(pages.begin(), pages.end(), [&](const ModulePage& one) { return mine(one) && one.canvas < 0; });
+        auto found = std::find_if(pages.rbegin(), pages.rend(), mine);
+        auto last = found != pages.rend() ? found.base() : pages.end(); // a level with no page yet: at the end
+        if (owner == 0) pages.insert(canvases[n].page_first ? pages.begin() : pages.end(), std::move(page));
+        else pages.insert(canvases[n].page_first && first != pages.end() ? first : last, std::move(page));
     }
     // A knob or menu entry chain_params does not describe: a plain 0-1. A
     // page the module draws is no value (Webstream's menu lists "browse").
     auto plain = [&](const std::string& key) {
         if (key.empty() || param(key) || std::find(selectors.begin(), selectors.end(), key) != selectors.end()) return;
+        if (std::find(no_values.begin(), no_values.end(), key) != no_values.end()) return; // Schimera's lyrics: a knob would write 0.01 over them
         if (std::any_of(canvases.begin(), canvases.end(), [&](const ModuleCanvas& canvas) { return canvas.key == key; })) return;
         ModuleParam p;
         p.key = p.name = key;

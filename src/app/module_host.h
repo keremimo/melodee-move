@@ -46,6 +46,7 @@ struct ModuleParam {
     bool options_as_string = false;   // the module wants an enum's name, not its index
     std::string unit;
     bool selector = false;            // an items list's choice (a bank, a soundfont): no knob, set first
+    bool live = false;                // the module moves it itself (pad pressure, a playhead): read it fresh to show it
     // An action, not a value (webstream's play/pause, stop): an enum of
     // "idle" and "trigger", sent "trigger" when pushed or turned.
     bool trigger() const;
@@ -57,7 +58,7 @@ struct ModuleParam {
 };
 // A page of knobs: up to eight keys, "" an empty knob; `level` the menu
 // level it belongs to; `canvas` a page the module draws itself (an index
-// into LoadedModule::canvases), with the root level's knobs.
+// into LoadedModule::canvases), with the knobs of the level that lists it.
 struct ModulePage { std::string name; std::vector<std::string> knobs; size_t level = 0; int canvas = -1; };
 
 // A page the module draws itself: a `type: "canvas"` parameter, its script
@@ -73,14 +74,22 @@ struct ModuleCanvas {
 // docs/MODULES.md, "ui_hierarchy"): levels of parameters and links to other
 // levels; a level may be a preset list (list_param) or a list of items to
 // choose from (items_param / select_param, e.g. a bank or a soundfont).
+// `visible_if` (Schwung's docs/MODULES.md): shown only while a parameter's
+// value passes. `value` is a number or an option's name.
+struct ShownIf {
+    enum class Test : uint8_t { Always, Equals, NotEquals, Greater, Less, Truthy, Falsy } test = Test::Always;
+    std::string param, value;
+};
 struct MenuItem {
     enum class Kind : uint8_t { Param, Level } kind = Kind::Param;
     std::string key;   // a parameter's key, or a level's id
     std::string label; // empty: the parameter's own name
+    ShownIf shown_if {};
 };
 struct ModuleLevel {
     std::string id, name;
     std::vector<MenuItem> items;
+    ShownIf shown_if {};
     std::string list_param, count_param, name_param;    // a preset list
     std::string items_param, select_param, navigate_to; // a list to choose from
 };
@@ -100,6 +109,7 @@ public:
     std::string get_now(const std::string& key);
 
     ModuleParam* param(const std::string& key);
+    const ModuleParam* param(const std::string& key) const;
     const ModuleInfo& info() const { return about; }
 
     std::vector<ModuleParam> params;
@@ -113,6 +123,14 @@ public:
     std::vector<ModuleCanvas> canvases;
     const ModuleLevel* level(const std::string& id) const;
     size_t level_index(const std::string& id) const; // 0 (root) when unknown
+    // visible_if, against the values Melodee holds: a level hidden, an entry
+    // of it hidden (a key a level lists under a condition is hidden while
+    // it fails), a page hidden with its level or its drawn page's entry.
+    bool shown(const ShownIf& rule) const;
+    bool level_shown(size_t index) const;
+    bool key_shown(size_t level, const std::string& key) const;
+    bool page_shown(size_t page) const;
+    std::vector<std::string> page_knobs(size_t page) const; // its knobs, hidden ones closed up
     std::string preset_param, preset_count_param, preset_name_param; // a preset list, where it has one
     int preset = 0, preset_count = 0;
     std::string preset_name;

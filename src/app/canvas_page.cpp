@@ -310,20 +310,39 @@ std::unique_ptr<CanvasPage> CanvasPage::load(const std::string& script, Host hos
     };
     for (const auto& f : functions) JS_SetPropertyStr(context, engine.ctx, f.name, JS_NewCFunction(context, f.function, f.name, f.length));
     JS_SetPropertyStr(context, engine.ctx, "state", JS_DupValue(context, engine.state));
+    JS_SetPropertyStr(context, engine.ctx, "width", JS_NewInt32(context, width));
+    JS_SetPropertyStr(context, engine.ctx, "height", JS_NewInt32(context, height));
     return page;
 }
 
 CanvasPage::~CanvasPage() = default;
 
-void CanvasPage::draw(juce::Graphics& g, const std::map<std::string, std::string>& values) {
+void CanvasPage::draw(juce::Graphics& g, const std::map<std::string, std::string>& values, const Frame& frame) {
     screen.fill(0);
     JSContext* context = engine->context;
+    // The band, on ctx as Schwung's frame-scoped ctx has it: a page lays
+    // itself out from ctx.width and ctx.height.
+    JS_SetPropertyStr(context, engine->ctx, "width", JS_NewInt32(context, frame.width));
+    JS_SetPropertyStr(context, engine->ctx, "height", JS_NewInt32(context, frame.height));
     JSValue info = JS_NewObject(context);
+    JS_SetPropertyStr(context, info, "key", JS_NewStringLen(context, frame.key.data(), frame.key.size()));
     JS_SetPropertyStr(context, info, "state", JS_DupValue(context, engine->state));
     JS_SetPropertyStr(context, info, "nowMs", JS_NewFloat64(context, double(juce::Time::currentTimeMillis())));
-    JSValue given = JS_NewObject(context);
-    for (const auto& [key, value] : values) JS_SetPropertyStr(context, given, key.c_str(), JS_NewStringLen(context, value.data(), value.size()));
+    JS_SetPropertyStr(context, info, "width", JS_NewInt32(context, frame.width));
+    JS_SetPropertyStr(context, info, "height", JS_NewInt32(context, frame.height));
+    JS_SetPropertyStr(context, info, "touched", JS_NewInt32(context, -1));
+    JS_SetPropertyStr(context, info, "preset", JS_NULL);
+    JSValue keys = JS_NewArray(context);
+    for (uint32_t n = 0; n < frame.keys.size(); ++n)
+        JS_SetPropertyUint32(context, keys, n, JS_NewStringLen(context, frame.keys[n].data(), frame.keys[n].size()));
+    JS_SetPropertyStr(context, info, "keys", keys);
+    JSValue given = JS_NewObject(context), base = JS_NewObject(context);
+    for (const auto& [key, value] : values) {
+        JS_SetPropertyStr(context, given, key.c_str(), JS_NewStringLen(context, value.data(), value.size()));
+        JS_SetPropertyStr(context, base, key.c_str(), JS_NewStringLen(context, value.data(), value.size())); // nothing modulates here
+    }
     JS_SetPropertyStr(context, info, "values", given);
+    JS_SetPropertyStr(context, info, "base", base);
     JS_FreeValue(context, engine->call("drawPage", {engine->ctx, info}));
     JS_FreeValue(context, info);
 

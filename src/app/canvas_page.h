@@ -7,6 +7,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <vector>
 
 // A Schwung module's own page: the script a `type: "canvas"` parameter
 // names (its canvas_script), run in QuickJS as Schwung's shadow UI runs it
@@ -16,8 +17,13 @@
 // The script sets globalThis.canvas_overlay to an object of hooks, all
 // optional:
 //
-//   drawPage(ctx, info)   paint the page; info: {state, nowMs, values}, the
-//                         values of the parameter's extra_keys
+//   drawPage(ctx, info)   paint the page; info, as Schwung's shadow UI hands
+//                         it: {key, values, base, keys, touched, preset,
+//                         nowMs, width, height, state}. key: the canvas
+//                         parameter's (one script may draw several pages and
+//                         tell them apart by it); values: the page's knobs'
+//                         and the parameter's extra_keys'; width and height
+//                         (also ctx.width, ctx.height): the band it owns
 //   onMidi(ctx, msg)      a jogwheel turn or push while the page is entered;
 //                         msg: {data: [status, number, value]}
 //   handleBack(ctx)       true: "I went up a level, keep me"; anything else:
@@ -52,8 +58,17 @@ public:
     static std::unique_ptr<CanvasPage> load(const std::string& script, Host host, std::string& error);
     ~CanvasPage();
 
-    // The page on the whole screen, `values` its extra_keys' values.
-    void draw(juce::Graphics& g, const std::map<std::string, std::string>& values);
+    // What a draw is told besides the values: which page (a canvas
+    // parameter's key), the knobs it carries, and the band it may paint,
+    // from the top left (Melodee keeps the rows below it for its own).
+    struct Frame {
+        std::string key;
+        std::vector<std::string> keys;
+        int width = CanvasPage::width, height = CanvasPage::height;
+    };
+    // The page on the screen, `values` its knobs' and extra_keys' values.
+    void draw(juce::Graphics& g, const std::map<std::string, std::string>& values, const Frame& frame);
+    void draw(juce::Graphics& g, const std::map<std::string, std::string>& values) { draw(g, values, Frame {}); }
     void midi(uint8_t status, uint8_t number, uint8_t value);
     bool back();
     void text_entered(const std::string& text, bool cancelled);
