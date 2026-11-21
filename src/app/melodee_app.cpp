@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "app/melodee_app.h"
+#include "app/prints.h"
 #include "app/screen.h"
+#include "app/song_desk.h"
+#include "ui/song_view.h"
 #include "move/display.h"
 #include "move/font.h"
 #include "ui/track_style.h"
@@ -127,6 +130,7 @@ bool MelodeeApp::global(bindings::Job job, const bindings::Use& use) {
         return true;
     }
     case Job::TracksOverview: studio.open("tracks"); return true;
+    case Job::Print: if (holding()) studio.select(held_track()); return false; // a track button held + Sampling: its PRINT opens
     // Transport and volume.
     case Job::PlayStop:
         if (studio.playing()) studio.stop();
@@ -163,6 +167,12 @@ void MelodeeApp::act(const bindings::Use& use) {
     const bindings::Binding* row = bindings::find(where(), use);
     if (!row || row->job == bindings::Job::Nothing) return;
     last_job = row->job;
+    // A frozen track's sound, notes or menus: "Unfreeze track N?" first (prints.h).
+    if (Screen* top = studio.top(); top && top == studio.screen(home_screen(studio.kind())) && changes_print(row->job) &&
+                                    studio.desk().printer().asks(studio.track())) {
+        studio.push("unfreeze");
+        return;
+    }
     if (global(row->job, use)) return;
     Screen* top = studio.top();
     if (top && top->job(row->job, use)) return;
@@ -267,7 +277,15 @@ void MelodeeApp::draw(juce::Graphics& g) {
     else if (holding() && now < volume_until) draw_volume(g);
     else if (holding() && now - held_at >= hold_shown && tracks()) tracks()->draw(g);
     else if (top && touched >= 0 && now < touched_until && !top->knob(unsigned(touched)).name.empty()) draw_touched(g);
-    else if (top) top->draw(g);
+    else if (top) {
+        top->draw(g);
+        // A frozen track's Play screen: its snowflake in the rail.
+        if (top == studio.screen(home_screen(studio.kind())) && studio.desk().printer().frozen(studio.track())) {
+            g.setColour(juce::Colours::black);
+            ui::snowflake(g, 8, 43);
+            g.setColour(juce::Colours::white);
+        }
+    }
     if (now < studio.message_until) {
         ui::sheet(g, {ui::content_x, ui::detail_y - 2, ui::content_width, 10});
         move::draw_text_centred(g, ui::content_x, ui::detail_y, ui::content_width, studio.message);

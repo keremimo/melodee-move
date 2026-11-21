@@ -72,6 +72,21 @@ uint64_t pattern_bit(unsigned p) { return uint64_t(1) << (p % 64); }
 
 } // namespace
 
+bool changes_print(bindings::Job job) {
+    using bindings::Job;
+    switch (job) {
+    case Job::TurnKnob: case Job::TurnKnobFine: case Job::OpenBrowser: case Job::SampleOptions: case Job::ModuleMenu:
+    case Job::ToggleStep: case Job::NoteOnStep: case Job::NoteOnBar: case Job::ClearPad: case Job::CopyPad: case Job::StepVelocity:
+    case Job::StepLength: case Job::StepLengthTo: case Job::TransposeStep: case Job::TransposeStepOctave: case Job::NudgeStep:
+    case Job::NudgeStepFine: case Job::NudgeStepWhole: case Job::StepMotion: case Job::Record: case Job::Quantize: case Job::DoubleLoop:
+    case Job::ClearBar: case Job::CopyStep: case Job::CopyBar: case Job::BarLength: case Job::BarVelocity: case Job::TransposeBar:
+    case Job::NudgeBar: case Job::LoopLength: case Job::LoopLengthFine:
+        return true;
+    default:
+        return false;
+    }
+}
+
 // The job as the print thread takes it: copies of what the prints are made of, as it was when it started.
 struct Printer::Work {
     Job job;

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #pragma once
+#include "app/bindings.h"
 #include "melodee/engine/print_player.h"
 #include "melodee/model/print.h"
 #include "melodee/model/project.h"
@@ -40,6 +41,11 @@
 namespace app {
 
 class Studio;
+
+// A job on a track's Play screen that changes what its prints are made of (a
+// knob, a step, its browser or menu, Seq Record): on a frozen track it asks
+// "Unfreeze track N?" first.
+bool changes_print(bindings::Job job);
 
 class Printer {
 public:

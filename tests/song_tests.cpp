@@ -14,6 +14,7 @@
 #include "app/wav_out.h"
 #include "move/audio.h"
 #include "move/controls.h"
+#include "move/display.h"
 #include "move/tools.h"
 #include "melodee/engine/engine_info.h"
 #include "melodee/model/project_file.h"
@@ -80,6 +81,51 @@ void write_project(const std::string& home, const std::string& loop) {
     app::write_whole(home + "/Projects/Move.mldp", bytes.data(), bytes.size());
 }
 
+// The Move's controls as a hand uses them.
+void press(App& app, Button button) {
+    app.surface(make_event(0xb0, button_cc(button), 127));
+    app.surface(make_event(0xb0, button_cc(button), 0));
+}
+void hold(App& app, Button button, bool down) { app.surface(make_event(0xb0, button_cc(button), down ? 127 : 0)); }
+template <class Do> void with(App& app, Button button, Do&& what) {
+    hold(app, button, true);
+    what();
+    hold(app, button, false);
+}
+void tap_pad(App& app, unsigned pad) {
+    app.surface(make_event(0x90, pad_note(pad), 100));
+    app.surface(make_event(0x80, pad_note(pad), 0));
+}
+void tap_step(App& app, unsigned step) {
+    app.surface(make_event(0x90, step_note(step), 127));
+    app.surface(make_event(0x80, step_note(step), 0));
+}
+void turn_wheel(App& app, int detents) { app.surface(make_event(0xb0, main_knob_cc, uint8_t(detents < 0 ? 128 + detents : detents))); }
+void turn_knob(App& app, unsigned knob, int detents) {
+    app.surface(make_event(0x90, uint8_t(knob), 127)); // touched
+    app.surface(make_event(0xb0, uint8_t(knob_first_cc + knob), uint8_t(detents < 0 ? 128 + detents : detents)));
+    app.surface(make_event(0x80, uint8_t(knob), 0));
+}
+// The app's screen as it is now, four times size, into build/song-screens/
+// (to set beside docs/ui/song.png).
+void snap(app::MelodeeApp& app, const std::string& name) {
+    juce::Image image(juce::Image::ARGB, move::screen_width, move::screen_height, true);
+    {
+        juce::Graphics g(image);
+        g.fillAll(juce::Colours::black);
+        g.setColour(juce::Colours::white);
+        app.draw(g);
+    }
+    fs::create_directories("build/song-screens");
+    auto file = juce::File::getCurrentWorkingDirectory().getChildFile(juce::String("build/song-screens/" + name + ".png"));
+    file.deleteFile();
+    juce::FileOutputStream output(file);
+    if (output.openedOk()) juce::PNGImageFormat().writeImageToStream(move::frame_image(move::pack(image), 4), output);
+}
+
+// The pad of the Song's lane (0 the bank's first, the top row) and bar (0-7 of the page).
+unsigned song_pad(unsigned lane, unsigned bar) { return (3 - lane) * 8 + bar; }
+
 struct Rig {
     app::MelodeeApp app;
     Session session;
@@ -103,7 +149,8 @@ struct Rig {
             render(1);
             if ((b & 7) == 0) app.service();
             if (done()) return true;
-            if ((b & 63) == 0) std::this_thread::sleep_for(std::chrono::microseconds(200)); // the other threads' turn
+            // The other threads' turn: about 20 times real time, so the exports' rings drain as they do on a Move.
+            if ((b & 15) == 0) std::this_thread::sleep_for(std::chrono::milliseconds(2));
         }
         return done();
     }
@@ -440,6 +487,148 @@ void test_wav_out() {
     CHECK(info.format == 1 && info.bits == 24 && info.frames == 1000 && info.rate == 48000);
 }
 
+// Song, EXPORT and PRINT driven by the Move's own controls, through the
+// bindings table (docs/MOVE_CONTROLS.md, "Song", "Print and freeze").
+void test_song_screens() {
+    std::string folder = "build/test-samples", home = "build/test-home-song-keys", loop = folder + "/loop.wav";
+    write_project(home, loop);
+    Rig rig(folder, home);
+    auto& app = rig.app;
+    auto status = [&] { return app.status(); };
+    // Shift + Step 13: Song; again: back.
+    with(app, Button::Shift, [&] { tap_step(app, 12); });
+    CHECK(has(status(), "page=song "));
+    with(app, Button::Shift, [&] { tap_step(app, 12); });
+    CHECK(has(status(), "page=kit-play"));
+    with(app, Button::Shift, [&] { tap_step(app, 12); });
+    // A pad: the lane and the bar; the wheel's push places A1 for four bars there.
+    tap_pad(app, song_pad(0, 2));
+    CHECK(has(status(), "song_cursor=3"));
+    press(app, Button::MainPush);
+    CHECK(has(status(), "song_clips=1"));
+    CHECK(rig.render(1) == 0); // the pads on Song are the song, not sounds
+    // Copy: duplicated after itself, the cursor on it; Delete: gone again.
+    press(app, Button::Copy);
+    CHECK(has(status(), "song_clips=2") && has(status(), "song_cursor=7"));
+    press(app, Button::Delete);
+    CHECK(has(status(), "song_clips=1"));
+    // The wheel back onto the clip; Loop: the brace on its bars.
+    turn_wheel(app, -4);
+    CHECK(has(status(), "song_cursor=3"));
+    press(app, Button::Loop);
+    CHECK(has(status(), "song_loop=2-6"));
+    // Shift + push: a marker.
+    with(app, Button::Shift, [&] { press(app, Button::MainPush); });
+    CHECK(has(status(), "song_markers=1"));
+    snap(app, "song-marker");
+    // Knob 2: the clip's length; knob 1 its pattern.
+    turn_knob(app, 1, 2);
+    {
+        std::lock_guard<std::mutex> guard(rig.studio().lock);
+        CHECK(rig.desk().song().clips[size_t(rig.desk().clip_here(0))].bars == 6);
+    }
+    turn_knob(app, 0, 1);
+    {
+        std::lock_guard<std::mutex> guard(rig.studio().lock);
+        CHECK(rig.desk().song().clips[size_t(rig.desk().clip_here(0))].pattern == 1);
+    }
+    // Mute held + the clip's pad: muted.
+    with(app, Button::Mute, [&] { tap_pad(app, song_pad(0, 2)); });
+    {
+        std::lock_guard<std::mutex> guard(rig.studio().lock);
+        CHECK(rig.desk().song().clips[size_t(rig.desk().clip_here(0))].muted);
+        CHECK(!rig.studio().current().mix.mute); // not the track
+    }
+    // Copy held + the clip's pad, then lane 2's bar 1: a copy there.
+    with(app, Button::Copy, [&] { tap_pad(app, song_pad(0, 2)); tap_pad(app, song_pad(1, 0)); });
+    CHECK(has(status(), "song_clips=2"));
+    // Delete held + that pad: gone.
+    with(app, Button::Delete, [&] { tap_pad(app, song_pad(1, 0)); });
+    CHECK(has(status(), "song_clips=1"));
+    // A step held and another: the loop from the first bar to the second.
+    app.surface(make_event(0x90, step_note(0), 127));
+    tap_step(app, 3);
+    app.surface(make_event(0x80, step_note(0), 0));
+    CHECK(has(status(), "song_loop=0-4"));
+    tap_step(app, 9);
+    CHECK(has(status(), "song_cursor=10"));
+    // Shift + Left: back to the marker; Left / Right a page of eight.
+    with(app, Button::Shift, [&] { press(app, Button::Left); });
+    CHECK(has(status(), "song_cursor=3"));
+    press(app, Button::Right);
+    CHECK(has(status(), "song_cursor=11"));
+    // Plus and Minus: the bank of four lanes.
+    press(app, Button::Up);
+    CHECK(has(status(), "track=5 "));
+    press(app, Button::Down);
+    CHECK(has(status(), "track=1 "));
+    // The wheel's push on a clip: its jobs; the seventh unmutes it.
+    turn_wheel(app, -8);
+    press(app, Button::MainPush);
+    CHECK(has(status(), "page=song-clip"));
+    snap(app, "clip-sheet");
+    turn_wheel(app, 6);
+    press(app, Button::MainPush);
+    CHECK(has(status(), "page=song "));
+    {
+        std::lock_guard<std::mutex> guard(rig.studio().lock);
+        CHECK(!rig.desk().song().clips[size_t(rig.desk().clip_here(0))].muted);
+    }
+    // Play: the song from the cursor; again: stopped.
+    std::this_thread::sleep_for(std::chrono::milliseconds(700)); // the touched knob let go
+    snap(app, "song");
+    press(app, Button::Play);
+    rig.render(4);
+    CHECK(has(status(), "song_playing=1 song_bar=3"));
+    snap(app, "song-playing");
+    press(app, Button::Play);
+    rig.render(2);
+    CHECK(has(status(), "playing=0"));
+    // Rec on Song: the song plays, launches written.
+    press(app, Button::Rec);
+    rig.render(2);
+    CHECK(has(status(), "song_playing=1") && has(status(), "song_rec=1"));
+    press(app, Button::Rec);
+    press(app, Button::Play);
+    rig.render(2);
+    // Sampling on Song: EXPORT; a 16-bit mixdown, then where it went.
+    press(app, Button::Sample);
+    CHECK(has(status(), "page=song-export"));
+    snap(app, "export");
+    turn_wheel(app, 2);
+    press(app, Button::MainPush);
+    rig.render(200);
+    snap(app, "exporting");
+    CHECK(rig.until([&] { return !rig.desk().exports().busy(); }, 30));
+    CHECK(has(status(), "export=Mixdowns/Tune.wav") && has(status(), "export_done=1"));
+    CHECK(wav_info(home + "/Mixdowns/Tune.wav").bits == 16);
+    snap(app, "exported");
+    press(app, Button::MainPush);
+    CHECK(has(status(), "page=song "));
+    press(app, Button::Back);
+    CHECK(has(status(), "page=kit-play"));
+    // A track button held + Sampling: PRINT for track 2 (the second button).
+    hold(app, Button::Row2, true);
+    press(app, Button::Sample);
+    hold(app, Button::Row2, false);
+    CHECK(has(status(), "page=print") && has(status(), "print_sheet=2") && has(status(), "track=2 "));
+    snap(app, "print");
+    press(app, Button::MainPush); // FREEZE
+    snap(app, "printing");
+    CHECK(rig.until([&] { std::lock_guard<std::mutex> g(rig.studio().lock); return rig.desk().printer().frozen(1); }, 30));
+    rig.render(4);
+    CHECK(has(status(), "frozen=1"));
+    press(app, Button::Back);
+    CHECK(has(status(), "page=kit-play"));
+    snap(app, "frozen");
+    // A knob on the frozen track asks first; push: live again.
+    turn_knob(app, 0, 3);
+    CHECK(has(status(), "page=unfreeze"));
+    snap(app, "unfreeze");
+    press(app, Button::MainPush);
+    CHECK(has(status(), "frozen=0") && has(status(), "page=kit-play"));
+}
+
 } // namespace
 
 int main() {
@@ -455,6 +644,8 @@ int main() {
     test_exports();
     std::cerr << "test_print_and_freeze\n";
     test_print_and_freeze();
+    std::cerr << "test_song_screens\n";
+    test_song_screens();
     std::cout << "song-tests: " << checks - failures << " of " << checks << " checks passed\n";
     return failures ? 1 : 0;
 }

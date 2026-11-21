@@ -99,6 +99,8 @@ public:
 
     Exports& exports() { return *exporter; }
     Printer& printer() { return *prints; }
+    const Exports& exports() const { return *exporter; }
+    const Printer& printer() const { return *prints; }
 
     std::string status() const; // " song_clips=... song_bar=..."
 

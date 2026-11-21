@@ -41,6 +41,8 @@ enum class Screen : uint8_t {
     Typing,
     Canvas,     // a module's own page, entered
     Tracks,     // the sixteen tracks, latched (Shift + Note/Session)
+    Song,       // Song (Shift + Step 13): lanes of clips over bars
+    Print,      // the PRINT sheet: a track's patterns on the pads
     Count
 };
 
@@ -98,7 +100,10 @@ constexpr uint16_t none = 0, shift = 1 << 0, track = 1 << 1, step = 1 << 2, pad 
     X(LoopMode) X(MuteSelected) X(Undo) X(Redo) X(UndoList) X(DuplicatePattern) X(DeleteCurrentPattern) X(TypeBackspace) \
     X(ToggleSession) X(PeekSession) X(TracksOverview) X(Back) X(BackToPlay) X(LeaveChop) X(CanvasBack) X(TypeCancel) \
     X(Quit) X(ShiftSteps) X(ShiftLock) X(Uppercase) \
-    X(Octave) X(PadBank) X(PitchesOctave) X(ScaleStep) X(TrackBank) X(SlicePage) X(Bar) X(Bar16) X(PatternPage) X(SliceStep)
+    X(Octave) X(PadBank) X(PitchesOctave) X(ScaleStep) X(TrackBank) X(SlicePage) X(Bar) X(Bar16) X(PatternPage) X(SliceStep) \
+    X(SongPick) X(SongCopyClip) X(SongDeleteClip) X(SongMuteClip) X(SongBar) X(SongLoopRange) X(SongCursor) X(SongPush) \
+    X(SongMarker) X(SongDuplicate) X(SongDelete) X(SongLoopClip) X(SongPage) X(SongMarkerJump) X(PlaySong) X(RestartSong) \
+    X(RecordSong) X(SongExport) X(Print) X(PrintPattern) X(PrintBank) X(PrintTurn) X(PrintPush)
 
 enum class Job : uint8_t {
 #define MELODEE_JOB_ENUM(name) name,
