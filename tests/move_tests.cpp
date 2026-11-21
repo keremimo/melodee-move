@@ -1242,6 +1242,33 @@ struct AudioThread {
     ~AudioThread() { running = false; thread.join(); }
 };
 
+// The Looper's pads in both layouts (app/pad_layout.h): the loops by logical
+// number, on the same physical pads, beside the track buttons.
+void test_looper_pads() {
+    using app::LoopDesk;
+    using app::PadLayout;
+    for (PadLayout layout : {PadLayout::Rows, PadLayout::Banks})
+        for (unsigned physical = 0; physical < 32; ++physical) {
+            unsigned row = physical / 8, column = physical % 8;
+            auto at = LoopDesk::pad_at(app::logical_pad(uint8_t(physical), layout), layout);
+            if (column < 4) CHECK(at.loop == int(3 - row) && at.job == column && at.track < 0);
+            else CHECK(at.loop < 0 && at.track == int(row * 4 + column - 4));
+        }
+    for (unsigned loop = 0; loop < 4; ++loop)
+        for (unsigned job = 0; job < 4; ++job)
+            for (PadLayout layout : {PadLayout::Rows, PadLayout::Banks}) {
+                uint8_t logical = LoopDesk::loop_pad(loop, job, layout);
+                CHECK(app::physical_pad(logical, layout) == (3 - loop) * 8 + job);
+                auto at = LoopDesk::pad_at(logical, layout);
+                CHECK(at.loop == int(loop) && at.job == job);
+            }
+    // Rows: L1 is pads 25-28, L4 1-4; Banks: L1 13-16, L4 1-4, the track's 16 the right bank, 17-32.
+    CHECK(LoopDesk::loop_pad(0, 0, PadLayout::Rows) == 24 && LoopDesk::loop_pad(3, 3, PadLayout::Rows) == 3);
+    CHECK(LoopDesk::loop_pad(0, 0, PadLayout::Banks) == 12 && LoopDesk::loop_pad(3, 0, PadLayout::Banks) == 0);
+    CHECK(LoopDesk::track_pad(0, PadLayout::Banks) == 16 && LoopDesk::track_pad(15, PadLayout::Banks) == 31);
+    CHECK(LoopDesk::track_pad(0, PadLayout::Rows) == 4 && LoopDesk::track_pad(15, PadLayout::Rows) == 31);
+}
+
 void test_looper() {
     // The Looper (docs/UI.md, "Looper"): Shift + Step 12 asks, the push turns
     // it on and its memory is made; a loop's row of pads records in the cycle
@@ -1292,6 +1319,17 @@ void test_looper() {
         melodee.audio_event(make_event(0x90, pad_note(24), 100)); // again: back to empty (an armed take cancelled)
         run(1);
         CHECK(loop_field(melodee.status(), 1) == "EMPTY");
+        // In the MPC banks the same pad is the left bank's 13, still L1's record pad.
+        app::set_pad_layout(app::PadLayout::Banks);
+        melodee.audio_event(make_event(0x80, pad_note(24), 0));
+        melodee.audio_event(make_event(0x90, pad_note(24), 100));
+        run(1);
+        CHECK(loop_field(melodee.status(), 1) == "ARM");
+        melodee.audio_event(make_event(0x80, pad_note(24), 0));
+        melodee.audio_event(make_event(0x90, pad_note(24), 100));
+        run(1);
+        CHECK(loop_field(melodee.status(), 1) == "EMPTY");
+        app::set_pad_layout(app::PadLayout::Rows);
         // A bar from the input with the metronome on, the round trip set.
         CHECK(studio.loops().remote("length 1 1") == "ok");
         CHECK(studio.loops().remote("latency " + std::to_string(round_trip)) == "ok");
@@ -1444,6 +1482,7 @@ int main() {
     test_synth_track();
     test_tracks();
     test_migration();
+    test_looper_pads();
     test_looper();
     std::cout << "move-tests: " << checks - failures << " of " << checks << " checks passed\n";
     return failures ? 1 : 0;

@@ -228,15 +228,16 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
         // The Looper on top: a loop's row of pads (L1 the top row) acts in
         // the cycle it was read; a clear is held, the MIDI thread's.
         bool looping = desk->pads_shown.load(std::memory_order_relaxed);
-        unsigned column = move::pad_column(input.index), row = move::pad_row(input.index);
-        if (looping && column < LoopDesk::PadJobs) {
+        auto layout = pad_layout();
+        auto at = LoopDesk::pad_at(logical_pad(uint8_t(input.index), layout), layout);
+        if (looping && at.loop >= 0) {
             went = {};
             if (!input.pressed || pads_typing.load(std::memory_order_relaxed) || !desk->pads_free.load(std::memory_order_relaxed)) return;
             using Do = melodee::looper::Do;
-            Do what = column == LoopDesk::RecordPad ? Do::Primary
-                    : column == LoopDesk::PlayPad ? (desk->pads_shift.load(std::memory_order_relaxed) ? Do::Now : Do::Toggle)
-                    : column == LoopDesk::UndoPad ? Do::Undo : Do::Enable;
-            if (what != Do::Enable) engine->send({Type::Looper, uint8_t(move::pad_rows - 1 - row), 0, uint16_t(what), 0});
+            Do what = at.job == LoopDesk::RecordPad ? Do::Primary
+                    : at.job == LoopDesk::PlayPad ? (desk->pads_shift.load(std::memory_order_relaxed) ? Do::Now : Do::Toggle)
+                    : at.job == LoopDesk::UndoPad ? Do::Undo : Do::Enable;
+            if (what != Do::Enable) engine->send({Type::Looper, uint8_t(at.loop), 0, uint16_t(what), 0});
             return;
         }
         if (input.pressed) {
@@ -247,10 +248,9 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
             auto kind = TrackKind(audio_kind.load(std::memory_order_relaxed));
             bool note_track = kind == TrackKind::Synth || kind == TrackKind::Keys || kind == TrackKind::Midi || kind == TrackKind::Plugin;
             int key = kind == TrackKind::Kit ? int(melodee::sampler_first_note + input.index) : note_track ? note_for(input.index, audio_octave.load(std::memory_order_relaxed)) : -1;
-            if (looping) { // the right 16 on the Looper: a kit's bank of 16, or 16 notes up from C
-                unsigned at = row * LoopDesk::PadJobs + column - LoopDesk::PadJobs;
-                key = kind == TrackKind::Kit ? int(melodee::sampler_first_note + unsigned(desk->pads_bank.load(std::memory_order_relaxed)) * 16 + at)
-                    : note_track ? std::clamp(synth_base_note + 12 * audio_octave.load(std::memory_order_relaxed) + int(at), 0, 127) : -1;
+            if (looping && at.track >= 0) { // the track's 16 on the Looper: a kit's bank of 16, or 16 notes up from C
+                key = kind == TrackKind::Kit ? int(melodee::sampler_first_note + unsigned(desk->pads_bank.load(std::memory_order_relaxed)) * 16 + unsigned(at.track))
+                    : note_track ? std::clamp(synth_base_note + 12 * audio_octave.load(std::memory_order_relaxed) + at.track, 0, 127) : -1;
             }
             if (key < 0) return;
             went = {track, key};

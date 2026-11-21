@@ -322,9 +322,9 @@ their touch, Plus and Minus, Back, a track button held and a step).
 
 | Control | On the Move | In Melodee | Status |
 | --- | --- | --- | --- |
-| Pad, left 16 (Looper) | (No Looper on the Move) | A loop's row, L1 on top: record, close, overdub and play again (as Rec); play or stop on the boundary, again cancels; undo then redo the last overdub; held 0.6 s, clear | done |
+| Pad, left 16 (Looper) | (No Looper on the Move) | A loop's row, L1 on top: record, close, overdub and play again (as Rec); play or stop on the boundary, again cancels; undo then redo the last overdub; held 0.6 s, clear. By the pad map: Rows L1 pads 25-28 to L4 1-4; Banks the left bank, L1 13-16 to L4 1-4 | done |
 | Shift + Pad, left 16 (Looper) | (As above) | The play / stop pad at once; the rest as without Shift | done |
-| Pad, right 16 (Looper, kit) | (As above) | The selected kit's bank of 16 (the last pad's), A01 bottom left; the pad played is the last pad | done |
+| Pad, right 16 (Looper, kit) | (As above) | The selected kit's bank of 16 (the last pad's), A01 bottom left (Banks: the right bank, 17-32); the pad played is the last pad | done |
 | Pad, right 16 (Looper, synth) | (As above) | 16 notes up from C at the track's octave | done |
 | Track button (Looper) | Selects the track | Selects the loop track, L1 the top button | done |
 | Track button held + Volume knob (Looper) | The track's volume, in dB | The loop track's level, in dB | done |

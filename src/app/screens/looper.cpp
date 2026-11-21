@@ -123,17 +123,18 @@ void loop_buttons(const Studio& studio, move::Lights& lights) {
     }
 }
 
-// The pads: the left 16 the loops' rows (L1 on top), the right 16 the selected track's.
+// The pads, by their logical numbers (app/pad_layout.h): the loops' rows
+// (L1 on top), and the selected track's 16 (LoopDesk::pad_at()).
 void loop_pads(const Studio& studio, move::Lights& lights, const std::array<bool, pad_count>& held, bool blink_on) {
     using namespace move;
     const auto& desk = studio.loops();
+    auto layout = pad_layout();
     static const uint8_t dim_red = nearest_colour({90, 0, 0});
     auto now = Studio::Clock::now();
     for (unsigned loop = 0; loop < LoopDesk::loops; ++loop) {
         auto v = desk.view(loop);
         auto colour = ui::looper::loop_colour(loop);
-        unsigned row = pad_rows - 1 - loop;
-        auto at = [&](unsigned job) { return row * pad_columns + job; };
+        auto at = [&](unsigned job) { return physical_pad(LoopDesk::loop_pad(loop, job, layout), layout); };
         bool audio = v.length > 0 && v.state != S::Empty;
         // Record: red recording (blinking armed), orange overdubbing, the loop's colour dim otherwise.
         uint8_t record = v.state == S::Recording ? colour::red : v.state == S::Armed ? (blink_on ? colour::red : colour::off)
@@ -164,19 +165,24 @@ void loop_pads(const Studio& studio, move::Lights& lights, const std::array<bool
     auto colour = ui::track_colour(studio.track());
     const auto& track = studio.current();
     unsigned bank = track.last_pad / 16 % 2;
-    for (unsigned row = 0; row < pad_rows; ++row)
-        for (unsigned column = LoopDesk::PadJobs; column < pad_columns; ++column) {
-            unsigned pad = row * pad_columns + column, at = row * 4 + column - LoopDesk::PadJobs;
-            uint8_t shown = colour::off;
-            if (kind == TrackKind::Kit) {
-                unsigned kit = bank * 16 + at;
-                shown = kit == track.last_pad ? colour::white : track.pads[kit].used() ? colour.bright : colour::off;
-            } else if (kind == TrackKind::Synth || kind == TrackKind::Keys || kind == TrackKind::Midi || kind == TrackKind::Plugin) {
-                shown = at % 12 == 0 ? colour.bright : natural(int(at)) ? colour::dark_grey : colour::off;
-            }
-            if (held[pad]) shown = colour::white;
-            lights.pad(pad, shown);
+    for (unsigned at = 0; at < 16; ++at) {
+        unsigned pad = physical_pad(LoopDesk::track_pad(at, layout), layout);
+        uint8_t shown = colour::off;
+        if (kind == TrackKind::Kit) {
+            unsigned kit = bank * 16 + at;
+            shown = kit == track.last_pad ? colour::white : track.pads[kit].used() ? colour.bright : colour::off;
+        } else if (kind == TrackKind::Synth || kind == TrackKind::Keys || kind == TrackKind::Midi || kind == TrackKind::Plugin) {
+            shown = at % 12 == 0 ? colour.bright : natural(int(at)) ? colour::dark_grey : colour::off;
         }
+        if (held[pad]) shown = colour::white;
+        lights.pad(pad, shown);
+    }
+}
+
+// Where a physical pad sits on the Looper, in the layout chosen.
+LoopDesk::PadAt looper_pad(unsigned physical) {
+    auto layout = pad_layout();
+    return LoopDesk::pad_at(logical_pad(uint8_t(physical), layout), layout);
 }
 
 void looper_buttons(const Studio& studio, move::Lights& lights, bool blink_on) {
@@ -220,9 +226,9 @@ public:
         using Kind = move::Input::Kind;
         if (in.kind == Kind::Pad && in.index < pad_count) {
             held[in.index] = in.pressed;
-            unsigned column = move::pad_column(in.index);
-            if (!in.pressed && column == LoopDesk::ClearPad) // a clear let go early does nothing
-                studio.loops().pad(move::pad_rows - 1 - move::pad_row(in.index), LoopDesk::ClearPad, false, Studio::Clock::now());
+            auto at = looper_pad(in.index);
+            if (!in.pressed && at.loop >= 0 && at.job == LoopDesk::ClearPad) // a clear let go early does nothing
+                studio.loops().pad(unsigned(at.loop), LoopDesk::ClearPad, false, Studio::Clock::now());
         }
     }
 
@@ -231,16 +237,15 @@ public:
         switch (job) {
         case Job::Looper: studio.home(); return true; // Shift + Step 12 again: back to Play
         case Job::LoopPad: case Job::LoopPadNow: { // the audio thread did the rest, in the cycle it was read
-            unsigned pad = unsigned(use.index);
-            desk.pad(move::pad_rows - 1 - move::pad_row(pad), move::pad_column(pad), true, Studio::Clock::now());
+            auto at = looper_pad(unsigned(use.index));
+            if (at.loop >= 0) desk.pad(unsigned(at.loop), at.job, true, Studio::Clock::now());
             return true;
         }
-        case Job::PlayPad: // the right 16 on a kit: the pad played becomes the last pad
-            if (studio.kind() == TrackKind::Kit) {
-                unsigned at = move::pad_row(unsigned(use.index)) * 4 + move::pad_column(unsigned(use.index)) - LoopDesk::PadJobs;
-                studio.select_pad(studio.current().last_pad / 16 % 2 * 16 + at);
-            }
+        case Job::PlayPad: { // the track's 16 on a kit: the pad played becomes the last pad
+            auto at = looper_pad(unsigned(use.index));
+            if (studio.kind() == TrackKind::Kit && at.track >= 0) studio.select_pad(studio.current().last_pad / 16 % 2 * 16 + unsigned(at.track));
             return true;
+        }
         case Job::PlayNote: return true;
         case Job::SelectLoop: desk.select(unsigned(use.index)); return true;
         case Job::MuteLoop: {
@@ -256,7 +261,7 @@ public:
         case Job::TurnKnob: case Job::TurnKnobFine: turn(unsigned(use.index), use.delta); return true;
         default:
             // A loop's pad with Mute, Copy, Delete or a step held: nothing (the Play screen's jobs are for its own pads).
-            return use.control == bindings::Control::Pad && move::pad_column(unsigned(use.index)) < LoopDesk::PadJobs;
+            return use.control == bindings::Control::Pad && looper_pad(unsigned(use.index)).loop >= 0;
         }
     }
 
@@ -364,7 +369,7 @@ public:
         base_lights(lights);
         if (!studio.loops().on()) {
             for (unsigned loop = 0; loop < LoopDesk::loops; ++loop)
-                for (unsigned job = 0; job < LoopDesk::PadJobs; ++job) lights.pad((move::pad_rows - 1 - loop) * move::pad_columns + job, 0);
+                for (unsigned job = 0; job < LoopDesk::PadJobs; ++job) lights.pad(physical_pad(LoopDesk::loop_pad(loop, job, pad_layout()), pad_layout()), 0);
             for (unsigned n = 0; n < move::step_count; ++n) lights.step(n, 0);
         }
     }

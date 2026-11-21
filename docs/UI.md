@@ -222,7 +222,13 @@ records the selected loop, the screens as drawn.
   undo then redo the last overdub; held 0.6 s, clear. The audio thread
   does their jobs in the cycle they were read. The right 16 keep playing
   the selected track: a kit's bank of 16 (the last pad's), A01 bottom
-  left; a note track 16 notes up from C.
+  left; a note track 16 notes up from C. Every pad goes through the pad
+  map (`src/app/pad_layout.h`), and in both layouts the loops sit on the
+  same pads: in **Rows** L1 is pads 25-28, L2 17-20, L3 9-12, L4 1-4, the
+  track's 16 the right half of each row; in **Banks** the left bank is the
+  loops (L1 13-16 down to L4 1-4, as the MPC numbers its pads) and the
+  right bank, 17-32, the track's 16 (`lights-rows`, `lights-banks` on the
+  sheet).
 - **Track buttons** are L1-L4: a tap picks the loop; Mute + one mutes it,
   Shift + Mute + one solos it, Mute alone mutes the selected loop; held
   with the Volume knob, its level (`VOL` / `L2` / `LOOP`). Held, they still

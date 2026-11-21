@@ -13,8 +13,12 @@
 // loop's sheet (MORE); Shift + the wheel turns to MIX. Knobs 1-8 are the
 // loop's: source, length, level, feedback, pan, send, quantize, after take.
 // Layout B, Melodee's own grid (a column a loop on the left 16), is drawn
-// beside it for Kerem to choose.
+// beside it for Kerem to choose (he chose A). In both pad layouts
+// (app/pad_layout.h) the loops sit on the same pads: Rows numbers them
+// 25-28 (L1) down to 1-4 (L4), Banks 13-16 down to 1-4 in the left bank,
+// the selected track's 16 on the right bank, 17-32.
 #include "ui/mockups.h"
+#include "app/pad_layout.h"
 #include "move/controls.h"
 #include "move/display.h"
 #include "move/font.h"
@@ -178,7 +182,12 @@ struct Panel {
     std::array<bool, move::pad_count> pulsing {};            // ringed: pulsing or blinking
     std::array<uint8_t, move::step_count> steps {};          // palette
     std::array<uint8_t, size_t(Button::Count)> buttons {};   // palette (RGB) or brightness (white)
+    std::array<uint8_t, move::pad_count> numbers {};         // a pad's number in the layout (1-32), 0 none
     void button(Button b, uint8_t value) { buttons[size_t(b)] = value; }
+    // Each pad's number in `layout` (app/pad_layout.h), as the hand counts them.
+    void number(app::PadLayout layout) {
+        for (uint8_t logical = 0; logical < move::pad_count; ++logical) numbers[app::physical_pad(logical, layout)] = uint8_t(logical + 1);
+    }
 };
 struct Lights { const char* name; const char* caption; Panel panel; };
 
@@ -228,6 +237,14 @@ std::vector<Lights> looper_lights() {
     using looper::loop_colour;
     std::vector<Lights> panels;
     panels.push_back({"lights-a", "A: A ROW A LOOP; RIGHT 16 THE KIT", looper_panel()});
+    {   // The pad layouts (app/pad_layout.h): the loops sit on the same pads, numbered as each layout counts.
+        Panel rows = looper_panel();
+        rows.number(app::PadLayout::Rows);
+        panels.push_back({"lights-rows", "ROWS: L1 25-28 ... L4 1-4", rows});
+        Panel banks = looper_panel();
+        banks.number(app::PadLayout::Banks);
+        panels.push_back({"lights-banks", "BANKS: L1 13-16 ... L4 1-4, KIT 17-32", banks});
+    }
     {   // Stopped, L1 armed: its record pad blinks red; Rec blinks; Play starts it after the count-in.
         Panel p;
         p.tracks = {loop_colour(0).bright, colour::dark_grey, colour::dark_grey, colour::dark_grey};
@@ -348,6 +365,10 @@ juce::Image panel_image(const Panel& p, int w, int h) {
         if (p.pulsing[pad]) {
             g.setColour(juce::Colours::white);
             g.drawRoundedRectangle(box.expanded(2.5f), 4, 2);
+        }
+        if (p.numbers[pad]) {
+            g.setColour(rgb(p.pads[pad]).getPerceivedBrightness() > 0.5f ? juce::Colours::black : juce::Colours::white);
+            move::draw_text_centred(g, int(box.getX()), int(box.getCentreY()) - 3, int(box.getWidth()), std::to_string(p.numbers[pad]));
         }
     }
     for (unsigned step = 0; step < move::step_count; ++step) {

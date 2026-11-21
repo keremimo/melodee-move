@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #pragma once
+#include "app/pad_layout.h"
 #include "move/latency.h"
 #include "melodee/engine/looper.h"
 #include "melodee/model/project.h"
@@ -42,6 +43,33 @@ public:
     static constexpr auto clear_time = std::chrono::milliseconds(600); // a clear pad held this long clears
     // A loop's row of pads (docs/UI.md, "Looper"): L1 the top row, its four left pads these jobs.
     enum PadJob : unsigned { RecordPad, PlayPad, UndoPad, ClearPad, PadJobs };
+    // A pad on the Looper by its logical number (app/pad_layout.h): a loop's
+    // pad (`loop` 0-3, its `job`), or one of the selected track's 16
+    // (`track` 0-15, bottom left first). Rows: L1 is pads 25-28, L2 17-20,
+    // L3 9-12, L4 1-4, the track's 16 the right half of each row. Banks: the
+    // left bank is the loops (L1 13-16 down to L4 1-4, as the MPC numbers
+    // its pads), the right bank 17-32 the track's 16. Either way the loops
+    // sit on the same pads, beside the track buttons.
+    struct PadAt { int loop = -1; unsigned job = 0; int track = -1; };
+    static constexpr PadAt pad_at(uint8_t logical, PadLayout layout) {
+        PadAt at;
+        if (logical >= 32) return at;
+        if (layout == PadLayout::Banks) {
+            if (logical < 16) { at.loop = 3 - logical / 4; at.job = logical % 4; }
+            else at.track = logical - 16;
+            return at;
+        }
+        unsigned row = logical / 8, column = logical % 8;
+        if (column < PadJobs) { at.loop = int(3 - row); at.job = column; }
+        else at.track = int(row * 4 + column - PadJobs);
+        return at;
+    }
+    static constexpr uint8_t loop_pad(unsigned loop, unsigned job, PadLayout layout) { // logical
+        return layout == PadLayout::Banks ? uint8_t((3 - loop % 4) * 4 + job % 4) : uint8_t((3 - loop % 4) * 8 + job % 4);
+    }
+    static constexpr uint8_t track_pad(unsigned track, PadLayout layout) { // logical
+        return layout == PadLayout::Banks ? uint8_t(16 + track % 16) : uint8_t((track % 16) / 4 * 8 + PadJobs + track % 4);
+    }
     // The Move's own round trip, output to input, when nothing else is set:
     // the runtime's one block (the simulated Move measures 128 + its cable).
     static constexpr int default_latency = 128;
