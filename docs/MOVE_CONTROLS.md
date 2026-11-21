@@ -78,11 +78,21 @@ after Schwung) differ for some buttons:
 | Shift + Steps 4, 12, 13 | No Move job (no icon): **4 the Mixer** (16 tracks, their effects), **12 the Looper**, **13 Song**. |
 | Shift held | **Nothing on the screen**, as on the stock Move: the steps with a Shift job light, Melodee's 4, 12 and 13 too (Kerem dropped the on-screen Shift card from the mockups). |
 | Undo, quit | **Undo held 0.4 s opens the undo list** (as Melodee's Shift + − hold on the MPC). **Shift + Back goes back to Ableton's Move app**, as today, and Setup (Shift + Step 2) lists it too. |
+| Set Overview (Shift + Step 1) | **The Move's way** (Kerem, mockups `docs/ui/projects.png`): the projects of a folder on the 32 pads, each keeping its pad as a Set keeps its slot. **A pad picks** (pulsing); **Back or a track button opens it**, as the Move enters Note Mode with the Set picked; an empty pad, then Back or a track button, makes a new project there. **The wheel's push opens the picked one's options** (Melodee's project sheet: Save, Save as new, Rename, Colour, Duplicate, Move to folder, New folder, Open at start; on another: Open, Load kit, Delete), Shift + a pad too (the Move's Set options). |
+| Typing | **The Move's own** (its Wi-Fi password): the wheel walks a strip of characters and its push types the one in the box; the strip ends with SPACE, DEL and OK, and OK finishes. The pads still type letters at once and the steps digits; Back deletes, held cancels; Shift is upper case. Every text: names and a module's page. |
+| The Menu | **No Menu on the Move**: Melodee's HERE, GO and its lessons are left out; Shift + the steps are the places. |
+| Light show | **Setup > Lights only** (LIGHT SHOW, SHOW STYLE): no key. |
 
 Followed from the rule without a choice: Left and Right become the
 pattern's bars, so pages move to Shift + turn; in Typing, Back deletes a
 character as on the Move, and holding Back cancels; in Chop the wheel sets
-the amount, as the Move's wheel sets the number of slices.
+the amount, as the Move's wheel sets the number of slices. Delete + a knob's
+touch deletes its motion, as on the Move; where the knob has none, it does
+Melodee's Erase + pot (the value back to its start). In the overview, Delete
+alone asks to delete the project picked (Melodee's Erase tapped), Plus and
+Minus page through the folder's 32-pad pages and the wheel walks the pads,
+none of which the Move uses there; a track held with Shift + Copy, a step,
+then another moves a track (Melodee's Move).
 
 ## The map
 
@@ -101,16 +111,16 @@ the amount, as the Move's wheel sets the number of slices.
 | Pad (Sampling) | Records into that pad (pulsing red); the pad again, any pad or Sampling stops; held, records until let go; another pad while recording carries on onto it from there | Melodee's Record onto the pad; a pad hit while recording starts the next part there | wave 2: sampling |
 | Pad (Session) | Launches the clip (a row a track, a column a scene); an empty slot is selected for a new clip; sliding down a column plays the scene | Launches the track's pattern; a column is a scene | wave 2: sequencer |
 | Shift + Pad (Session) | With an audio clip copied: pastes it bounced into an audio clip slot | Pastes the copied pattern printed to audio | wave 2: song & export |
-| Pad (Overview) | Selects a Set; Play previews it | Selects a project | wave 2: MIDI/sync/undo/projects |
-| Shift + Pad (Overview) | The Set's options: colour, Ableton Cloud | The project's options: colour | wave 2: MIDI/sync/undo/projects |
+| Pad (Overview) | Selects a Set; Play previews it | Picks a project (pulsing), a folder or an empty pad; Back or a track button opens it | done |
+| Shift + Pad (Overview) | The Set's options: colour, Ableton Cloud | The project's options: colour, and Melodee's project sheet (save as new, rename, duplicate, move, load kit...) | done |
 | Pad held + Volume knob | The sample's gain | The pad's level | done |
-| Pad held + Volume knob (Overview) | The Set's volume, all four tracks at once | The project's volume | wave 2: MIDI/sync/undo/projects |
+| Pad held + Volume knob (Overview) | The Set's volume, all four tracks at once | The open project's volume, all its tracks at once | done |
 | Copy held + Pad (Play, kit) | No job (Control Live's Drum mode: copies the pad's devices onto the next pad pressed) | Copies the pad's sound onto the next pad pressed | wave 2: kit depth |
 | Copy held + Pad (Session) | Copies the clip, then pastes it on the next pad pressed (asks before replacing) | Copies the pattern | wave 2: sequencer |
-| Copy held + Pad (Overview) | Copies the Set onto the next pad (asks before replacing) | Copies the project | wave 2: MIDI/sync/undo/projects |
+| Copy held + Pad (Overview) | Copies the Set onto the next pad (asks before replacing) | The same for the project | done |
 | Delete held + Pad (Play, kit) | Deletes the pad's notes in the clip | Deletes its notes; a pad with none is emptied (as Control Live's Drum mode and the MPC's Erase + pad) | wave 2: sequencer |
 | Delete held + Pad (Session) | Deletes the clip at once | Deletes the pattern | wave 2: sequencer |
-| Delete held + Pad (Overview) | Deletes the Set, the pad again to confirm | Deletes the project, asked first | wave 2: MIDI/sync/undo/projects |
+| Delete held + Pad (Overview) | Deletes the Set, the pad again to confirm | The same: the question, the pad again (or push) deletes it | done |
 | Delete held + Pad (Chop) | No job (Control Live's Slicing mode: deletes the slice) | Takes the slice's cut out | wave 2: sampling |
 | Mute held + Pad (Play, kit) | Mutes or unmutes the drum pad (dim white) | Mutes or unmutes the kit pad | wave 2: mixer & effects |
 | Step held + Pad | Adds or removes that note on the step | The same on the pattern | wave 2: sequencer |
@@ -152,8 +162,8 @@ while Shift is held.
 
 | Control | On the Move | In Melodee | Status |
 | --- | --- | --- | --- |
-| Shift + Step 1 | The Set Overview | Projects, 32 to a page | wave 2: MIDI/sync/undo/projects |
-| Shift + Step 2 | Setup: battery, Wi-Fi, update, Cloud, Control Live, Link, MIDI and MIDI Sync, USB-C audio, Move Manager, brightness | Setup: Melodee's settings, MIDI and sync, LED brightness, the web page's address and code, Back to Move | wave 2: MIDI/sync/undo/projects |
+| Shift + Step 1 | The Set Overview | Projects, 32 to a page, each keeping its pad | done |
+| Shift + Step 2 | Setup: battery, Wi-Fi, update, Cloud, Control Live, Link, MIDI and MIDI Sync, USB-C audio, Move Manager, brightness | Setup: Melodee's settings (pads, lights and brightness, Basic or Full, the usage log, About), MIDI and sync, the web page, Back to Move | done |
 | Shift + Step 3 | Workflow Settings: quantize amount, step grid, count-in, autoload, time signature, maximum recording length | The same for Melodee's patterns | wave 2: sequencer |
 | Shift + Step 4 | No job | The Mixer: 16 tracks, their effects | wave 2: mixer & effects |
 | Shift + Step 5 | Tempo (the wheel; Shift for fine; push confirms) | The Tempo screen (today on Shift + Play) | done |
@@ -176,7 +186,7 @@ while Shift is held.
 | Track button | Selects the track (and Note Mode, from the Overview or Session) | Selects that track of the bank in view, as it is let go (today on the press) | done |
 | Track button held | Shows that track while held, without selecting it | The sixteen tracks on the screen, the steps picking (core's design A; it selects the track on the press today) | done |
 | Track button held + Volume knob | The track's volume, in dB on the screen | The track's level | done |
-| Shift + Track button | The track's options: colour, MIDI In and Out channel | The same | wave 2: MIDI/sync/undo/projects |
+| Shift + Track button | The track's options: colour, MIDI In and Out channel | Its colour and name (MIDI channels: move-midi) | done |
 | Mute held + Track button | Mutes or unmutes the track (its LED dims) | The same | done |
 | Shift + Mute held + Track button | Solos or unsolos the track (its LED blue) | The same | done |
 | Track button held + Copy held + Step | No job (Control Live: Copy + a track button duplicates the track) | Copies that track onto the next step's, asking before replacing | done |
@@ -184,6 +194,8 @@ while Shift is held.
 | Step (Tracks) | (No Melodee screen of tracks on the Move) | In the sixteen tracks latched by Shift + Note/Session: picks that track | done |
 | Copy held + Step (Tracks) | (As above) | Copies that track onto the next step's | done |
 | Delete held + Step (Tracks) | (As above) | Deletes that track, asked first | done |
+| Track button held + Shift + Copy held + Step | No job | Moves that track: then a step, where it goes; a track there trades places (Melodee's Move) | done |
+| Shift + Copy held + Step (Tracks) | (As above) | The same | done |
 
 ### Knobs
 
@@ -231,7 +243,10 @@ while Shift is held.
 | Wheel touch (Sampling) | Shows the input source | The same | wave 2: sampling |
 | Wheel turn (Canvas) | No job | The module's own page | done |
 | Wheel push (Canvas) | No job | Enters the page, then the page's push | done |
-| Wheel push (Typing) | Types the character, or Enter | Done | done |
+| Wheel push (Typing) | Types the character, or Enter | The same: the strip's character in the box; OK at its end is Enter | done |
+| Wheel turn (Typing) | Moves through the characters | The same: the strip of characters, SPACE, DEL and OK at its end | done |
+| Wheel turn (Overview) | No job | Picks the next or previous pad's project | done |
+| Wheel push (Overview) | No job | The picked project's options (as Shift + its pad); on a folder, goes in | done |
 | Loop held + Wheel turn | The loop's length in bars | The pattern's length | wave 2: sequencer |
 | Shift + Loop held + Wheel turn | The loop's length, fine | The same | wave 2: sequencer |
 
@@ -241,7 +256,7 @@ while Shift is held.
 | --- | --- | --- | --- |
 | Play | Starts or stops; stops a recording too | The same | done |
 | Shift + Play | Restarts every playing clip | Restarts every pattern from its top | done |
-| Play (Overview) | Previews the selected Set | Previews the project | wave 2: MIDI/sync/undo/projects |
+| Play (Overview) | Previews the selected Set | Opens the project picked and plays it, the overview staying (the open one: Play) | done |
 | Rec | Records into the selected track (count-in first); again stops, playback goes on | Melodee's Seq Record | core |
 | Rec (Sampling) | On an audio track: records into the clip | Into an audio track's take | wave 2: sampling |
 
@@ -269,6 +284,7 @@ while Shift is held.
 | Delete | Deletes the selected track's clip | Deletes the pattern | wave 2: sequencer |
 | Delete (Typing) | (Back deletes on the Move) | A backspace | done |
 | Shift + Delete | No job | None given | free |
+| Delete (Overview) | No job (Delete + a pad deletes) | Asks to delete the project picked (Melodee's Erase tapped) | done |
 
 ### Note/Session, Back, Shift
 
@@ -302,6 +318,7 @@ while Shift is held.
 | Shift + Left or Right | No job (Control Live: 16 bars) | 16 bars | wave 2: sequencer |
 | Left or Right (Session) | No job (Control Live: the session ring a track) | The patterns' page, eight at a time | wave 2: sequencer |
 | Left or Right (Chop) | No job | The slice before or after | done |
+| Plus or Minus (Overview) | No job | The folder's next or previous 32 pads | done |
 
 ### Outside the surface
 
@@ -320,7 +337,7 @@ Not checked by the tests: they follow from the screens.
 | Pads, a synth | Roots in the track's colour, the scale's notes light grey, the rest dark | Every C in the track's colour, the other naturals dim; scales with Keys & Scales | done |
 | Pads, 16 Pitches | The right 16: roots in the track's colour, the scale light grey | The same | wave 2: kit depth |
 | Pads, Session | Clips in the track's colour; the selected one pulsing white; one waiting to start pulsing green, one about to stop pulsing in its colour | The same for patterns | wave 2: sequencer |
-| Pads, Overview | Sets in their colours, the selected one pulsing; an empty slot dark, white when selected | The same for projects | wave 2: MIDI/sync/undo/projects |
+| Pads, Overview | Sets in their colours, the selected one pulsing; an empty slot dark, white when selected | The same for projects; folders grey | done |
 | Pads, Browser | All pulse while browsing presets; the target pad pulses while browsing samples | The same | next |
 | Pads, Sampling | The pads that can take a sample pink; the one recording pulsing red | The same | wave 2: sampling |
 | Steps, Play | White with notes; the track's colour dim where empty; grey dim past the loop; the playhead green; brighter under a long note; red over a step's automation | The same | wave 2: sequencer |

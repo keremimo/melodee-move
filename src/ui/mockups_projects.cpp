@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// Projects, Setup, undo, naming, the Menu and the lessons on the Move, as
+// Projects, Setup, undo and naming on the Move, as
 // mockups: projects.png. Ableton's keys keep their meaning (its manual,
 // docs/MOVE_CONTROLS.md): Shift + Step 1 is the Set Overview, here Melodee's
 // projects on the 32 pads; Shift + Step 2 is Setup, here Melodee's
@@ -210,19 +210,6 @@ std::vector<Screen> projects_screens() {
             g.setColour(on);
             detail(g, "MOVE 2 TO: A STEP");
         }},
-        {"menu-go", "WHEEL PUSH HELD: THE MENU, GO", [](juce::Graphics& g) {
-            sys::menu_go(g, {"PLAY", "LOAD", "SMPL", "CHOP", "PATT", "LOOP", "TRKS", "KEYS", "MIX", "WORK", "TMPO", "LPR", "SONG", "PROJ", "SETP", "LRN"},
-                         8, "SHIFT + STEP 4");
-        }},
-        {"menu-here", "THE MENU, HERE: THE PAGE'S JOBS", [](juce::Graphics& g) {
-            sys::menu_here(g, {"SAMPLE OPTIONS", "CHOP", "PAD PAGES", "PAD LEVEL", "16 PITCHES", "SELECT A PAD"}, 0, "SHIFT + PUSH");
-        }},
-        {"learn", "MENU > LRN: THE LESSONS", [](juce::Graphics& g) {
-            sys::setup_list(g, "LRN", "", {{"FIRST BEAT", "DONE"}, {"PATTERNS", ""}, {"MIX A TRACK", ""}, {"SHAPE A PAD", ""}}, 3);
-        }},
-        {"lesson", "SHAPE A PAD, STEP 2 OF 4", [](juce::Graphics& g) {
-            sys::lesson(g, "SHAPE A PAD", 2, 4, "TURN", "KNOB 5", "HOLD PUSH: LEAVE");
-        }},
     };
 }
 
@@ -301,21 +288,6 @@ std::vector<Lights> projects_lights() {
         p.tracks[1] = move::colour::bright_green;
         p.button(Button::Shift, move::white_bright);
         panels.push_back({"lights-track-colour", "TRACK 2'S COLOUR: ITS BUTTON SHOWS IT", p});
-    }
-    {   // The Menu's GO: the left 16 pads the places, in four colours: sound, patterns, mix, project.
-        Panel p = base_panel();
-        static const uint8_t kinds[4] {move::colour::orange, move::colour::azure, move::colour::bright_green, move::colour::violet};
-        for (unsigned n = 0; n < 16; ++n) {
-            unsigned pad = (n / 4) * 8 + n % 4; // bottom left first, rows of four
-            p.pads[pad] = n == 10 ? move::colour::dark_grey : kinds[n / 4];
-        }
-        p.pads[(8 / 4) * 8 + 8 % 4] = move::colour::white; // MIX, picked
-        panels.push_back({"lights-menu", "MENU GO: 16 PLACES ON THE LEFT PADS", p});
-    }
-    {   // A lesson's step: only its control lit, blinking; everything else dark.
-        Panel p;
-        p.knobs[4] = true;
-        panels.push_back({"lights-lesson", "A LESSON: ONLY KNOB 5 LIT", p});
     }
     {   // The light show, Pulse on beat 1: the pads in the tracks' colours, harder on the one.
         Panel p = base_panel();
@@ -420,7 +392,7 @@ juce::Image sheet(const std::vector<Screen>& screens, const std::vector<Lights>&
     g.setColour(juce::Colour(0xffd8f0ff));
     move::draw_text(g, gap, 20, "MELODEE ON MOVE: PROJECTS AND SYSTEM", 4);
     g.setColour(juce::Colour(0xff8a96a3));
-    move::draw_text(g, gap, 60, "SETS, SETUP, UNDO, NAMES, MENU. DOCS/UI.MD", 2);
+    move::draw_text(g, gap, 60, "SETS, SETUP, UNDO, NAMES, TRACK OPTIONS. DOCS/UI.MD", 2);
     auto place = [&](size_t n, int from) { return juce::Point<int>(gap + int(n % 2) * (screen_w + gap), from + int(n / 2) * (screen_h + caption + gap)); };
     for (size_t n = 0; n < screens.size(); ++n) {
         auto at = place(n, top);

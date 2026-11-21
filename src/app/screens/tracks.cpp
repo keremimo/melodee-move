@@ -8,6 +8,7 @@
 // asks to delete it. The app shows this screen while a track button is held
 // (MelodeeApp), over whatever screen is on top.
 #include "app/screens/common.h"
+#include "ui/system_draw.h"
 
 namespace app::screens {
 namespace {
@@ -16,7 +17,7 @@ class Tracks final : public Screen {
 public:
     using Screen::Screen;
 
-    void enter() override { copy_down = delete_down = false; copy_from = -1; }
+    void enter() override { copy_down = delete_down = moving = false; copy_from = -1; }
 
     // Latched by Shift + Note/Session it is a screen of its own; held under a
     // track button the app hands it the steps.
@@ -24,13 +25,13 @@ public:
     void input(const move::Input& input) override {
         if (input.kind != move::Input::Kind::Button) return;
         auto button = move::Button(input.index);
-        if (button == move::Button::Copy) { copy_down = input.pressed; if (!input.pressed) copy_from = -1; }
+        if (button == move::Button::Copy) { copy_down = input.pressed; if (!input.pressed) { copy_from = -1; moving = false; } }
         if (button == move::Button::Delete) delete_down = input.pressed;
     }
     bool job(bindings::Job job, const bindings::Use& use) override {
         using bindings::Job;
         if (job == Job::Back) { studio.close(); return true; }
-        if (job != Job::PickTrack && job != Job::CopyTrack && job != Job::ClearTrack) return false;
+        if (job != Job::PickTrack && job != Job::CopyTrack && job != Job::ClearTrack && job != Job::MoveTrack) return false;
         if (use.index < 0 || unsigned(use.index) >= melodee::track_count) return true;
         unsigned t = unsigned(use.index);
         bool used = studio.kind(t) != TrackKind::Empty;
@@ -38,6 +39,18 @@ public:
             if (!used) return true;
             pending_from = pending_to = int(t);
             studio.open("delete-track");
+            return true;
+        }
+        if (job == Job::MoveTrack) { // Melodee's Move: a track, then where it goes; one there trades places
+            if (copy_from < 0) { if (used) { copy_from = int(t); moving = true; } return true; }
+            if (int(t) == copy_from) return true;
+            int from = copy_from;
+            copy_from = -1;
+            moving = false;
+            if (studio.move_track(unsigned(from), t)) {
+                studio.name_step("MOVE TRACK " + std::to_string(from + 1), int(t));
+                studio.say("TRACK " + std::to_string(from + 1) + " TO " + std::to_string(t + 1));
+            }
             return true;
         }
         if (job == Job::CopyTrack) {
@@ -58,7 +71,7 @@ public:
     void lights(move::Lights& lights) override {
         using namespace move;
         for (unsigned t = 0; t < melodee::track_count; ++t) {
-            uint8_t colour = studio.kind(t) == TrackKind::Empty ? colour::dark_grey : ui::track_colour(t).bright;
+            uint8_t colour = studio.kind(t) == TrackKind::Empty ? colour::dark_grey : studio.colour_of(t).bright;
             if (int(t) == copy_from) colour = colour::white;
             else if (t == studio.track() && copy_from < 0) colour = colour::white;
             lights.step(t, colour);
@@ -83,6 +96,8 @@ public:
         }
         g.setColour(juce::Colours::white);
         if (delete_down) ui::detail(g, "DELETE: A STEP");
+        else if (copy_down && moving) ui::detail(g, "MOVE " + std::to_string(copy_from + 1) + " TO: A STEP");
+        else if (copy_down && studio.shift) ui::detail(g, "MOVE: A STEP");
         else if (copy_down) ui::detail(g, copy_from < 0 ? "COPY: A STEP" : "COPY " + std::to_string(copy_from + 1) + " TO: A STEP");
         else ui::detail(g, two_digits(studio.track() + 1) + " " + tag(studio.track()) + " " + upper(studio.current().name).substr(0, 7));
     }
@@ -96,20 +111,23 @@ public:
 
     void copy() {
         if (pending_from < 0 || pending_to < 0) return;
-        if (studio.copy_track(unsigned(pending_from), unsigned(pending_to)))
+        if (studio.copy_track(unsigned(pending_from), unsigned(pending_to))) {
             studio.say("TRACK " + std::to_string(pending_from + 1) + " TO " + std::to_string(pending_to + 1));
+            studio.name_step("COPY TRACK " + std::to_string(pending_from + 1), pending_to);
+        }
         pending_from = pending_to = -1;
     }
     void erase() {
         if (pending_to < 0) return;
         studio.delete_track(unsigned(pending_to));
         studio.say("TRACK " + std::to_string(pending_to + 1) + " DELETED");
+        studio.name_step("DELETE TRACK " + std::to_string(pending_to + 1), pending_to);
         pending_from = pending_to = -1;
     }
     int pending_from = -1, pending_to = -1;
 
 private:
-    bool copy_down = false, delete_down = false;
+    bool copy_down = false, delete_down = false, moving = false;
     int copy_from = -1;
 };
 
@@ -144,23 +162,22 @@ public:
     }
 
     void draw(juce::Graphics& g) override {
+        // Melodee's one question sheet (ui::system::question): what goes, and that undo brings it back.
         auto& tracks = tracks_of(studio);
         int to = std::max(tracks.pending_to, 0), from = std::max(tracks.pending_from, 0);
         const auto& target = studio.project().tracks[unsigned(to)];
-        std::string what = upper(target.name).substr(0, 12);
+        ui::system::Question q;
+        q.undoable = true;
         if (deleting) {
-            ui::rail(g, "DEL", std::to_string(to + 1), kind_tag(studio.kind(unsigned(to))));
-            move::draw_text(g, ui::content_x + 2, 4, "DELETE TRACK " + std::to_string(to + 1) + "?");
-            move::draw_text(g, ui::content_x + 2, 18, what);
-            move::draw_text(g, ui::content_x + 2, 28, "ITS SOUND, KIT AND");
-            move::draw_text(g, ui::content_x + 2, 38, "PATTERNS GO");
+            q.rail_top = "DEL"; q.rail_big = std::to_string(to + 1); q.rail_bottom = kind_tag(studio.kind(unsigned(to)));
+            q.asked = "DELETE TRACK " + std::to_string(to + 1) + "?";
+            q.lines = {upper(target.name).substr(0, 17), "SOUND, KIT, PATTERNS"};
         } else {
-            ui::rail(g, "COPY", std::to_string(from + 1), "> " + std::to_string(to + 1));
-            move::draw_text(g, ui::content_x + 2, 4, "TRACK " + std::to_string(from + 1) + " TO " + std::to_string(to + 1));
-            move::draw_text(g, ui::content_x + 2, 18, std::to_string(to + 1) + " HAS " + what.substr(0, 8) + ":");
-            move::draw_text(g, ui::content_x + 2, 28, "REPLACE IT?");
+            q.rail_top = "COPY"; q.rail_big = std::to_string(from + 1); q.rail_bottom = "> " + std::to_string(to + 1);
+            q.asked = "REPLACE TRACK " + std::to_string(to + 1) + "?";
+            q.lines = {upper(target.name).substr(0, 17), "WITH TRACK " + std::to_string(from + 1)};
         }
-        ui::detail(g, "PUSH YES", "BACK NO");
+        ui::system::question(g, q);
     }
 
 private:

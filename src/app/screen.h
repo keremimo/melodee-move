@@ -51,6 +51,9 @@ public:
     virtual Knob knob(unsigned) const { return {}; }
     // What the touched knob's rail says under its number.
     virtual std::string knob_owner() const { return {}; }
+    // Knob n's value back to its start (Delete + its touch where it has no
+    // motion: Melodee's Erase + pot); false: nothing to reset.
+    virtual bool reset_knob(unsigned) { return false; }
     // Fields for the status line (" key=value ..."), whether shown or not.
     virtual std::string status() const { return {}; }
 

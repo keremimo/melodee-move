@@ -205,46 +205,4 @@ void about(juce::Graphics& g, const About& a) {
     detail(g, "BACK");
 }
 
-// ---------------------------------------------------------------- the Menu and lessons
-
-void menu_go(juce::Graphics& g, const std::array<std::string, 16>& places, int picked, std::string_view shortcut) {
-    rail(g, "MENU", "GO", "HERE");
-    int cell_w = content_width / 4, cell_h = 12;
-    for (int n = 0; n < 16; ++n) {
-        // Melodee's place n is pad n of the left 16, bottom left first: drawn
-        // as the pads lie, the top row first.
-        int row = 3 - n / 4, column = n % 4;
-        int x = content_x + column * cell_w, y = row * cell_h;
-        bool chosen = n == picked, there = !places[size_t(n)].empty();
-        g.setColour(on);
-        if (chosen) g.fillRect(x, y, cell_w - 1, cell_h - 1);
-        else if (there) g.drawRect(x, y, cell_w - 1, cell_h - 1);
-        g.setColour(chosen ? off : on);
-        move::draw_text_centred(g, x, y + 2, cell_w - 1, places[size_t(n)].substr(0, 4));
-    }
-    g.setColour(on);
-    detail(g, std::string(shortcut.substr(0, 16)));
-}
-
-void menu_here(juce::Graphics& g, const std::vector<std::string>& jobs, int picked, std::string_view shortcut) {
-    rail(g, "MENU", "", "HERE");
-    list(g, content(0, 52), jobs, picked, 1);
-    detail(g, std::string(shortcut.substr(0, 16)));
-}
-
-void lesson(juce::Graphics& g, std::string_view title, unsigned step, unsigned steps, std::string_view line1, std::string_view line2,
-            std::string_view detail_text) {
-    rail(g, "LRN", std::to_string(step), "/" + std::to_string(steps));
-    g.setColour(on);
-    move::draw_text(g, content_x + 1, 0, std::string(title.substr(0, 17)));
-    g.fillRect(content_x, 8, content_width, 1);
-    auto big = [&](int y, std::string_view text) {
-        if (move::text_width(text, 2) <= content_width - 2) move::draw_text(g, content_x + 1, y, text, 2);
-        else move::draw_text(g, content_x + 1, y + 4, text.substr(0, 17));
-    };
-    big(13, line1);
-    big(31, line2);
-    detail(g, std::string(detail_text.substr(0, 16)));
-}
-
 } // namespace ui::system

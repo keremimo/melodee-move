@@ -42,7 +42,7 @@ public:
     void lights(move::Lights& lights) override {
         using namespace move;
         const auto& track = studio.current();
-        auto colour = ui::track_colour(studio.track()).bright;
+        auto colour = studio.colour_of(studio.track()).bright;
         for (unsigned at = 0; at < pad_count; ++at)
             lights.pad(at, track.pads[at].used() ? (at == studio.pad() ? colour::white : colour) : at == studio.pad() ? colour::dark_grey : colour::off);
         steps_playhead(studio, lights);
@@ -100,6 +100,25 @@ public:
         }
     }
     std::string knob_owner() const override { return pad_label(studio.pad()); }
+    // Delete + a knob's touch with no motion: the value as a new pad has it (Melodee's Erase + pot).
+    bool reset_knob(unsigned which) override {
+        if (!studio.sample_of_pad()) return false;
+        PadSound sound = studio.current().pads[studio.pad()];
+        const PadSound fresh {};
+        switch (which) {
+        case 0: sound.pitch = fresh.pitch; sound.fine = fresh.fine; break;
+        case 1: sound.level = fresh.level; break;
+        case 2: sound.pan = fresh.pan; break;
+        case 3: sound.start = fresh.start; break;
+        case 4: sound.end = fresh.end; break;
+        case 5: sound.attack = fresh.attack; break;
+        case 6: sound.decay = fresh.decay; break;
+        case 7: sound.cutoff = fresh.cutoff; sound.filter = fresh.filter; break;
+        default: return false;
+        }
+        studio.set_pad(studio.track(), studio.pad(), sound);
+        return true;
+    }
 
 private:
     int focus = 1; // the Device View's item the wheel is on: 0 the kit, 1 the pad, 2-3 the effects

@@ -4,10 +4,12 @@
 #include "move/display.h"
 #include "move/font.h"
 #include "ui/track_style.h"
+#include "ui/system_draw.h"
 #include "ui/widgets.h"
 #include "melodee/engine/engine_info.h"
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstdlib>
 #include <filesystem>
 
@@ -52,6 +54,17 @@ std::string spoken(const char* name) {
 constexpr const char* keyboard_rows[4] {"abcdefgh", "ijklmnop", "qrstuvwx", "yz -.'&\b"};
 constexpr const char* step_keys = "1234567890()/:,!";
 char key_for_pad(unsigned pad) { return keyboard_rows[3 - pad / 8][pad % 8]; }
+// The Move's own typing (Kerem's decision): the wheel walks this strip, its
+// push types the one in the box; SPACE, DEL and OK end it.
+const std::vector<std::string>& strip() {
+    static const std::vector<std::string> keys = [] {
+        std::vector<std::string> made;
+        for (char c : std::string("abcdefghijklmnopqrstuvwxyz0123456789-_.'&()!")) made.push_back(std::string(1, c));
+        for (const char* key : {"SP", "DL", "OK"}) made.push_back(key);
+        return made;
+    }();
+    return keys;
+}
 
 std::string upper(std::string text) {
     for (auto& c : text) c = char(std::toupper(static_cast<unsigned char>(c)));
@@ -68,7 +81,10 @@ int track_button(move::Button button) {
 } // namespace
 
 MelodeeApp::MelodeeApp(std::string library, std::string home, std::string modules)
-    : own(std::make_unique<Studio>(std::move(library), std::move(home), std::move(modules))) {}
+    : own(std::make_unique<Studio>(std::move(library), std::move(home), std::move(modules))) {
+    started_unix = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    own->machine.version = __DATE__; // the build's day
+}
 
 MelodeeApp::~MelodeeApp() = default; // the studio saves what is not saved yet
 
@@ -119,7 +135,7 @@ bool MelodeeApp::trigger(bindings::Job job) {
 void MelodeeApp::type(char c) {
     auto& studio = *own;
     if (c == '\b') { if (!studio.typed.empty()) studio.typed.pop_back(); return; }
-    if (studio.typed.size() >= 120) return;
+    if (studio.typed.size() >= studio.typing_room) return;
     studio.typed += studio.shift ? char(std::toupper(static_cast<unsigned char>(c))) : c;
 }
 
@@ -130,9 +146,14 @@ bool MelodeeApp::global(bindings::Job job, const bindings::Use& use) {
     unsigned bank = ui::bank_of(studio.track()) * ui::tracks_a_bank;
     switch (job) {
     // The track buttons: a tap selects, held the sixteen (drawn), a step picks.
-    case Job::SelectTrack: studio.select(bank + unsigned(use.index)); return true;
+    case Job::SelectTrack:
+        // The overview's: a track button opens the project picked (the Move enters Note Mode with the Set).
+        if (auto* top = studio.top(); top && top->screen_kind() == bindings::Screen::Overview && top->job(job, use)) return true;
+        studio.select(bank + unsigned(use.index));
+        return true;
+    case Job::TrackOptions: studio.options_track = bank + unsigned(use.index); studio.open("track-options"); return true;
     case Job::PeekTrack: return true;
-    case Job::PickTrack: case Job::CopyTrack: case Job::ClearTrack:
+    case Job::PickTrack: case Job::CopyTrack: case Job::ClearTrack: case Job::MoveTrack:
         if (!holding()) return false; // the sixteen latched: the screen's
         if (auto* sixteen = tracks()) sixteen->job(job, use);
         return true;
@@ -186,7 +207,15 @@ bool MelodeeApp::global(bindings::Job job, const bindings::Use& use) {
     case Job::TypeKey: type(key_for_pad(unsigned(use.index))); return true;
     case Job::TypeDigit: type(step_keys[use.index]); return true;
     case Job::TypeBackspace: type('\b'); return true;
-    case Job::TypeDone: studio.finish_typing(false); return true;
+    case Job::TypeTurn: studio.typing_strip = std::clamp(studio.typing_strip + use.delta, 0, int(strip().size()) - 1); return true;
+    case Job::TypeDone: { // the strip's key in the box; OK finishes
+        const auto& key = strip()[size_t(std::clamp(studio.typing_strip, 0, int(strip().size()) - 1))];
+        if (key == "OK") studio.finish_typing(false);
+        else if (key == "DL") type('\b');
+        else if (key == "SP") type(' ');
+        else type(key[0]);
+        return true;
+    }
     case Job::TypeCancel: studio.finish_typing(true); return true;
     case Job::Uppercase: return true; // type() reads Shift
     default: return false;
@@ -236,15 +265,26 @@ void MelodeeApp::act(const bindings::Use& use) {
     auto job = row->job;
     last_job = job;
     std::string name = (turn && gesture_open) || job == bindings::Job::Undo || job == bindings::Job::Redo ? std::string() : step_name(job, use);
+    if (studio.opening && job != bindings::Job::MainVolume) return; // a project opening: presses wait (the Loading sheet)
     [&] {
         if (global(job, use)) return;
         Screen* top = studio.top();
         if (top && top->job(job, use)) return;
         // The track's Play screen under the one on top keeps what that one leaves.
         if (auto* play = studio.screen(home_screen(studio.kind())); play && play != top && play->job(job, use)) return;
-        trigger(job);
+        if (trigger(job)) return;
+        // Delete + a knob's touch with no motion to delete: Melodee's Erase + pot, the value back to its start.
+        if (job == bindings::Job::DeleteMotion && top) {
+            if (top->reset_knob(unsigned(use.index))) studio.name_step("RESET " + top->knob(unsigned(use.index)).name);
+            else if (auto* play = studio.screen(home_screen(studio.kind())); play && play != top && play->reset_knob(unsigned(use.index)))
+                studio.name_step("RESET " + play->knob(unsigned(use.index)).name);
+        }
     }();
     if (no_step(job)) studio.not_a_step();
+    if (studio.settings.usage_log && use.control != Control::PadPressure) { // what the hands do, no names (Setup's usage log)
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - started).count();
+        usage += std::to_string(ms) + ' ' + (studio.top() ? studio.top()->id() : std::string("-")) + ' ' + bindings::job_name(job) + '\n';
+    }
     if (use.control == Control::PadPressure) return;
     if (turn) {
         if (!gesture_open) { gesture_open = true; gesture_control = use.control; gesture_index = use.index; gesture_name = name; }
@@ -292,6 +332,18 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point now) {
     using namespace move;
     std::lock_guard<std::mutex> guard(own->lock);
     auto& studio = *own;
+    // How the Move is doing, for Setup's About: the audio cycle's share over the last second.
+    if (now - machine_at >= std::chrono::seconds(1)) {
+        const auto& run = session();
+        uint64_t calls = run.process_calls.load(), ns = run.process_ns.load();
+        double period_ns = run.rate ? 1e9 * run.period / run.rate : 2902000.0;
+        if (calls > machine_calls) studio.machine.cpu_percent = float(100.0 * double(ns - machine_ns) / double(calls - machine_calls) / period_ns);
+        studio.machine.peak_us = unsigned(run.process_ns_peak.load() / 1000);
+        studio.machine.late = unsigned(run.xruns.load());
+        machine_calls = calls;
+        machine_ns = ns;
+        machine_at = now;
+    }
     // Holds that came due (a track button, Undo, Back held).
     for (const auto& use : gestures.tick(now)) act(use);
     if (gesture_open && now - gesture_at >= gesture_quiet) close_gesture(); // a knob left still: its turns are one step
@@ -301,7 +353,7 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point now) {
     unsigned first = ui::bank_of(studio.track()) * ui::tracks_a_bank;
     for (unsigned n = 0; n < 4; ++n) {
         unsigned t = first + n;
-        auto colour = ui::track_colour(t);
+        auto colour = studio.colour_of(t); // its own (track options) or its place's
         const auto& mix = studio.project().tracks[t].mix;
         bool selected = t == studio.track();
         uint8_t shown = studio.kind(t) == TrackKind::Empty ? (selected ? colour::dark_grey : colour::off)
@@ -324,6 +376,7 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point now) {
         return;
     }
     if (auto* top = studio.top()) top->lights(lights);
+    settings_lights(lights, now); // Setup's pad lights, brightness and the light show
     if (holding()) {
         if (auto* sixteen = tracks()) sixteen->lights(lights); // the steps as the tracks, over the screen's
     } else if (studio.shift) { // the steps with a Shift job that works (docs/MOVE_CONTROLS.md); the metronome bright when on
@@ -340,6 +393,75 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point now) {
     }
 }
 
+// Setup's lights (MIDI thread, under `lock`): the brightness on every light;
+// on a Play screen, the pads white or dark (Pad lights), or the light show
+// in time with the tempo (Melodee's: Pulse, Sweep, Chase, Ripple, Levels).
+void MelodeeApp::settings_lights(move::Lights& lights, Clock::time_point now) {
+    using namespace move;
+    auto& studio = *own;
+    const auto& settings = studio.settings;
+    lights.set_brightness(settings.brightness);
+    Screen* top = studio.top();
+    if (!top || top->screen_kind() != bindings::Screen::Play || holding() || studio.shift) return;
+    if (!settings.light_show) {
+        if (settings.pad_lights == 0) return;
+        for (unsigned at = 0; at < pad_count; ++at) {
+            uint8_t was = lights.pad_wanted(at);
+            lights.pad(at, settings.pad_lights == 2 || !was ? colour::off : was == colour::white ? colour::white : colour::light_grey);
+        }
+        return;
+    }
+    // Where the show is: the tempo's beats, playing or not (stopped: half as bright).
+    double beats;
+    if (studio.playing()) beats = double(studio.host().ticks()) / melodee::ticks_per_quarter;
+    else beats = std::chrono::duration<double>(now.time_since_epoch()).count() * studio.tempo() / 600.0;
+    unsigned beat = unsigned(beats);
+    double phase = beats - std::floor(beats);
+    unsigned bar = beat / 4;
+    bool playing = studio.playing();
+    auto colour = ui::track_colour(bar / 4); // a new colour every four bars
+    uint8_t lit = playing ? colour.bright : colour.dim, soft = playing ? colour.dim : colour::off;
+    uint32_t held = session().held_pads.load(std::memory_order_relaxed);
+    for (unsigned at = 0; at < pad_count; ++at) {
+        unsigned column = move::pad_column(at), row = move::pad_row(at);
+        uint8_t shown = colour::off;
+        switch (settings.show_style % 5) {
+        case 0: // Pulse: the whole panel on the beat, harder on beat 1
+            if (phase < 0.3) shown = beat % 4 == 0 ? (playing ? colour::white : lit) : lit;
+            break;
+        case 1: { // Sweep: a bar of light across, left to right and back, a beat each way
+            double x = beat % 2 ? 7.0 - phase * 7.0 : phase * 7.0;
+            double off = std::abs(double(column) - x);
+            shown = off < 0.6 ? lit : off < 1.6 ? soft : colour::off;
+            break;
+        }
+        case 2: { // Chase: a pad a sixteenth, through the 32 in two bars, the top row first
+            unsigned sixteenth = unsigned(beats * 4) % pad_count;
+            unsigned slot = (3 - row) * 8 + column;
+            shown = slot == sixteenth ? lit : (slot + 1) % pad_count == sixteenth ? soft : colour::off;
+            break;
+        }
+        case 3: { // Ripple: a ring from the middle on beat 1
+            double radius = (beat % 4 == 0 ? phase : 1.0 + phase) * 3.0;
+            double dx = double(column) - 3.5, dy = double(row) - 1.5, d = std::sqrt(dx * dx + dy * dy);
+            shown = std::abs(d - radius) < 0.7 ? lit : colour::off;
+            break;
+        }
+        default: { // Levels: the mix as a meter, a column each side twice
+            float level = std::max(studio.host().out_level(column % 2), 0.0f);
+            double db = level > 0 ? 20.0 * std::log10(level) : -100.0;
+            unsigned height = db > -6 ? 4 : db > -12 ? 3 : db > -24 ? 2 : db > -48 ? 1 : 0;
+            shown = row < height ? (row == 3 ? colour::red : lit) : colour::off;
+            break;
+        }
+        }
+        if (held & (1u << at)) shown = colour::white; // a pad pressed flashes white
+        lights.pad(at, shown);
+    }
+    unsigned step_at = unsigned(beats * 4) % step_count;
+    for (unsigned step = 0; step < step_count; ++step) lights.step(step, step == step_at ? colour::white : colour::off);
+}
+
 // ---------------------------------------------------------------- screen thread
 
 void MelodeeApp::draw(juce::Graphics& g) {
@@ -347,11 +469,17 @@ void MelodeeApp::draw(juce::Graphics& g) {
     auto& studio = *own;
     auto now = Clock::now();
     Screen* top = studio.top();
+    if (studio.opening) { // a project opening: its name, how far
+        ui::system::loading(g, studio.opening_name, studio.opening_samples_done, studio.opening_samples, studio.opening_synths_done,
+                            studio.opening_synths, studio.opening_file);
+        return;
+    }
     if (studio.typing) draw_typing(g);
     else if (holding() && now < volume_until) draw_volume(g);
     else if (holding() && now - held_at >= hold_shown && tracks()) tracks()->draw(g);
     else if (top && touched >= 0 && now < touched_until && !top->knob(unsigned(touched)).name.empty()) draw_touched(g);
     else if (top) top->draw(g);
+    if (studio.dirty && !studio.typing) ui::system::unsaved_mark(g); // Melodee's UNSAVED: changes not saved yet
     if (now < studio.message_until) {
         ui::sheet(g, {ui::content_x, ui::detail_y - 2, ui::content_width, 10});
         move::draw_text_centred(g, ui::content_x, ui::detail_y, ui::content_width, studio.message);
@@ -374,24 +502,48 @@ void MelodeeApp::draw_volume(juce::Graphics& g) {
 
 void MelodeeApp::draw_typing(juce::Graphics& g) {
     auto& studio = *own;
-    move::draw_text(g, 1, 1, upper(studio.typing_title.empty() ? "TEXT" : studio.typing_title).substr(0, 21));
-    g.fillRect(0, 10, ui::width, 1);
-    std::string line = studio.typed + "_";
-    if (line.size() > 21) line = line.substr(line.size() - 21);
-    move::draw_text(g, 1, 24, line);
-    move::draw_text(g, 1, 46, "PADS: LETTERS");
-    move::draw_text(g, 1, 56, "PUSH: OK  BACK: DEL");
+    // The name sheet: the strip around the key in the box, seven at a time.
+    const auto& keys = strip();
+    int picked = std::clamp(studio.typing_strip, 0, int(keys.size()) - 1);
+    int first = std::clamp(picked - 3, 0, int(keys.size()) - 7);
+    std::vector<std::string> shown;
+    for (int n = first; n < first + 7; ++n) shown.push_back(keys[size_t(n)].size() == 1 && studio.shift ? upper(keys[size_t(n)]) : keys[size_t(n)]);
+    ui::system::name_sheet(g, upper(studio.typing_title.empty() ? "TEXT" : studio.typing_title), studio.typed, studio.typing_room, shown,
+                           size_t(picked - first), studio.shift);
 }
 
 // ---------------------------------------------------------------- service thread, and the rest
 
-void MelodeeApp::service() { own->service(); }
+void MelodeeApp::service() {
+    own->service();
+    // The usage log: a file each start, written whole every ten seconds while there is more.
+    std::string text;
+    {
+        std::lock_guard<std::mutex> guard(own->lock);
+        auto now = Clock::now();
+        if (usage.size() == usage_written || now - usage_at < std::chrono::seconds(10)) return;
+        usage_at = now;
+        usage_written = usage.size();
+        text = usage;
+    }
+    std::error_code error;
+    auto folder = std::filesystem::path(own->home_folder()) / "Usage";
+    std::filesystem::create_directories(folder, error);
+    auto file = (folder / ("usage-" + std::to_string(started_unix) + ".txt")).string();
+    write_whole(file, text.data(), text.size());
+    give_to_owner_of(file, own->home_folder());
+}
 
 std::string control_path(const std::string& home) {
     std::error_code error;
     std::string folder = !home.empty() ? home : std::filesystem::is_directory("/data/UserData", error) ? "/data/UserData/Melodee" : "Melodee";
     std::filesystem::create_directories(folder, error);
     return (std::filesystem::path(folder) / "melodee-move.sock").string();
+}
+
+bool MelodeeApp::finished() const {
+    std::lock_guard<std::mutex> guard(own->lock);
+    return own->quit;
 }
 
 std::string MelodeeApp::command(const std::string& line) {

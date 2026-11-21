@@ -927,6 +927,7 @@ void test_synth_track() {
         tap_pad(second, 25);                                   // b
         tap_pad(second, 26);                                   // c
         tap_step(second, 0);                                   // 1
+        second.surface(make_event(0xb0, main_knob_cc, 63));   // the strip to its end, OK (the Move's own typing)
         press(second, Button::MainPush);                       // done
         CHECK(has(second.status(), "typing=0"));
         loudest(second, 1); // the page's sets reach the module

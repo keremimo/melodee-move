@@ -112,6 +112,9 @@ public:
     // A module that finished loading as a step left it (a project opened, a
     // track copied, an undo): what it reads back is the baseline, no step.
     void settle(unsigned track, const ModuleState& state) { if (track < base_modules.size()) base_modules[track] = state; }
+    // A sample slot as reading its file filled it in (its length): the
+    // baseline's too, no step.
+    void settle_sample(unsigned slot, const melodee::SampleRef& ref) { base->samples.edit(slot) = ref; }
     // Every slot a step could bring back (a save frees only the others).
     void slots_in_use(std::vector<bool>& used) const;
     // The baseline's bytes of the project, for the tests.

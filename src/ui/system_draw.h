@@ -6,8 +6,8 @@
 #include <string_view>
 #include <vector>
 
-// The screens of projects, Setup, undo, naming, the Menu and the lessons
-// (docs/UI.md, "Projects and system"), drawn from plain data: the mockups
+// The screens of projects, Setup, undo and naming (docs/UI.md, "Projects
+// and system"), drawn from plain data: the mockups
 // (mockups_projects.cpp) draw them with an example, the app's screens
 // (src/app/screens/) with what is there, so a screen is its mockup.
 namespace ui::system {
@@ -98,17 +98,5 @@ struct About {
     std::string version;
 };
 void about(juce::Graphics& g, const About& about);
-
-// ---------------------------------------------------------------- the Menu and lessons
-
-// GO: sixteen places laid out as the left 16 pads (Melodee's order, bottom
-// left first, rows of four), the one picked inverted; the detail line how
-// it opens without the Menu.
-void menu_go(juce::Graphics& g, const std::array<std::string, 16>& places, int picked, std::string_view shortcut);
-// HERE: the screen's own jobs, the detail line the picked one's shortcut.
-void menu_here(juce::Graphics& g, const std::vector<std::string>& jobs, int picked, std::string_view shortcut);
-
-void lesson(juce::Graphics& g, std::string_view title, unsigned step, unsigned steps, std::string_view line1,
-            std::string_view line2, std::string_view detail);
 
 } // namespace ui::system

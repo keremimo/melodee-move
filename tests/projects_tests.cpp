@@ -198,11 +198,223 @@ void test_undo_app() {
     CHECK(studio.tempo() == 1200);
 }
 
+// ---------------------------------------------------------------- projects, Setup, track options
+
+void tap_step(App& app, unsigned step) {
+    app.surface(make_event(0x90, step_note(step), 127));
+    app.surface(make_event(0x80, step_note(step), 0));
+}
+void shift_step(App& app, unsigned step) { with(app, Button::Shift, [&] { tap_step(app, step); }); }
+unsigned overview_pad(unsigned slot) { return (3 - slot / 8) * 8 + slot % 8; } // the Set Overview's: the top row first
+
+void test_projects() {
+    std::string folder = "build/test-samples", loop = folder + "/loop.wav", home = "build/test-home-projects";
+    std::filesystem::create_directories(folder);
+    std::filesystem::remove_all(home);
+    CHECK(write_test_loop(loop));
+    app::MelodeeApp melodee(folder, home);
+    Session session;
+    melodee.attach(session);
+    auto status = [&] { return melodee.status(); };
+    CHECK(melodee.save_now().empty());
+    CHECK(has(status(), " project=Move "));
+
+    // Shift + Step 1: the projects, read by the service thread.
+    shift_step(melodee, 0);
+    CHECK(has(status(), "page=projects"));
+    melodee.service();
+    CHECK(has(status(), "overview_items=1 ") && has(status(), "overview_item=Move"));
+    // An empty pad, then Back: a new project there.
+    tap_pad(melodee, overview_pad(1));
+    press(melodee, Button::Back);
+    melodee.service();
+    CHECK(has(status(), " project=Project_1 ") && has(status(), "page=kit-play"));
+    CHECK(std::filesystem::exists(home + "/Projects/Project 1.mldp"));
+    CHECK(has(status(), " undo=0 ")); // a project opened: nothing to undo
+
+    // Back to Move: pick it, a track button opens it.
+    shift_step(melodee, 0);
+    melodee.service();
+    CHECK(has(status(), "overview_items=2 ") && has(status(), "overview_item=Project_1"));
+    tap_pad(melodee, overview_pad(0));
+    press(melodee, Button::Row1);
+    melodee.service();
+    CHECK(has(status(), " project=Move ") && has(status(), "track=1 "));
+
+    // Its options (the wheel's push): Rename, typed the Move's way.
+    shift_step(melodee, 0);
+    melodee.service();
+    press(melodee, Button::MainPush);
+    CHECK(has(status(), "page=project-options"));
+    turn_wheel(melodee, 2); // SAVE, SAVE AS NEW, RENAME
+    press(melodee, Button::MainPush);
+    CHECK(has(status(), "typing=1"));
+    tap_pad(melodee, 24);   // a
+    turn_wheel(melodee, 63); // the strip's end: OK
+    press(melodee, Button::MainPush);
+    CHECK(has(status(), "typing=0"));
+    melodee.service();
+    CHECK(has(status(), " project=Movea "));
+    CHECK(std::filesystem::exists(home + "/Projects/Movea.mldp") && !std::filesystem::exists(home + "/Projects/Move.mldp"));
+
+    // Delete + Project 1's pad asks; the pad again deletes it.
+    with(melodee, Button::Delete, [&] { tap_pad(melodee, overview_pad(1)); });
+    CHECK(has(status(), "page=question"));
+    tap_pad(melodee, overview_pad(1));
+    melodee.service();
+    CHECK(!std::filesystem::exists(home + "/Projects/Project 1.mldp"));
+    CHECK(has(status(), "overview_items=1 "));
+    // Copy + Movea's pad, then an empty pad: a copy there.
+    with(melodee, Button::Copy, [&] { tap_pad(melodee, overview_pad(0)); });
+    tap_pad(melodee, overview_pad(5));
+    melodee.service();
+    CHECK(std::filesystem::exists(home + "/Projects/Movea 2.mldp"));
+    CHECK(has(status(), "overview_items=2 "));
+    press(melodee, Button::Back); // the copy picked: Back opens it
+    melodee.service();
+    CHECK(has(status(), " project=Movea_2 "));
+
+    // Load kit: Movea's first kit onto this one's track 1, one undo.
+    shift_step(melodee, 0);
+    melodee.service();
+    press(melodee, Button::Back); // the open one picked: out
+    CHECK(melodee.load_now(loop, 0).empty());
+    melodee.studio().close_step("LOAD A01");
+    {
+        std::lock_guard<std::mutex> guard(melodee.studio().lock);
+        melodee.studio().ask_projects({});
+    }
+    melodee.service();
+    CHECK(melodee.studio().save_project().empty());
+    // A new project, then Movea 2's kit onto it.
+    shift_step(melodee, 0);
+    melodee.service();
+    tap_pad(melodee, overview_pad(9));
+    press(melodee, Button::Back);
+    melodee.service();
+    CHECK(has(status(), " project=Project_1 ") && !melodee.studio().project().tracks[0].pads[0].used());
+    {
+        std::lock_guard<std::mutex> guard(melodee.studio().lock);
+        app::Studio::ProjectJob kit;
+        kit.kind = app::Studio::ProjectJob::Kind::LoadKit;
+        kit.path = home + "/Projects/Movea 2.mldp";
+        melodee.studio().ask_projects(kit);
+    }
+    melodee.service();
+    CHECK(melodee.studio().project().tracks[0].pads[0].used());
+    CHECK(has(status(), "samples=1 "));
+    press(melodee, Button::Undo);
+    CHECK(!melodee.studio().project().tracks[0].pads[0].used());
+    CHECK(has(status(), "undo_last=LOAD_KIT"));
+}
+
+void test_setup_and_tracks() {
+    std::string folder = "build/test-samples", loop = folder + "/loop.wav", home = "build/test-home-setup";
+    std::filesystem::remove_all(home);
+    CHECK(write_test_loop(loop));
+    app::MelodeeApp melodee(folder, home);
+    Session session;
+    melodee.attach(session);
+    auto status = [&] { return melodee.status(); };
+    auto& studio = melodee.studio();
+
+    // Setup: PADS > RESPONSE, edited with the wheel, kept by a push.
+    shift_step(melodee, 1);
+    CHECK(has(status(), "page=setup") && has(status(), "setup_level=0"));
+    press(melodee, Button::MainPush); // PADS
+    CHECK(has(status(), "setup_level=1"));
+    press(melodee, Button::MainPush); // RESPONSE: editing
+    CHECK(has(status(), "setup_editing=1"));
+    turn_wheel(melodee, 1);
+    press(melodee, Button::MainPush);
+    CHECK(studio.settings.response == 2 && has(status(), "setup_editing=0"));
+    turn_wheel(melodee, 1);
+    press(melodee, Button::MainPush); // PRESSURE: two values, flipped at once
+    CHECK(!studio.settings.pressure);
+    press(melodee, Button::Back);
+    CHECK(has(status(), "setup_level=0"));
+    turn_wheel(melodee, 2);           // FEATURES (PADS, LIGHTS, FEATURES): Basic
+    press(melodee, Button::MainPush);
+    CHECK(!studio.settings.full);
+    CHECK(melodee.save_now().empty());
+    {   // Kept in Move.settings.
+        app::MelodeeApp again(folder, home);
+        CHECK(again.studio().settings.response == 2 && !again.studio().settings.pressure && !again.studio().settings.full);
+    }
+    turn_wheel(melodee, 2);           // ABOUT
+    press(melodee, Button::MainPush);
+    CHECK(has(status(), "page=about"));
+    press(melodee, Button::Back);
+    turn_wheel(melodee, 1);           // BACK TO MOVE
+    press(melodee, Button::MainPush);
+    CHECK(melodee.finished());
+    studio.quit = false;
+    press(melodee, Button::Back);
+
+    // Track options: Shift + track button 2, its colour, undone.
+    with(melodee, Button::Shift, [&] { press(melodee, Button::Row2); });
+    CHECK(has(status(), "page=track-options") && has(status(), "options_track=2"));
+    press(melodee, Button::MainPush); // COLOUR: editing
+    turn_wheel(melodee, 3);
+    press(melodee, Button::MainPush);
+    CHECK(studio.extras().track_colour[1] != 0 && studio.colour_of(1).bright == studio.extras().track_colour[1]);
+    press(melodee, Button::Back);
+    press(melodee, Button::Undo);
+    CHECK(studio.extras().track_colour[1] == 0);
+    // Its name, typed.
+    with(melodee, Button::Shift, [&] { press(melodee, Button::Row2); });
+    turn_wheel(melodee, 1);
+    press(melodee, Button::MainPush); // NAME
+    CHECK(has(status(), "typing=1"));
+    for (int n = 0; n < 8; ++n) press(melodee, Button::Back); // "SYNTH 2" deleted
+    tap_pad(melodee, 24); tap_pad(melodee, 25);              // "ab"
+    turn_wheel(melodee, 63);
+    press(melodee, Button::MainPush);
+    CHECK(std::string(studio.project().tracks[1].name) == "ab");
+    press(melodee, Button::Undo);
+    CHECK(std::string(studio.project().tracks[1].name) == "SYNTH 2");
+
+    // Moving track 1 (the kit) to 3: trading places with nothing.
+    down(melodee, Button::Row1);
+    down(melodee, Button::Shift);
+    down(melodee, Button::Copy);
+    tap_step(melodee, 0);
+    tap_step(melodee, 2);
+    up(melodee, Button::Copy);
+    up(melodee, Button::Shift);
+    up(melodee, Button::Row1);
+    CHECK(studio.kind(2) == app::TrackKind::Kit && studio.kind(0) == app::TrackKind::Empty);
+    press(melodee, Button::Undo);
+    CHECK(studio.kind(0) == app::TrackKind::Kit && studio.kind(2) == app::TrackKind::Empty);
+
+    // Delete + knob 1's touch: no motion, so its value back to its start.
+    studio.select(0);
+    CHECK(melodee.load_now(loop, 0).empty());
+    turn_knob(melodee, 0, 5);
+    CHECK(studio.project().tracks[0].pads[0].pitch == 5);
+    with(melodee, Button::Delete, [&] { melodee.surface(make_event(0x90, 0, 127)); melodee.surface(make_event(0x80, 0, 0)); });
+    CHECK(studio.project().tracks[0].pads[0].pitch == 0);
+    press(melodee, Button::Undo);
+    CHECK(studio.project().tracks[0].pads[0].pitch == 5);
+
+    // The light show on: the pads follow it, not the kit.
+    studio.settings.light_show = true;
+    studio.settings.show_style = 4; // Levels: silent, every pad dark
+    Lights lights;
+    melodee.lights(lights, App::Clock::now());
+    CHECK(lights.pad_wanted(0) == 0);
+    studio.settings.light_show = false;
+    melodee.lights(lights, App::Clock::now());
+    CHECK(lights.pad_wanted(0) != 0); // A01 holds the loop
+}
+
 } // namespace
 
 int main() {
     test_history();
     test_undo_app();
+    test_projects();
+    test_setup_and_tracks();
     std::cout << "projects-tests: " << checks - failures << "/" << checks << " checks passed\n";
     return failures ? 1 : 0;
 }

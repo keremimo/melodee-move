@@ -526,6 +526,9 @@ CanvasPage::Host Studio::canvas_host(unsigned t) {
     host.text_entry = [this, t](const std::string& title, const std::string& initial) {
         auto* module = module_track(t);
         typing = true;
+        typing_done = nullptr; // the page's: Studio::finish_typing() hands it the text
+        typing_room = 120;
+        typing_strip = 0;
         typed = initial;
         typing_title = title;
         typing_track = int(t);
@@ -553,9 +556,55 @@ CanvasPage::Host Studio::canvas_host(unsigned t) {
     return host;
 }
 
+void Studio::ask_name(std::string title, std::string initial, size_t room, std::function<void(const std::string&)> done) {
+    typing = true;
+    typed = std::move(initial);
+    typing_title = std::move(title);
+    typing_track = typing_canvas = -1;
+    typing_room = room;
+    typing_strip = 0;
+    typing_done = std::move(done);
+    pads_typing.store(true);
+}
+
+void Studio::ask(Question question) {
+    asked = std::move(question);
+    push("question");
+}
+
+ui::TrackColour Studio::colour_of(unsigned t) const {
+    t %= melodee::track_count;
+    uint8_t own = move_extras.track_colour[t];
+    if (!own) return ui::track_colour(t);
+    for (const auto& colour : ui::track_colours)
+        if (colour.bright == own) return colour; // one of the sixteen: its dim one too
+    return {own, own};
+}
+
+bool Studio::move_track(unsigned from, unsigned to) {
+    from %= melodee::track_count;
+    to %= melodee::track_count;
+    if (from == to || !song->tracks[from].used()) return false;
+    std::swap(song->tracks[from], song->tracks[to]);   // whole: mix strip too
+    std::swap(bank->at[from], bank->at[to]);
+    std::swap(modules[from], modules[to]);             // each module keeps its entry: the track names it
+    std::swap(move_extras.track_colour[from], move_extras.track_colour[to]);
+    apply_track(from);
+    apply_track(to);
+    if (selected == from || selected == to) select(selected == from ? to : from);
+    changed();
+    return true;
+}
+
 void Studio::finish_typing(bool cancelled) {
     typing = false;
     pads_typing.store(false);
+    if (auto done = std::move(typing_done); done) { // the name sheet's
+        typing_done = nullptr;
+        typing_track = typing_canvas = -1;
+        if (!cancelled) done(typed);
+        return;
+    }
     auto* module = typing_track >= 0 ? module_track(unsigned(typing_track)) : nullptr;
     int index = typing_canvas;
     typing_canvas = typing_track = -1;
@@ -870,7 +919,10 @@ unsigned Studio::read_missing_samples() {
         ++opening_samples_done;
         if (!sample) { ++missing; continue; }
         if (!engine->offer_sample(slot, sample->data.get())) { ++missing; continue; }
-        if (song->samples[slot].frames != sample->data->model_frames()) song->samples.edit(slot).frames = sample->data->model_frames();
+        if (song->samples[slot].frames != sample->data->model_frames()) {
+            song->samples.edit(slot).frames = sample->data->model_frames();
+            history.settle_sample(slot, song->samples[slot]); // read, not edited: no step
+        }
         if (slot >= samples.size()) samples.resize(slot + 1);
         samples[slot] = std::move(sample);
     }
@@ -1477,7 +1529,18 @@ void Studio::run_project_job(const ProjectJob& job) {
     };
     switch (job.kind) {
     case Kind::List: break;
-    case Kind::Open: failed = open_project(job.path); break;
+    case Kind::Open: {
+        bool already = false;
+        {
+            std::lock_guard<std::mutex> guard(lock);
+            already = job.path == path;
+        }
+        if (!already) failed = open_project(job.path);
+        std::lock_guard<std::mutex> guard(lock);
+        if (failed.empty() && job.track >= 0) select(unsigned(job.track));
+        if (failed.empty() && job.play && !engine->playing()) play();
+        break;
+    }
     case Kind::New: {
         auto folder = folder_path();
         auto file = projects::path_for(folder, projects::free_name(folder, "Project"));
@@ -1485,6 +1548,8 @@ void Studio::run_project_job(const ProjectJob& job) {
         if (failed.empty()) {
             if (job.pad >= 0) projects::keep_pad(folder, fs::path(file).filename().string(), job.pad);
             failed = save_project();
+            std::lock_guard<std::mutex> guard(lock);
+            if (job.track >= 0) select(unsigned(job.track));
         }
         break;
     }
@@ -1569,6 +1634,8 @@ void Studio::run_project_job(const ProjectJob& job) {
         break;
     }
     }
+    // A project opened: its samples and modules read now, the Loading sheet up meanwhile.
+    if (job.kind == Kind::Open || job.kind == Kind::New) restore();
     // Saved before the folder is read, so the open one shows as it is.
     if (job.kind != Kind::List && job.kind != Kind::Open && job.kind != Kind::New && job.kind != Kind::Save) {
         bool unsaved = false;

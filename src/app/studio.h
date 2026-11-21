@@ -3,6 +3,8 @@
 #include "app/canvas_page.h"
 #include "app/history.h"
 #include "app/projects.h"
+#include "ui/track_style.h"
+#include <functional>
 #include "app/module_host.h"
 #include "app/project_store.h"
 #include "move/app.h"
@@ -170,6 +172,12 @@ public:
     bool new_track(unsigned track, TrackKind kind);
     void delete_track(unsigned track);
     bool copy_track(unsigned from, unsigned to); // `to` replaced
+    // Melodee's Move: `from` goes to `to`, a track there trading places, mix
+    // strip, module, colour and patterns with it. Nothing is lost.
+    bool move_track(unsigned from, unsigned to);
+    // A track's colour on the lights: its own (track options) or the
+    // track's place's (ui/track_style.h).
+    ui::TrackColour colour_of(unsigned track) const;
     ModuleTrack* module_track(unsigned track);
     ModuleTrack* module_track() { return module_track(selected); }
     int octave(unsigned track) const; // the bottom-left pad's octave on a note track (0: C2)
@@ -218,6 +226,29 @@ public:
     std::string typed, typing_title;
     int typing_canvas = -1, typing_track = -1;
     void finish_typing(bool cancelled);
+    // The name sheet (the Move's typing): `done` gets the text unless it is
+    // cancelled (Back held). Under `lock`.
+    void ask_name(std::string title, std::string initial, size_t room, std::function<void(const std::string&)> done);
+    std::function<void(const std::string&)> typing_done;
+    size_t typing_room = 120;
+    int typing_strip = 0; // the strip's character in the box (ui::system::name_sheet)
+
+    // The question before a loss (Melodee's one sheet): what is asked, what
+    // goes, whether undo brings it back. `yes` runs on a push (or the pad
+    // asked about, pressed again); Back or anything else leaves it.
+    struct Question {
+        std::string rail_top, rail_big, rail_bottom, asked, line1, line2;
+        bool undoable = false;
+        std::string yes_key = "PUSH YES";
+        int pad = -1; // a pad that says yes too (the Move's Delete + pad, again)
+        std::function<void()> yes;
+    };
+    void ask(Question question);
+    Question asked;
+    bool quit = false; // Setup's Back to Move: the runtime ends, Ableton's app comes back
+    unsigned options_track = 0; // whose options Shift + a track button opened
+    // How the Move is doing, for Setup's About (MelodeeApp fills it from the runtime's session).
+    struct Machine { float cpu_percent = 0; unsigned peak_us = 0; unsigned late = 0; std::string version; } machine;
     unsigned slow_calls = 0; // calls into a module that held the audio thread 1 ms or more
     uint32_t slowest_us = 0;
 
@@ -276,6 +307,8 @@ public:
         std::string path, name;  // the project or folder; a name, a folder (MoveTo), the target (Copy)
         int pad = -1;            // where a new one lies
         uint8_t colour = 0;
+        bool play = false;       // Open: and play it (the overview's Play, the Move's preview)
+        int track = -1;          // Open, New: then this track, on Play (a track button opened it)
     };
     void ask_projects(ProjectJob job);
     std::string projects_root() const;           // <home>/Projects
