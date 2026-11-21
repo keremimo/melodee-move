@@ -138,6 +138,10 @@ Schwung's footer on the detail line (`JOG PAGE CLK MENU`, `CLK ENTER`,
 - Back: the peek, the picker, an entered door, one at a time, then out to
   the Device View on the module. A locked Shift is a held Shift here, and
   Back stays Back.
+- Turning a text parameter's knob opens its keyboard too (Kerem,
+  2026-11-21; under Schwung a turn there does nothing), so trying the knobs
+  finds it on a page that draws instead of showing knobs (Schimera's Line:
+  knob 3, Lyrics).
 - A page the module draws (Webstream's Browse, Schimera's mouth and lyrics)
   is one of its pages, drawn in place in the band under the strip; an
   enterable one is a door like any other.

@@ -1013,6 +1013,13 @@ void test_schwung_pages() {
     run.pages->text_entered("hello", false);
     run.frames(2);
     CHECK(run.module->get_now("searched") == "hello");
+    // Turning a text parameter's knob opens its keyboard too (Kerem,
+    // 2026-11-21), once for the whole turn.
+    for (int n = 0; n < 3; ++n) run.cc(73, 1);
+    CHECK((run.keyboards == std::vector<std::string> {"Words", "Words"}));
+    run.pages->text_entered("again", false);
+    run.frames(2);
+    CHECK(run.module->get_now("searched") == "again");
 }
 
 void test_schwung_modules() {

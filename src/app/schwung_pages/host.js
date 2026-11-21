@@ -215,6 +215,23 @@ function refreshTrailingIfChanged() {
     if (now !== trailingText) controller.refreshTrailing();
 }
 
+// A turn on a cell that cannot be turned (Schwung's io.turnDoor). A text
+// parameter (Schimera's Lyrics): its keyboard opens (Kerem, 2026-11-21: so
+// trying the knobs finds it; under Schwung a turn there does nothing, the
+// held knob and the click being its only way in, which stays). Once, while
+// the keyboard is up: a turn's further detents do not open it again.
+function openText(key, meta) {
+    if (pendingText || !ctx) return;
+    pendingText = key;
+    ctx.openTextEntry({ title: (meta && (meta.label || meta.name)) || key, initial: getParam(PREFIX + ":" + key) || "" });
+}
+function turnDoor(fullKey, direction, slot, held, info) {
+    const meta = info && info.meta;
+    if (!meta || meta.type !== "string") return false;
+    openText(info.key || bare(fullKey), meta);
+    return true;
+}
+
 function ensure() {
     if (controller || !ctx) return;
     moduleDir = ctx.getParam("melodee:module_dir");
@@ -234,6 +251,7 @@ function ensure() {
         heldStep: () => -1, deleteHeld: () => false, sceneArmed: () => false, heldStepIsHold: () => false,
         canvasPageHook,
         trailingMenus,
+        turnDoor,
     });
     controller.load({ slot: 0, component: PREFIX, prefix: PREFIX, visible, paginate: true });
     controller.setLayout(lib.LAYOUT_MOVY || "movy");
@@ -409,11 +427,7 @@ function take(todo) {
         enumPicker = { key, title: String(title), options: todo.options.map(String), index: todo.index || 0 };
         return;
     }
-    if (meta.type === "string") {
-        pendingText = key;
-        ctx.openTextEntry({ title, initial: getParam(PREFIX + ":" + key) || "" });
-        return;
-    }
+    if (meta.type === "string") { openText(key, meta); return; }
     if (meta.type === "canvas" || meta.canvas_script) {
         opened = { key, script: meta.canvas_script || "canvas.js", enterable: true };
         return;

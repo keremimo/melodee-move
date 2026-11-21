@@ -20,6 +20,10 @@ Melodee for Ableton Move as Schwung's module catalog installs it
   Schwung's own presets. The Module page has the module's help, Swap, Remove
   and Auto Sample.
 - With Shift locked (a double press), Back works again.
+- A module's text, such as Schimera's Lyrics, opens the keyboard when its knob
+  is turned (knob 3 on Line and Play), as well as with its knob held and the
+  wheel pushed. Sections and the other lists no longer draw over a page the
+  module draws.
 - A Schwung module's pages follow what the module declares, as under
   Schwung: its pages shown or hidden as it asks (Schimera's Vowel pages in
   Vowel mode), its presets page and lists, and a text parameter opens the
