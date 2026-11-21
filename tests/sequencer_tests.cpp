@@ -762,6 +762,31 @@ void test_more(app::MelodeeApp& melodee) {
     h.button(Button::Delete); // the note in focus erased
     CHECK(p.events.size() == 2);
     h.button(Button::Back);
+    // A chord pad (a note track's chord or Keys & Scale pad, which instruments' audio path stamps): every key recorded.
+    {
+        p = melodee::Pattern {};
+        seqr.sync(0, 30);
+        h.button(Button::Play);
+        h.render(20);
+        h.button(Button::Rec);
+        h.render(2);
+        auto& stamp = const_cast<app::Studio::PadStamp&>(melodee.studio().stamp(7));
+        const int chord[3] {60, 64, 67};
+        stamp.track.store(0);
+        stamp.key.store(chord[0]);
+        for (unsigned k = 0; k < 3; ++k) stamp.keys[k].store(chord[k]);
+        stamp.count.store(3);
+        stamp.velocity.store(90);
+        stamp.position.store(48);
+        stamp.ticks.store(melodee.studio().host().ticks());
+        stamp.sounded.store(true);
+        melodee.surface(make_event(0x90, pad_note(7), 90)); // the MIDI thread's side alone: the stamp stands as set
+        CHECK(seq::notes_in(p, seq::step_span(p, 2)).size() == 3);
+        melodee.surface(make_event(0x80, pad_note(7), 0));
+        h.button(Button::Rec);
+        h.button(Button::Play);
+        h.render(2);
+    }
     // To Pads PATTERN (for Chop's sheet): a note a slice, where it falls.
     seqr.slices_to_pattern(4, {0, 1000, 3000}, 4000);
     auto at = seq::notes_in(p, {0, p.length}, 40);

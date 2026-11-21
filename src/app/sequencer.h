@@ -206,7 +206,8 @@ private:
     bool any_written = false;
     struct HeldNote { int key = -1; unsigned track = 0, number = 0; uint32_t tick = 0, since = 0; };
     std::array<HeldNote, 32> held_notes {};
-    std::array<int, move::pad_count> pad_keys {}; // what each pad played (its key), -1 none
+    std::array<int, move::pad_count> pad_keys {}; // what each pad played (its first key), -1 none
+    std::array<std::vector<int>, move::pad_count> pad_chords; // and all its keys (a chord pad's)
     std::array<int, move::pad_count> pad_tracks {};
     std::vector<uint8_t> keys_down; // a note track's keys held, for a step's chord
     bool click_now = false;

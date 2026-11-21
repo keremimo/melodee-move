@@ -242,10 +242,15 @@ public:
     // key it went to (also when the press stayed quiet), how hard, where the
     // track's pattern was, and whether it sounded. Seq Record writes the
     // note at the tick it was heard; a step held + the pad adds that key.
+    // A pad that plays a chord (a note track's chord or Keys & Scale pad)
+    // stamps each of its keys, `key` the first.
     struct PadStamp {
+        static constexpr unsigned most = 8; // melodee::notes_per_step
         std::atomic<int> track {-1}, key {-1}, velocity {0}, position {-1};
         std::atomic<uint32_t> ticks {0};
         std::atomic<bool> sounded {false};
+        std::array<std::atomic<int>, most> keys {}; // keys[0..count)
+        std::atomic<unsigned> count {0};
     };
     const PadStamp& stamp(unsigned pad) const { return stamps[pad % pad_count]; }
     // MIDI thread: the track the pads play repeats its keys (1, Note Repeat)
