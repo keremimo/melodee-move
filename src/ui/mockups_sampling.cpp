@@ -279,7 +279,7 @@ std::vector<Screen> sampling_screens() {
             rail(g, "SLC", "16", "PADS");
             move::draw_text(g, content_x + 1, 1, "16 SLICES TO PADS");
             list(g, content(11, 36), {"POLY", "MONO", "THRU", "KIT", "PATTERN ON"}, 4, 1);
-            detail(g, "A NOTE A SLICE", "FLIP");
+            detail(g, "NOTES TOO", "FLIP");
         }},
         {"audio-input", "AUDIO TRACK: SAMPLING OPENS ITS INPUT", [](juce::Graphics& g) {
             rail(g, "AUD", "3", "IN");

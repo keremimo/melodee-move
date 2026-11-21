@@ -17,6 +17,7 @@
 #include "move/controls.h"
 #include "move/app.h"
 #include "move/audio.h"
+#include "move/display.h"
 #include "move/tools.h"
 #include <chrono>
 #include <thread>
@@ -723,6 +724,22 @@ void test_screens() {
 
 } // namespace
 
+// The screen as the Move shows it, into build/instruments-screens/NAME.png (four times its size), to look at.
+void snap(app::MelodeeApp& app, const std::string& name) {
+    juce::Image image(juce::Image::ARGB, move::screen_width, move::screen_height, true);
+    {
+        juce::Graphics g(image);
+        g.fillAll(juce::Colours::black);
+        g.setColour(juce::Colours::white);
+        app.draw(g);
+    }
+    fs::create_directories("build/instruments-screens");
+    auto file = juce::File::getCurrentWorkingDirectory().getChildFile(juce::String("build/instruments-screens/" + name + ".png"));
+    file.deleteFile();
+    juce::FileOutputStream output(file);
+    if (output.openedOk()) juce::PNGImageFormat().writeImageToStream(move::frame_image(move::pack(image), 4), output);
+}
+
 void test_kit_instrument() {
     // An instrument on a kit pad (Melodee's SFZ on a pad): loaded as a sample is, its files landing, a hit playing key 60
     // plus the pad's Semi (here the SFZ's second zone); the pad's TRIM page is ZONES there, a zone walked and trimmed on
@@ -783,6 +800,8 @@ void test_kit_instrument() {
         CHECK(has(melodee.status(), "kit_zone=2"));
         knob(1, 7);  // ZONE TUNE +7 cents
         knob(2, -2); // ZONE LEVEL -1 dB
+        std::this_thread::sleep_for(std::chrono::milliseconds(2500)); // the knob's big view and the message gone
+        snap(melodee, "kit-zones");
         {
             std::lock_guard<std::mutex> guard(studio.lock);
             const auto& kit = studio.project().tracks[0];

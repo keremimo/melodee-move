@@ -614,7 +614,7 @@ public:
         ui::list(g, ui::content(11, 36),
                  {to_pads_names[0], to_pads_names[1], to_pads_names[2], to_pads_names[3], pattern ? "PATTERN ON" : "PATTERN OFF"}, how, 1);
         unsigned first = chop().first_empty();
-        ui::detail(g, how == to_pads_pattern ? (pattern ? "A NOTE A SLICE" : "PADS ONLY") : first < pad_count ? "FROM " + pad_label(first) : "NO EMPTY PADS",
+        ui::detail(g, how == to_pads_pattern ? (pattern ? "NOTES TOO" : "PADS ONLY") : first < pad_count ? "FROM " + pad_label(first) : "NO EMPTY PADS",
                    how == to_pads_pattern ? "FLIP" : "PUSH");
     }
     std::string status() const override { return " to_pads=" + std::to_string(how) + " to_pads_pattern=" + std::to_string(int(pattern)); }
