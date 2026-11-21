@@ -137,7 +137,7 @@ def check(asset, version):
         if member.mode & 0o7000:
             problems.append(f"{relative}: setuid, setgid or sticky")
     for required in EXECUTABLES + ("bin/melodee-move", "bin/realtime-helper", "help.json", "SOURCE.txt",
-                                    "licenses/LICENSE-AGPL-3.0.txt", "licenses/THIRD_PARTY.md"):
+                                    "licenses/LICENSE-AGPL-3.0.txt", "licenses/THIRD_PARTY.md", "licenses/ellic-core-LICENSE.txt"):
         if required not in files:
             problems.append(f"no {required}")
     if "help.json" in files:

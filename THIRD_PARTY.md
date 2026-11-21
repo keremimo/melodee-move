@@ -2,6 +2,7 @@
 
 | Part | Where | Licence |
 | --- | --- | --- |
+| [ellic-core](https://github.com/keremimo/ellic-core) (Kerem Kilic, Ellic Studio): Melodee's engine, model and shared files | the `core/` submodule, linked into the binary; its licence in `licenses/ellic-core-LICENSE.txt`, its sources in its own `THIRD_PARTY.md` | MIT |
 | [JUCE](https://github.com/juce-framework/JUCE) 9.0.5 (`juce_core`, `juce_events`, `juce_graphics`) | fetched to `build/deps/JUCE` by `tools/dependencies.py`, linked into the binary; its licence in `licenses/JUCE-LICENSE.md` | AGPLv3 (JUCE's open-source licence) |
 | GCC's libstdc++ and libgcc | linked into the binary statically | GPL-3.0 with the GCC Runtime Library Exception |
 | FreeType, Fontconfig, libpng, Brotli, libuuid, Expat, zlib | linked dynamically, through JUCE; copied from Ubuntu 22.04 into `dist/*/lib`, each with its package's copyright file in `licenses/lib/` | FreeType Licence; MIT-style; libpng; MIT; BSD-3-Clause; MIT; zlib |

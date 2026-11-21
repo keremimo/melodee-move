@@ -43,6 +43,7 @@ printf '<?xml version="1.0"?>\n<fontconfig></fontconfig>\n' > "$OUT/lib/fonts.co
 # are linked in, Rubik is carried by the web page (tools/web_bundle.py).
 cp LICENSE "$OUT/licenses/LICENSE-AGPL-3.0.txt"
 cp THIRD_PARTY.md "$OUT/licenses/THIRD_PARTY.md"
+cp core/LICENSE "$OUT/licenses/ellic-core-LICENSE.txt"
 cp build/deps/JUCE/LICENSE.md "$OUT/licenses/JUCE-LICENSE.md"
 cp build/deps/quickjs/LICENSE "$OUT/licenses/QuickJS-LICENSE.txt"
 cp build/deps/rubik/OFL.txt "$OUT/licenses/Rubik-OFL.txt"
