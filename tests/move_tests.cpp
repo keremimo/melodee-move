@@ -1522,6 +1522,76 @@ void test_chop_depth() {
     CHECK(has(melodee.status(), "page=kit-play"));
 }
 
+void test_audio_track() {
+    // An audio track (guide/audio-tracks.md): Sampling opens its INPUT, Rec
+    // arms it, Play records one pass of its pattern into "Move Audio/Take
+    // 001.wav", which the pattern then plays; its CLIP's level; the take back
+    // after a restart.
+    std::string folder = "build/test-samples", home = "build/test-home-audio";
+    std::filesystem::create_directories(folder);
+    std::filesystem::remove_all(home);
+    AudioBlock in {}, out {};
+    unsigned phase = 0;
+    Lights lights;
+    auto blocks = [&](app::MelodeeApp& melodee, int count, bool tone) {
+        int32_t peak = 0;
+        for (int block = 0; block < count; ++block) {
+            for (unsigned f = 0; f < audio_frames; ++f, ++phase) {
+                int32_t v = tone ? to_s32(0.4f * float(std::sin(6.2831853 * 220.0 * phase / 44100.0))) : 0;
+                in[2 * f] = in[2 * f + 1] = v;
+            }
+            out.fill(0);
+            melodee.render(in, out);
+            peak = std::max(peak, peak_of(out));
+            if (block % 16 == 0) { melodee.service(); melodee.lights(lights, App::Clock::now()); }
+        }
+        return peak;
+    };
+    {
+        app::MelodeeApp melodee(folder, home, "build/test-no-modules");
+        Session session;
+        melodee.attach(session);
+        melodee.audio_opened(AudioFormat {});
+        CHECK(melodee.restore_now().empty());
+        {
+            std::lock_guard<std::mutex> guard(melodee.studio().lock);
+            CHECK(melodee.studio().new_track(2, app::TrackKind::Audio));
+            melodee.studio().select(2);
+        }
+        melodee.surface(make_event(0xb0, audio_in_sense_cc, 127)); // a cable in: the line
+        CHECK(has(melodee.status(), "track=3 kind=audio") && has(melodee.status(), "page=audio-play"));
+        press_button(melodee, Button::Sample);
+        CHECK(has(melodee.status(), "page=audio-input"));
+        press_button(melodee, Button::Rec);
+        CHECK(has(melodee.status(), "audio_armed=1"));
+        blocks(melodee, 20, true);
+        press_button(melodee, Button::Play); // one pass of the pattern (a bar, 2 s at 120 BPM) from its top
+        blocks(melodee, 200, true);
+        CHECK(has(melodee.status(), "audio_arm=-2")); // recording
+        blocks(melodee, 700, true);
+        for (int n = 0; n < 50; ++n) blocks(melodee, 1, false);
+        CHECK(std::filesystem::exists(home + "/Projects/Move Audio/Take 001.wav"));
+        press_button(melodee, Button::Back);
+        CHECK(has(melodee.status(), "page=audio-play") && has(melodee.status(), "take=1 "));
+        CHECK(blocks(melodee, 800, false) > to_s32(0.1f)); // the pattern plays its take, the input silent
+        melodee.surface(make_event(0xb0, knob_first_cc, 124)); // knob 1: the level 4 x 0.5 dB down
+        CHECK(has(melodee.status(), "take_gain=-20"));
+        press_button(melodee, Button::Play);
+        CHECK(melodee.save_now().empty());
+    }
+    {   // Again: the take read back for the pattern, and played.
+        app::MelodeeApp melodee(folder, home, "build/test-no-modules");
+        Session session;
+        melodee.attach(session);
+        melodee.audio_opened(AudioFormat {});
+        CHECK(melodee.restore_now().empty());
+        CHECK(has(melodee.status(), "kind=audio") && has(melodee.status(), "take=1 ") && has(melodee.status(), "take_gain=-20"));
+        blocks(melodee, 20, false);
+        press_button(melodee, Button::Play);
+        CHECK(blocks(melodee, 800, false) > to_s32(0.08f));
+    }
+}
+
 } // namespace
 
 int main() {
@@ -1544,6 +1614,7 @@ int main() {
     test_sampling();
     test_sample_files();
     test_chop_depth();
+    test_audio_track();
     std::cout << "move-tests: " << checks - failures << " of " << checks << " checks passed\n";
     return failures ? 1 : 0;
 }

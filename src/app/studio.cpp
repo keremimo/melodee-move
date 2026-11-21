@@ -2,6 +2,7 @@
 #include "app/studio.h"
 #include "app/sampling.h"
 #include "app/screen.h"
+#include "melodee/engine/audio_player.h"
 #include "melodee/engine/engine_info.h"
 #include "melodee/shell/sample_decode.h"
 #include <juce_core/juce_core.h>
@@ -745,6 +746,8 @@ void Studio::take_back() {
     while (engine->take_retired_pattern(pattern)) delete pattern;
     const melodee::SampleData* sample = nullptr;
     while (engine->take_retired(sample)) sampler_shell->retired(sample); // the samples are the studio's, kept for the run; a preview's goes
+    melodee::AudioPack* audio_pack = nullptr;
+    while (engine->take_done_audio(audio_pack)) delete audio_pack; // an audio track's takes, replaced (the takes' frames are Sampling's)
     melodee::MidiOutEvent out;
     while (engine->take_midi(out)) {} // MIDI out: not yet on the Move
     // A Schwung track's runner, handed back: its track can go now.

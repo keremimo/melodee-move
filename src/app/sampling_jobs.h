@@ -40,4 +40,14 @@ struct Sampling::Edit {
     int target = -1; // Extract: the pad it goes onto
 };
 
+// An audio track's take as it is written: "<project> Audio/Take NNN.wav.part" until whole.
+struct Sampling::AudioJob {
+    unsigned track = 0, take = 0;
+    std::string path; // the file it becomes
+    uint16_t tempo = 1200;
+    melodee::WavStream file;
+    bool open = false;
+    std::vector<float> left, right; // the take as it came (a pattern's pass at most)
+};
+
 } // namespace app

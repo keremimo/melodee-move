@@ -5,6 +5,7 @@
 #include <array>
 #include <chrono>
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -156,6 +157,31 @@ public:
     // The audio thread let go of a sample (EngineHost::take_retired): a preview's is freed.
     void retired(const melodee::SampleData* sample);
 
+    // ------------------------------------------------- an audio track's takes (audio_takes.cpp)
+    // Melodee's audio track (guide/audio-tracks.md) on the Move: Rec on its
+    // INPUT arms it (again: let go; while recording: ends, kept); the next
+    // pass of its pattern from the top is recorded (Play starts it when
+    // stopped), drained into "<project> Audio/Take NNN.wav" as it comes; that
+    // pattern plays it from then on. Its source is the input as the jack has
+    // it; its monitor heard while armed or recording. Takes are held in
+    // memory once read (a pattern's length at most), and each track's pack
+    // made again when a take's CLIP or WARP changes.
+    std::vector<Source> audio_sources() const;
+    void step_audio_source(unsigned track, int delta);
+    bool audio_armed(unsigned track) const { return audio_arm == int(track); }
+    int audio_recording() const;     // the track recording now, -1 none
+    void arm_audio(unsigned track);  // Rec: arms, lets go, or ends the take
+    void audio_changed(unsigned track); // its takes or their settings changed: its pack again
+    void restore_audio();             // every audio track's pack, once the project is read
+    struct TakeData {
+        std::vector<float> left, right;
+        unsigned rate = 44100;
+        std::vector<uint8_t> peaks; // the loudest of each 441 frames (44.1 kHz), as Melodee's take peaks
+    };
+    const TakeData* take_data(unsigned take) const;
+    std::vector<uint8_t> recording_peaks; // the take being recorded, for the screen
+    uint32_t recording_frames = 0;
+
     // ------------------------------------------------- service thread
     void service();
 
@@ -177,6 +203,16 @@ private:
     std::vector<std::unique_ptr<melodee::SampleData>> previews; // offered to the engine's preview slot, until handed back
     std::vector<std::string> deleting, to_install;
     bool lists_dirty = false;
+    // An audio track's take.
+    void service_audio(); // audio_takes.cpp
+    void send_pack(unsigned track);
+    int audio_arm = -1;
+    struct AudioJob;
+    std::unique_ptr<AudioJob> audio_job;
+    std::map<unsigned, std::unique_ptr<TakeData>> takes;   // by take number, kept for the run (packs point into them)
+    std::vector<unsigned> takes_wanted, packs_wanted;       // to read; tracks whose pack waits for them
+    int audio_quiet_sent = -1;
+    bool audio_restored = false;
 
     Studio& studio;
     bool input_known = false, line = false, to_speaker = true;

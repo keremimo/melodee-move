@@ -164,7 +164,7 @@ std::vector<Binding> make_table() {
         {"Shift + Play", S::Any, T::Any, H::shift, C::Play, G::Press, J::Restart, St::Done},
         {"Play (Overview)", S::Overview, T::Any, H::none, C::Play, G::Press, J::PreviewProject, St::Wave2, projects},
         {"Rec", S::Any, T::Any, H::none, C::Rec, G::Press, J::Record, St::Core},
-        {"Rec (Sampling)", S::Sampling, T::Audio, H::none, C::Rec, G::Press, J::RecordAudio, St::Wave2, sampling},
+        {"Rec (Sampling)", S::Sampling, T::Audio, H::none, C::Rec, G::Press, J::RecordAudio, St::Done},
 
         // Capture and Sampling
         {"Capture", S::Any, T::Any, H::none, C::Capture, G::Press, J::Recall, St::Wave2, sequencer},

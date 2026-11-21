@@ -351,21 +351,41 @@ bool Sampling::recall() {
 
 void Sampling::tick(bool in_view) {
     auto& host = studio.host();
-    // Monitor: Auto hears the input only while Sampling is in view; the mic
-    // through the speaker keeps the speaker quiet (no howl), as Melodee.
-    bool monitoring = input.monitoring(in_view);
+    // An audio track selected, armed or recording takes its own source, its
+    // monitor heard while it is armed or recording (Melodee's record_tick);
+    // else Input Config's: Auto hears the input only while Sampling is in view.
+    int recording = audio_recording();
+    int audio_t = recording >= 0 ? recording : audio_arm >= 0 ? audio_arm : studio.kind() == TrackKind::Audio ? int(studio.track()) : -1;
+    InputSource want = input.source;
+    unsigned want_track = input.track % melodee::track_count;
+    bool want_post = input.post;
+    bool monitoring = input.monitoring(in_view), mic_heard = input.mutes_speaker(in_view);
+    if (audio_t >= 0) {
+        const auto& setting = studio.project().tracks[unsigned(audio_t)].audio;
+        want = setting.source;
+        want_track = 0;
+        want_post = true;
+        monitoring = setting.monitor == melodee::TrackMonitor::On && (audio_arm == audio_t || recording == audio_t);
+        mic_heard = monitoring && want == InputSource::Mic;
+    }
     if (!monitor_known || monitoring != monitor_sent) {
         studio.send({Type::Monitor, 0, 0, 0, int16_t(monitoring)});
         monitor_sent = monitoring;
         monitor_known = true;
     }
-    bool quiet = to_speaker && input.mutes_speaker(in_view);
+    bool quiet = to_speaker && mic_heard; // the mic through the speaker would howl
     if (quiet != quiet_sent) { studio.quiet_speaker(quiet); quiet_sent = quiet; }
-    // The engine hears the input as set (after a take, a source changed meanwhile).
+    // While a track records its take, its old one is not heard.
+    if (recording != audio_quiet_sent) {
+        if (audio_quiet_sent >= 0) studio.send({Type::AudioQuiet, uint8_t(audio_quiet_sent), 0, 0, 0});
+        if (recording >= 0) studio.send({Type::AudioQuiet, uint8_t(recording), 0, 0, 1});
+        audio_quiet_sent = recording;
+    }
+    // The engine hears the source as set (after a take, a source changed meanwhile).
     if (host.recorder().state() == State::Idle && !job
-        && (host.record_source() != unsigned(input.source)
-            || (input.source == InputSource::Track && (host.record_track() != input.track % melodee::track_count || host.record_post() != input.post))))
-        send_source();
+        && (host.record_source() != unsigned(want)
+            || (want == InputSource::Track && (host.record_track() != want_track || host.record_post() != want_post))))
+        studio.send({Type::RecordSource, uint8_t(want), 0, uint16_t(want_track), int16_t(want_post)});
     // The pads play Melodee's own sound while a take of it waits or runs.
     int redirect = pads_play_source() ? int(input.source == InputSource::Track ? input.track : track) : -1;
     if (redirect != redirect_sent) { studio.pads_play(redirect); redirect_sent = redirect; }
@@ -486,6 +506,7 @@ void Sampling::service() {
     }
     for (auto& recall : todo) land_recall(*recall);
     service_files();
+    service_audio();
 }
 
 // The take ended: its file made whole (24-bit, or 32-bit float where it went

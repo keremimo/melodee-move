@@ -250,7 +250,7 @@ while Shift is held.
 | Shift + Play | Restarts every playing clip | Restarts every pattern from its top | done |
 | Play (Overview) | Previews the selected Set | Previews the project | wave 2: MIDI/sync/undo/projects |
 | Rec | Records into the selected track (count-in first); again stops, playback goes on | Melodee's Seq Record | core |
-| Rec (Sampling) | On an audio track: records into the clip | Into an audio track's take | wave 2: sampling |
+| Rec (Sampling) | On an audio track: records into the clip | Arms the audio track's take (again: lets go; while it records: ends it, kept); Play records one pass of its pattern | done |
 
 ### Capture and Sampling
 
