@@ -11,7 +11,7 @@ page carries it too.
   Melodee runs and comes back when it ends.
 - **Shift + Back**: back to Move. Save your Set before starting Melodee, as
   for any quit of Move.
-- **Master knob**: the volume.
+- **Master knob**: the volume, kept from one start to the next.
 
 ## The web page
 

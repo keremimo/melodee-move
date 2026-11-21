@@ -395,6 +395,9 @@ public:
     bool dirty = false;
     unsigned saves = 0;
     std::atomic<float> volume {0.8f};
+    // The Volume knob turned (under `lock`): the main volume kept in
+    // Move.settings three seconds on, the project left as it is (no UNSAVED).
+    void volume_changed();
     bool shift = false;
 
     // The Looper (app/loop_desk.h, docs/UI.md "Looper"): four loops on
@@ -617,6 +620,7 @@ private:
     void release_chain_fx(const melodee::Chain& chain); // its Schwung effects let go (a track deleted)
     void copy_chain_fx(melodee::Chain& chain);          // each its own instance (a track copied)
     std::string write(std::vector<uint8_t> bytes, std::string settings_text);
+    std::string write_settings(const std::string& text); // Move.settings alone
     std::vector<uint8_t> project_bytes() const;
     std::vector<uint8_t> bytes_to_save(); // the `saving` hooks, then project_bytes()
     std::string settings_text() const;
@@ -649,6 +653,8 @@ private:
     unsigned last_track = 0; // and its track=
     bool restored = false;
     Clock::time_point changed_at {}, retry_at {};
+    bool settings_dirty = false; // Move.settings alone to write (volume_changed()); a project save writes it too
+    Clock::time_point settings_at {};
 
     // The audio thread's: the track the pads play, how, and where each
     // pad's press went (its track and key), so its release and pressure

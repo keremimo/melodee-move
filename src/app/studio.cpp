@@ -1247,7 +1247,7 @@ void Studio::close() {
 std::string Studio::settings_text() const {
     std::ostringstream out;
     out << settings_header << '\n' << "track " << selected << '\n' << "click " << int(click_on) << '\n' << "click_level " << click_volume << '\n'
-        << "response " << unsigned(settings.response) << '\n' << "pressure " << int(settings.pressure) << '\n'
+        << "volume " << std::lround(volume.load() * 100.0f) << '\n' << "response " << unsigned(settings.response) << '\n' << "pressure " << int(settings.pressure) << '\n'
         << "pad_lights " << unsigned(settings.pad_lights) << '\n' << "pad_fade " << unsigned(settings.pad_fade) << '\n'
         << "brightness " << unsigned(settings.brightness) << '\n' << "light_show " << int(settings.light_show) << '\n'
         << "show_style " << unsigned(settings.show_style) << '\n' << "full " << int(settings.full) << '\n'
@@ -1283,6 +1283,7 @@ void Studio::read_settings() {
         if (word == "track") last_track = value % melodee::track_count;
         else if (word == "click") click_on = value != 0;
         else if (word == "click_level") click_volume = std::min(value, 100u);
+        else if (word == "volume") volume = float(std::min(value, 100u)) / 100.0f;
         else if (word == "response") settings.response = uint8_t(std::min(value, 3u));
         else if (word == "pressure") settings.pressure = value != 0;
         else if (word == "pad_lights") settings.pad_lights = uint8_t(std::min(value, 2u));
@@ -1300,6 +1301,11 @@ void Studio::read_settings() {
         else if (sampler_shell->setting(word, value)) continue; // Sampling's
         else settings_more[word] = line; // another area's: kept as it is
     }
+}
+
+void Studio::volume_changed() {
+    settings_dirty = true;
+    settings_at = Clock::now();
 }
 
 void Studio::settings_changed() {
@@ -1373,11 +1379,21 @@ std::string Studio::write(std::vector<uint8_t> bytes, std::string settings) {
     return failed;
 }
 
+std::string Studio::write_settings(const std::string& text) {
+    std::error_code error;
+    fs::create_directories(home_path, error);
+    give_to_owner_of(home_path, move_user_data);
+    auto failed = write_whole(settings_path, text.data(), text.size());
+    if (failed.empty()) give_to_owner_of(settings_path, move_user_data);
+    return failed;
+}
+
 std::string Studio::save_now() {
     std::unique_lock<std::mutex> guard(lock);
     auto bytes = bytes_to_save();
     auto settings = settings_text();
     dirty = false;
+    settings_dirty = false;
     guard.unlock();
     auto error = write(std::move(bytes), std::move(settings));
     guard.lock();
@@ -1730,11 +1746,20 @@ void Studio::service() {
         auto bytes = bytes_to_save();
         auto settings = settings_text();
         dirty = false;
+        settings_dirty = false; // written with it
         guard.unlock();
         auto error = write(std::move(bytes), std::move(settings));
         guard.lock();
         if (error.empty()) ++saves;
         else { dirty = true; retry_at = now + autosave_retry; say("NOT SAVED"); }
+    } else if (settings_dirty && !dirty && !opening && now - settings_at >= autosave_idle && now >= retry_at) {
+        // Move.settings alone (the main volume): the project as its file.
+        auto settings = settings_text();
+        settings_dirty = false;
+        guard.unlock();
+        auto error = write_settings(settings);
+        guard.lock();
+        if (!error.empty()) { settings_dirty = true; retry_at = now + autosave_retry; }
     }
 }
 
@@ -1917,11 +1942,14 @@ void Studio::run_file_jobs() {
 void Studio::stopping() {
     loop_desk->flush(std::chrono::milliseconds(300)); // a loop being written is waited for, a moment
     bool unsaved = false;
+    std::string settings; // the main volume turned and not written yet
     {
         std::lock_guard<std::mutex> guard(lock);
         unsaved = dirty;
+        if (!dirty && settings_dirty) { settings = settings_text(); settings_dirty = false; }
     }
     if (unsaved) save_now();
+    else if (!settings.empty()) write_settings(settings);
 }
 
 void Studio::loop_pads(bool shown, bool free) {

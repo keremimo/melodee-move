@@ -616,6 +616,32 @@ void test_saving() {
     CHECK(!damaged.samples[0].chop.used());
 }
 
+void test_main_volume() {
+    // The Volume knob's main volume is the Move's: kept in Move.settings
+    // (not the project's, so no UNSAVED) and back on the next start.
+    std::string folder = "build/test-samples", home = "build/test-home-volume";
+    std::filesystem::create_directories(folder);
+    std::filesystem::remove_all(home);
+    auto percent = [](app::MelodeeApp& melodee) { return std::lround(melodee.studio().volume.load() * 100.0f); };
+    {
+        app::MelodeeApp first(folder, home);
+        Session session;
+        first.attach(session);
+        CHECK(first.restore_now().empty());
+        CHECK(first.save_now().empty()); // as a start leaves it: nothing unsaved
+        CHECK(percent(first) == 80);
+        for (int n = 0; n < 5; ++n) first.surface(make_event(0xb0, master_knob_cc, 127)); // five down
+        CHECK(percent(first) == 75);
+        CHECK(has(first.status(), "unsaved=0"));
+        first.stopping(); // the run ending: Move.settings written though the project was not
+    }
+    std::ifstream file(home + "/Move.settings");
+    std::string text((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    CHECK(has(text, "\nvolume 75\n"));
+    app::MelodeeApp second(folder, home);
+    CHECK(percent(second) == 75);
+}
+
 
 void test_schwung_modules() {
     // Schwung's module API, against the tests' stand-in module
@@ -2232,6 +2258,7 @@ int main() {
     test_spi_host();
     test_melodee_app();
     test_saving();
+    test_main_volume();
     test_schwung_modules();
     test_canvas_page();
     test_synth_track();

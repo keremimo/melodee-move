@@ -215,6 +215,7 @@ bool MelodeeApp::global(bindings::Job job, const bindings::Use& use) {
     case Job::Restart: studio.restart(); return true; // the Move's retrigger: every playing pattern from its top
     case Job::MainVolume:
         studio.volume = std::clamp(studio.volume.load() + use.delta * 0.01f, 0.0f, 1.0f);
+        studio.volume_changed(); // kept in Move.settings, back on the next start
         if (meter_until != Clock::time_point::max()) meter_until = Clock::now() + turn_linger; // the Move's meter as it turns
         return true;
     case Job::Metronome: studio.set_click(!studio.click(), studio.click_level()); return false; // and its screen opens

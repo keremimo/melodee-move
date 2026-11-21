@@ -471,7 +471,7 @@ sections, each on Shift + Step n.
 | **K1-K3 and Shift + K** (MELODEE.md › The panel) | done | knobs 1-8; Shift + knob finer | [ ] |
 | **Wheel and Push**; Shift + Push goes back (MELODEE.md › The panel) | done | jogwheel and its push; Back | [ ] |
 | **− / +**: octave, bank, list (MELODEE.md › The panel) | done | Up / Down | [ ] |
-| **Main volume** (MELODEE.md › The panel) | done | master knob | [ ] |
+| **Main volume** (MELODEE.md › The panel) | done | master knob; kept in Move.settings across starts | [ ] |
 | **Play and Stop** (MELODEE.md › The panel) | done | Play, a toggle | [ ] |
 | **Sample Select**: the browser on a kit, the picker on a plug-in track (MELODEE.md › The panel) | done | Menu | [ ] |
 | **Exit** (Power): save and back to the stock app (MELODEE.md › Project and system) | done | Shift + Back | [ ] |
