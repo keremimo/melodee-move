@@ -324,6 +324,10 @@ public:
     // the whole line kept and written back unless settings_text() already
     // wrote that word. An area may set its own here too.
     std::map<std::string, std::string> settings_more;
+    // Called on the service thread, outside `lock`, once the open project is
+    // saved and before another is swapped in: what an area still has to
+    // write into the old one (the Looper's playing loops).
+    std::vector<std::function<void()>> closing;
     // Called under `lock` once another project is in (opened or new), its path given: an area's reset (the Looper's loops).
     std::vector<std::function<void(const std::string& path)>> opened;
     // Opening a project: the Loading sheet's counts.

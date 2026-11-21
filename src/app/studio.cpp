@@ -1402,6 +1402,7 @@ std::string Studio::open_project(const std::string& file, bool fresh) {
             }
         }
     }
+    for (const auto& hook : closing) if (hook) hook(); // other areas' last writes into it (the Looper's loops)
     // The next one read, outside the lock.
     auto next = std::make_unique<melodee::Project>();
     auto next_bank = std::make_unique<melodee::PatternBank>();

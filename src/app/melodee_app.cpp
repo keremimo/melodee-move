@@ -52,9 +52,9 @@ std::string spoken(const char* name) {
 
 // Typing, for a module's page: the pads a keyboard, top row first ('\b'
 // backspace), the steps digits and marks.
-constexpr const char* keyboard_rows[4] {"abcdefgh", "ijklmnop", "qrstuvwx", "yz -.'&\b"};
 constexpr const char* step_keys = "1234567890()/:,!";
-char key_for_pad(unsigned pad) { return keyboard_rows[3 - pad / 8][pad % 8]; }
+// The pad map's keyboard (pad_layout.h): the physical pad's key in the layout chosen.
+char key_for_pad(unsigned pad) { return typing_key(uint8_t(pad), pad_layout()); }
 // The Move's own typing (Kerem's decision): the wheel walks this strip, its
 // push types the one in the box; SPACE, DEL and OK end it.
 const std::vector<std::string>& strip() {
@@ -205,7 +205,7 @@ bool MelodeeApp::global(bindings::Job job, const bindings::Use& use) {
     case Job::ShiftSteps: return true; // lights() shows them
     case Job::ShiftLock: studio.say(gestures.shift_locked() ? "SHIFT LOCKED" : "SHIFT"); return true;
     // Typing, for a module's page that asked: the pads and steps a keyboard.
-    case Job::TypeKey: type(key_for_pad(logical_pad(uint8_t(use.index), pad_layout()))); return true; // the pad map's: letters in its order
+    case Job::TypeKey: type(key_for_pad(unsigned(use.index))); return true;
     case Job::TypeDigit: type(step_keys[use.index]); return true;
     case Job::TypeBackspace: type('\b'); return true;
     case Job::TypeTurn: studio.typing_strip = std::clamp(studio.typing_strip + use.delta, 0, int(strip().size()) - 1); return true;
@@ -370,10 +370,9 @@ void MelodeeApp::lights(move::Lights& lights, Clock::time_point now) {
     lights.button(Button::Delete, studio.typing ? white_dim : 0);
     lights.button(Button::Copy, 0);
     if (studio.typing) { // the keyboard
-        for (unsigned at = 0; at < pad_count; ++at) { // `at` the logical pad, lit where it lies
+        for (unsigned at = 0; at < pad_count; ++at) {
             char c = key_for_pad(at);
-            lights.pad(physical_pad(uint8_t(at), pad_layout()),
-                       c == '\b' ? colour::red : c == ' ' ? colour::azure : std::isalpha(static_cast<unsigned char>(c)) ? colour::light_grey : colour::dark_grey);
+            lights.pad(at, c == '\b' ? colour::red : c == ' ' ? colour::azure : std::isalpha(static_cast<unsigned char>(c)) ? colour::light_grey : colour::dark_grey);
         }
         for (unsigned step = 0; step < step_count; ++step) lights.step(step, step < 10 ? colour::light_grey : colour::dark_grey);
         lights.button(Button::Back, white_dim);
