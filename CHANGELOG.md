@@ -4,6 +4,21 @@ Melodee for Ableton Move as Schwung's module catalog installs it
 (`melodee-move-module.tar.gz`). A version is `module/module.json`'s;
 `tools/release.sh` builds it and takes its release notes from here.
 
+## 0.2.1 (2026-11-21)
+
+- A long sample streamed from the card no longer takes memory for the whole
+  file when it loads. Memory is now locked as it is first touched, so a
+  5-minute WAV that used to make 102 MB resident on load makes none, and
+  playing it touches about 8 MB. The audio thread's stack, the render
+  workers' stacks and Schwung's modules are still read in and locked before
+  they play.
+- `melodee-move --ctl 'melodee-press wheel-push'` presses the jogwheel's
+  button; it was read as a turn of nothing.
+- Melodee's engine and model now come from
+  [ellic-core](https://github.com/keremimo/ellic-core), the engine shared
+  with Melodee on the MPC Sample (MIT), compiled unchanged. The package
+  carries its licence in `licenses/ellic-core-LICENSE.txt`.
+
 ## 0.2.0 (2026-11-21)
 
 What Schwung asked for before listing Melodee in its catalog.

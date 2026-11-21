@@ -1,7 +1,7 @@
 {
     "id": "melodee-move",
     "name": "Melodee",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "description": "Melodee's sampler and Chop on the Move's 32 pads, with the Move to itself",
     "author": "Kerem Kilic (Ellic Studio)",
     "component_type": "tool",
