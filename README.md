@@ -253,7 +253,7 @@ Three parts so far:
   marks one.
 - **Setup** (Shift + Step 2) is Melodee's Settings: the pads' response and
   pressure, pad lights, pad fade, the lights' brightness, a light show in
-  time with the tempo, Basic or Full, a usage log (`Usage/`, what the hands
+  time with the tempo, a usage log (`Usage/`, what the hands
   do, no names), About, and Back to Move. **Shift + a track button** is the
   track's options: its colour and name. Names are typed the Move's way: the
   wheel walks the characters, its push types one, OK at the end of the

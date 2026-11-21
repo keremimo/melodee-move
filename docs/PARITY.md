@@ -361,7 +361,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Text never under 11 px**, never cut (MELODEE.md › Across every page) | n/a | one 5 x 7 font at 128 x 64 (UI.md) | — |
 | **The Menu**: HERE, the page's jobs with their shortcuts; GO, the 16 places as the pads (guide/basics.md) | n/a | Kerem (2026-11-20): no Menu on the Move; Shift + the steps are the places | [ ] |
 | **Lessons**: First beat, Sequences, Mix a track, Shape a pad (guide/basics.md) | n/a | Kerem (2026-11-20): no Menu on the Move, so no Learn | [ ] |
-| **Basic and Full**: Basic shows the stock pages plus tracks, plug-ins, the mixer and Song (guide/settings.md) | done | Setup > FEATURES: Basic leaves out Melodee's Looper (Shift + Step 12); other areas ask `studio.settings.full` for their extras | [ ] |
+| **Basic and Full**: Basic shows the stock pages plus tracks, plug-ins, the mixer and Song (guide/settings.md) | n/a | Kerem (2026-11-20): the Move is always Full; no FEATURES in Setup | [ ] |
 
 ## Sound engines and synths
 
@@ -491,7 +491,7 @@ sections, each on Shift + Step n.
 
 | Status | Rows |
 | --- | --- |
-| `done` | 267 |
+| `done` | 266 |
 | `sequencer` | 4 |
 | `sampling` | 0 |
 | `kit depth` | 1 |
@@ -502,7 +502,7 @@ sections, each on Shift + Step n.
 | `MIDI & sync & undo & projects` | 2 |
 | `web page` | 11 |
 | `schwung` | 16 |
-| `n/a` | 30 |
+| `n/a` | 31 |
 | All rows | 336 |
 
 # Ableton Move parity

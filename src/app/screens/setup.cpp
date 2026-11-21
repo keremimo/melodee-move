@@ -6,9 +6,10 @@
 // response and pressure. LIGHTS: pad lights, pad fade, brightness, the light
 // show and its style; LAYOUT (move-pad-layout's). MIDI and MIDI SYNC
 // (move-midi's MIDI Config) and WEB PAGE (move-web's) where those screens
-// are here. FEATURES Full or Basic, USB AUDIO (read only) and USB VOLUME
-// (docs/USB_AUDIO.md), the usage log, ABOUT, and BACK TO MOVE (Ableton's app again, as Shift + Back). Every
-// setting is the same for every project, kept in Move.settings.
+// are here. USB AUDIO (read only) and USB VOLUME (docs/USB_AUDIO.md). The
+// usage log, ABOUT, and BACK TO MOVE (Ableton's app again,
+// as Shift + Back). No FEATURES (Basic or Full): the Move is always Full.
+// Every setting is the same for every project, kept in Move.settings.
 #include "app/screens/common.h"
 #include "ui/system_draw.h"
 #include <sys/statvfs.h>
@@ -105,7 +106,6 @@ private:
             top.push_back({"MIDI SYNC", {}, studio.screen("midi-sync") ? "midi-sync" : "midi-config"});
         }
         if (studio.screen("web-page")) top.push_back({"WEB PAGE", {}, "web-page"});
-        top.push_back({"FEATURES", {"BASIC", "FULL"}});
         // USB audio to a computer (docs/USB_AUDIO.md): what it is doing, read
         // only; whether the Volume knob turns the mix on 1-2 too.
         top.push_back({"USB AUDIO", {}});
@@ -124,7 +124,6 @@ private:
         if (name == "BRIGHTNESS") return s.brightness;
         if (name == "LIGHT SHOW") return s.light_show;
         if (name == "SHOW STYLE") return s.show_style;
-        if (name == "FEATURES") return s.full;
         if (name == "USAGE LOG") return s.usage_log;
         if (name == "USB VOLUME") return s.usb_full ? 0 : 1;
         return 0;
@@ -149,7 +148,6 @@ private:
         else if (name == "BRIGHTNESS") s.brightness = uint8_t(v);
         else if (name == "LIGHT SHOW") s.light_show = v != 0;
         else if (name == "SHOW STYLE") s.show_style = uint8_t(v);
-        else if (name == "FEATURES") s.full = v != 0;
         else if (name == "USAGE LOG") s.usage_log = v != 0;
         else if (name == "USB VOLUME") s.usb_full = v == 0;
         studio.settings_changed();

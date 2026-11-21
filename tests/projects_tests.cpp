@@ -338,25 +338,25 @@ void test_setup_and_tracks() {
     CHECK(!studio.settings.pressure);
     press(melodee, Button::Back);
     CHECK(has(status(), "setup_level=0"));
-    // FEATURES: Basic (PADS, LIGHTS, then move-midi's MIDI and MIDI SYNC and
-    // move-web's WEB PAGE where those screens are here, FEATURES).
-    turn_wheel(melodee, 2 + (studio.screen("midi-config") ? 2 : 0) + (studio.screen("web-page") ? 1 : 0));
-    press(melodee, Button::MainPush);
-    CHECK(!studio.settings.full);
     // Another area's lines (a key=value, a word) kept as they were. (MIDI
     // Config's keys, the pad layout and the Looper's input delay are read and
     // written by Studio itself.)
     melodee.studio().settings_more["other_area"] = "other_area=2";
     melodee.studio().settings_more["other_word"] = "other_word 7";
+    melodee.studio().settings_more["full"] = "full 0"; // FEATURES, gone: an old file's line is dropped
     CHECK(melodee.save_now().empty());
     {   // Kept in Move.settings.
         app::MelodeeApp again(folder, home);
-        CHECK(again.studio().settings.response == 2 && !again.studio().settings.pressure && !again.studio().settings.full);
+        CHECK(again.studio().settings.response == 2 && !again.studio().settings.pressure);
         CHECK(again.studio().settings_more.count("other_area") && again.studio().settings_more.at("other_word") == "other_word 7");
+        CHECK(!again.studio().settings_more.count("full"));
     }
-    // USB AUDIO after FEATURES: read only, a push changes nothing. USB
-    // VOLUME: FULL or KNOB, flipped at once (docs/USB_AUDIO.md).
-    turn_wheel(melodee, 1);           // USB AUDIO
+    // USB AUDIO after PADS, LIGHTS, then move-midi's MIDI and MIDI SYNC and
+    // move-web's WEB PAGE where those screens are here: read only, a push
+    // changes nothing. USB VOLUME: FULL or KNOB, flipped at once
+    // (docs/USB_AUDIO.md).
+    int doors = (studio.screen("midi-config") ? 2 : 0) + (studio.screen("web-page") ? 1 : 0);
+    turn_wheel(melodee, 2 + doors);   // USB AUDIO
     press(melodee, Button::MainPush);
     CHECK(has(status(), "page=setup") && has(status(), "setup_editing=0") && studio.settings.usb_full);
     turn_wheel(melodee, 1);           // USB VOLUME
@@ -364,7 +364,8 @@ void test_setup_and_tracks() {
     CHECK(!studio.settings.usb_full);
     press(melodee, Button::MainPush);
     CHECK(studio.settings.usb_full);
-    turn_wheel(melodee, 2);           // ABOUT, past USAGE LOG
+    // ABOUT, past USAGE LOG. No FEATURES: the Move is always Full.
+    turn_wheel(melodee, 2);
     press(melodee, Button::MainPush);
     CHECK(has(status(), "page=about"));
     press(melodee, Button::Back);

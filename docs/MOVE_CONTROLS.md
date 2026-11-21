@@ -214,7 +214,7 @@ while Shift is held.
 | Control | On the Move | In Melodee | Status |
 | --- | --- | --- | --- |
 | Shift + Step 1 | The Set Overview | Projects, 32 to a page, each keeping its pad | done |
-| Shift + Step 2 | Setup: battery, Wi-Fi, update, Cloud, Control Live, Link, MIDI and MIDI Sync, USB-C audio, Move Manager, brightness | Setup: Melodee's settings (pads, lights and brightness, Basic or Full, the usage log, About), MIDI and sync, the web page, Back to Move | done |
+| Shift + Step 2 | Setup: battery, Wi-Fi, update, Cloud, Control Live, Link, MIDI and MIDI Sync, USB-C audio, Move Manager, brightness | Setup: Melodee's settings (pads, lights and brightness, the usage log, About), MIDI and sync, the web page, Back to Move | done |
 | Shift + Step 3 | Workflow Settings: quantize amount, step grid, count-in, autoload, time signature, maximum recording length | The same for Melodee's patterns | done |
 | Shift + Step 4 | No job | The Mixer: 16 tracks, their effects; on the Mixer, Knob FX, then Pad FX, then Flex Beat | done |
 | Shift + Step 5 | Tempo (the wheel; Shift for fine; push confirms) | The Tempo screen (today on Shift + Play) | done |

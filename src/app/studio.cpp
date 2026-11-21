@@ -1283,7 +1283,7 @@ std::string Studio::settings_text() const {
         << "volume " << std::lround(volume.load() * 100.0f) << '\n' << "response " << unsigned(settings.response) << '\n' << "pressure " << int(settings.pressure) << '\n'
         << "pad_lights " << unsigned(settings.pad_lights) << '\n' << "pad_fade " << unsigned(settings.pad_fade) << '\n'
         << "brightness " << unsigned(settings.brightness) << '\n' << "light_show " << int(settings.light_show) << '\n'
-        << "show_style " << unsigned(settings.show_style) << '\n' << "full " << int(settings.full) << '\n'
+        << "show_style " << unsigned(settings.show_style) << '\n'
         << "usage_log " << int(settings.usage_log) << '\n' << "usb_full " << int(settings.usb_full) << '\n' << "last " << path << '\n';
     if (!settings.start.empty()) out << "start " << settings.start << '\n';
     // The other areas' own: the pad layout, the sequencer's, MIDI Config, the Looper's input delay.
@@ -1324,7 +1324,7 @@ void Studio::read_settings() {
         else if (word == "brightness") settings.brightness = uint8_t(std::min(value, 3u));
         else if (word == "light_show") settings.light_show = value != 0;
         else if (word == "show_style") settings.show_style = uint8_t(std::min(value, 4u));
-        else if (word == "full") settings.full = value != 0;
+        else if (word == "full") continue; // FEATURES, Basic or Full, is gone: the Move is always Full
         else if (word == "usage_log") settings.usage_log = value != 0;
         else if (word == "usb_full") settings.usb_full = value != 0;
         else if (word == "last") last_path = rest;

@@ -146,13 +146,12 @@ struct Settings {
     uint8_t brightness = 3;  // the lights: 0 low, 1 mid, 2 high, 3 max (the Move's four)
     bool light_show = false;
     uint8_t show_style = 0;  // Pulse, Sweep, Chase, Ripple, Levels
-    bool full = true;        // Full, or Basic: the Move's own pages, tracks, modules, the mixer and Song
     bool usage_log = false;  // what the hands do, a file each start (Usage/)
     bool usb_full = true;    // USB VOLUME: a computer records the main mix at full volume, or as the Volume knob has it
     std::string start;       // the project opened at start; empty: the one open last
     bool operator==(const Settings& o) const {
         return response == o.response && pressure == o.pressure && pad_lights == o.pad_lights && pad_fade == o.pad_fade &&
-               brightness == o.brightness && light_show == o.light_show && show_style == o.show_style && full == o.full &&
+               brightness == o.brightness && light_show == o.light_show && show_style == o.show_style &&
                usage_log == o.usage_log && usb_full == o.usb_full && start == o.start;
     }
 };
