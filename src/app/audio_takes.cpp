@@ -238,7 +238,7 @@ void Sampling::service_audio() {
     // Whole: kept, onto the pattern it recorded; or dropped.
     bool kept = j.file.close() && state == BounceState::Done && !j.left.empty();
     std::error_code error;
-    if (kept) fs::rename(j.path + ".part", j.path, error);
+    if (kept) { fs::rename(j.path + ".part", j.path, error); hand_back(j.path, studio.home_folder()); }
     else fs::remove(j.path + ".part", error);
     const unsigned rate = take.rate();
     int pattern = host.audio_take_pattern();

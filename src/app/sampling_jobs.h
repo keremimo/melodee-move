@@ -3,11 +3,25 @@
 #include "app/sampling.h"
 #include "app/studio.h"
 #include "melodee/engine/recall_ring.h"
+#include <filesystem>
 #include <string>
 #include <vector>
 
 // Sampling's work in hand, shared by sampling.cpp and sampling_files.cpp.
 namespace app {
+
+// A file Melodee wrote, and its folders up to Melodee's own, given to the
+// Move's user (a run over SSH is root's), as the project file is.
+inline void hand_back(const std::string& path, const std::string& home) {
+    namespace fs = std::filesystem;
+    constexpr const char* move_user_data = "/data/UserData";
+    give_to_owner_of(path, move_user_data);
+    const fs::path top = fs::path(home);
+    for (fs::path folder = fs::path(path).parent_path(); !folder.empty() && folder != folder.parent_path(); folder = folder.parent_path()) {
+        give_to_owner_of(folder.string(), move_user_data);
+        if (folder == top) break;
+    }
+}
 
 // A file being made: a take drained from the recorder as it comes, or Audio
 // Recall's copy of the ring. The MIDI thread fills in what it is; the

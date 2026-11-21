@@ -446,8 +446,11 @@ void Sampling::service() {
     if (!folders_made) { // Melodee's samples folders (MELODEE.md, Files on the card)
         folders_made = true;
         std::error_code error;
-        for (const char* kept : {"Recorded", "Edits", "Banks", "Looper", "Expansions", "Keygroups", "Stems"})
-            fs::create_directories(fs::path(studio.home_folder()) / "Samples" / kept, error);
+        for (const char* kept : {"Recorded", "Edits", "Banks", "Looper", "Expansions", "Keygroups", "Stems"}) {
+            auto folder = fs::path(studio.home_folder()) / "Samples" / kept;
+            fs::create_directories(folder, error);
+            hand_back(folder.string(), studio.home_folder());
+        }
     }
     // A take: its file opened as it starts, drained as it comes, made whole as it ends.
     Job* taking_job = nullptr;
@@ -537,6 +540,7 @@ void Sampling::land_take(Job& j) {
         fs::rename(j.path + ".part", j.path, fs_error); // longer than a pad holds: the file keeps it all, the pad its first 60 s
         sample = read_sample(j.path, error);
     }
+    if (j.drained) hand_back(j.path, studio.home_folder());
     recorder.spill(false);
     recorder.release();
     std::lock_guard<std::mutex> guard(studio.lock);
@@ -600,6 +604,7 @@ void Sampling::land_recall(Job& j) {
         std::error_code fs_error;
         fs::create_directories(fs::path(j.path).parent_path(), fs_error);
         error = melodee::keep_capture(*data, rate, j.path);
+        if (error.empty()) hand_back(j.path, studio.home_folder());
         sample = make_sample(j.path, std::move(data));
     }
     std::lock_guard<std::mutex> guard(studio.lock);

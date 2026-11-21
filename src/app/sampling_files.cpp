@@ -268,6 +268,8 @@ void Sampling::service_files() {
         fs::create_directories(home, error);
         write_lines(home / "Starred.txt", star_list);
         write_lines(home / "Recent.txt", recent_list);
+        hand_back((home / "Starred.txt").string(), home.string());
+        hand_back((home / "Recent.txt").string(), home.string());
     }
     // The preview: read (up to 30 s), offered to the preview slot, then played.
     if (asked && !wanted.empty()) {
@@ -334,6 +336,7 @@ void Sampling::service_files() {
                                                           : upper_text(edit->name) + "-Slice " + std::to_string(edit->slice + 1);
         std::string path = free_name(folder, stem);
         std::string failed = melodee::keep_capture(*data, data->rate, path);
+        if (failed.empty()) hand_back(path, home.string());
         std::unique_ptr<Sample> sample = failed.empty() ? make_sample(path, std::move(data)) : nullptr;
         std::lock_guard<std::mutex> guard(studio.lock);
         if (!sample) { studio.say("NOT WRITTEN"); continue; }
@@ -387,6 +390,9 @@ void Sampling::service_files() {
             std::lock_guard<std::mutex> guard(studio.lock);
             install_done = unsigned(n + 1);
         }
+        for (const auto& item : fs::recursive_directory_iterator(folder, fs::directory_options::skip_permission_denied, error))
+            hand_back(item.path().string(), home.string());
+        hand_back(folder.string(), home.string());
         std::lock_guard<std::mutex> guard(studio.lock);
         install_done = install_total;
         installing.clear();
