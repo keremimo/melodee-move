@@ -6,6 +6,12 @@ Melodee for Ableton Move as Schwung's module catalog installs it
 
 ## Unreleased
 
+- Typing works with Shift held or locked: a pad types a capital, the steps,
+  the wheel and its push type as without it.
+- A module's pages start over each time you go in, as under Schwung, so
+  pages that depend on a setting changed elsewhere show up: Schimera's Vowel
+  and Mouth pages, with its mouth, appear in Vowel mode whichever way it was
+  chosen. Loading one of My Presets does the same and lands on My Presets.
 - A module's pages now behave exactly as under Schwung, in Melodee's own
   look. On a synth track the push on the module goes into its pages; there
   the wheel turns pages, Shift + the wheel jumps a section, the push with no

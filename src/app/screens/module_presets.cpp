@@ -36,6 +36,9 @@ public:
             if (!presets.empty()) {
                 studio.load_user_preset(studio.pages_target, presets[size_t(cursor)]);
                 studio.close();
+                // As Schwung after a Load: its pages start over (what the
+                // preset changed may show or hide pages), on My Presets.
+                if (SchwungPages* pages = studio.pages_of(studio.pages_target)) pages->enter("My Presets", false);
             }
             return true;
         case Job::Back: studio.close(); return true;

@@ -1020,6 +1020,43 @@ void test_schwung_pages() {
     run.pages->text_entered("again", false);
     run.frames(2);
     CHECK(run.module->get_now("searched") == "again");
+
+    // A gate moved from outside the pages (Schimera's Mode, turned on the
+    // Device View's knobs): while the pages are up Schwung's controller keeps
+    // its plan; entered again, it starts over, as Schwung's host makes a new
+    // one on every entry, and the level the gate opens is there.
+    const std::string gated_dir = "build/test-modules-gated/sound_generators/gated";
+    std::filesystem::create_directories(gated_dir);
+    std::filesystem::copy_file("build/test-modules/sound_generators/fake/dsp.so", gated_dir + "/dsp.so", std::filesystem::copy_options::overwrite_existing);
+    std::ofstream(gated_dir + "/module.json") << R"({"id": "gated", "name": "Gated", "abbrev": "GAT", "api_version": 2,
+      "component_type": "sound_generator", "dsp": "dsp.so", "capabilities": {"midi_in": true,
+      "chain_params": [
+        {"key": "level", "name": "Level", "type": "float", "min": 0, "max": 1},
+        {"key": "wave", "name": "Wave", "type": "enum", "options": ["Sine", "Square"]},
+        {"key": "voices", "name": "Voices", "type": "int", "min": 1, "max": 8}],
+      "ui_hierarchy": {"levels": {
+        "root": {"name": "Gated", "params": [{"level": "a", "label": "A"}, {"level": "b", "label": "B"}]},
+        "a": {"name": "A", "knobs": ["level"], "params": ["level"]},
+        "b": {"name": "B", "knobs": ["voices"], "params": ["voices"], "visible_if": {"param": "wave", "equals": 0}}}}}})";
+    auto gated = app::scan_modules("build/test-modules-gated");
+    CHECK(gated.size() == 1);
+    if (gated.empty()) return;
+    Run g;
+    if (!start(gated[0], g)) return;
+    const auto& gv = g.pages->view();
+    CHECK(!g.to("knobs", "B")); // Square: B is hidden
+    int before = gv.count;
+    g.module->set_now("wave", "0");
+    g.frames(8);
+    CHECK(gv.count == before);
+    g.pages->enter();
+    g.frames(8);
+    CHECK(gv.count == before + 1 && g.to("knobs", "B"));
+    // Starting over on a page by name (back from My Presets after a Load).
+    CHECK(g.to("knobs", "A"));
+    g.pages->enter("B", false);
+    g.frames(4);
+    CHECK(gv.page == "B" && !gv.wheel);
 }
 
 void test_schwung_modules() {
@@ -1665,6 +1702,15 @@ void test_user_presets() {
     frames(melodee, 2);
     mine = rows();
     CHECK(!mine.empty() && mine[0].value == "Bright");
+    // As Schwung after a Load: its pages started over, on My Presets, the
+    // door closed; the push opens it again.
+    {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        auto* pages = studio.pages_of(target);
+        CHECK(pages && pages->view().page == "My Presets" && !pages->view().menu.entered);
+    }
+    press_button(melodee, Button::MainPush);
+    frames(melodee, 1);
     // Delete: its row, a question, yes.
     turn_wheel(melodee, 3);
     frames(melodee, 1);

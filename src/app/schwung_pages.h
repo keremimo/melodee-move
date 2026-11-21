@@ -80,6 +80,11 @@ public:
     void frame(juce::Graphics& g, juce::Rectangle<int> band);
     void midi(uint8_t status, uint8_t number, uint8_t value); // a Move control, raw (Schwung's numbers)
     void text_entered(const std::string& text, bool cancelled);
+    // Entered from the Device View, or back from a sheet that changed the
+    // module (a user preset loaded): Schwung's controller starts over on the
+    // next frame, as Schwung's host makes a new one on every entry, landing
+    // on `page` by name when given (its door open when `open`).
+    void enter(const std::string& page = {}, bool open = false);
 
     const ModuleView& view() const { return model; }
     // The drawn pages' state, to keep with the project (JSON; empty: none).
@@ -98,6 +103,7 @@ private:
     std::unique_ptr<CanvasPage> page;
     ModuleView model;
     std::string states;
+    std::string fresh; // what host.js reads once as "melodee:fresh": {} or {"page", "enter"}
 };
 
 } // namespace app

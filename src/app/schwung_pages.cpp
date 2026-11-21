@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <memory>
+#include <utility>
 
 // The seam, in the binary as the web page's files are (make runs at the
 // repository root).
@@ -61,6 +62,7 @@ std::unique_ptr<SchwungPages> SchwungPages::load(CanvasPage::Host host, Hooks ho
         if (key == "melodee:module_dir") return hooks.module_dir;
         if (key == "melodee:trailing") return hooks.trailing ? hooks.trailing() : std::string("[]");
         if (key == "melodee:page_states") return self->states;
+        if (key == "melodee:fresh") return std::exchange(self->fresh, std::string());
         return read(key);
     };
     host.set = [set, self, hooks](const std::string& key, const std::string& value) {
@@ -84,6 +86,15 @@ void SchwungPages::frame(juce::Graphics& g, juce::Rectangle<int> band) {
     frame.width = band.getWidth();
     frame.height = band.getHeight();
     page->draw(g, {}, frame);
+}
+
+void SchwungPages::enter(const std::string& page_name, bool open) {
+    auto* landing = new juce::DynamicObject();
+    if (!page_name.empty()) {
+        landing->setProperty("page", juce::String(page_name));
+        landing->setProperty("enter", open);
+    }
+    fresh = juce::JSON::toString(juce::var(landing), true).toStdString();
 }
 
 void SchwungPages::midi(uint8_t status, uint8_t number, uint8_t value) { page->midi(status, number, value); }

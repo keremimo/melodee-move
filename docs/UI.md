@@ -145,6 +145,12 @@ Schwung's footer on the detail line (`JOG PAGE CLK MENU`, `CLK ENTER`,
 - A page the module draws (Webstream's Browse, Schimera's mouth and lyrics)
   is one of its pages, drawn in place in the band under the strip; an
   enterable one is a door like any other.
+- Each way in from the Device View starts the pages over, as Schwung builds
+  its page controller afresh on every entry: the module's values read again,
+  its pages planned from them, the first page of knobs first. So pages a
+  value outside them shows or hides (Schimera's Vowel and Mouth pages, in
+  Vowel mode only) are there. A user preset loaded starts them over too, back
+  on My Presets with its door closed, as Schwung lands after a Load.
 
 After the module's own pages, as Schwung appends its own: **My Presets**
 (Preset: the list to load from, `* name` once edited; Save; Save As; Delete,

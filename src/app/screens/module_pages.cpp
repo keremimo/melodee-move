@@ -20,7 +20,13 @@ class ModulePages final : public Screen {
 public:
     using Screen::Screen;
 
-    void enter() override { held.fill(false); shifted = false; }
+    // Entered from the Device View (sheets over the pages are pushed, so a
+    // return from one is no entry): Schwung's controller starts over.
+    void enter() override {
+        held.fill(false);
+        shifted = false;
+        if (SchwungPages* pages = studio.pages_of(studio.pages_target)) pages->enter();
+    }
 
     bindings::Screen screen_kind() const override { return bindings::Screen::Canvas; }
 

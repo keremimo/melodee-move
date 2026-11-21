@@ -20,6 +20,8 @@
 //   getParam("melodee:module_dir")   where the module's own page scripts are
 //   getParam("melodee:trailing")     the pages Melodee adds after the module's (JSON)
 //   getParam("melodee:page_states")  the drawn pages' kept state, at start (JSON)
+//   getParam("melodee:fresh")        once, after the pages are entered: start over
+//                                    ({} or {"page", "enter"}: land there by name)
 //   setParam("melodee:view", json)   the page as data, after every hook
 //   setParam("melodee:action", id)   a trailing page's entry pushed
 //   setParam("melodee:page_states", json) a drawn page's state changed
@@ -232,8 +234,34 @@ function turnDoor(fullKey, direction, slot, held, info) {
     return true;
 }
 
+// Entered from the Device View: a fresh controller, as Schwung's host builds
+// one on every entry (shadow_ui_param_pages.mjs: exitParamPages drops it,
+// enterParamPages makes it). Its plan and values are then the module's as
+// they are now, so a gate moved from outside (Schimera's Mode, turned on the
+// Device View's knobs) shows the pages it gates. A throttled write, due by
+// now, goes out first. The drawn pages' scripts and kept state stay.
+function startOver() {
+    try { controller.tick(); } catch (e) { /* nothing pending is lost by a throw here */ }
+    controller = null;
+    shift = false;
+    exited = false;
+    pendingText = null;
+    textForPage = null;
+    enumPicker = null;
+    opened = null;
+    loadingPoll = 0; loadingInterval = LOADING_POLL_TICKS; wasLoading = false;
+    trailingText = null;
+}
+
 function ensure() {
-    if (controller || !ctx) return;
+    if (!ctx) return;
+    let landing = null;
+    const fresh = ctx.getParam("melodee:fresh");
+    if (fresh) {
+        try { landing = JSON.parse(fresh) || {}; } catch (e) { landing = {}; }
+        if (controller) startOver();
+    }
+    if (controller) return;
     moduleDir = ctx.getParam("melodee:module_dir");
     pageStates = {};
     try {
@@ -255,6 +283,9 @@ function ensure() {
     });
     controller.load({ slot: 0, component: PREFIX, prefix: PREFIX, visible, paginate: true });
     controller.setLayout(lib.LAYOUT_MOVY || "movy");
+    // Back from My Presets after a Load: on that page, its door closed
+    // (shadow_ui.js reconciles the grid with restorePage("My Presets")).
+    if (landing && landing.page) controller.restorePage(String(landing.page), { enter: !!landing.enter });
     lastTick = Date.now();
 }
 
