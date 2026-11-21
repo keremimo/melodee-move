@@ -28,8 +28,6 @@ public:
     // track, 1 the sound, 2 on the effects.
     void draw_row(juce::Graphics& g, const std::string& track_item, const std::string& sound_item, const std::vector<Item>& items, int focus) const;
 
-    // What a wheel touch says of an effect item: "FX2: DELAY", "+: ADD EFFECT".
-    std::string focus_name(const Item& item) const;
     // An effect item's jobs: its knobs, its push (the browser; a Schwung
     // effect's pages, as Schwung's click on a box), Shift + push (its options;
     // a Schwung effect swapped), Mute, Delete and Copy held + push, Shift +

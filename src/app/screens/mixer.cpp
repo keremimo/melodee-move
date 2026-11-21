@@ -424,7 +424,6 @@ public:
         case Job::OpenBrowser: case Job::SampleOptions: case Job::ModuleMenu: return true;
         case Job::Mixer: studio.open("knob-fx"); return true;
         case Job::Back: studio.close(); return true;
-        case Job::ShowFocus: studio.say(name_of(at)); return true;
         default: return false;
         }
     }

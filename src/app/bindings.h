@@ -99,9 +99,9 @@ constexpr uint16_t none = 0, shift = 1 << 0, track = 1 << 1, step = 1 << 2, pad 
     X(SelectTrack) X(PeekTrack) X(TrackLevel) X(TrackOptions) X(MuteTrack) X(SoloTrack) X(CopyTrack) X(ClearTrack) \
     X(TurnKnob) X(ShowKnob) X(TurnKnobFine) X(SecondParameter) X(DeleteMotion) X(ToggleMotion) X(TurnMainEffect) \
     X(MainVolume) X(ShowMeter) \
-    X(Focus) X(OpenBrowser) X(SampleOptions) X(ModuleMenu) X(Page) X(ShowFocus) X(BrowseTurn) X(BrowsePush) \
+    X(Focus) X(OpenBrowser) X(SampleOptions) X(ModuleMenu) X(Page) X(BrowseTurn) X(BrowsePush) \
     X(BrowserOptions) X(ListTurn) X(ListTurnFine) X(ListPush) X(ChopAmount) X(ToPads) X(ToPadsChoose) X(ToPadsPlace) \
-    X(InputTurn) X(InputPush) X(ShowSource) X(CanvasTurn) X(CanvasPush) X(TypeDone) X(LoopLength) X(LoopLengthFine) \
+    X(InputTurn) X(InputPush) X(CanvasTurn) X(CanvasPush) X(TypeDone) X(LoopLength) X(LoopLengthFine) \
     X(PlayStop) X(Restart) X(PreviewProject) X(Record) X(RecordAudio) \
     X(Recall) X(ClearRecall) X(SamplingMode) X(AudioRecall) \
     X(LoopMode) X(MuteSelected) X(Undo) X(Redo) X(UndoList) X(DuplicatePattern) X(DeleteCurrentPattern) X(TypeBackspace) \

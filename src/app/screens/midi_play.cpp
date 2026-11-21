@@ -90,7 +90,6 @@ public:
             return true;
         // The Device View: the track, its sound, its effects.
         case Job::Focus: focus = std::clamp(focus + (use.delta > 0 ? 1 : -1), 0, 3); return true;
-        case Job::ShowFocus: studio.say(focus == 0 ? "MIDI TRACK" : focus == 1 ? "SOUND: " + sound_name() : "EFFECTS"); return true;
         case Job::OpenBrowser:
             if (focus == 1) studio.open("midi-sounds");
             else if (focus >= 2) studio.say("EFFECTS: NOT YET");

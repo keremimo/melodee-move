@@ -21,6 +21,9 @@ Melodee for Ableton Move as Schwung's module catalog installs it
   (the default), 400 and 600 ms.
 - On a kit, the last pad pressed now flashes white while held or sounding
   and fades back to its own colour, bright, instead of staying white.
+- Touching the wheel no longer flashes a message (a module's bare preset
+  number like 001, the item in focus, the input source): the screen
+  already shows them.
 
 ## 0.2.1 (2026-11-21)
 

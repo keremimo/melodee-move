@@ -97,7 +97,6 @@ public:
             if (cursor == 1 || cursor == 3) editing = !editing; // gain, start: push, then the wheel
             else step_row(cursor, 1, true);
             return true;
-        case Job::ShowSource: studio.say(s.source_name() + " " + s.gain_text()); return true;
         case Job::TurnKnob: case Job::TurnKnobFine:
             if (page == 1) step_setting(use.index, use.delta, false);
             else if (use.index < int(input_rows().size())) { step_row(use.index, use.delta); rows_until = now + rows_linger; cursor = use.index; }

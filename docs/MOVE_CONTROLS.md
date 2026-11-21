@@ -279,7 +279,7 @@ while Shift is held.
 | Shift + Wheel push (Play, kit) | Sample Options for the sample in focus: Slice, Reverse | Sample Options: Chop, Reverse, Trim, Normalize, Save | done |
 | Shift + Wheel push (Play, synth) | No job (in the browser, Shift opens Options: Save Preset) | Schwung's Shift + click on the module's pages (Schwung's own code draws them, docs/UI.md); without Schwung's code, the module's menu: its levels, presets and own pages | done |
 | Shift + Wheel turn (Play) | The parameter banks of the instrument or sample in focus | The pad pages, a module's pages (Schwung's, then ARP and CHORD) | done |
-| Wheel touch (Play) | Highlights the sample (audio track) | Names the item in focus | done |
+| Wheel touch (Play) | Highlights the sample (audio track) | No job: the screen already shows the item in focus (Kerem, 2026-11-21) | none |
 | Mute held + Wheel push (Play) | No job (Control Live: deactivates the device) | Bypasses the effect in focus, or brings it back | done |
 | Delete held + Wheel push (Play) | No job | Removes the effect in focus; the rest close up | done |
 | Copy held + Wheel push (Play) | No job | Copies the effect in focus; Copy still held, a push on another slot pastes it | done |
@@ -311,7 +311,7 @@ while Shift is held.
 | Wheel push (To Pads) | (Slicing Mode places at once) | Places the slices on the first empty pads | done |
 | Wheel turn (Sampling) | Picks gain, monitoring or source | Melodee's input rows: source, gain, monitor, start (threshold), length; Shift + turn its SAMPLING settings | done |
 | Wheel push (Sampling) | Switches the source (Mic, Line in, Line in mono, Resampling, USB-C) or the setting | The row's next value (gain and start: push, then the wheel); while a take runs, ends it | done |
-| Wheel touch (Sampling) | Shows the input source | The same | done |
+| Wheel touch (Sampling) | Shows the input source | No job: the screen already shows the source (Kerem, 2026-11-21) | none |
 | Wheel turn (Canvas) | No job | A module's pages entered: the next page, or inside an entered door (its presets, a menu, a list, a drawn page) its cursor, as Schwung's jog | done |
 | Wheel push (Canvas) | No job | A module's pages entered: Schwung's click (a held knob: that parameter, a text one the keyboard; none: the Sections picker; a door: in, then its row) | done |
 | Shift + Wheel turn (Canvas) | No job | A module's pages entered: the next section, as Schwung's Shift + jog | done |

@@ -110,7 +110,6 @@ public:
         case Job::InputTurn: cursor = std::clamp(cursor + use.delta, 0, 2); return true;
         case Job::InputPush: step(cursor, 1, true); return true;
         case Job::TurnKnob: case Job::TurnKnobFine: if (use.index < 3) { cursor = use.index; step(use.index, use.delta, false); } return true;
-        case Job::ShowSource: studio.say(source_label(studio.current().audio.source, s)); return true;
         case Job::SamplingMode: case Job::Back: studio.close(); return true;
         case Job::RecordPad: case Job::RecordPadUp: return true; // an audio track's pads play nothing
         default: return false;
@@ -211,7 +210,7 @@ public:
         case Job::TurnKnob: turn(unsigned(use.index), use.delta, false); return true;
         case Job::TurnKnobFine: turn(unsigned(use.index), use.delta, true); return true;
         case Job::OpenBrowser: studio.open("audio-input"); return true; // the wheel's push: its INPUT
-        case Job::Focus: case Job::ShowFocus: return true;
+        case Job::Focus: return true;
         default: return false;
         }
     }

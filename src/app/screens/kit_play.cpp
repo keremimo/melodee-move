@@ -65,9 +65,6 @@ public:
         case Job::SecondParameter: fine = use.index; return true;
         case Job::PadLevel: turn(1, use.delta, false); return true;
         case Job::Focus: focus = std::clamp(focus + (use.delta > 0 ? 1 : -1), 0, 1 + int(effects.size())); return true;
-        case Job::ShowFocus: // the item in focus, named in full
-            studio.say(focus == 0 ? std::string("TRACK MIX") : focus == 1 ? "PAD " + pad_label(studio.pad()) : fx.focus_name(effects[size_t(focus - 2)]));
-            return true;
         case Job::OpenBrowser: // KIT or the pad: Load, its kits (MPC programs), banks and samples, until the track types' sheet
             studio.open("load-samples");
             return true;
