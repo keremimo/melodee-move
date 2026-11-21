@@ -530,10 +530,10 @@ void test_screens() {
     }
     hand.press(Button::Back);
     CHECK(has(*rig.melodee, "page=kit-play"));
-    // Shift + Step 2, then its MIDI CONFIG row (Setup's MIDI row, once Setup is merged); SYNC IN to CLOCK; PANIC.
+    // Shift + Step 2: Setup (move-projects'); its MIDI row: MIDI Config. SYNC IN to CLOCK; PANIC.
     hand.shift([&] { hand.step(1); });
-    CHECK(has(*rig.melodee, "page=setup-pads"));
-    hand.wheel(1);
+    CHECK(has(*rig.melodee, "page=setup"));
+    hand.wheel(2); // PADS, LIGHTS, MIDI
     hand.press(Button::MainPush);
     CHECK(has(*rig.melodee, "page=midi-config"));
     snap(*rig.melodee, "config");
@@ -551,7 +551,7 @@ void test_screens() {
     hand.press(Button::Back); // the list again
     CHECK(has(*rig.melodee, "page=midi-config") && has(*rig.melodee, "midi_panicked=0"));
     hand.press(Button::Back);
-    CHECK(has(*rig.melodee, "page=setup-pads"));
+    CHECK(has(*rig.melodee, "page=setup"));
     hand.press(Button::Back);
     CHECK(has(*rig.melodee, "page=kit-play"));
     // Tempo while MIDI clock leads: the tempo heard.
