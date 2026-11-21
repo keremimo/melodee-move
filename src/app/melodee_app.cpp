@@ -699,7 +699,7 @@ std::string control_path(const std::string& home) {
     std::error_code error;
     std::string folder = !home.empty() ? home : std::filesystem::is_directory("/data/UserData", error) ? "/data/UserData/Melodee" : "Melodee";
     std::filesystem::create_directories(folder, error);
-    return (std::filesystem::path(folder) / "melodee-move.sock").string();
+    return (std::filesystem::path(folder) / ".melodee-move.sock").string();
 }
 
 bool MelodeeApp::finished() const {

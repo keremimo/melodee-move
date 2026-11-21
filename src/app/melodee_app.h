@@ -31,7 +31,8 @@
 namespace app {
 
 // Where the running Melodee listens for commands (move/remote.h): its
-// folder's melodee-move.sock (`home` empty: /data/UserData/Melodee).
+// folder's .melodee-move.sock, hidden from the web page's list (`home`
+// empty: /data/UserData/Melodee).
 std::string control_path(const std::string& home);
 
 class MelodeeApp : public move::App {

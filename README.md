@@ -349,7 +349,7 @@ beside this one (`../melodee-sample`, or `MELODEE_SAMPLE`), unchanged.
 ### Remote
 
 `melodee-move --ctl 'COMMAND'` (over SSH, on the Move) talks to the running
-Melodee through its socket, `/data/UserData/Melodee/melodee-move.sock`
+Melodee through its socket, `/data/UserData/Melodee/.melodee-move.sock`
 (`--home DIR` or `--control SOCKET` for another), as `device.py ctl` does
 on the MPC:
 
