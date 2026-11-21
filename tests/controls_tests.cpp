@@ -216,7 +216,8 @@ void test_decisions() {
     // Typing takes all but the Volume knob and Shift + Back; Back deletes, held cancels.
     CHECK(resolve(typing, use_of(Control::Back, Gesture::Press, held::shift)) == Job::Quit);
     CHECK(resolve(typing, use_of(Control::Volume, Gesture::Turn)) == Job::MainVolume);
-    CHECK(resolve(typing, use_of(Control::Step, Gesture::Press, held::shift, 4)) == Job::Nothing);
+    CHECK(resolve(typing, use_of(Control::Step, Gesture::Press, held::shift, 4)) == Job::TypeDigit); // a digit, never Shift + Step's own job
+    CHECK(resolve(typing, use_of(Control::Pad, Gesture::Press, held::shift)) == Job::TypeKey);       // a capital (Shift held or locked)
     CHECK(resolve(typing, use_of(Control::Back)) == Job::TypeBackspace);
     CHECK(resolve(typing, use_of(Control::Back, Gesture::Hold)) == Job::TypeCancel);
     CHECK(resolve(typing, use_of(Control::NoteSession, Gesture::Tap)) == Job::Nothing);
