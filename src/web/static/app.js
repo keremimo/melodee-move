@@ -197,7 +197,7 @@ const files = (() => {
         + '<span class="meta size">' + (e.dir ? '' : bytes(e.size)) + '</span><span class="meta when">' + when(e.time) + '</span>'
         + '<span class="acts">'
         + (kind === 'audio' ? '<button class="act play" title="Play" data-act="play">' + icons.play + '</button>' : '')
-        + (e.dir ? '' : '<a class="act" title="Download" href="/api/file?path=' + enc(join(e.name)) + '&save=1">' + icons.save + '</a>')
+        + '<a class="act" data-act="save" title="' + (e.dir ? 'Download as a zip' : 'Download') + '" href="/api/file?path=' + enc(join(e.name)) + '&save=1">' + icons.save + '</a>'
         + '<button class="act" title="Rename" data-act="rename">' + icons.rename + '</button>'
         + '<button class="act del" title="Delete" data-act="delete">' + icons.del + '</button>'
         + '</span></li>';

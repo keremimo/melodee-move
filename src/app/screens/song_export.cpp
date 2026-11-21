@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // EXPORT (Sampling on Song; docs/UI.md "Song", Kerem's decision in
 // docs/MOVE_CONTROLS.md): the song as a mixdown (32-bit float, 24 or 16-bit
-// dithered), stems, a MIDI file or an MPC 3 project under Melodee's folder,
-// or into a new pattern. The wheel picks, its push exports (named after the
-// project, numbered past what is there). A mixdown and stems play the song
-// once through, as Melodee renders them: the screen shows how far, Back (or
-// Play) stops it and drops the files. Then where it went; push or Back goes
-// back to Song. The work is exports.h's.
+// dithered), stems, a MIDI file, an MPC 3 project or an Ableton Live Set
+// under Melodee's folder, or into a new pattern. The wheel picks, its push
+// exports (named after the project, numbered past what is there). A mixdown
+// and stems play the song once through, as Melodee renders them: the screen
+// shows how far, Back (or Play) stops it and drops the files. Then where it
+// went; push or Back goes back to Song. The work is exports.h's.
 #include "app/screens/common.h"
 #include "app/exports.h"
 #include "app/song_desk.h"
@@ -76,11 +76,12 @@ public:
         }
         if (shown.busy) {
             int percent = int(std::lround(shown.fraction * 100));
-            ui::rail(g, "EXPT", shown.kind == Kind::Mpc3 ? "" : std::to_string(std::min(percent, 99)), shown.kind == Kind::Mpc3 ? "" : "%");
+            const bool writes = Exports::writes_project(shown.kind); // no song plays: no clock
+            ui::rail(g, "EXPT", writes ? "" : std::to_string(std::min(percent, 99)), writes ? "" : "%");
             move::draw_text(g, ui::content_x + 2, 1, Exports::kind_name(shown.kind));
             auto slash = shown.file.find('/');
             move::draw_text(g, ui::content_x + 2, 12, upper(slash == std::string::npos ? shown.name : shown.file.substr(slash + 1)).substr(0, 16));
-            if (shown.kind == Kind::Mpc3) {
+            if (writes) {
                 move::draw_text(g, ui::content_x + 2, 28, shown.said.empty() ? "WRITING..." : upper(shown.said).substr(0, 16));
             } else {
                 ui::progress(g, {ui::content_x + 2, 26, ui::content_width - 4, 9}, shown.fraction);

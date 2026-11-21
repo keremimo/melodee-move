@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "app/exports.h"
+#include "app/live_export.h"
 #include "app/prints.h"
 #include "app/project_store.h"
 #include "app/song_desk.h"
 #include "app/studio.h"
 #include "app/wav_out.h"
+#include "melodee/model/audio_track.h"
 #include "melodee/model/print.h"
 #include "melodee/shell/mpc3_export.h"
 #include <algorithm>
@@ -42,6 +44,7 @@ const char* Exports::kind_name(Kind kind) {
     case Kind::Stems: return "STEMS";
     case Kind::Midi: return "MIDI FILE";
     case Kind::Mpc3: return "MPC 3 PROJECT";
+    case Kind::Live: return "ABLETON LIVE SET";
     case Kind::ToPattern: return "SONG TO PATTERN";
     default: return "";
     }
@@ -53,6 +56,7 @@ std::string Exports::folder_of(Kind kind) {
     case Kind::Stems: return "Stems";
     case Kind::Midi: return "MIDI";
     case Kind::Mpc3: return "MPC 3";
+    case Kind::Live: return "Ableton";
     default: return "";
     }
 }
@@ -62,8 +66,9 @@ std::string Exports::free_name(const std::string& folder, const std::string& ste
     for (unsigned n = 1; n < 10000; ++n) {
         std::string name = stem + (n > 1 ? " " + std::to_string(n) : std::string());
         auto candidate = fs::path(folder) / (name + extension);
-        // An MPC 3 project is its file and its data folder.
-        bool taken = fs::exists(candidate, e) || (extension == ".xpj" && fs::exists(fs::path(folder) / (name + "_[ProjectData]"), e));
+        // An MPC 3 project is its file and its data folder; a Live Set is its project folder.
+        bool taken = fs::exists(candidate, e) || (extension == ".xpj" && fs::exists(fs::path(folder) / (name + "_[ProjectData]"), e)) ||
+                     (extension == ".als" && fs::exists(fs::path(folder) / (name + " Project"), e));
         if (!taken) return name;
     }
     return stem;
@@ -123,34 +128,35 @@ std::string Exports::start(Kind what) {
         give_to_owner_of(file, home);
         return finished(name, folder_of(what) + "/" + name + ".mid", bytes.size(), "");
     }
-    case Kind::Mpc3: {
+    case Kind::Mpc3: case Kind::Live: {
         std::string folder = (fs::path(home) / folder_of(what)).string();
         kind = what;
         path = folder;
         {
             std::lock_guard<std::mutex> guard(lock);
-            now.name = free_name(folder, stem, ".xpj");
-            now.file = folder_of(what) + "/" + now.name + ".xpj";
+            now.name = free_name(folder, stem, what == Kind::Live ? ".als" : ".xpj");
+            now.file = folder_of(what) + "/" + now.name + (what == Kind::Live ? " Project" : ".xpj");
             now.busy = true;
         }
         // Synth tracks with notes go as their prints: those printed first (tick()).
-        mpc3_pending = 0;
+        prints_pending = 0;
         for (unsigned t = 0; t < melodee::track_count; ++t) {
             if (studio.kind(t) != TrackKind::Synth || desk.printer().deep(t) || !desk.printer().printable(t)) continue;
             auto with = desk.printer().with_notes(t);
-            if (with[0] | with[1]) mpc3_pending |= 1u << t;
+            if (with[0] | with[1]) prints_pending |= 1u << t;
         }
-        if (mpc3_pending && !studio.project_path().empty()) {
-            mpc3_waiting = true;
+        if (prints_pending && !studio.project_path().empty()) {
+            prints_waiting = true;
             cancelled.store(false);
             running.store(true, std::memory_order_release);
             return {};
         }
-        mpc3_pending = 0;
-        mpc3_project = std::make_unique<melodee::Project>(project);
-        mpc3_bank = std::make_unique<melodee::PatternBank>(studio.patterns());
-        mpc3_prints = std::make_unique<melodee::PrintTable>(desk.printer().table());
-        mpc3_prints_dir = melodee::prints_folder(studio.project_path());
+        prints_pending = 0;
+        copy_project = std::make_unique<melodee::Project>(project);
+        copy_bank = std::make_unique<melodee::PatternBank>(studio.patterns());
+        copy_prints = std::make_unique<melodee::PrintTable>(desk.printer().table());
+        copy_prints_dir = melodee::prints_folder(studio.project_path());
+        copy_audio_dir = melodee::audio_folder(studio.project_path());
         break;
     }
     case Kind::Mix32: case Kind::Mix24: case Kind::Mix16: case Kind::Stems: {
@@ -212,13 +218,13 @@ std::string Exports::start(Kind what) {
 }
 
 void Exports::tick() {
-    if (!mpc3_waiting) return;
+    if (!prints_waiting) return;
     auto& printer = studio.song_desk().printer();
     printer.tick(); // the last prints' records in the table first
     if (printer.busy()) return;
-    while (mpc3_pending) {
-        unsigned t = unsigned(__builtin_ctz(mpc3_pending));
-        mpc3_pending &= mpc3_pending - 1;
+    while (prints_pending) {
+        unsigned t = unsigned(__builtin_ctz(prints_pending));
+        prints_pending &= prints_pending - 1;
         Printer::Job job;
         job.track = t;
         auto with = printer.with_notes(t);
@@ -230,11 +236,12 @@ void Exports::tick() {
         return;
     }
     // Every print made: the project, as it is now, written on the export thread.
-    mpc3_waiting = false;
-    mpc3_project = std::make_unique<melodee::Project>(studio.project());
-    mpc3_bank = std::make_unique<melodee::PatternBank>(studio.patterns());
-    mpc3_prints = std::make_unique<melodee::PrintTable>(printer.table());
-    mpc3_prints_dir = melodee::prints_folder(studio.project_path());
+    prints_waiting = false;
+    copy_project = std::make_unique<melodee::Project>(studio.project());
+    copy_bank = std::make_unique<melodee::PatternBank>(studio.patterns());
+    copy_prints = std::make_unique<melodee::PrintTable>(printer.table());
+    copy_prints_dir = melodee::prints_folder(studio.project_path());
+    copy_audio_dir = melodee::audio_folder(studio.project_path());
     {
         std::lock_guard<std::mutex> guard(lock);
         now.said.clear();
@@ -245,10 +252,10 @@ void Exports::tick() {
 
 void Exports::cancel() {
     if (!running.load()) return;
-    if (mpc3_waiting) { // its prints called off: nothing written
+    if (prints_waiting) { // its prints called off: nothing written
         studio.song_desk().printer().cancel();
-        mpc3_waiting = false;
-        mpc3_pending = 0;
+        prints_waiting = false;
+        prints_pending = 0;
         running.store(false, std::memory_order_release);
         std::lock_guard<std::mutex> guard(lock);
         now.busy = false;
@@ -256,7 +263,7 @@ void Exports::cancel() {
         return;
     }
     cancelled.store(true);
-    if (kind != Kind::Mpc3) studio.send({Type::Stop}); // the render stops with the song
+    if (!writes_project(kind)) studio.send({Type::Stop}); // the render stops with the song
 }
 
 Exports::Shown Exports::shown() const {
@@ -291,7 +298,7 @@ void Exports::run() {
             if (stopping) return;
             job_waiting = false;
         }
-        if (kind == Kind::Mpc3) mpc3_job();
+        if (writes_project(kind)) project_job();
         else render_job();
         running.store(false, std::memory_order_release);
     }
@@ -373,8 +380,7 @@ void Exports::render_job() {
     }
 }
 
-void Exports::mpc3_job() {
-    melodee::Mpc3Export report;
+void Exports::project_job() {
     std::string name;
     {
         std::lock_guard<std::mutex> guard(lock);
@@ -382,22 +388,40 @@ void Exports::mpc3_job() {
     }
     std::error_code e;
     fs::create_directories(path, e);
-    auto error = melodee::export_mpc3_project(*mpc3_project, *mpc3_bank, path, name, report, mpc3_prints.get(), mpc3_prints_dir);
-    mpc3_project.reset();
-    mpc3_bank.reset();
-    mpc3_prints.reset();
-    if (error.empty()) give_to_owner_of(path, studio.home_folder());
+    std::string error;
+    char said[64] = {};
+    if (kind == Kind::Live) {
+        LiveExport report;
+        error = export_live_set(*copy_project, *copy_bank, path, name, report, copy_prints.get(), copy_prints_dir, copy_audio_dir);
+        // Run as root over SSH, everything it wrote goes to the Move's user.
+        if (error.empty()) {
+            const fs::path made = fs::path(path) / (name + " Project");
+            give_to_owner_of(path, studio.home_folder());
+            give_to_owner_of(made.string(), studio.home_folder());
+            for (auto it = fs::recursive_directory_iterator(made, e); !e && it != fs::recursive_directory_iterator(); it.increment(e))
+                give_to_owner_of(it->path().string(), studio.home_folder());
+        }
+        unsigned left = report.skipped + report.missing;
+        std::snprintf(said, sizeof said, "%u TRACKS %u CLIPS%s", report.tracks, report.clips + report.arranged,
+                      left ? (" " + std::to_string(left) + " LEFT").c_str() : "");
+    } else {
+        melodee::Mpc3Export report;
+        error = melodee::export_mpc3_project(*copy_project, *copy_bank, path, name, report, copy_prints.get(), copy_prints_dir);
+        if (error.empty()) give_to_owner_of(path, studio.home_folder());
+        unsigned left = report.skipped_tracks + report.skipped_pads;
+        std::snprintf(said, sizeof said, "%u TRACKS %u SEQ%s", report.tracks + report.keygroups + report.audio + report.midi, report.sequences,
+                      left ? (" " + std::to_string(left) + " LEFT").c_str() : "");
+    }
+    copy_project.reset();
+    copy_bank.reset();
+    copy_prints.reset();
     std::lock_guard<std::mutex> guard(lock);
     now.busy = false;
     now.done = error.empty();
     now.error = error;
     if (error.empty()) {
         ++exported;
-        char text[64];
-        unsigned left = report.skipped_tracks + report.skipped_pads;
-        std::snprintf(text, sizeof text, "%u TRACKS %u SEQ%s", report.tracks + report.keygroups + report.audio + report.midi, report.sequences,
-                      left ? (" " + std::to_string(left) + " LEFT").c_str() : "");
-        now.said = text;
+        now.said = said;
     }
 }
 

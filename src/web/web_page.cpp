@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "web/web_page.h"
 #include "web/web_bundle.h"
+#include "web/zip_stream.h"
 #include "melodee/web/card_files.h" // card_place, folder_json, free_path, file_type: Melodee's own, as on the MPC
 #include "melodee/web/web_server.h" // json_text, safe_name
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <filesystem>
+#include <memory>
 #include <thread>
 #include <vector>
 
@@ -282,6 +284,20 @@ Reply WebPage::list(const Request& request) {
 Reply WebPage::send_file(const Request& request) {
     std::string file;
     if (!place(query_of(request, "path"), file)) return error_reply(404, "Not in Melodee's folder");
+    std::error_code error;
+    if (fs::is_directory(file, error)) { // a folder (a Live Set's project) saved as a zip of it
+        if (query_of(request, "save") != "1") return error_reply(404, "Not a file");
+        std::string top = fs::path(file).filename().string();
+        if (query_of(request, "path").empty() || top.empty()) top = "Melodee";
+        auto plan = std::make_shared<ZipPlan>();
+        if (auto why = plan_zip(file, top, *plan); !why.empty()) return error_reply(413, why);
+        Reply reply;
+        reply.type = "application/zip";
+        reply.download = top + ".zip";
+        reply.headers.push_back({"Content-Length", std::to_string(plan->bytes)});
+        reply.stream = [plan](const Send& send) { send_zip(*plan, send); };
+        return reply;
+    }
     Reply reply;
     reply.type = melodee::web::file_type(fs::path(file).filename().string());
     reply.file = file;

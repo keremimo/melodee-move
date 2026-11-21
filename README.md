@@ -183,10 +183,16 @@ Three parts so far:
   it. **Sampling on Song exports** (the Move's Resampling records its whole
   output): a mixdown (32-bit float, or 24 or 16-bit dithered) or stems, the
   song played once through in real time; a MIDI file; an MPC 3 project
-  (synth tracks as their prints, made first); the song into a new pattern.
-  They go under `/data/UserData/Melodee`: `Mixdowns/`, `Stems/<name>/`,
-  `MIDI/`, `MPC 3/`, as Melodee writes them on the MPC's card. A `.mid` in
-  the samples browser loads its notes onto the track's pattern.
+  (synth tracks as their prints, made first); an Ableton Live Set, to go on
+  with the project in Live 12.1 or later (each pattern a Session View clip,
+  the song laid out in Arrangement View, kits as Drum Racks of Simplers,
+  synth tracks as their notes and their prints, levels, sends and tempo;
+  not the effects); the song into a new pattern. They go under
+  `/data/UserData/Melodee`: `Mixdowns/`, `Stems/<name>/`, `MIDI/`,
+  `MPC 3/`, as Melodee writes them on the MPC's card, and
+  `Ableton/<name> Project/`, which the web page downloads as a zip (any
+  folder's download button). A `.mid` in the samples browser loads its notes
+  onto the track's pattern.
 - **Print and freeze** (a track button held + Sampling: PRINT): a kit or
   synth track's patterns printed by a print host of Melodee's (its lean
   engine host and a second instance of the Schwung module) on a thread at

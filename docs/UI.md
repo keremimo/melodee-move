@@ -869,12 +869,22 @@ doors (docs/MOVE_CONTROLS.md, Decisions). `docs/ui/song.png` is the sheet
   Ramp). A track button leaves for Play, as on the Move.
 - **EXPORT** (Sampling on Song; the Move's Resampling records its whole
   output): MIXDOWN 32 FLOAT, 24 BIT, 16 BIT, STEMS, MIDI FILE, MPC 3
-  PROJECT, SONG TO PATTERN; the wheel picks, push exports, named after the
-  project. A mixdown or stems play the song once through: the screen shows
-  how far (`37 %`, the clock, the tail), Sampling red; Back or Play stops it
-  and drops the files. Then where it went (`MIXDOWNS/`, `MOVE 3.WAV`, its
-  length and size); push goes back. Under `/data/UserData/Melodee`:
-  `Mixdowns/`, `Stems/<name>/`, `MIDI/`, `MPC 3/`, as on the MPC's card.
+  PROJECT, ABLETON LIVE SET, SONG TO PATTERN; the wheel picks, push exports,
+  named after the project. A mixdown or stems play the song once through:
+  the screen shows how far (`37 %`, the clock, the tail), Sampling red; Back
+  or Play stops it and drops the files. Then where it went (`MIXDOWNS/`,
+  `MOVE 3.WAV`, its length and size); push goes back. Under
+  `/data/UserData/Melodee`:
+  `Mixdowns/`, `Stems/<name>/`, `MIDI/`, `MPC 3/`, as on the MPC's card,
+  and `Ableton/<name> Project/`: a Live Set (Live 12.1 or later) to go on
+  with the project in Live, its samples and prints copied beside it. The web
+  page downloads that folder as a zip. Each pattern is a Session View clip
+  in the scene of its number, the song is laid out in Arrangement View, a kit
+  is a Drum Rack of Simplers, a keygroup track a Simpler (an SFZ of zones a
+  Sampler), a synth track its notes on a MIDI track and its prints on an
+  audio track beside it; levels, pans, mutes, sends (the buses as return
+  tracks), tempo, scenes' tempos, markers and the loop brace go with it.
+  Effects, Motion and pad filters do not (src/app/live_export.h).
 - **PRINT** (a track button held + Sampling): the track's patterns on the
   pads (Plus / Minus: 32 a bank), with notes dim in its colour, to print
   ice, the one playing blinking; a pad takes one out or back. TAP (knob 1),

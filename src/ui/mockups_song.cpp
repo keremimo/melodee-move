@@ -157,7 +157,7 @@ std::vector<Screen> song_screens() {
         {"export", "SAMPLING ON SONG: EXPORT", [](juce::Graphics& g) {
             rail(g, "EXPT", "", "SONG");
             list(g, content(0, 52), {"MIXDOWN 32 FLOAT", "MIXDOWN 24 BIT", "MIXDOWN 16 BIT", "STEMS", "MIDI FILE", "MPC 3 PROJECT",
-                                     "SONG TO PATTERN"}, 0, 1);
+                                     "ABLETON LIVE SET", "SONG TO PATTERN"}, 0, 1);
             detail(g, "AS MOVE 3", "3:14");
         }},
         {"exporting", "MIXDOWN: THE SONG PLAYS ONCE THROUGH", [](juce::Graphics& g) {

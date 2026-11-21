@@ -7,6 +7,7 @@
 #include "web/screens.h"
 #include "web/web_layer.h"
 #include "web/web_page.h"
+#include "web/zip_stream.h"
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -217,6 +218,31 @@ void test_page(const fs::path& scratch) {
 
     auto file = page.handle(request("GET", "/api/file", {{"path", "Samples/Snare.wav"}, {"save", "1"}}), none);
     CHECK(file.status == 200 && file.type == "audio/wav" && file.file == (home / "Samples/Snare.wav").string() && file.download == "Snare.wav");
+
+    // A folder saved as a zip (an Ableton Live Set's project): its files under its name, stored, read back whole.
+    fs::create_directories(home / "Samples/Kits/.cache");
+    std::ofstream(home / "Samples/Kits/Hat.wav") << "RIFF hat";
+    std::ofstream(home / "Samples/Kits/.cache/x") << "hidden";
+    auto zipped = page.handle(request("GET", "/api/file", {{"path", "Samples"}, {"save", "1"}}), none);
+    CHECK(zipped.status == 200 && zipped.type == "application/zip" && zipped.download == "Samples.zip" && zipped.stream);
+    std::string bytes;
+    if (zipped.stream) zipped.stream([&](const std::string& part) { bytes += part; return true; });
+    std::ofstream("build/test-web.zip", std::ios::binary) << bytes; // for a look with other unzips
+    CHECK(!zipped.headers.empty() && zipped.headers[0].first == "Content-Length" && zipped.headers[0].second == std::to_string(bytes.size()));
+    {
+        juce::MemoryInputStream in(bytes.data(), bytes.size(), false);
+        juce::ZipFile zip(in);
+        CHECK(zip.getNumEntries() == 2); // Snare.wav and Kits/Hat.wav; nothing hidden
+        auto read = [&](const char* name) {
+            int index = zip.getIndexOfFileName(name);
+            if (index < 0) return std::string("missing");
+            std::unique_ptr<juce::InputStream> entry(zip.createStreamForEntry(index));
+            return entry ? entry->readEntireStreamAsString().toStdString() : std::string("unreadable");
+        };
+        CHECK(read("Samples/Kits/Hat.wav") == "RIFF hat" && read("Samples/Snare.wav") == "RIFF");
+    }
+    CHECK(web::crc32_of("123456789", 9) == 0xcbf43926u); // the check value of CRC-32
+    CHECK(page.handle(request("GET", "/api/file", {{"path", "Samples"}}), none).status == 404); // a folder plays nothing
 
     // Nothing outside Melodee's folder, by name or by link.
     CHECK(page.handle(request("GET", "/api/list", {{"path", ".."}}), none).status == 404);

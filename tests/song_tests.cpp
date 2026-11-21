@@ -2,11 +2,12 @@
 // Song, its exports, print and freeze (docs/PARITY.md's `song & export`
 // rows), against the whole app as the Move runs it: the song's model jobs,
 // playing from a bar, Rec into the song, the MIDI file both ways, the song
-// into a pattern, a mixdown, stems and an MPC 3 project written while the
-// song plays, prints made by the print host and a track frozen, unfrozen and
+// into a pattern, a mixdown, stems, an MPC 3 project and an Ableton Live
+// Set written while the song plays, prints made by the print host and a track frozen, unfrozen and
 // opened frozen again. The tests drive the audio thread themselves (render)
 // and the service thread (service), as the runtime would.
 #include "app/exports.h"
+#include "app/live_export.h"
 #include "app/new_project.h"
 #include "app/melodee_app.h"
 #include "app/pad_layout.h"
@@ -19,15 +20,18 @@
 #include "move/display.h"
 #include "move/tools.h"
 #include "melodee/engine/engine_info.h"
+#include "melodee/engine/midi_engine.h"
 #include "melodee/model/project_file.h"
 #include "melodee/model/smf.h"
 #include <chrono>
 #include <cmath>
 #include <cstring>
 #include <filesystem>
+#include <functional>
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <set>
 #include <string>
 #include <thread>
 #include <vector>
@@ -328,6 +332,186 @@ WavInfo wav_info(const std::string& path) {
     return w;
 }
 
+// A Live Set's XML: the .als is gzip around it.
+std::unique_ptr<juce::XmlElement> live_set(const std::string& file) {
+    juce::FileInputStream in(juce::File(juce::String::fromUTF8(file.c_str())));
+    if (!in.openedOk()) return nullptr;
+    juce::GZIPDecompressorInputStream unpacked(&in, false, juce::GZIPDecompressorInputStream::gzipFormat);
+    return juce::parseXML(unpacked.readEntireStreamAsString());
+}
+// Elements named `tag` anywhere under `root`.
+std::vector<juce::XmlElement*> all_of(juce::XmlElement& root, const char* tag) {
+    std::vector<juce::XmlElement*> out;
+    std::function<void(juce::XmlElement&)> walk = [&](juce::XmlElement& e) {
+        for (auto* child : e.getChildIterator()) {
+            if (child->hasTagName(tag)) out.push_back(child);
+            walk(*child);
+        }
+    };
+    walk(root);
+    return out;
+}
+juce::String value_of(juce::XmlElement* e, const char* path) { // "Name/EffectiveName": the Value of that child
+    for (auto part : juce::StringArray::fromTokens(path, "/", "")) e = e ? e->getChildByName(part) : nullptr;
+    return e ? e->getStringAttribute("Value") : juce::String();
+}
+
+void test_live_numbers() {
+    CHECK(app::live_time_signature(4, 4) == 201);
+    CHECK(app::live_time_signature(3, 4) == 200);
+    CHECK(app::live_time_signature(6, 8) == 302);
+    CHECK(app::live_time_signature(7, 16) == 402);
+}
+
+// The Live Set's pieces, written from a project made here: a kit of layers, a choke group, a muted pad and a pad
+// played at other pitches (a track of its own), ratchets, a kit lane of its own length and the project's swing; a
+// keygroup track and a MIDI track's program; scenes named and timed; the song with a muted clip, the tempo lane,
+// markers and the loop. The set stays in build/test-live/ (to open in Live).
+void test_live_set_details() {
+    const std::string folder = "build/test-live", loop = fs::absolute("build/test-samples/loop.wav").string();
+    fs::remove_all(folder);
+    auto project = app::new_project();
+    auto bank = std::make_unique<melodee::PatternBank>();
+    std::snprintf(project->name, sizeof project->name, "Details");
+    project->tempo = 1000;
+    project->swing = 60;
+    auto& ref = project->samples.edit(0);
+    std::snprintf(ref.path, sizeof ref.path, "%s", loop.c_str());
+    std::snprintf(ref.name, sizeof ref.name, "loop");
+    auto& kit = project->tracks[0];
+    melodee::load_sound(kit, melodee::EngineKind::Sampler, 0);
+    kit.set_name("DRUMS");
+    for (unsigned n = 0; n < 4; ++n) kit.pads[n].sample = 0;
+    kit.pads[0].play = melodee::PadPlay::OneShot;
+    kit.pads[0].group = 1;
+    kit.pads[1].play = melodee::PadPlay::Gate;
+    kit.pads[1].group = 1;
+    kit.pads[1].high_velocity = 63;
+    kit.pads[1].layers[0].sample = 0; // a second layer, the hard hits
+    kit.pads[1].layers[0].low = 64;
+    kit.pads[1].layers[0].pitch = 12;
+    kit.set_pad_muted(2, true);
+    kit.mix.level = 80;
+    kit.mix.pan = -25;
+    auto& keys = project->tracks[1];
+    melodee::load_sound(keys, melodee::EngineKind::Keygroup, 0);
+    keys.set_name("KEYS");
+    keys.pads[0].sample = 0;
+    auto& midi = project->tracks[2];
+    melodee::load_sound(midi, melodee::EngineKind::Midi, 0);
+    midi.set_name("SYNTH OUT");
+    midi.params[melodee::midi_track::Program] = 6; // program 5, sent by each clip
+    const uint32_t bar = project->bar_ticks(), quarter = melodee::ticks_per_quarter;
+    auto note = [&](unsigned t, unsigned p, uint32_t tick, unsigned key, int pitch = 0, unsigned ratchet = 1) {
+        melodee::Event e;
+        e.tick = tick;
+        e.key = uint8_t(key);
+        e.length = 12;
+        e.pitch = int8_t(pitch);
+        e.ratchet = uint8_t(ratchet);
+        e.chance = 50;
+        bank->at[t][p].events.push_back(e);
+        bank->at[t][p].length = bar;
+        bank->at[t][p].free = false;
+    };
+    const unsigned c1 = melodee::sampler_first_note;
+    note(0, 0, 0, c1, 0, 3);           // pad 1, three hits
+    note(0, 0, quarter, c1 + 1);       // pad 2
+    note(0, 0, 2 * quarter, c1 + 3, 5); // pad 4, five semitones up
+    bank->at[0][0].lanes.push_back({uint8_t(c1), bar / 2}); // pad 1's lane half the pattern: again on beat 3
+    note(0, 16, 0, c1 + 1);            // B1: the seventeenth scene
+    note(1, 0, 0, 60);
+    note(1, 0, quarter / 4, 64);       // a sixteenth late: swung
+    note(2, 0, 0, 48);
+    std::snprintf(project->scenes[0].name, sizeof project->scenes[0].name, "INTRO");
+    project->scenes[0].tempo = 900;
+    auto& song = project->song;
+    song.place({0, 0, 0, 2, false});
+    song.place({1, 0, 2, 1, true});
+    song.tempo.set(2, 1300, false);
+    song.tempo.set(4, 1500, true);
+    song.loop_start = 0;
+    song.loop_end = 2;
+    song.step_marker(2);
+
+    app::LiveExport report;
+    CHECK(app::export_live_set(*project, *bank, folder, "Details", report).empty());
+    CHECK(report.tracks == 4 && report.scenes == 17 && report.missing == 0 && report.samples == 1);
+    auto set = live_set(folder + "/Details Project/Details.als");
+    CHECK(set != nullptr);
+    if (!set) return;
+    auto tracks = all_of(*set, "MidiTrack");
+    CHECK(tracks.size() == 4);
+    if (tracks.size() != 4) return;
+    CHECK(value_of(tracks[0], "Name/EffectiveName") == "DRUMS" && value_of(tracks[1], "Name/EffectiveName") == "DRUMS A04");
+    CHECK(value_of(tracks[2], "Name/EffectiveName") == "KEYS" && value_of(tracks[3], "Name/EffectiveName") == "SYNTH OUT");
+    // The kit: pads 1-3 (pad 4 went to its own track), on C1, C#1 and D1; 1 and 2 choke each other, 3 is muted.
+    auto branches = all_of(*tracks[0], "DrumBranch");
+    CHECK(branches.size() == 3);
+    if (branches.size() == 3) {
+        CHECK(value_of(branches[0], "BranchInfo/ReceivingNote") == "92" && value_of(branches[2], "BranchInfo/ReceivingNote") == "90");
+        CHECK(value_of(branches[0], "BranchInfo/ChokeGroup") == "1" && value_of(branches[1], "BranchInfo/ChokeGroup") == "1");
+        CHECK(value_of(branches[2], "MixerDevice/Speaker/Manual") == "false" && value_of(branches[0], "MixerDevice/Speaker/Manual") == "true");
+        CHECK(value_of(branches[0], "DeviceChain/MidiToAudioDeviceChain/Devices/OriginalSimpler/Globals/PlaybackMode") == "1");
+        CHECK(value_of(branches[1], "DeviceChain/MidiToAudioDeviceChain/Devices/OriginalSimpler/Globals/PlaybackMode") == "0");
+        auto parts = all_of(*branches[1], "MultiSamplePart"); // its two layers, by velocity, the second an octave up
+        CHECK(parts.size() == 2);
+        if (parts.size() == 2) {
+            CHECK(value_of(parts[0], "VelocityRange/Max") == "63" && value_of(parts[1], "VelocityRange/Min") == "64");
+            CHECK(value_of(parts[1], "RootKey") == "48" && value_of(parts[0], "IsActive") == "true");
+        }
+    }
+    CHECK(value_of(tracks[0], "DeviceChain/Mixer/Volume/Manual").getDoubleValue() < 1 && value_of(tracks[0], "DeviceChain/Mixer/Pan/Manual") == "-0.5");
+    // A1 on the kit: pad 1's three hits twice (its lane repeats), pad 2 once, swung; a chance of a half.
+    auto a1 = all_of(*tracks[0]->getChildByName("DeviceChain")->getChildByName("MainSequencer")->getChildByName("ClipSlotList"), "MidiClip");
+    CHECK(a1.size() == 2); // A1 and B1
+    if (!a1.empty()) {
+        auto events = all_of(*a1[0], "MidiNoteEvent");
+        CHECK(events.size() == 7);
+        std::set<double> times;
+        for (auto* e : events) times.insert(e->getDoubleAttribute("Time"));
+        CHECK(times.count(0) && times.count(2) && times.count(1)); // the hits' first, the lane again, pad 2 on beat 2
+        CHECK(times.count(0.05)); // the second hit, 4 ticks in, swung 60: 4.8 ticks
+        CHECK(events[0]->getStringAttribute("Probability") == "0.5");
+    }
+    // The pad played at other pitches: its own Simpler, its notes 60 + their pitch.
+    auto pitched = all_of(*tracks[1]->getChildByName("DeviceChain")->getChildByName("MainSequencer")->getChildByName("ClipSlotList"), "MidiNoteEvent");
+    CHECK(pitched.size() == 1 && value_of(tracks[1], "DeviceChain/MainSequencer/ClipSlotList/ClipSlot/ClipSlot/Value/MidiClip/Notes/KeyTracks/KeyTrack/MidiKey") == "65");
+    // The keygroup track: a Simpler at its root; the second sixteenth under swing 60 is 0.3 beats in (24 ticks, 28.8 played).
+    auto keys_notes = all_of(*tracks[2], "MidiNoteEvent");
+    CHECK(keys_notes.size() >= 2);
+    bool swung_note = false;
+    for (auto* e : keys_notes) swung_note = swung_note || std::fabs(e->getDoubleAttribute("Time") - 0.3) < 1e-9;
+    CHECK(swung_note);
+    CHECK(value_of(tracks[2], "DeviceChain/DeviceChain/Devices/OriginalSimpler/Player/MultiSampleMap/SampleParts/MultiSamplePart/RootKey") == "60");
+    // The MIDI track's clips send its program.
+    CHECK(value_of(tracks[3], "DeviceChain/MainSequencer/ClipSlotList/ClipSlot/ClipSlot/Value/MidiClip/ProgramChange") == "5");
+    // Scenes: A1 named and timed, the rest by their numbers.
+    auto scenes = all_of(*set, "Scene");
+    CHECK(scenes.size() == 17);
+    if (scenes.size() == 17) {
+        CHECK(value_of(scenes[0], "Name") == "INTRO" && value_of(scenes[0], "Tempo") == "90" && value_of(scenes[0], "IsTempoEnabled") == "true");
+        CHECK(value_of(scenes[16], "Name") == "B1" && value_of(scenes[16], "IsTempoEnabled") == "false");
+    }
+    // The song: the kit's clip over two bars, the keys' muted; the tempo lane: a step to 130 on bar 3, a ramp to 150 by bar 5.
+    auto* kit_timeline = tracks[0]->getChildByName("DeviceChain")->getChildByName("MainSequencer")->getChildByName("ClipTimeable");
+    auto arranged = kit_timeline ? all_of(*kit_timeline, "MidiClip") : std::vector<juce::XmlElement*> {};
+    CHECK(arranged.size() == 1 && arranged[0]->getStringAttribute("Time") == "0" && value_of(arranged[0], "CurrentEnd") == "8");
+    auto* keys_timeline = tracks[2]->getChildByName("DeviceChain")->getChildByName("MainSequencer")->getChildByName("ClipTimeable");
+    auto muted = keys_timeline ? all_of(*keys_timeline, "MidiClip") : std::vector<juce::XmlElement*> {};
+    CHECK(muted.size() == 1 && muted[0]->getStringAttribute("Time") == "8" && value_of(muted[0], "Disabled") == "true");
+    auto tempo = all_of(*set->getChildByName("LiveSet")->getChildByName("MainTrack"), "FloatEvent");
+    CHECK(tempo.size() == 4);
+    if (tempo.size() == 4) {
+        CHECK(tempo[0]->getStringAttribute("Value") == "100" && tempo[1]->getStringAttribute("Time") == "8" && tempo[1]->getStringAttribute("Value") == "100");
+        CHECK(tempo[2]->getStringAttribute("Value") == "130" && tempo[3]->getStringAttribute("Time") == "16" && tempo[3]->getStringAttribute("Value") == "150");
+    }
+    auto* transport = set->getChildByName("LiveSet")->getChildByName("Transport");
+    CHECK(transport && value_of(transport, "LoopOn") == "true" && value_of(transport, "LoopLength") == "8");
+    auto locators = all_of(*set, "Locator");
+    CHECK(locators.size() == 1 && value_of(locators[0], "Name") == "INTRO" && value_of(locators[0], "Time") == "8");
+}
+
 void test_exports() {
     std::string folder = "build/test-samples", home = "build/test-home-song-export", loop = folder + "/loop.wav";
     write_project(home, loop);
@@ -384,6 +568,67 @@ void test_exports() {
     CHECK(exports.shown().done && exports.shown().error.empty());
     CHECK(fs::exists(home + "/MPC 3/Tune.xpj") && fs::is_directory(home + "/MPC 3/Tune_[ProjectData]"));
     CHECK(fs::exists(home + "/MPC 3/Tune_[ProjectData]/loop.wav"));
+    // The Live Set: its folder, the set (gzip around Live's XML) and its samples beside it.
+    {
+        std::lock_guard<std::mutex> guard(rig.studio().lock);
+        auto& song = rig.studio().project().song;
+        song.markers[0] = {};
+        song.markers[0].bar = 1;
+        std::snprintf(song.markers[0].name, sizeof song.markers[0].name, "VERSE");
+        song.marker_count = 1;
+        rig.studio().project().tracks[1].mix.sends[2] = 50; // PERC into bus C: a return track
+        CHECK(exports.start(app::Exports::Kind::Live).empty());
+    }
+    for (int wait = 0; wait < 1200 && exports.busy(); ++wait) std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    CHECK(exports.shown().done && exports.shown().error.empty() && exports.shown().file == "Ableton/Tune Project");
+    CHECK(has(exports.shown().said, "2 TRACKS"));
+    const std::string set_file = home + "/Ableton/Tune Project/Tune.als";
+    CHECK(fs::exists(set_file) && fs::exists(home + "/Ableton/Tune Project/Samples/Imported/loop.wav"));
+    if (auto set = live_set(set_file)) {
+        CHECK(set->hasTagName("Ableton") && set->getStringAttribute("MinorVersion").startsWith("12."));
+        auto tracks = all_of(*set, "MidiTrack");
+        CHECK(tracks.size() == 2);
+        if (tracks.size() == 2) {
+            CHECK(value_of(tracks[0], "Name/EffectiveName") == "DRUMS" && value_of(tracks[1], "Name/EffectiveName") == "PERC");
+            // A kit: a Drum Rack, pad 1 on C1 (Live keeps 128 - the note), a Simpler of the sample, by its path in the set.
+            auto branches = all_of(*tracks[0], "DrumBranch");
+            CHECK(branches.size() == 1 && all_of(*tracks[0], "DrumGroupDevice").size() == 1);
+            if (!branches.empty()) CHECK(value_of(branches[0], "BranchInfo/ReceivingNote") == "92");
+            auto files = all_of(*tracks[0], "FileRef");
+            CHECK(!files.empty() && value_of(files[0], "RelativePath") == "Samples/Imported/loop.wav" && value_of(files[0], "RelativePathType") == "1");
+            // A1 and A2 in the first two scenes: four quarters on a bar, sixteen eighths on two.
+            auto slots = all_of(*tracks[0]->getChildByName("DeviceChain")->getChildByName("MainSequencer"), "MidiClip");
+            CHECK(slots.size() >= 2);
+            if (slots.size() >= 2) {
+                CHECK(value_of(slots[0], "Loop/LoopEnd") == "4" && all_of(*slots[0], "MidiNoteEvent").size() == 4);
+                CHECK(value_of(slots[1], "Loop/LoopEnd") == "8" && all_of(*slots[1], "MidiNoteEvent").size() == 16);
+                CHECK(value_of(slots[0], "Notes/KeyTracks/KeyTrack/MidiKey") == "36");
+            }
+            // The song: its clips laid out in Arrangement View.
+            auto* timeline = tracks[0]->getChildByName("DeviceChain")->getChildByName("MainSequencer")->getChildByName("ClipTimeable");
+            CHECK(timeline && !all_of(*timeline, "MidiClip").empty());
+            // Every track's clip slots one a scene.
+            auto scenes = all_of(*set, "Scene");
+            CHECK(scenes.size() == 2 && value_of(scenes[0], "Name") == "A1");
+            for (auto* track : tracks) CHECK(track->getChildByName("DeviceChain")->getChildByName("MainSequencer")->getChildByName("ClipSlotList")->getNumChildElements() == 2);
+        }
+        auto returns = all_of(*set, "ReturnTrack");
+        CHECK(returns.size() == 1 && value_of(returns[0], "Name/EffectiveName") == "Bus C");
+        auto* main = set->getChildByName("LiveSet")->getChildByName("MainTrack");
+        CHECK(main && value_of(main, "DeviceChain/Mixer/TimeSignature/Manual") == "201");
+        CHECK(main && value_of(main, "DeviceChain/Mixer/Tempo/Manual").getDoubleValue() == rig.studio().tempo() / 10.0);
+        auto locators = all_of(*set, "Locator");
+        CHECK(locators.size() == 1 && value_of(locators[0], "Name") == "VERSE" && value_of(locators[0], "Time") == "4");
+    } else {
+        CHECK(!"the Live Set reads");
+    }
+    // Again: numbered past the first.
+    {
+        std::lock_guard<std::mutex> guard(rig.studio().lock);
+        CHECK(exports.start(app::Exports::Kind::Live).empty());
+    }
+    for (int wait = 0; wait < 1200 && exports.busy(); ++wait) std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    CHECK(fs::exists(home + "/Ableton/Tune 2 Project/Tune 2.als"));
     // Song to pattern from the export list.
     {
         std::lock_guard<std::mutex> guard(rig.studio().lock);
@@ -606,6 +851,35 @@ void test_synth_freeze() {
     auto shown = rig.desk().exports().shown();
     CHECK(shown.done && shown.error.empty() && fs::exists(home + "/MPC 3/Tune.xpj"));
     CHECK(has(rig.app.status(), "print_skipped=1"));
+    // Live: the synth track's notes on a MIDI track, its prints on an audio track beside it.
+    {
+        std::lock_guard<std::mutex> guard(rig.studio().lock);
+        CHECK(rig.desk().exports().start(app::Exports::Kind::Live).empty());
+    }
+    for (int wait = 0; wait < 1500 && rig.desk().exports().busy(); ++wait) {
+        rig.render(8);
+        rig.app.service();
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    shown = rig.desk().exports().shown();
+    CHECK(shown.done && shown.error.empty());
+    if (auto set = live_set(home + "/Ableton/Tune Project/Tune.als")) {
+        auto audio = all_of(*set, "AudioTrack");
+        CHECK(audio.size() == 1);
+        if (!audio.empty()) {
+            CHECK(value_of(audio[0], "Name/EffectiveName").endsWith(" Print"));
+            auto clips = all_of(*audio[0], "AudioClip");
+            CHECK(!clips.empty() && value_of(clips[0], "IsWarped") == "true");
+            auto files = all_of(*audio[0], "FileRef");
+            CHECK(!files.empty() && fs::exists(home + "/Ableton/Tune Project/" + value_of(files[0], "RelativePath").toStdString()));
+        }
+        unsigned synth_notes = 0;
+        for (auto* track : all_of(*set, "MidiTrack"))
+            if (all_of(*track, "DrumGroupDevice").empty()) synth_notes += unsigned(all_of(*track, "MidiNoteEvent").size());
+        CHECK(synth_notes >= 1);
+    } else {
+        CHECK(!"the Live Set with a synth reads");
+    }
 }
 
 // The pad layouts (pad_layout.h): PRINT's patterns are numbered pads, so
@@ -815,6 +1089,10 @@ int main() {
     test_song_plays();
     std::cerr << "test_midi_file\n";
     test_midi_file();
+    std::cerr << "test_live_numbers\n";
+    test_live_numbers();
+    std::cerr << "test_live_set_details\n";
+    test_live_set_details();
     std::cerr << "test_exports\n";
     test_exports();
     std::cerr << "test_print_and_freeze\n";
