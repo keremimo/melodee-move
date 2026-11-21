@@ -286,8 +286,10 @@ the screens were built; the screens are `src/app/screens/kit_play.cpp`,
   resonance, envelope amount and its four stages) and KIT FILT (the filter
   after every pad: type, cutoff, resonance). A page draws its knobs as
   cells under its title, three letters each; a knob touched shows its full
-  name and value large. On a pad holding an instrument TRIM becomes ZONES
-  (drawn, waiting for the instruments' loading).
+  name and value large. On a pad holding an instrument (an SFZ, EXS or
+  DecentSampler preset, loaded from the kit's Load as a sample is) TRIM
+  becomes ZONES, as a keygroup's: the zones over the keys, knob 1 the zone
+  in hand, 2 ZONE TUNE (cents), 3 ZONE LEVEL, trimmed on that pad only.
 - **Shift + a knob touched** (the Move's second parameter): a kit knob's
   fine view. TUNE shows its cents; START, END and LOOP POINT their place
   close up, 32 times nearer (the Move's Sample Start zoom); Shift + turn
