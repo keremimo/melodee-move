@@ -300,6 +300,7 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
     closing.push_back([this] { loop_desk->flush(std::chrono::milliseconds(300)); });
     saving.push_back([this] { loop_desk->keep_values(); });
     opened.push_back([this](const std::string&) { loop_desk->reopen(); });
+    opened.push_back([this](const std::string&) { sampler_shell->project_opened(); }); // its audio tracks' takes
     set_module_tempo(song->tempo / 10.0f);
     audio_track.store(int(selected));
     audio_kind.store(int(kind(selected)));

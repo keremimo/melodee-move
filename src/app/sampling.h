@@ -173,6 +173,11 @@ public:
     void arm_audio(unsigned track);  // Rec: arms, lets go, or ends the take
     void audio_changed(unsigned track); // its takes or their settings changed: its pack again
     void restore_audio();             // every audio track's pack, once the project is read
+    // Another project opened (Studio's `opened` hooks, under the lock): the
+    // last one's takes let go (the engine let their packs go as it reloaded),
+    // the new one's read from its own folder. A take still being written
+    // lands first.
+    void project_opened();
     struct TakeData {
         std::vector<float> left, right;
         unsigned rate = 44100;

@@ -112,6 +112,15 @@ const Sampling::TakeData* Sampling::take_data(unsigned take) const {
 
 void Sampling::audio_changed(unsigned t) { send_pack(t); }
 
+void Sampling::project_opened() {
+    if (audio_job) return; // a take armed or being written: it ends first (rare: a project opened while recording)
+    audio_arm = -1;
+    takes.clear(); // numbered by the project: another project's Take 1 is another take
+    takes_wanted.clear();
+    packs_wanted.clear();
+    audio_restored = false; // service_audio() sends the new project's packs
+}
+
 void Sampling::restore_audio() {
     for (unsigned t = 0; t < melodee::track_count; ++t)
         if (studio.kind(t) == TrackKind::Audio) send_pack(t);
