@@ -1317,11 +1317,40 @@ void test_sampling() {
         settle();
         CHECK(has(melodee.status(), "last_take=RESAMPLE 1"));
         CHECK(std::filesystem::exists(recorded + "/RESAMPLE 1.wav"));
+        // LENGTH SEQ, stopped: the pad starts Play and the take is one pass of the kit's pattern (a bar, 2 s).
+        melodee.surface(make_event(0xb0, uint8_t(knob_first_cc + 4), 1));
+        tap_pad(melodee, 12);
+        blocks(4, false);
+        CHECK(has(melodee.status(), "playing=1"));
+        blocks(720, false);
+        settle();
+        CHECK(has(melodee.status(), "last_take=RESAMPLE 2"));
+        press_button(melodee, Button::Play);
+        melodee.surface(make_event(0xb0, uint8_t(knob_first_cc + 4), 127)); // FREE again
+        // START at -24 dB: armed, it waits through silence, the tone starts it.
+        melodee.surface(make_event(0xb0, knob_first_cc, 125)); // SOURCE back to the line (RESAMPLE, LINE R, LINE L, LINE)
+        CHECK(has(melodee.status(), "source=LINE "));
+        melodee.surface(make_event(0xb0, uint8_t(knob_first_cc + 3), 49));
+        tap_pad(melodee, 13);
+        blocks(100, false);
+        CHECK(has(melodee.status(), "rec=armed"));
+        blocks(100, true);
+        CHECK(has(melodee.status(), "rec=recording"));
+        press_button(melodee, Button::Sample);
+        blocks(2, false);
+        settle();
+        CHECK(has(melodee.status(), "last_take=TAKE 4"));
+        // Shift + the wheel: the SAMPLING settings; knob 1 Recall's cut on to FIRST.
+        with_shift(melodee, [&] { turn_wheel(melodee, 1); });
+        melodee.surface(make_event(0xb0, knob_first_cc, 1));
+        press_button(melodee, Button::Back);
     }
     // The input as set is kept with the Move's settings.
     std::ifstream settings(home + "/Move.settings");
     std::string text((std::istreambuf_iterator<char>(settings)), std::istreambuf_iterator<char>());
-    CHECK(has(text, "in_source 4") && has(text, "in_threshold 0"));
+    CHECK(has(text, "in_source 1") && has(text, "in_threshold 72") && has(text, "recall_grab 1"));
+    for (const char* kept : {"Recorded", "Edits", "Banks", "Looper", "Expansions", "Keygroups", "Stems"})
+        CHECK(std::filesystem::is_directory(home + "/Samples/" + kept));
 }
 
 void test_sample_files() {

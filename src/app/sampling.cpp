@@ -389,10 +389,6 @@ void Sampling::tick(bool in_view) {
     // The pads play Melodee's own sound while a take of it waits or runs.
     int redirect = pads_play_source() ? int(input.source == InputSource::Track ? input.track : track) : -1;
     if (redirect != redirect_sent) { studio.pads_play(redirect); redirect_sent = redirect; }
-    // Play stopping stops a take, as on the Move.
-    bool playing = studio.playing();
-    if (was_playing && !playing && taking()) stop();
-    was_playing = playing;
     if (armed_here && host.recorder().state() != State::Idle) armed_here = false; // the audio thread has it
     if (armed_here && Clock::now() - armed_at > arm_settles) armed_here = false;
 }
@@ -447,6 +443,12 @@ std::string Sampling::status() const {
 // ---------------------------------------------------------------- service thread
 
 void Sampling::service() {
+    if (!folders_made) { // Melodee's samples folders (MELODEE.md, Files on the card)
+        folders_made = true;
+        std::error_code error;
+        for (const char* kept : {"Recorded", "Edits", "Banks", "Looper", "Expansions", "Keygroups", "Stems"})
+            fs::create_directories(fs::path(studio.home_folder()) / "Samples" / kept, error);
+    }
     // A take: its file opened as it starts, drained as it comes, made whole as it ends.
     Job* taking_job = nullptr;
     State state;

@@ -212,7 +212,7 @@ private:
     std::map<unsigned, std::unique_ptr<TakeData>> takes;   // by take number, kept for the run (packs point into them)
     std::vector<unsigned> takes_wanted, packs_wanted;       // to read; tracks whose pack waits for them
     int audio_quiet_sent = -1;
-    bool audio_restored = false;
+    bool audio_restored = false, folders_made = false;
 
     Studio& studio;
     bool input_known = false, line = false, to_speaker = true;
@@ -223,7 +223,7 @@ private:
     std::vector<uint32_t> cuts;
     bool armed_here = false, saving = false, stopping = false;
     Clock::time_point armed_at {};
-    bool was_playing = false, monitor_sent = false, monitor_known = false, quiet_sent = false;
+    bool monitor_sent = false, monitor_known = false, quiet_sent = false;
     int redirect_sent = -2;
     std::unique_ptr<Job> job; // the take's file (the service thread's while it records)
     std::vector<std::unique_ptr<Job>> recalls;

@@ -130,7 +130,7 @@ bool MelodeeApp::global(bindings::Job job, const bindings::Use& use) {
     case Job::TracksOverview: studio.open("tracks"); return true;
     // Transport and volume.
     case Job::PlayStop:
-        if (studio.playing()) studio.stop();
+        if (studio.playing()) { studio.stop(); studio.sampling().stop(); } // stops a recording too, as on the Move
         else studio.play();
         return true;
     case Job::Restart: studio.restart(); return true; // the Move's retrigger: every playing pattern from its top
