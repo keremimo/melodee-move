@@ -91,7 +91,8 @@ public:
         case Page::Arp: case Page::Chord: {
             auto note_page = page == Page::Arp ? NotePage::Arp : NotePage::Chord;
             draw_note_page(g, studio, t, note_page, note_page_right(studio, t, note_page));
-            ui::detail(g, detail_left(*sample), bar_beat(studio));
+            auto [left, right] = note_page_detail(studio, t, note_page);
+            ui::detail(g, left, right);
             return;
         }
         default: break;

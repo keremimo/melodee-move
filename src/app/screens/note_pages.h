@@ -102,10 +102,30 @@ inline void note_page_turn(Studio& studio, unsigned t, NotePage page, unsigned n
     }
 }
 
-// The page drawn under the Device View's items: its title and knob cells.
+// The page drawn under the Device View's items: its title and knob cells;
+// CHORD's five in a row over the notes its last chord played
+// (docs/ui/instruments.png).
 inline void draw_note_page(juce::Graphics& g, const Studio& studio, unsigned t, NotePage page, const std::string& right) {
     move::draw_text(g, ui::content_x + 1, 11, note_page_title(page));
     if (!right.empty()) move::draw_text(g, ui::width - move::text_width(right), 11, right);
+    if (page == NotePage::Chord) {
+        auto area = ui::content(20, 14);
+        int cell = area.getWidth() / 5;
+        for (unsigned n = 0; n < 5; ++n) {
+            auto knob = note_page_knob(studio, t, page, n);
+            int x = area.getX() + int(n) * cell, bar = cell - 4;
+            move::draw_text(g, x + 1, area.getY(), std::string_view(knob.name).substr(0, size_t(std::max(1, (cell - 2) / move::glyph_advance))));
+            g.fillRect(x + 1, area.getBottom() - 1, bar, 1);
+            g.fillRect(x + 1, area.getBottom() - 4, std::max(1, int(knob.fraction * float(bar))), 3);
+        }
+        const auto& track = studio.project().tracks[t % melodee::track_count];
+        auto notes = pad_notes(studio.project(), track, 0, studio.key_shift(t));
+        std::string text;
+        for (unsigned k = 0; k < notes.count && k < 4; ++k) text += (k ? " " : "") + note_name(notes.keys[k]);
+        if (!track.chord) text = "CHORDS OFF";
+        move::draw_text_centred(g, ui::content_x, 37, ui::content_width, text);
+        return;
+    }
     std::array<std::string, 8> names;
     std::array<float, 8> values {};
     for (unsigned n = 0; n < 8; ++n) {
@@ -153,6 +173,19 @@ inline std::string octave_or_bank(Studio& studio, int way, int lowest_octave, in
 inline std::string drum_name(int key) {
     const char* name = melodee::gm_drum_name(unsigned(key));
     return std::to_string(key) + " " + upper(name ? name : note_name(key));
+}
+
+// The detail line under ARP and CHORD (docs/ui/instruments.png): the mode and
+// rate, the octaves; the chord's type and voicing, its inversion.
+inline std::pair<std::string, std::string> note_page_detail(const Studio& studio, unsigned t, NotePage page) {
+    const auto& track = studio.project().tracks[t % melodee::track_count];
+    if (page == NotePage::Arp)
+        return {upper(std::string(melodee::arp_mode_name(melodee::ArpMode(track.arp_mode))) + " " + melodee::arp_rate_name(track.arp_rate)).substr(0, 12),
+                "X" + std::to_string(track.arp_octaves)};
+    if (page == NotePage::Chord)
+        return {upper(std::string(melodee::chord_type_name(track.chord_type)) + " " + melodee::chord_voicing_name(track.chord_voicing)).substr(0, 12),
+                upper(melodee::chord_invert_name(track.chord_invert))};
+    return {};
 }
 
 // The rows of fourths' lowest note, or a drum's, for the rail.

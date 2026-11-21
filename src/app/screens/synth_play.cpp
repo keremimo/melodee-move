@@ -144,7 +144,10 @@ public:
         if (NotePage* own = melodee_page()) { // MACRO, ARP, CHORD (screens/note_pages.h)
             std::string right = *own == NotePage::Macro ? lowest_note(studio) : note_page_right(studio, studio.track(), *own);
             draw_note_page(g, studio, studio.track(), *own, right);
-            ui::detail(g, upper(module.preset_name.empty() ? module.info().name : module.preset_name).substr(0, 12), bar_beat(studio));
+            if (*own != NotePage::Macro) { auto [left, more] = note_page_detail(studio, studio.track(), *own); ui::detail(g, left, more); return; }
+            char number[16];
+            std::snprintf(number, sizeof number, "%03d", std::clamp(module.preset + 1, 0, 999));
+            ui::detail(g, upper(module.preset_name.empty() ? module.info().name : module.preset_name).substr(0, 12), module.preset_param.empty() ? bar_beat(studio) : number);
             return;
         }
         std::string title = upper(page ? page->name : module.info().name).substr(0, 12), lowest = note_name(studio.note_for(0, studio.octave(studio.track())));
