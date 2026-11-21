@@ -5,7 +5,7 @@
 # whole runtime against a simulated Move (the spike: a pad, the jogwheel to
 # LATENCY, the meter timing clicks through a 300-frame cable, Shift + Back to
 # quit; Melodee: load, chop, To Pads, saved and restored, transport and
-# tempo, the pad layout set to MPC banks and kept, the synth track saved and
+# tempo, the pads in MPC banks and kept, the synth track saved and
 # restored),
 # and the packages in dist/. When Melodee's own page previews are at hand
 # (MELODEE_PREVIEWS, by default ../melodee-sample/build/melodee-preview),
@@ -55,10 +55,10 @@ RESTORE_EXPECTED='page=kit-play .*pad=A02 samples=1 pads=17 loading=0 saves=1 un
 TRANSPORT_SCRIPT='100:0xb0,85,127;101:0xb0,85,0;300:0xb0,49,127;301:0x90,20,127;302:0x80,20,0;303:0xb0,49,0;320:0xb0,14,2;340:0xb0,3,127;341:0xb0,3,0;360:0xb0,49,127;361:0x90,21,127;362:0x80,21,0;363:0xb0,49,0;380:0xb0,51,127;381:0xb0,51,0'
 TRANSPORT_EXPECTED='page=kit-play .*playing=1 tick=[1-9][0-9]* tempo=122.0 click=1'
 # The pad layouts, on that project (A01 the loop, A02 to B01 its 16
-# slices): Shift + Step 2 at 100 opens Setup > PADS, push edits LAYOUT, the
-# wheel right turns it to Banks, push sets it, Back at 180; the bottom row's
-# fifth pad at 300 is B01 in Banks (A05 in Rows). The next start keeps Banks.
-PADS_SCRIPT='100:0xb0,49,127;101:0x90,17,127;102:0x80,17,0;103:0xb0,49,0;120:0xb0,3,127;121:0xb0,3,0;140:0xb0,14,1;160:0xb0,3,127;161:0xb0,3,0;180:0xb0,51,127;181:0xb0,51,0;300:0x90,72,100;330:0x80,72,0'
+# slices), with Move.settings saying MPC banks (as Setup > PADS > LAYOUT
+# leaves it): the bottom row's fifth pad at 100 is B01 in Banks (A05 in
+# Rows); the save on the way out keeps Banks, and so does the next start.
+PADS_SCRIPT='100:0x90,72,100;130:0x80,72,0'
 PADS_EXPECTED='page=kit-play .*pad=B01 .*layout=banks'
 # The synth track: Track 2 tapped at 50, the wheel's push at 60 lists the
 # modules (none loaded yet), its push at 80 loads the one in
@@ -94,6 +94,7 @@ docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE
     { build/melodee-move --backend simulated --samples build/simulated-samples --home build/simulated-home --seconds 3 --script '$TRANSPORT_SCRIPT' 2> build/simulated-transport.log || true; } &&
     tail -n 1 build/simulated-transport.log &&
     grep -qE '$TRANSPORT_EXPECTED' build/simulated-transport.log &&
+    echo 'pads 1' >> build/simulated-home/Move.settings &&
     { build/melodee-move --backend simulated --samples build/simulated-samples --home build/simulated-home --seconds 3 --script '$PADS_SCRIPT' 2> build/simulated-pads.log || true; } &&
     tail -n 1 build/simulated-pads.log &&
     grep -qE '$PADS_EXPECTED' build/simulated-pads.log &&

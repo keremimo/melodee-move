@@ -240,16 +240,17 @@ project, as it is the hands' and not the song's. No shortcut (Kerem): the
 Move has few free keys, and a stray press would move every pad. Push edits
 it: the wheel turns it while the screen shows where each run of pads starts
 and the pads light their numbering (pad 1 white, the banks or rows in two
-colours); push sets it, said on the screen (`PADS: MPC BANKS`), and every
-pad's job and light changes at once; Back leaves it as it was. Setup is
-move-projects' (Shift + Step 2); until it lands, Shift + Step 2 opens
-SETUP > PADS itself (`src/app/screens/setup_pads.cpp`, the row
-`src/app/pad_setting.*`).
+colours); push sets it, said on the screen (`PADS: MPC BANKS`), every pad's
+job and light changes at once, and the list is back; Back leaves it as it
+was. Setup and its PADS list (RESPONSE, PRESSURE, LAYOUT) are
+move-projects' (`screens/setup.cpp`, Shift + Step 2); the LAYOUT row opens
+`setup-pads` (`src/app/screens/setup_pads.cpp`), the row's words and what
+setting it does are `src/app/pad_setting.*`.
 
 | Screen | Rail | Subject | Detail |
 | --- | --- | --- | --- |
-| Setup > PADS | `PADS` / / `SETP` | the list: `LAYOUT  BANKS` | |
-| Editing LAYOUT | `PADS` / / `SETP` | the 32 pads, each run's first number inverted | `MOVE ROWS 8 A ROW`, `MPC BANKS 2 X 4X4` |
+| Setup > PADS (move-projects') | `PADS` / / `SETP` | the list: `LAYOUT  BANKS` among its rows | |
+| Editing LAYOUT (`setup-pads`) | `PADS` / / `SETP` | the 32 pads, each run's first number inverted | `MOVE ROWS 8 A ROW`, `MPC BANKS 2 X 4X4` |
 
 ## Screens in code
 
