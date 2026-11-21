@@ -1184,6 +1184,7 @@ void Studio::apply_step(const Step& step, bool forward) {
                     loaded.preset = file.preset;
                     if (auto* param = loaded.param(loaded.preset_param)) param->value = file.preset;
                     synth_set(*module, loaded.preset_param, std::to_string(file.preset));
+                    if (!loaded.preset_name_param.empty()) module->player.ask(loaded.preset_name_param, true); // its name, for the screen
                 }
                 for (const auto& [key, value] : file.values)
                     if (ModuleParam* param = loaded.param(key); param && param->text() != value) {
@@ -1621,6 +1622,7 @@ void Studio::take_answers() {
                 if (key == module.preset_param) module.preset = int(param->value);
             }
         }
+        track->player.send_asks(); // what waited for room, now the answers are taken
         // An items list, read whole: [{"index": 0, "label": "GM"}, ...] or names.
         std::string text;
         if (track->pick_reading && track->player.long_answer(text)) {
@@ -2073,6 +2075,7 @@ std::string Studio::load_module_now(unsigned t, const std::string& id, const Syn
     track->canvas_entered = false;
     if (typing && typing_track == int(t)) { typing = false; pads_typing.store(false); typing_canvas = typing_track = -1; }
     track->set_at.clear();
+    track->player.drop_asks(); // the module before's keys
     track->page = 0;
     track->menu_open = false;
     track->pick_items.clear();

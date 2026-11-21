@@ -5,6 +5,7 @@
 #include "move/queues.h"
 #include <atomic>
 #include <chrono>
+#include <deque>
 #include <memory>
 #include <mutex>
 #include <thread>
@@ -149,7 +150,14 @@ public:
     // Any thread but the audio thread, one at a time (the app's lock).
     bool set_module(LoadedModule* module); // null: none
     bool set(const std::string& key, const std::string& value);
-    bool ask(const std::string& key); // answered on a later block
+    // Answered on a later block, never dropped: what the queues have no room
+    // for yet waits here (a preset change asks Surge for some 300 values),
+    // sent by send_asks() as answers are taken. A key already waiting is
+    // asked once; `first` puts it ahead of the rest (the preset's name).
+    void ask(const std::string& key, bool first = false);
+    void send_asks();   // the waiting asks, as many as can be answered
+    void drop_asks();   // the waiting asks forgotten (another module)
+    size_t waiting_asks() const { return backlog.size(); }
     uint64_t last_serial() const { return serial; } // the last set's or ask's
     // A read too long for an Answer (an items list): one at a time, answered
     // on a later block. False while one is pending.
@@ -198,8 +206,13 @@ private:
     bool next_block(); // `block` filled with the module's next block (false: nothing, silence)
     void timed(Clock::time_point begun, const char* kind, const char* key, const char* value);
 
+    static constexpr size_t answer_slots = 64;
     move::SpscRing<Command, 256> commands;
-    move::SpscRing<Answer, 64> answers;
+    move::SpscRing<Answer, answer_slots> answers;
+    // The asks sent and not yet answered stay under what `answers` holds
+    // (one slot less), so the audio thread always has room for an answer.
+    std::deque<std::string> backlog; // the producer's: asks not sent yet
+    size_t asked = 0, answered = 0;  // the producer's
     move::SpscRing<LoadedModule*, 8> retiring;
     move::SpscRing<Slow, 16> slows;
     // The long read: 0 none, 1 asked, 2 answered.

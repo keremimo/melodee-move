@@ -310,10 +310,11 @@ private:
         module.preset = to;
         if (auto* param = module.param(module.preset_param)) param->value = to;
         studio.synth_set(track, module.preset_param, std::to_string(to));
-        // A preset sets every parameter: ask for each again, to show and save.
+        // Its name first, for the screen; then, as a preset sets every
+        // parameter, each again, to show and save (Surge's 300 wait their turn).
+        if (!module.preset_name_param.empty()) track.player.ask(module.preset_name_param, true);
         for (const auto& param : module.params)
             if (param.key != module.preset_param) track.player.ask(param.key);
-        if (!module.preset_name_param.empty()) track.player.ask(module.preset_name_param);
         studio.changed();
     }
 

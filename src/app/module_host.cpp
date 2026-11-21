@@ -497,15 +497,36 @@ bool SynthPlayer::set(const std::string& key, const std::string& value) {
     return commands.push(command);
 }
 
-bool SynthPlayer::ask(const std::string& key) {
-    Command command;
-    command.kind = Command::Kind::Ask;
-    command.serial = ++serial;
-    std::snprintf(command.key, key_size, "%s", key.c_str());
-    return commands.push(command);
+void SynthPlayer::ask(const std::string& key, bool first) {
+    if (auto waiting = std::find(backlog.begin(), backlog.end(), key); waiting != backlog.end()) {
+        if (!first) return; // sent later than this ask: its answer is as new
+        backlog.erase(waiting);
+    }
+    if (first) backlog.push_front(key);
+    else backlog.push_back(key);
+    send_asks();
 }
 
-bool SynthPlayer::answer(Answer& out) { return answers.pop(out); }
+void SynthPlayer::send_asks() {
+    while (!backlog.empty() && asked - answered < answer_slots - 1) {
+        Command command;
+        command.kind = Command::Kind::Ask;
+        command.serial = serial + 1; // its serial as sent: after every set before it
+        std::snprintf(command.key, key_size, "%s", backlog.front().c_str());
+        if (!commands.push(command)) return; // full of sets: the next service
+        serial = command.serial;
+        ++asked;
+        backlog.pop_front();
+    }
+}
+
+void SynthPlayer::drop_asks() { backlog.clear(); }
+
+bool SynthPlayer::answer(Answer& out) {
+    if (!answers.pop(out)) return false;
+    ++answered;
+    return true;
+}
 
 bool SynthPlayer::ask_long(const std::string& key) {
     if (long_state.load(std::memory_order_acquire) != 0) return false;

@@ -758,7 +758,8 @@ void test_schwung_modules() {
     int32_t loud = peak_of(out);
     CHECK(loud > to_s32(0.1f));
     player.pressure(60, 127);
-    CHECK(player.ask("pressure") && player.ask("note"));
+    player.ask("pressure");
+    player.ask("note");
     out.fill(0);
     player.render(in, out, 1.0f);
     CHECK(peak_of(out) > loud);
@@ -772,6 +773,36 @@ void test_schwung_modules() {
     player.render(in, out, 1.0f);
     CHECK(peak_of(out) == 0);
     CHECK(player.answer(answer) && std::string(answer.key) == "level" && std::string(answer.value) == "0.25");
+    // More asks than the queues hold at once (a preset change asks Surge for
+    // some 300 values): none dropped, each answered as room is made. The
+    // preset's name, asked first, comes back among the first, not after them all.
+    {
+        for (int n = 0; n < 300; ++n) player.ask("value" + std::to_string(n));
+        player.ask("value200"); // still waiting: asked once
+        player.ask("preset_name", true);
+        CHECK(player.waiting_asks() > 0);
+        int answers = 0, name_at = -1;
+        std::string name;
+        for (int block = 0; block < 400 && (player.waiting_asks() || answers < 301); ++block) {
+            player.render(in, out, 1.0f);
+            while (player.answer(answer)) {
+                if (std::string(answer.key) == "preset_name") { name = answer.value; name_at = answers; }
+                ++answers;
+            }
+            player.send_asks(); // as the service does
+        }
+        CHECK(answers == 301 && !player.waiting_asks());
+        CHECK(name == "Fake 0" && name_at >= 0 && name_at < 80);
+        // A module replaced: its keys still waiting are forgotten.
+        for (int n = 0; n < 100; ++n) player.ask("value" + std::to_string(n));
+        CHECK(player.waiting_asks() > 0);
+        player.drop_asks();
+        CHECK(!player.waiting_asks());
+        for (int block = 0; block < 40; ++block) {
+            player.render(in, out, 1.0f);
+            while (player.answer(answer)) {}
+        }
+    }
     // A call that holds the audio thread up is reported, with what it was.
     app::SynthPlayer::Slow slow;
     CHECK(!player.slow(slow)); // nothing slow so far
