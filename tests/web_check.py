@@ -108,14 +108,14 @@ check(status == 200 and facts["via"] == "local" and facts["version"].startswith(
 shown = frames("127.0.0.1", 1)
 check(len(shown) == 1 and sum(bin(b).count("1") for b in shown[0]) > 200, "the screen's stream shows Melodee's screen")
 
-check(call("127.0.0.1", "POST", "/api/mkdir?path=&name=Samples")[0] == 200, "a folder made")
+check(call("127.0.0.1", "POST", "/api/mkdir?path=&name=From%20the%20web")[0] == 200, "a folder made") # Samples/ is Sampling's, made at start
 sample = b"RIFF" + bytes(range(256)) * 40
-check(call("127.0.0.1", "POST", "/api/upload?path=Samples&name=Web%20Kick.wav", sample)[0] == 200, "a sample uploaded")
-status, data, _ = call("127.0.0.1", "GET", "/api/list?path=Samples")
+check(call("127.0.0.1", "POST", "/api/upload?path=From%20the%20web&name=Web%20Kick.wav", sample)[0] == 200, "a sample uploaded")
+status, data, _ = call("127.0.0.1", "GET", "/api/list?path=From%20the%20web")
 check(status == 200 and any(e["name"] == "Web Kick.wav" and e["size"] == len(sample) for e in json.loads(data)["entries"]), "listed: %s" % data)
-check(call("127.0.0.1", "GET", "/api/file?path=Samples/Web%20Kick.wav")[1] == sample, "read back whole")
-check(call("127.0.0.1", "POST", "/api/rename?path=Samples/Web%20Kick.wav&to=Kick.wav")[0] == 200, "renamed")
-check(call("127.0.0.1", "POST", "/api/delete?path=Samples/Kick.wav")[0] == 200, "deleted")
+check(call("127.0.0.1", "GET", "/api/file?path=From%20the%20web/Web%20Kick.wav")[1] == sample, "read back whole")
+check(call("127.0.0.1", "POST", "/api/rename?path=From%20the%20web/Web%20Kick.wav&to=Kick.wav")[0] == 200, "renamed")
+check(call("127.0.0.1", "POST", "/api/delete?path=From%20the%20web/Kick.wav")[0] == 200, "deleted")
 check(call("127.0.0.1", "POST", "/api/delete?path=")[0] == 403, "Melodee's folder itself stays")
 
 # At this machine's own address: as on Wi-Fi.
