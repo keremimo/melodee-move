@@ -287,6 +287,15 @@ public:
         return {value.name, value.text(edit, v), fraction};
     }
     std::string knob_owner() const override { return pad_label(studio.pad()); }
+    // TRIM's START, END and LOOP POINT touched: the place close up under its value.
+    std::string draw_knob_place(juce::Graphics& g, unsigned which, juce::Rectangle<int> area, bool fine_view) const override {
+        const Sample* sample = studio.sample_of_pad();
+        if (page != Trim || which > 2 || !sample || !studio.current().pads[studio.pad()].used()) return {};
+        const auto& sound = studio.current().pads[studio.pad()];
+        uint32_t end = sound.end ? sound.end : sample->data->model_frames();
+        uint32_t at = which == 0 ? sound.start : which == 1 ? end : sound.loop_point();
+        return draw_place(g, area, *sample, at, sound.start, end, place_zoom(fine_view));
+    }
     std::string status() const override {
         return studio.top() == this ? " kit_page=" + std::string(page_names[size_t(page)]) + " layer=" + std::to_string(layer + 1) : std::string();
     }
@@ -329,12 +338,10 @@ private:
     void draw_fine(juce::Graphics& g) {
         auto shown = knob(unsigned(fine));
         if (shown.name.empty()) return;
-        const Sample* sample = studio.sample_of_pad();
-        if (page == Trim && fine <= 2 && sample) {
-            const auto& sound = studio.current().pads[studio.pad()];
-            uint32_t frames = std::max<uint32_t>(1, sample->data->model_frames());
-            uint32_t at = fine == 0 ? sound.start : fine == 1 ? (sound.end ? sound.end : frames) : sound.loop_point();
-            if (close_up(g, *sample, at)) { ui::detail(g, shown.value, "X32"); return; }
+        if (auto zoom = draw_knob_place(g, unsigned(fine), ui::place_area(), true); !zoom.empty()) {
+            ui::place_value(g, shown.value);
+            ui::detail(g, shown.name, zoom);
+            return;
         }
         ui::big_parameter(g, ui::content(4, 44), shown.name, shown.value, shown.fraction);
         ui::detail(g, "SHIFT: FINE");

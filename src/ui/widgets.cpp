@@ -88,6 +88,41 @@ void cuts(juce::Graphics& g, juce::Rectangle<int> area, const std::vector<int>& 
     g.setColour(on);
 }
 
+void close_up(juce::Graphics& g, juce::Rectangle<int> area, const std::vector<float>& peaks, int kept_from, int kept_to,
+              const std::vector<int>& marks) {
+    waveform(g, area, peaks);
+    int width = area.getWidth(), top = area.getY();
+    g.setColour(off);
+    for (int column = 0; column < width; ++column) {
+        int x = area.getX() + column;
+        size_t index = peaks.empty() ? 0 : size_t(column) * peaks.size() / size_t(width);
+        if (peaks.empty() || peaks[index] < 0) { g.fillRect(x, top, 1, area.getHeight()); continue; } // before the start, past the end
+        if (column >= kept_from && column <= kept_to) continue;
+        for (int y = top + (column & 1); y < area.getBottom(); y += 2) pixel(g, x, y); // half lit: trimmed away
+    }
+    for (int column : marks) {
+        if (column < 0 || column >= width) continue;
+        int x = area.getX() + column;
+        for (int y = top; y < area.getBottom(); y += 2) {
+            g.setColour(on); pixel(g, x, y);
+            g.setColour(off); pixel(g, x, y + 1);
+        }
+    }
+    int x = area.getX() + width / 2;
+    g.setColour(off);
+    g.fillRect(x - 1, top + 2, 3, area.getHeight() - 2);
+    g.setColour(on);
+    g.fillRect(x, top, 1, area.getHeight());
+    g.fillRect(x - 2, top, 5, 1); // a notch on top
+    g.fillRect(x - 1, top + 1, 3, 1);
+}
+
+void place_value(juce::Graphics& g, std::string_view value) {
+    g.setColour(on);
+    int scale = move::text_width(value, 2) <= content_width ? 2 : 1;
+    move::draw_text_centred(g, content_x, scale == 2 ? 0 : 4, content_width, value, scale);
+}
+
 void knob_strip(juce::Graphics& g, const std::array<float, 8>& values, int touched) {
     int top = height - strip_height;
     for (int knob = 0; knob < 8; ++knob) {

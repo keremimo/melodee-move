@@ -62,7 +62,13 @@ a meter, a big parameter, or a page of knob cells under a large title.
 
 **A touched knob** takes the subject: its name, its value large, a bar, the
 unit under it; the rail says `KNOB` and its number. The screen goes back a
-moment after the knob is let go.
+moment after the knob is let go. A knob that is a place in a sample (START,
+END, a loop point, a slice's cut) keeps the waveform in view instead: its
+value large along the top, the frames round the place close up under it,
+eight times nearer than the whole (32 with Shift held, as a turn moves
+1/256 of the sample, Shift 1/8192), the place a line down the middle with a
+notch on top, what does not play half lit, the region's other end dotted
+where in view; the detail line says the knob's name and how near (`X8`).
 
 **Sheets** (a choice such as TO PADS, NEW TRACK) take the subject; the
 jogwheel picks, a push confirms, Back leaves.
@@ -73,6 +79,7 @@ jogwheel picks, a push confirms, Back leaves.
 | --- | --- | --- | --- |
 | Play, a kit track | `KIT` / track / pad | the last pad's waveform, start and end | sample name, length |
 | Knob touched | `KNOB` / knob / pad or module | name, value, bar | unit |
+| A place touched | `KNOB` / knob / pad, `SLC`, `KEYS` or `TAKE` | value, the place close up | name, `X8` (`X32` with Shift) |
 | Pad pages (5) | `PAD` / pad / page | page title, 8 knob cells | |
 | Chop | `SLC` / slice / count | waveform, cuts, the selected slice inverted | chop type, tempo |
 | Chop, close up | `SLC` / slice / `STRT` or `END` | the cut zoomed, the hits marked below | offset, zoom |
@@ -289,9 +296,9 @@ the screens were built; the screens are `src/app/screens/kit_play.cpp`,
   name and value large. On a pad holding an instrument TRIM becomes ZONES
   (drawn, waiting for the instruments' loading).
 - **Shift + a knob touched** (the Move's second parameter): a kit knob's
-  fine view. TUNE shows its cents; START, END and LOOP POINT their place
-  close up, 32 times nearer (the Move's Sample Start zoom); Shift + turn
-  moves them finely.
+  fine view. TUNE shows its cents; START, END and LOOP POINT their value
+  over their place close up, 32 times nearer (the Move's Sample Start
+  zoom); Shift + turn moves them finely.
 - **16 Pitches** (Shift + Step 8, as on the Move): the right 16 pads play the
   last pad up the project's key from its own note (Melodee's 16 Levels
   Scale), pad 1 bottom left; Plus and Minus their octave; the left 16 one
@@ -330,7 +337,7 @@ the screens were built; the screens are `src/app/screens/kit_play.cpp`,
 | --- | --- | --- | --- |
 | Play, banks moved | `KIT` / track / pad | the last pad's waveform | `PADS C01-D16`, for a moment |
 | A pad page | `PAD` / pad / page (`3/9`) | the page's title, eight cells; TRIM, LAYERS, CLOUD a picture | TRIM the region's length; LAYERS the layer's velocities and level |
-| A knob Shift + touched | `KNOB` / knob / `FINE`, `STRT`, `END` | the value large, or the place close up | the place, `X32` |
+| A knob Shift + touched | `KNOB` / knob / `FINE`, `STRT`, `END` | the value large, or the value over the place close up | the name, `X32` |
 | 16 Pitches | `PTCH` / track / pad | the last pad's waveform | key and scale, octave |
 | Copy held | `COPY` / pad / `PAD` | the pad, `ONTO A PAD` | the sample |
 | Copy onto a used pad | `COPY` / from / to | `REPLACE`, the pad | `PUSH YES`, `BACK NO` |

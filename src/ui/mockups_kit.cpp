@@ -163,14 +163,31 @@ std::vector<Screen> kit_screens() {
             big_parameter(g, content(4, 44), "WARP", "SEQ", 0.1f);
             detail(g, "8 BEATS");
         }},
+        {"touch-start", "KNOB 4 TOUCHED: START OVER ITS PLACE, X8", [](juce::Graphics& g) {
+            rail(g, "KNOB", "4", "A05");
+            place_value(g, "0.24S");
+            std::vector<float> peaks(size_t(content_width), 0.04f);
+            for (int column = 54; column < content_width; ++column) peaks[size_t(column)] = 0.95f * std::exp(-(column - 54) / 18.0f) + 0.06f;
+            for (int column = 0; column < 22; ++column) peaks[size_t(column)] = 0.5f * std::exp(-column / 10.0f) + 0.04f;
+            close_up(g, place_area(), peaks, content_width / 2, content_width);
+            detail(g, "START", "X8");
+        }},
         {"shift-touch", "SHIFT + KNOB 1 ON TRIM: START CLOSE UP", [](juce::Graphics& g) {
             rail(g, "KNOB", "1", "STRT");
-            auto area = content(0, subject_height);
+            place_value(g, "0.24S");
             std::vector<float> peaks(size_t(content_width), 0.03f);
-            for (int column = 50; column < content_width; ++column) peaks[size_t(column)] = 0.95f * std::exp(-(column - 50) / 30.0f) + 0.05f;
-            waveform(g, area, peaks);
-            g.fillRect(content_x + 48, 0, 1, subject_height);
-            detail(g, "-4 MS", "X32");
+            for (int column = 54; column < content_width; ++column) peaks[size_t(column)] = 0.95f * std::exp(-(column - 54) / 30.0f) + 0.05f;
+            close_up(g, place_area(), peaks, content_width / 2, content_width);
+            detail(g, "START", "X32");
+        }},
+        {"touch-end", "KNOB 5 TOUCHED ON A SHORT REGION: ITS START IN VIEW", [](juce::Graphics& g) {
+            rail(g, "KNOB", "5", "A05");
+            place_value(g, "0.31S");
+            std::vector<float> peaks(size_t(content_width), 0.04f);
+            for (int column = 12; column < content_width; ++column) peaks[size_t(column)] = 0.9f * std::exp(-(column - 12) / 34.0f) + 0.05f;
+            for (int column = 0; column < 4; ++column) peaks[size_t(column)] = -1;
+            close_up(g, place_area(), peaks, 12, content_width / 2 - 1, {12});
+            detail(g, "END", "X8");
         }},
         {"zones", "PAGE 1 ON AN INSTRUMENT PAD: ZONES", [](juce::Graphics& g) {
             rail(g, "PAD", "A07", "ZONE");

@@ -186,6 +186,15 @@ public:
         }
     }
     std::string knob_owner() const override { return "KEYS"; }
+    // One sample's START, END and LOOP PT touched: the place close up under its value.
+    std::string draw_knob_place(juce::Graphics& g, unsigned n, juce::Rectangle<int> area, bool fine) const override {
+        const unsigned t = studio.track();
+        const Sample* sample = studio.keys_sample(t);
+        if (!sample || sample->instrument || Page(page_of[t]) != Page::Zones || (n != 0 && n != 1 && n != 3)) return {};
+        const auto& sound = studio.current().pads[0];
+        uint32_t end = end_of(*sample, sound), at = n == 0 ? sound.start : n == 1 ? end : sound.loop_point();
+        return draw_place(g, area, *sample, at, sound.start, end, place_zoom(fine));
+    }
 
     std::string status() const override {
         return " keys_page=" + std::to_string(unsigned(page_of[studio.track()]) + 1) + " keys_zone=" + std::to_string(zone + 1);

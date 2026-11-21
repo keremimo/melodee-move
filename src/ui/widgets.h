@@ -40,6 +40,20 @@ void waveform(juce::Graphics& g, juce::Rectangle<int> area, const std::vector<fl
 // Cuts across a waveform: dotted lines, the selected one solid with tabs.
 void cuts(juce::Graphics& g, juce::Rectangle<int> area, const std::vector<int>& columns, int selected = -1);
 
+// A place in a sample close up (a START, END, loop point or cut being set):
+// `peaks` across `area`, a negative one where the sample is not (left
+// dark); the place a line down the middle with a notch on top; the columns
+// outside `kept_from` to `kept_to` (what does not play) half lit; `marks`
+// (the region's other ends in view) dotted.
+void close_up(juce::Graphics& g, juce::Rectangle<int> area, const std::vector<float>& peaks, int kept_from, int kept_to,
+              const std::vector<int>& marks = {});
+// A touched knob that is a place (docs/UI.md, "A touched knob"): its value
+// large along the top, the place close up under it in place_area(), its
+// name and how near on the detail line.
+constexpr int place_top = 16;
+inline juce::Rectangle<int> place_area() { return content(place_top, subject_height - place_top); }
+void place_value(juce::Graphics& g, std::string_view value);
+
 // The eight knobs as a strip along the bottom, left to right as on the Move:
 // each a bar of its value; the touched one drawn as a solid block.
 void knob_strip(juce::Graphics& g, const std::array<float, 8>& values, int touched = -1);

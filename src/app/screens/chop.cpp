@@ -177,6 +177,12 @@ public:
         }
     }
     std::string knob_owner() const override { return "SLC"; }
+    // The slice's START or END touched: the cut close up under its value.
+    std::string draw_knob_place(juce::Graphics& g, unsigned which, juce::Rectangle<int> area, bool) const override {
+        const Sample* sample = studio.sample_of(track, pad);
+        if (!sample || !slices.count || which > 1) return {};
+        return close_picture(g, area, *sample, std::max<uint32_t>(1, sample->data->model_frames()), which);
+    }
 
     std::string status() const override {
         return " slices=" + std::to_string(slices.count) + " chop=" + melodee::chop_mode_name(mode) + " slice=" + std::to_string(selected + 1) +
@@ -495,34 +501,29 @@ private:
         unsigned n = selected;
         uint32_t cut = close_which == 0 ? slices.start[n] : slices.end(n, frames);
         ui::rail(g, "SLC", two_digits(n + 1), close_which == 0 ? "STRT" : "END");
-        auto area = ui::content(0, ui::subject_height - 4);
+        auto zoom = close_picture(g, ui::content(0, ui::subject_height - 4), sample, frames, close_which);
+        const auto& sound = studio.project().tracks[track].pads[pad];
+        char offset[16];
+        std::snprintf(offset, sizeof offset, "+%.2fS", (cut - sound.start) / 44100.0);
+        ui::detail(g, offset, zoom);
+    }
+    // The selected slice's start (0) or end (1) close up in `area`: about 120
+    // ms round it, from the frames themselves, the slice lit, the hits marked
+    // under it. Says how near against the region ("X35").
+    std::string close_picture(juce::Graphics& g, juce::Rectangle<int> area, const Sample& sample, uint32_t frames, unsigned which) const {
+        unsigned n = std::min(selected, slices.count - 1);
+        uint32_t start = slices.start[n], end = slices.end(n, frames), cut = which == 0 ? start : end;
         int width = area.getWidth();
         int64_t from = int64_t(cut) - close_frames / 2;
-        const auto& data = *sample.data;
-        std::vector<float> peaks(size_t(width), 0.0f);
-        for (int x = 0; x < width; ++x) {
-            int64_t a = from + int64_t(x) * close_frames / width, b = from + int64_t(x + 1) * close_frames / width;
-            float most = 0;
-            for (int64_t f = std::max<int64_t>(a, 0); f < b && f < int64_t(frames); ++f) {
-                uint32_t own = data.own(uint32_t(f));
-                if (own < data.left.size()) most = std::max({most, std::fabs(data.left[own]), std::fabs(data.right[own])});
-            }
-            peaks[size_t(x)] = most;
-        }
-        ui::waveform(g, area, peaks);
-        ui::cuts(g, area, {width / 2}, 0);
-        std::vector<int> marks;
+        draw_span(g, area, close_frames, cut, start, end,
+                  [&](int64_t at, uint32_t span, int columns) { return close_peaks(sample, at, span, columns); });
         uint8_t floor = melodee::mark_floor(amounts[unsigned(ChopMode::Threshold)]);
         for (unsigned h = 0; h < sample.hit_count; ++h)
             if (sample.hits[h].strength >= floor && int64_t(sample.hits[h].frame) >= from && int64_t(sample.hits[h].frame) < from + close_frames)
-                marks.push_back(int((int64_t(sample.hits[h].frame) - from) * width / close_frames));
-        for (int x : marks) g.fillRect(area.getX() + x, area.getBottom() + 1, 1, 2);
+                g.fillRect(area.getX() + int((int64_t(sample.hits[h].frame) - from) * width / close_frames), area.getBottom() + 1, 1, 2);
         const auto& sound = studio.project().tracks[track].pads[pad];
-        char offset[16], zoom[16];
-        std::snprintf(offset, sizeof offset, "+%.2fS", (cut - sound.start) / 44100.0);
         uint32_t region = (sound.end ? sound.end : frames) - sound.start;
-        std::snprintf(zoom, sizeof zoom, "X%u", std::max<uint32_t>(1, region / close_frames));
-        ui::detail(g, offset, zoom);
+        return "X" + std::to_string(std::max<uint32_t>(1, region / close_frames));
     }
     // A manual take: the cuts so far, where it plays now, the pad that cuts next.
     void draw_take(juce::Graphics& g, const Sample& sample, uint32_t frames) {

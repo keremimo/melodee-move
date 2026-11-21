@@ -181,6 +181,14 @@ public:
         }
     }
     std::string knob_owner() const override { return pad_label(studio.pad()); }
+    // A touched START or END: the place close up under its value.
+    std::string draw_knob_place(juce::Graphics& g, unsigned which, juce::Rectangle<int> area, bool fine_view) const override {
+        const Sample* sample = studio.sample_of_pad();
+        if (focus != 1 || (which != 3 && which != 4) || !sample) return {};
+        const PadSound& sound = studio.current().pads[studio.pad()];
+        uint32_t end = sound.end ? sound.end : sample->data->model_frames();
+        return draw_place(g, area, *sample, which == 3 ? sound.start : end, sound.start, end, place_zoom(fine_view));
+    }
     std::string status() const override {
         return " bank=" + std::to_string(studio.pad_bank()) + " first=" + pad_label(studio.pad_first()) + " pitches=" + std::to_string(int(studio.pitches())) +
                " copy_from=" + std::to_string(copy_from);
@@ -297,12 +305,13 @@ private:
             ui::big_parameter(g, ui::content(4, 44), "FINE TUNE", text, (sound.fine + 50) / 100.0f);
             return true;
         }
-        if ((fine != 3 && fine != 4) || !sample || sample->data->left.empty()) return false; // a long sample: no frames in memory to draw
-        uint32_t frames = std::max<uint32_t>(1, sample->data->model_frames());
-        uint32_t at = fine == 3 ? sound.start : sound.end ? sound.end : frames;
+        if ((fine != 3 && fine != 4) || !sample) return false;
+        uint32_t end = sound.end ? sound.end : sample->data->model_frames(), at = fine == 3 ? sound.start : end;
+        auto zoom = draw_place(g, ui::place_area(), *sample, at, sound.start, end, place_zoom(true));
+        if (zoom.empty()) return false;
         ui::rail(g, "KNOB", std::to_string(fine + 1), fine == 3 ? "STRT" : "END");
-        close_up(g, *sample, at);
-        ui::detail(g, seconds(at), "X32");
+        ui::place_value(g, seconds(at));
+        ui::detail(g, fine == 3 ? "START" : "END", zoom);
         return true;
     }
     void turn(unsigned which, int delta, bool fine_turn) {

@@ -601,6 +601,12 @@ void MelodeeApp::draw_touched(juce::Graphics& g) {
     auto* top = own->top();
     auto shown = top->knob(unsigned(touched));
     ui::rail(g, "KNOB", std::to_string(touched + 1), top->knob_owner());
+    // A place in a sample: its value over the frames round it, close up.
+    if (auto zoom = top->draw_knob_place(g, unsigned(touched), ui::place_area(), own->shift); !zoom.empty()) {
+        ui::place_value(g, shown.value);
+        ui::detail(g, shown.name.substr(0, 16 - zoom.size() - 1), zoom);
+        return;
+    }
     ui::big_parameter(g, ui::content(4, 44), shown.name, shown.value, shown.fraction);
     if (auto detail = top->knob_detail(unsigned(touched)); !detail.empty()) ui::detail(g, detail.substr(0, 16));
 }

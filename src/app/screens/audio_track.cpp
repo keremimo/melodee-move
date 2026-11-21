@@ -277,6 +277,16 @@ public:
         }
     }
     std::string knob_owner() const override { return "TAKE"; }
+    // The take's START or END touched: the place close up under its value.
+    std::string draw_knob_place(juce::Graphics& g, unsigned which, juce::Rectangle<int> area, bool fine) const override {
+        const auto* region = current();
+        if (!region || !region->used() || page || (which != 1 && which != 2)) return {};
+        const auto* data = studio.sampling().take_data(region->take);
+        if (!data || data->left.empty() || !region->take_frames) return {};
+        uint32_t end = region->offset + region->frames;
+        return draw_place(g, area, region->take_frames, which == 1 ? region->offset : end, region->offset, end, place_zoom(fine),
+                          [&](int64_t from, uint32_t span, int width) { return close_peaks(data->left, data->right, data->rate, from, span, width); });
+    }
     std::string status() const override {
         const auto* region = current();
         if (studio.kind() != TrackKind::Audio) return {};

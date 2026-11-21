@@ -58,6 +58,12 @@ public:
     virtual bool knob_lane(unsigned, unsigned& /*param*/, unsigned& /*pad*/) const { return false; }
     // The detail line under knob n shown large; empty: none.
     virtual std::string knob_detail(unsigned) const { return {}; }
+    // Knob n as a place in a sample (START, END, a loop point, a cut): a
+    // touch shows the frames round it under its value (docs/UI.md, "A
+    // touched knob"), drawn here into `area`, `fine` (Shift held) nearer.
+    // Says how near ("X8"); empty: not a place, or nothing to draw, and the
+    // knob shows large.
+    virtual std::string draw_knob_place(juce::Graphics&, unsigned, juce::Rectangle<int> /*area*/, bool /*fine*/) const { return {}; }
     // Knob n's value back to its start (Delete + its touch where it has no
     // motion: Melodee's Erase + pot); false: nothing to reset.
     virtual bool reset_knob(unsigned) { return false; }

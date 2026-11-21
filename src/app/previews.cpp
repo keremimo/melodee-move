@@ -157,6 +157,14 @@ int write_previews(const std::string& directory, const std::string& modules) {
     send(0xbf, move::knob_first_cc, 2);
     ok = save(melodee, folder, "touch") && ok;
     send(0x9f, 0, 0);
+    send(0x9f, 3, 127); // touch knob 4, START: its value over its place
+    send(0xbf, move::knob_first_cc + 3, 3);
+    ok = save(melodee, folder, "touch-start") && ok;
+    send(0xbf, move::button_cc(move::Button::Shift), 127);
+    ok = save(melodee, folder, "touch-start-fine") && ok;
+    send(0xbf, move::button_cc(move::Button::Shift), 0);
+    send(0xbf, move::knob_first_cc + 3, 125); // back where it was
+    send(0x9f, 3, 0);
     press(move::Button::MainPush); // the Device View's pad: Load
     ok = save(melodee, folder, "load") && ok;
     press(move::Button::Back);
@@ -168,6 +176,11 @@ int write_previews(const std::string& directory, const std::string& modules) {
     press(move::Button::MainPush);   // Chop
     for (int n = 0; n < 6; ++n) press(move::Button::Right);
     ok = save(melodee, folder, "chop") && ok;
+    send(0x9f, 0, 127); // touch knob 1: the slice's start over its cut
+    ok = save(melodee, folder, "chop-touch") && ok;
+    send(0x9f, 0, 0);
+    melodee.surface(move::make_event(0x9f, 0, 0));
+    std::this_thread::sleep_for(std::chrono::milliseconds(700));
     press(move::Button::MainPush);
     ok = save(melodee, folder, "to-pads") && ok;
 
