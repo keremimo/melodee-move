@@ -192,6 +192,7 @@ std::unique_ptr<Sample> read_sample(const std::string& path, std::string& error,
     make_overview(*sample->data, sample->overview);
     auto mono = model_mono(*sample->data);
     sample->hit_count = find_hits_in(mono, sample->hits, sample->beats, &sample->autos);
+    sample->root = find_root(mono); // the note it holds: a keygroup of it plays from there
     return sample;
 }
 
