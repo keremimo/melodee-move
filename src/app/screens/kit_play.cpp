@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // A kit track's Play screen (docs/UI.md, docs/MOVE_CONTROLS.md): the Move's
 // Device View. Along the top the kit's items, KIT, the last pad, FX1, FX2;
-// the wheel walks them, its push opens the one it is on (the pad: Load
-// samples), Shift + push Sample Options (Chop), Shift + turn the pad pages
-// (kit_pages.cpp). Under them the last pad's waveform with start and end;
+// the wheel walks them, its push opens the one it is on (KIT and the pad:
+// Load, kits and samples), Shift + push Sample Options (Chop), Shift + turn
+// the pad pages (kit_pages.cpp). Under them the last pad's waveform with start and end;
 // knobs 1-8 tune, level, pan, start, end, attack, decay, cutoff (Shift:
 // finer; Shift + a touch, its fine view). The pads play the kit and pick the
 // pad edited (Shift + a pad picks it quietly), two of its eight banks, Plus
@@ -66,9 +66,8 @@ public:
         case Job::PadLevel: turn(1, use.delta, false); return true;
         case Job::Focus: focus = std::clamp(focus + (use.delta > 0 ? 1 : -1), 0, 1 + int(effects.size())); return true;
         case Job::ShowFocus: studio.say(item(focus)); return true;
-        case Job::OpenBrowser:
-            if (focus == 1) studio.open("load-samples");
-            else studio.say("KITS: NOT YET");
+        case Job::OpenBrowser: // KIT or the pad: Load, its kits (MPC programs), banks and samples, until the track types' sheet
+            studio.open("load-samples");
             return true;
         case Job::SampleOptions:
             if (studio.sample_of_pad()) studio.open("sample-options");

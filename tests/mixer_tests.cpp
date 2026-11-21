@@ -500,6 +500,11 @@ void test_screens(Rig& rig) {
     for (int n = 0; n < 4; ++n) wheel(rig, -1);
     turn(rig, knob_first_cc + 2, 12); // send A
     CHECK(studio.project().tracks[6].mix.sends[0] == 12);
+    // Its push: Load, as the pad's (kits, banks, samples); Back out to the item.
+    press(rig, Button::MainPush);
+    CHECK(page_of(rig) == "load-samples");
+    for (int n = 0; n < 6 && page_of(rig) == "load-samples"; ++n) press(rig, Button::Back);
+    CHECK(page_of(rig) == "kit-play");
     // Shift + turn on a kit's track item: its last pad's own sends.
     button(rig, Button::Shift, true);
     wheel(rig, 1);

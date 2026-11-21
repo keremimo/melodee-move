@@ -274,7 +274,7 @@ while Shift is held.
 | Control | On the Move | In Melodee | Status |
 | --- | --- | --- | --- |
 | Wheel turn (Play) | Device View: walks the Track Preset, its instrument, sample and effects | Walks the track, its sound (a kit's last pad, a module's preset) and its effects | done |
-| Wheel push (Play) | Opens the browser for the item in focus | Opens its browser: track types, kits and Schwung modules; samples onto the pad; the module's presets; Schwung's effects | done |
+| Wheel push (Play) | Opens the browser for the item in focus | Opens its browser: a synth's track its Schwung modules, a kit's track (KIT) and pad Load (kits, banks, samples; the track types' sheet not yet); the module's presets; Schwung's effects | done |
 | Shift + Wheel push (Play, kit) | Sample Options for the sample in focus: Slice, Reverse | Sample Options: Chop, Reverse, Trim, Normalize, Save | done |
 | Shift + Wheel push (Play, synth) | No job (in the browser, Shift opens Options: Save Preset) | The module's menu: its levels, presets and own pages | done |
 | Shift + Wheel turn (Play) | The parameter banks of the instrument or sample in focus | The pad pages, a module's pages | done |
