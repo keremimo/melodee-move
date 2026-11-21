@@ -307,14 +307,14 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
             if (pads_quiet.load(std::memory_order_relaxed)) return;  // another job (docs/MOVE_CONTROLS.md)
             int track = audio_track.load(std::memory_order_relaxed);
             auto kind = TrackKind(audio_kind.load(std::memory_order_relaxed));
-            int16_t velocity = int16_t(std::max<int>(1, input.value));
+            int16_t velocity = int16_t(full_level.load(std::memory_order_relaxed) ? 127 : std::max<int>(1, input.value));
             int key = -1;
             if (kind == TrackKind::Kit) {
                 // The kit's pads: two banks of 16 from the lower in view; with
                 // 16 Pitches, the left 16 one bank as the MPC lays it and the
                 // right 16 the last pad at its pitches (Melodee's 16 Levels).
                 // (The user's pad layout: app/pad_layout.h; 16 Pitches is two MPC banks in either.)
-                unsigned bank = unsigned(audio_bank.load(std::memory_order_relaxed)) * 16;
+                unsigned bank = unsigned(audio_first.load(std::memory_order_relaxed)); // the first pad in view
                 if (audio_slices.load(std::memory_order_relaxed)) { // Chop: the slices on pads 1-32
                     key = int(melodee::sampler_first_note + logical_pad(input.index, pad_layout()));
                 } else if (audio_pitches.load(std::memory_order_relaxed)) {
@@ -500,7 +500,7 @@ void Studio::select_pad(unsigned at) {
 
 int Studio::kit_pad_at(unsigned move_pad) const {
     const auto& track = current();
-    unsigned bank = track.bank * 16u;
+    unsigned bank = pad_first();
     if (track.levels) { // the left bank the kit, the right one the pitches, MPC style in either layout
         unsigned n = logical_pad(uint8_t(move_pad), PadLayout::Banks);
         return n >= 16 ? -1 : int((bank + n) % melodee::sampler_pads);
@@ -514,14 +514,19 @@ int Studio::move_pad_of(unsigned kit_pad) const {
     return -1;
 }
 
-void Studio::set_pad_bank(int bank) {
+void Studio::set_pad_bank(int bank) { set_pad_first(bank * 16 + pad_nudge[selected] % 16); }
+
+unsigned Studio::pad_first() const {
+    unsigned first = current().bank * 16u + pad_nudge[selected] % 16u;
+    return std::min(first, melodee::sampler_pads - pads_in_view());
+}
+
+void Studio::set_pad_first(int first) {
     auto& track = current();
-    int highest = int(melodee::sampler_banks) - (track.levels ? 1 : 2); // two banks in view, one with 16 Pitches
-    bank = std::clamp(bank, 0, highest);
-    if (track.bank == bank) return;
-    track.bank = uint8_t(bank);
+    first = std::clamp(first / 4 * 4, 0, int(melodee::sampler_pads - pads_in_view())); // two banks in view, one with 16 Pitches
+    pad_nudge[selected] = uint8_t(first % 16);
+    if (track.bank != first / 16) { track.bank = uint8_t(first / 16); changed(); }
     refresh_pads();
-    changed();
 }
 
 bool Studio::pitches() const { return kind() == TrackKind::Kit && current().levels; }
@@ -534,8 +539,9 @@ void Studio::set_pitches(bool on) {
         track.levels_pad = track.last_pad;
         track.levels_kind = uint8_t(melodee::LevelsKind::Scale); // in key (Kerem, 2026-11-20)
         track.bank = uint8_t(track.last_pad / 16); // the left 16: the last pad's bank
+        pad_nudge[selected] = 0;
     } else {
-        track.bank = uint8_t(std::min<unsigned>(track.bank, melodee::sampler_banks - 2));
+        set_pad_first(int(pad_first()));
     }
     refresh_pads();
     changed();
@@ -555,7 +561,7 @@ int Studio::pitch_semitones(unsigned pitch) const {
 void Studio::refresh_pads() {
     const auto& track = current();
     bool kit = kind() == TrackKind::Kit;
-    audio_bank.store(track.bank, std::memory_order_relaxed);
+    audio_first.store(int(pad_first()), std::memory_order_relaxed);
     audio_levels_pad.store(track.levels_pad % melodee::sampler_pads, std::memory_order_relaxed);
     if (kit && track.levels)
         for (unsigned n = 0; n < 16; ++n) audio_semitones[n].store(std::clamp(pitch_semitones(n), -63, 63), std::memory_order_relaxed);

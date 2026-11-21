@@ -89,9 +89,8 @@ inline bool close_up(juce::Graphics& g, const Sample& sample, uint32_t at) {
 
 // The pads in view as the rail and messages name them: "C01-D16".
 inline std::string banks_in_view(const Studio& studio) {
-    unsigned bank = studio.pad_bank();
-    std::string text = pad_label(bank * 16);
-    return text + "-" + pad_label(bank * 16 + (studio.pitches() ? 15 : 31));
+    unsigned first = studio.pad_first();
+    return pad_label(first) + "-" + pad_label(first + studio.pads_in_view() - 1);
 }
 
 } // namespace app::screens

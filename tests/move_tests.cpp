@@ -1238,6 +1238,18 @@ void test_kit_depth() {
     CHECK(has(status(), " bank=6 "));      // G-H, the last two
     for (int n = 0; n < 9; ++n) press_button(melodee, Button::Down);
     CHECK(has(status(), " bank=0 "));
+    // Shift + Plus or Minus: four pads at a time.
+    with_shift(melodee, [&] { press_button(melodee, Button::Up); });
+    CHECK(has(status(), " first=A05 "));
+    {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        CHECK(studio.kit_pad_at(0) == 4 && studio.kit_pad_at(31) == 35);
+    }
+    press_button(melodee, Button::Up); // a bank on, still four in
+    CHECK(has(status(), " bank=1 first=B05 "));
+    press_button(melodee, Button::Down);
+    with_shift(melodee, [&] { press_button(melodee, Button::Down); });
+    CHECK(has(status(), " bank=0 first=A01 "));
     tap_pad(melodee, 0);
     CHECK(has(status(), "pad=A01 "));
     {   // The pad layout (app/pad_layout.h): in Banks the right 4x4 is the second bank.
