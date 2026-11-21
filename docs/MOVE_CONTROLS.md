@@ -145,7 +145,7 @@ the amount, as the Move's wheel sets the number of slices.
 | Copy held + Step | Copies the step (hold the first and press the last for a range), then pastes where the next step is pressed | The same | wave 2: sequencer |
 | Copy held + Step (Loop) | Copies the bar | The same | wave 2: sequencer |
 | Delete held + Step (Loop) | Clears the bar's notes | The same | wave 2: sequencer |
-| Step (Chop) | No job | Plays the sample from that sixteenth (the steps are the sample in 16 parts, lit where a cut falls) | wave 2: sampling |
+| Step (Chop) | No job | Plays the sample from that sixteenth (the steps are the sample in 16 parts, lit where a cut falls) | done |
 | Step (Typing) | (Text is typed with the wheel) | A digit, steps 1-10 | done |
 | Track button held + Step | No job | Picks track 1-16; an empty one opens the new-track sheet | done |
 
@@ -305,7 +305,7 @@ while Shift is held.
 | Plus or Minus (16 Pitches) | The pitches' octave | The same | wave 2: kit depth |
 | Shift + Plus or Minus | No job (Control Live: a scale degree; four pads) | A synth a scale degree, a kit four pads | wave 2: instruments |
 | Plus or Minus (Session) | No job (Control Live: the session ring a scene) | The bank of four tracks | wave 2: sequencer |
-| Plus or Minus (Chop) | No job | Slices 33-64 | wave 2: sampling |
+| Plus or Minus (Chop) | No job | Slices 33-64 | done |
 | Left or Right (Play) | The clip's previous or next bar (or page of steps) | The pattern's bar (today the page, which moves to Shift + turn) | wave 2: sequencer |
 | Shift + Left or Right | No job (Control Live: 16 bars) | 16 bars | wave 2: sequencer |
 | Left or Right (Session) | No job (Control Live: the session ring a track) | The patterns' page, eight at a time | wave 2: sequencer |

@@ -1444,6 +1444,84 @@ void test_sample_files() {
     CHECK(has(melodee.status(), "track=3 kind=kit") && has(melodee.status(), "page=kit-play") && has(melodee.status(), "pads=0"));
 }
 
+void test_chop_depth() {
+    // Chop on the Move past the first scope: slices 33-64 on Plus, Delete +
+    // a pad, the slice options (Extract, Split, Merge, Remove all cuts), a
+    // manual take with the red pad, a step, To Pads KIT.
+    std::string folder = "build/test-samples", home = "build/test-home-chop", loop = folder + "/loop.wav";
+    std::filesystem::create_directories(folder);
+    std::filesystem::remove_all(home);
+    CHECK(write_test_loop(loop));
+    app::MelodeeApp melodee(folder, home, "build/test-no-modules");
+    Session session;
+    melodee.attach(session);
+    melodee.audio_opened(AudioFormat {});
+    CHECK(melodee.restore_now().empty());
+    CHECK(melodee.load_now(loop, 0).empty());
+    Lights lights;
+    AudioBlock in {}, out {};
+    auto settle = [&] {
+        for (int n = 0; n < 20; ++n) { melodee.service(); out.fill(0); melodee.render(in, out); melodee.lights(lights, App::Clock::now()); }
+    };
+    auto knob = [&](unsigned n, int detents) { melodee.surface(make_event(0xb0, uint8_t(knob_first_cc + n), uint8_t(detents < 0 ? 128 + detents : detents))); };
+    auto options = [&](int row) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(320)); // two Shift presses within 0.3 s would lock it (the Move's)
+        with_shift(melodee, [&] { press_button(melodee, Button::MainPush); });
+        CHECK(has(melodee.status(), "page=slice-options"));
+        turn_wheel(melodee, row);
+        press_button(melodee, Button::MainPush);
+    };
+    open_chop(melodee);
+    knob(2, 1);
+    knob(2, 1);  // type: Auto, Beats, Regions (a step a turn)
+    knob(3, 24); // 16 + 24: 40 slices
+    CHECK(has(melodee.status(), "slices=40 chop=Regions"));
+    press_button(melodee, Button::Up); // Plus: slices 33-40 on the pads
+    CHECK(has(melodee.status(), "bank=2"));
+    tap_pad(melodee, 2);
+    CHECK(has(melodee.status(), "slice=35"));
+    press_button(melodee, Button::Down);
+    CHECK(has(melodee.status(), "bank=1"));
+    melodee.surface(make_event(0xb0, button_cc(Button::Delete), 127)); // Delete + A02: its cut out
+    tap_pad(melodee, 1);
+    melodee.surface(make_event(0xb0, button_cc(Button::Delete), 0));
+    CHECK(has(melodee.status(), "slices=39"));
+    tap_step(melodee, 4); // the sample from its fifth sixteenth
+    tap_pad(melodee, 3);
+    options(0); // Extract: slice 4 onto the next empty pad
+    settle();
+    CHECK(std::filesystem::exists(home + "/Samples/Edits/LOOP-Slice 4.wav"));
+    CHECK(has(melodee.status(), "page=chop") && has(melodee.status(), "slices=39"));
+    options(1); // Split
+    CHECK(has(melodee.status(), "slices=40"));
+    options(2); // Merge
+    CHECK(has(melodee.status(), "slices=39"));
+    std::this_thread::sleep_for(std::chrono::milliseconds(320));
+    with_shift(melodee, [&] { turn_wheel(melodee, 1); }); // the start from hit to hit
+    CHECK(has(melodee.status(), "page=chop"));
+    options(3); // Remove all cuts: a manual take, from the first pad
+    CHECK(has(melodee.status(), "slices=1 chop=Manual") && has(melodee.status(), "manual_next=1"));
+    tap_pad(melodee, 0); // the region plays; the red moves to A02
+    CHECK(has(melodee.status(), "manual_next=2"));
+    std::this_thread::sleep_for(std::chrono::milliseconds(120));
+    tap_pad(melodee, 1); // the red pad cuts
+    CHECK(has(melodee.status(), "slices=2") && has(melodee.status(), "manual_next=3"));
+    std::this_thread::sleep_for(std::chrono::milliseconds(120));
+    tap_pad(melodee, 2);
+    CHECK(has(melodee.status(), "slices=3") && has(melodee.status(), "manual_next=4"));
+    tap_pad(melodee, 1); // a lit pad: plays again from its slice, the cut after it gone
+    CHECK(has(melodee.status(), "slices=2") && has(melodee.status(), "manual_next=3"));
+    knob(0, 1); // another control: the take stops short, the red stays
+    CHECK(has(melodee.status(), "manual_next=3"));
+    // To Pads KIT: a pad a sound.
+    knob(2, -1); // Threshold
+    press_button(melodee, Button::MainPush);
+    CHECK(has(melodee.status(), "page=to-pads"));
+    turn_wheel(melodee, 3);
+    press_button(melodee, Button::MainPush);
+    CHECK(has(melodee.status(), "page=kit-play"));
+}
+
 } // namespace
 
 int main() {
@@ -1465,6 +1543,7 @@ int main() {
     test_migration();
     test_sampling();
     test_sample_files();
+    test_chop_depth();
     std::cout << "move-tests: " << checks - failures << " of " << checks << " checks passed\n";
     return failures ? 1 : 0;
 }
