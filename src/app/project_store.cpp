@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "app/project_store.h"
-#include "melodee/engine/engine_info.h"
 #include "melodee/model/project_file.h"
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -25,6 +24,16 @@ template <size_t N> void copy_text(char (&to)[N], const std::string& from) {
     std::snprintf(to, N, "%s", from.c_str());
 }
 
+std::string chops_path(const std::string& project) { return project + ".chops"; }
+std::string synth_path(const std::string& project) { return project + ".synth"; }
+
+std::string read_text(const std::string& path) {
+    std::ifstream in(path, std::ios::binary);
+    return in ? std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>()) : std::string();
+}
+
+} // namespace
+
 // A file whole or not at all: written beside, flushed, renamed over.
 std::string write_whole(const std::string& path, const void* bytes, size_t size) {
     std::string temporary = path + ".writing";
@@ -47,11 +56,6 @@ std::string write_whole(const std::string& path, const void* bytes, size_t size)
     }
     return {};
 }
-
-std::string chops_path(const std::string& project) { return project + ".chops"; }
-std::string synth_path(const std::string& project) { return project + ".synth"; }
-
-} // namespace
 
 std::string chops_text(const KitFile& kit) {
     std::ostringstream out;
@@ -91,56 +95,57 @@ void read_chops(const std::string& text, KitFile& kit) {
     }
 }
 
-std::string save_kit(const KitFile& kit, const std::string& path) {
-    // A project and its patterns are large: on the heap, off the audio thread.
-    auto project = std::make_unique<melodee::Project>();
-    auto patterns = std::make_unique<melodee::PatternBank>();
-    copy_text(project->name, "Move");
-    auto& track = project->tracks[0];
-    track.engine = melodee::EngineKind::Sampler;
-    copy_text(track.name, "KIT 1");
-    const auto& info = melodee::engine_info(melodee::EngineKind::Sampler);
-    for (unsigned n = 0; n < info.param_count && n < track.params.size(); ++n) track.params[n] = info.params[n].initial;
-    for (unsigned pad = 0; pad < pad_count; ++pad) track.pads[pad] = kit.pads[pad];
-    track.last_pad = uint8_t(kit.last_pad);
-    for (const auto& sample : kit.samples) {
-        if (sample.slot >= melodee::sample_slots) continue;
-        auto& ref = project->samples.edit(sample.slot);
-        copy_text(ref.path, sample.path);
-        copy_text(ref.name, sample.name);
-        ref.frames = sample.frames;
-    }
-    auto bytes = melodee::save_project(*project, *patterns);
-    if (auto error = write_whole(path, bytes.data(), bytes.size()); !error.empty()) return error;
-    auto chops = chops_text(kit);
-    return write_whole(chops_path(path), chops.data(), chops.size());
+namespace {
+
+// Melodee keeps a sample's chop in the sample's own WAV file, as the MPC
+// does. Here the samples are the Move's own library, left untouched: each
+// chop goes into the project instead, in a section of the Move's own
+// ("MVCH", the chops' text lines) after Melodee's. Melodee's reader skips a
+// section it does not know, so the file stays a Melodee project.
+constexpr char chops_tag[4] {'M', 'V', 'C', 'H'};
+constexpr char project_magic[8] {'M', 'E', 'L', 'O', 'D', 'E', 'E', '1'};
+
+KitFile chops_of(const melodee::Project& project) {
+    KitFile kit;
+    for (size_t slot = 0; slot < melodee::sample_slots; ++slot)
+        if (project.samples[slot].path[0] && project.chops[slot].used())
+            kit.samples.push_back({uint16_t(slot), project.samples[slot].path, project.samples[slot].name, 0, project.chops[slot]});
+    return kit;
 }
 
-std::string load_kit(const std::string& path, KitFile& kit) {
+} // namespace
+
+std::vector<uint8_t> project_file_bytes(const melodee::Project& project, const melodee::PatternBank& patterns, const PluginStates& states) {
+    auto bytes = melodee::save_project(project, patterns, &states);
+    auto text = chops_text(chops_of(project));
+    bytes.insert(bytes.end(), chops_tag, chops_tag + 4);
+    auto size = uint32_t(text.size());
+    for (int k = 0; k < 4; ++k) bytes.push_back(uint8_t(size >> (8 * k)));
+    bytes.insert(bytes.end(), text.begin(), text.end());
+    return bytes;
+}
+
+std::string read_project_file(const std::string& path, melodee::Project& project, melodee::PatternBank& patterns, PluginStates& states) {
     std::ifstream in(path, std::ios::binary);
     if (!in) return "missing";
     std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-    auto project = std::make_unique<melodee::Project>();
-    auto patterns = std::make_unique<melodee::PatternBank>();
-    if (auto error = melodee::load_project(bytes, *project, *patterns); !error.empty()) return error;
-    const auto& track = project->tracks[0];
-    if (track.engine != melodee::EngineKind::Sampler) return "track 1 is not a kit";
-    for (unsigned pad = 0; pad < pad_count; ++pad) kit.pads[pad] = track.pads[pad];
-    kit.last_pad = track.last_pad % pad_count;
-    kit.samples.clear();
-    for (size_t slot = 0; slot < melodee::sample_slots; ++slot) {
-        const auto& ref = project->samples[slot];
-        if (!ref.path[0]) continue;
-        KitFile::Sample sample;
-        sample.slot = uint16_t(slot);
-        sample.path = ref.path;
-        sample.name = ref.name;
-        sample.frames = ref.frames;
-        sample.chop = project->chops[slot]; // an older Melodee file's CHOP, if it had one
-        kit.samples.push_back(std::move(sample));
+    if (auto error = melodee::load_project(bytes, project, patterns, nullptr, &states); !error.empty()) return error;
+    // The Move's chops, where the file has them.
+    if (bytes.size() < 8 || std::memcmp(bytes.data(), project_magic, 8)) return {};
+    for (size_t at = 8; at + 8 <= bytes.size();) {
+        uint32_t size = 0;
+        for (int k = 0; k < 4; ++k) size |= uint32_t(bytes[at + 4 + size_t(k)]) << (8 * k);
+        if (at + 8 + size > bytes.size()) break;
+        if (!std::memcmp(bytes.data() + at, chops_tag, 4)) {
+            KitFile kit;
+            for (size_t slot = 0; slot < melodee::sample_slots; ++slot)
+                if (project.samples[slot].path[0]) kit.samples.push_back({uint16_t(slot), project.samples[slot].path, project.samples[slot].name, 0, {}});
+            read_chops(std::string(bytes.begin() + long(at + 8), bytes.begin() + long(at + 8 + size)), kit);
+            for (const auto& sample : kit.samples)
+                if (sample.chop.used()) project.chops.edit(sample.slot) = sample.chop;
+        }
+        at += 8 + size;
     }
-    std::ifstream chops(chops_path(path));
-    if (chops) read_chops(std::string((std::istreambuf_iterator<char>(chops)), std::istreambuf_iterator<char>()), kit);
     return {};
 }
 
@@ -152,39 +157,90 @@ std::string synth_text(const SynthFile& synth) {
         if (synth.preset >= 0) out << "preset " << synth.preset << '\n';
         for (const auto& [key, value] : synth.values)
             if (key.find_first_of(" \n") == std::string::npos && value.find('\n') == std::string::npos) out << "param " << key << ' ' << value << '\n';
+        for (const auto& [key, state] : synth.pages) // JSON never holds a raw newline
+            if (!key.empty() && key.find_first_of(" \n") == std::string::npos && !state.empty() && state.find('\n') == std::string::npos)
+                out << "page " << key << ' ' << state << '\n';
     }
     return out.str();
 }
 
-void read_synth(const std::string& text, SynthFile& synth) {
+bool read_synth(const std::string& text, SynthFile& synth) {
     synth = {};
     std::istringstream in(text);
     std::string line;
-    if (!std::getline(in, line) || line != synth_header) return;
+    if (!std::getline(in, line) || line != synth_header) return false;
     while (std::getline(in, line)) {
         auto space = line.find(' ');
         if (space == std::string::npos) continue;
         auto word = line.substr(0, space), rest = line.substr(space + 1);
-        if (word == "track") synth.track = unsigned(std::strtoul(rest.c_str(), nullptr, 10)) % 2;
+        if (word == "track") synth.track = unsigned(std::strtoul(rest.c_str(), nullptr, 10)) % melodee::track_count;
         else if (word == "octave") synth.octave = std::clamp(int(std::strtol(rest.c_str(), nullptr, 10)), -4, 4);
         else if (word == "module") synth.module = rest;
         else if (word == "preset") synth.preset = int(std::strtol(rest.c_str(), nullptr, 10));
         else if (word == "param") {
             auto gap = rest.find(' ');
             if (gap != std::string::npos && gap) synth.values.emplace_back(rest.substr(0, gap), rest.substr(gap + 1));
+        } else if (word == "page") {
+            auto gap = rest.find(' ');
+            if (gap != std::string::npos && gap) synth.pages.emplace_back(rest.substr(0, gap), rest.substr(gap + 1));
         }
     }
+    return true;
 }
 
-std::string save_synth(const SynthFile& synth, const std::string& project) {
+std::vector<uint8_t> synth_state(const SynthFile& synth) {
     auto text = synth_text(synth);
-    return write_whole(synth_path(project), text.data(), text.size());
+    return {text.begin(), text.end()};
 }
 
-void load_synth(const std::string& project, SynthFile& synth) {
-    std::ifstream in(synth_path(project));
-    synth = {};
-    if (in) read_synth(std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>()), synth);
+bool read_synth_state(const std::vector<uint8_t>& state, SynthFile& synth) {
+    return read_synth(std::string(state.begin(), state.end()), synth);
+}
+
+bool migrate(const std::string& path, melodee::Project& project, PluginStates& states,
+             std::string (*module_folder)(const std::string& id, const void* context), const void* context, unsigned& played) {
+    auto chops = read_text(chops_path(path)), synth = read_text(synth_path(path));
+    if (chops.empty() && synth.empty()) return false;
+    // Each chop onto its sample's slot, where the file has none of its own.
+    KitFile kit;
+    for (size_t slot = 0; slot < melodee::sample_slots; ++slot)
+        if (project.samples[slot].path[0]) kit.samples.push_back({uint16_t(slot), project.samples[slot].path, project.samples[slot].name, 0, {}});
+    read_chops(chops, kit);
+    for (const auto& sample : kit.samples)
+        if (sample.chop.used() && !project.chops[sample.slot].used()) project.chops.edit(sample.slot) = sample.chop;
+    // The synth track: track 2, a PLUGIN track on the module.
+    SynthFile saved;
+    played = 0;
+    if (read_synth(synth, saved)) {
+        played = std::min(saved.track, 1u);
+        auto& track = project.tracks[1];
+        if (!track.used()) {
+            track = melodee::Track {};
+            track.engine = melodee::EngineKind::Plugin;
+            copy_text(track.name, "SYNTH");
+            track.octave = int8_t(3 + saved.octave);
+            if (!saved.module.empty()) {
+                unsigned entry = 0;
+                while (entry < melodee::max_plugins && project.plugins[entry].used()) ++entry;
+                if (entry < melodee::max_plugins) {
+                    auto& ref = project.plugins[entry];
+                    copy_text(ref.path, module_folder(saved.module, context));
+                    copy_text(ref.name, saved.module);
+                    track.plugin = uint8_t(entry);
+                    saved.track = 1;
+                    states[entry] = synth_state(saved);
+                }
+            }
+        }
+    }
+    return true;
+}
+
+void retire_side_files(const std::string& path) {
+    for (const auto& side : {chops_path(path), synth_path(path)}) {
+        std::ifstream exists(side);
+        if (exists) { exists.close(); std::rename(side.c_str(), (side + ".migrated").c_str()); }
+    }
 }
 
 void give_to_owner_of(const std::string& path, const std::string& reference) {

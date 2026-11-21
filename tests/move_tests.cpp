@@ -15,6 +15,9 @@
 #include "spike/spike_app.h"
 #include "app/canvas_page.h"
 #include "app/melodee_app.h"
+#include "app/project_store.h"
+#include "melodee/model/project_file.h"
+#include "melodee/engine/engine_info.h"
 #include <chrono>
 #include <filesystem>
 #include <cmath>
@@ -418,19 +421,19 @@ void test_melodee_app() {
     melodee.surface(make_event(0xb0, button_cc(Button::Loop), 127)); // Chop
     unsigned slices = melodee.slice_count();
     CHECK(slices >= 4 && slices <= 64);
-    CHECK(melodee.status().find("page=chop") != std::string::npos);
+    CHECK(melodee.status().find("page=chop ") != std::string::npos);
     CHECK(play(1, 20) > to_s32(0.05f));     // pad 2 plays slice 2
     CHECK(quiet());
     CHECK(play(slices, 20) == 0);           // past the last slice: nothing
     melodee.surface(make_event(0xb0, button_cc(Button::MainPush), 127)); // To Pads
     melodee.surface(make_event(0xb0, button_cc(Button::MainPush), 127)); // Poly, onto the empty pads
-    CHECK(melodee.status().find("page=play") != std::string::npos);
+    CHECK(melodee.status().find("page=kit-play") != std::string::npos);
     CHECK(melodee.status().find("pad=A02") != std::string::npos); // the first empty pad after A01
     CHECK(play(1, 20) > to_s32(0.05f));     // A02 now holds slice 1
     CHECK(quiet());
     // Knob 1 tunes the last pad; touching it shows it; a turn of Regions' amount re-chops.
     melodee.surface(make_event(0xb0, knob_first_cc, 3));
-    CHECK(melodee.status().find("page=play") != std::string::npos);
+    CHECK(melodee.status().find("page=kit-play") != std::string::npos);
     melodee.surface(make_event(0xb0, button_cc(Button::Back), 127));
     CHECK(melodee.load_now(folder + "/missing.wav", 3) != "");
 
@@ -511,10 +514,21 @@ void test_saving() {
     CHECK(second.slice_count() == chopped && has(second.status(), "chop=Beats"));
     press(second, Button::Back);
     CHECK(second.save_now().empty());
-    app::KitFile kit;
-    CHECK(app::load_kit(project, kit).empty());
-    CHECK(kit.samples.size() == 2); // the missing file is kept, by path
-    CHECK(app::load_kit(home + "/nothing.mldp", kit) == "missing");
+    // The file is Melodee's own project: track 1 the kit, its two samples by
+    // path (the missing one kept), A01's chop in CHOP.
+    {
+        auto project = std::make_unique<melodee::Project>();
+        auto patterns = std::make_unique<melodee::PatternBank>();
+        app::PluginStates states;
+        CHECK(app::read_project_file(home + "/Projects/Move.mldp", *project, *patterns, states).empty());
+        unsigned files = 0, chopped_files = 0;
+        for (size_t slot = 0; slot < melodee::sample_slots; ++slot) {
+            files += project->samples[slot].path[0] != 0;
+            chopped_files += project->chops[slot].used();
+        }
+        CHECK(files == 2 && chopped_files == 1 && project->tracks[0].engine == melodee::EngineKind::Sampler);
+        CHECK(app::read_project_file(home + "/nothing.mldp", *project, *patterns, states) == "missing");
+    }
     // The chops' lines: what is written reads back; a damaged line is left out.
     app::KitFile original;
     original.samples.push_back({3, "/a.wav", "a.wav", 1000, {}});
@@ -656,7 +670,8 @@ void test_schwung_modules() {
         CHECK(heard > to_s32(0.05f)); // level 0.25, set above
         streaming.set("stall", "80"); // its thread waits 80 ms, past its 35 ms lead
         double slowest_ms = 0;
-        for (int block = 0; block < 30; ++block) {
+        // Until its lead has run out (a slow machine may take longer to get there).
+        for (int block = 0; block < 30 || (block < 300 && !streaming.stream_late()); ++block) {
             auto begun = std::chrono::steady_clock::now();
             out.fill(0);
             streaming.render(in, out, 1.0f);
@@ -696,12 +711,13 @@ void test_schwung_modules() {
 
 void test_canvas_page() {
     // A module's own page script, hosted as Schwung hosts it.
-    struct Calls { std::vector<std::string> sets; std::string title, initial, opened; } calls;
+    struct Calls { std::vector<std::string> sets; std::string title, initial, opened; int changed = 0; } calls;
     app::CanvasPage::Host host;
     host.get = [](const std::string& key) { return key == "level" ? std::string("0.42") : std::string(); };
     host.set = [&](const std::string& key, const std::string& value) { calls.sets.push_back(key + "=" + value); };
     host.text_entry = [&](const std::string& title, const std::string& initial) { calls.title = title; calls.initial = initial; };
     host.open_file = [&](const std::string& path) { calls.opened = path; };
+    host.changed = [&] { ++calls.changed; };
     std::string error;
     auto page = app::CanvasPage::load("tests/fake_module/page.js", host, error);
     CHECK(page && error.empty());
@@ -723,6 +739,22 @@ void test_canvas_page() {
     CHECK(calls.sets.size() == 2 && calls.sets[1] == "searched=drums");
     CHECK(page->back());  // a level up
     CHECK(!page->back()); // at its top
+    CHECK(calls.changed == 6); // each gesture, not the draw
+    // What the page keeps in ctx.state goes with the module and comes back
+    // onto a new page: here a level down, as it was left.
+    page->midi(0xb0, 3, 127);
+    auto kept = page->saved_state();
+    CHECK(kept.find("\"depth\":1") != std::string::npos);
+    auto again = app::CanvasPage::load("tests/fake_module/page.js", host, error);
+    CHECK(again != nullptr);
+    if (again) {
+        CHECK(again->saved_state().empty()); // nothing kept yet
+        again->restore_state("not json");
+        again->restore_state("[1, 2]");
+        again->restore_state(kept);
+        CHECK(again->back() && !again->back());
+        CHECK(again->saved_state() == "{\"depth\":0}");
+    }
     // A script that throws is reported and not called again; one that does
     // not parse, or sets no page, is refused.
     std::filesystem::create_directories("build/test-pages");
@@ -765,12 +797,12 @@ void test_synth_track() {
         melodee.audio_opened(AudioFormat {});
         CHECK(melodee.restore_now().empty());
         press(melodee, Button::Row2);
-        CHECK(has(melodee.status(), "track=synth synth=-"));
+        CHECK(has(melodee.status(), "track=2 kind=synth") && has(melodee.status(), "synth=-"));
         press(melodee, Button::Menu);
-        CHECK(has(melodee.status(), "page=load"));
+        CHECK(has(melodee.status(), "page=load-modules"));
         press(melodee, Button::MainPush);
         melodee.service(); // loads it
-        CHECK(has(melodee.status(), "page=play") && has(melodee.status(), "synth=fake"));
+        CHECK(has(melodee.status(), "page=synth-play") && has(melodee.status(), "synth=fake"));
         // A pad plays a note, in the cycle it was read; let go, it stops.
         melodee.audio_event(make_event(0x90, pad_note(0), 100));
         CHECK(loudest(melodee, 1) > to_s32(0.05f));
@@ -815,7 +847,7 @@ void test_synth_track() {
         CHECK(has(melodee.status(), "octave=1"));
         // Row 1: the kit again; its pads its own.
         press(melodee, Button::Row1);
-        CHECK(has(melodee.status(), "track=kit"));
+        CHECK(has(melodee.status(), "track=1 kind=kit"));
         melodee.audio_event(make_event(0x90, pad_note(0), 100));
         CHECK(loudest(melodee, 2) == 0); // an empty kit
         melodee.audio_event(make_event(0x80, pad_note(0), 0));
@@ -823,8 +855,18 @@ void test_synth_track() {
         CHECK(melodee.save_now().empty());
         project = melodee.project_path();
     }
-    app::SynthFile saved;
-    app::load_synth(project, saved);
+    // The module's state, in its PLUG entry of the project.
+    auto saved_state = [](const std::string& file) {
+        auto read = std::make_unique<melodee::Project>();
+        auto patterns = std::make_unique<melodee::PatternBank>();
+        app::PluginStates states;
+        app::SynthFile synth;
+        if (app::read_project_file(file, *read, *patterns, states).empty() && read->tracks[1].engine == melodee::EngineKind::Plugin
+            && read->tracks[1].plugin < melodee::max_plugins)
+            app::read_synth_state(states[read->tracks[1].plugin], synth);
+        return synth;
+    };
+    app::SynthFile saved = saved_state(project);
     CHECK(saved.module == "fake" && saved.preset == 1 && saved.octave == 1 && saved.track == 1);
     bool level_saved = false, table_saved = false, action_saved = false;
     for (const auto& [key, value] : saved.values) {
@@ -840,7 +882,7 @@ void test_synth_track() {
         second.attach(session);
         second.audio_opened(AudioFormat {});
         CHECK(second.restore_now().empty());
-        CHECK(has(second.status(), "track=synth synth=fake octave=1"));
+        CHECK(has(second.status(), "track=2 kind=synth") && has(second.status(), "synth=fake octave=1"));
         CHECK(second.synth_value("level") == "0.13" && second.synth_value("preset") == "1" && second.synth_value("table") == "2");
         CHECK(second.synth_value("wave") == "0");
         second.audio_event(make_event(0x90, pad_note(0), 100));
@@ -857,7 +899,7 @@ void test_synth_track() {
         { juce::Graphics g(screen); g.setColour(juce::Colours::white); second.draw(g); }
         CHECK(second.canvas_pixel(0, 0) && second.canvas_pixel(13, 30) && second.canvas_pixel(1, 41)); // its block, level 0.13, std
         press(second, Button::MainPush); // in: the host's push, not the page's
-        CHECK(has(second.status(), "entered=1 typing=0"));
+        CHECK(has(second.status(), "entered=1") && has(second.status(), "typing=0"));
         second.surface(make_event(0xb0, main_knob_cc, 1)); // the page's: the level to 0.9
         CHECK(second.synth_value("level") == "0.9");
         press(second, Button::MainPush); // the page's: a level down, and it asks for text
@@ -878,6 +920,12 @@ void test_synth_track() {
         CHECK(has(second.status(), "entered=1"));
         press(second, Button::Back); // at its top: out
         CHECK(has(second.status(), "canvas=browse entered=0"));
+        // The page's gestures made the project unsaved; saved, its ctx.state is the module's, the page's own key no value.
+        CHECK(has(second.status(), "unsaved=1"));
+        CHECK(second.save_now().empty());
+        auto with_page = saved_state(project);
+        CHECK(with_page.pages.size() == 1 && with_page.pages[0].first == "browse" && with_page.pages[0].second.find("\"depth\":0") != std::string::npos);
+        CHECK(std::none_of(with_page.values.begin(), with_page.values.end(), [](const auto& value) { return value.first == "browse"; }));
     }
     {
         // Its module gone: the track keeps naming it, and saves it so.
@@ -888,17 +936,251 @@ void test_synth_track() {
         CHECK(has(third.status(), "synth=-"));
         CHECK(third.save_now().empty());
     }
-    app::load_synth(project, saved);
+    saved = saved_state(project);
     CHECK(saved.module == "fake" && saved.preset == 1);
     // The file's own lines: a value with spaces; a damaged file is none.
     app::SynthFile text;
     text.module = "obxd";
     text.values = {{"mode", "Saw Up"}};
+    text.pages = {{"browse", "{\"provider\":\"sampledig\",\"stack\":[\"dig\"]}"}};
     app::SynthFile back;
     app::read_synth(app::synth_text(text), back);
     CHECK(back.module == "obxd" && back.values.size() == 1 && back.values[0].second == "Saw Up");
+    CHECK(back.pages.size() == 1 && back.pages[0].first == "browse" && back.pages[0].second == text.pages[0].second);
     app::read_synth("something else\nmodule x\n", back);
     CHECK(back.module.empty());
+}
+
+void test_tracks() {
+    // Sixteen tracks on Melodee's engine host: a project with a pattern opens
+    // and plays it on Play; new, copy and delete; the track buttons; the
+    // new-track sheet; tempo and metronome.
+    std::string folder = "build/test-samples", home = "build/test-home-tracks", loop = folder + "/loop.wav";
+    std::filesystem::create_directories(folder);
+    std::filesystem::remove_all(home);
+    std::filesystem::create_directories(home + "/Projects");
+    CHECK(write_test_loop(loop));
+    {   // A Melodee project, as the MPC would leave it: a kit on track 1, A01 the loop, four steps on A01 in pattern 1.
+        auto project = std::make_unique<melodee::Project>();
+        auto patterns = std::make_unique<melodee::PatternBank>();
+        melodee::load_sound(project->tracks[0], melodee::EngineKind::Sampler, 0);
+        project->tracks[0].pads[0].sample = 0;
+        auto& ref = project->samples.edit(0);
+        std::snprintf(ref.path, sizeof ref.path, "%s", loop.c_str());
+        std::snprintf(ref.name, sizeof ref.name, "loop.wav");
+        for (uint32_t beat = 0; beat < 4; ++beat) {
+            melodee::Event step;
+            step.tick = beat * melodee::ticks_per_quarter;
+            step.key = uint8_t(melodee::sampler_first_note);
+            step.length = 4;
+            patterns->at[0][0].events.push_back(step);
+        }
+        app::PluginStates none;
+        auto bytes = app::project_file_bytes(*project, *patterns, none);
+        CHECK(app::write_whole(home + "/Projects/Move.mldp", bytes.data(), bytes.size()).empty());
+    }
+    auto press = [](app::MelodeeApp& melodee, Button button) {
+        melodee.surface(make_event(0xb0, button_cc(button), 127));
+        melodee.surface(make_event(0xb0, button_cc(button), 0));
+    };
+    AudioBlock in {}, out {};
+    auto loudest = [&](app::MelodeeApp& melodee, int blocks) {
+        int32_t peak = 0;
+        for (int block = 0; block < blocks; ++block) { out.fill(0); melodee.render(in, out); peak = std::max(peak, peak_of(out)); }
+        return peak;
+    };
+    app::MelodeeApp melodee(folder, home, "build/test-no-modules");
+    // Until a long while is silent (the loop has quiet gaps between its hits).
+    auto ring_out = [&] { for (int block = 0, quiet = 0; block < 8000 && quiet < 200; ++block) quiet = loudest(melodee, 1) ? 0 : quiet + 1; };
+    Session session;
+    melodee.attach(session);
+    melodee.audio_opened(AudioFormat {});
+    CHECK(melodee.restore_now().empty());
+    CHECK(has(melodee.status(), "track=1 kind=kit tracks=1") && has(melodee.status(), "samples=1 pads=1"));
+    CHECK(loudest(melodee, 40) == 0); // stopped: silent
+    press(melodee, Button::Play);
+    CHECK(loudest(melodee, 40) > to_s32(0.05f)); // the pattern plays A01
+    melodee.service();
+    CHECK(has(melodee.status(), "playing=1") && !has(melodee.status(), "tick=0 "));
+    uint32_t before = 0;
+    {   // Restarted (the Move's Shift + Play): from the top again.
+        std::lock_guard<std::mutex> guard(melodee.studio().lock);
+        before = melodee.studio().host().ticks();
+        melodee.studio().restart();
+    }
+    loudest(melodee, 1);
+    CHECK(before > 10 && melodee.studio().host().ticks() < 3 && has(melodee.status(), "playing=1"));
+    press(melodee, Button::Play);
+    loudest(melodee, 2);
+    CHECK(has(melodee.status(), "playing=0"));
+    // The Move's settings: Shift + Step 5 the tempo (the jogwheel two up, push
+    // confirms); Shift + Step 6 the metronome on; Shift + Step 7 the groove.
+    auto shift_step = [&](unsigned n) {
+        session.shift = true;
+        melodee.surface(make_event(0x90, step_note(n), 127));
+        melodee.surface(make_event(0x80, step_note(n), 0));
+        session.shift = false;
+    };
+    shift_step(4);
+    CHECK(has(melodee.status(), "page=tempo"));
+    melodee.surface(make_event(0xb0, main_knob_cc, 2));
+    press(melodee, Button::MainPush);
+    CHECK(has(melodee.status(), "page=kit-play") && has(melodee.status(), "tempo=122.0 click=0"));
+    shift_step(5);
+    CHECK(has(melodee.status(), "page=metronome") && has(melodee.status(), "click=1"));
+    press(melodee, Button::Back);
+    shift_step(6);
+    melodee.surface(make_event(0xb0, main_knob_cc, 3));
+    press(melodee, Button::MainPush);
+    CHECK(has(melodee.status(), "page=kit-play") && has(melodee.status(), "swing=53"));
+    // Shift + Play is the Move's (retrigger): it opens nothing.
+    session.shift = true;
+    press(melodee, Button::Play);
+    session.shift = false;
+    CHECK(has(melodee.status(), "page=kit-play") && has(melodee.status(), "playing=0"));
+    // Mute alone: the selected track; Mute + a track button: that one; Shift + Mute + a track button: solo.
+    press(melodee, Button::Mute);
+    CHECK(has(melodee.status(), "mute=1 solo=0"));
+    press(melodee, Button::Mute);
+    CHECK(has(melodee.status(), "mute=0 solo=0"));
+    melodee.surface(make_event(0xb0, button_cc(Button::Mute), 127));
+    session.shift = true;
+    press(melodee, Button::Row1);
+    session.shift = false;
+    melodee.surface(make_event(0xb0, button_cc(Button::Mute), 0));
+    CHECK(has(melodee.status(), "track=1 kind=kit") && has(melodee.status(), "mute=0 solo=1"));
+    melodee.surface(make_event(0xb0, button_cc(Button::Mute), 127));
+    session.shift = true;
+    press(melodee, Button::Row1);
+    session.shift = false;
+    melodee.surface(make_event(0xb0, button_cc(Button::Mute), 0));
+    CHECK(has(melodee.status(), "solo=0"));
+    // A track button held, the Volume knob: that track's volume.
+    melodee.surface(make_event(0xb0, button_cc(Button::Row1), 127));
+    melodee.surface(make_event(0xb0, master_knob_cc, 127)); // one down
+    melodee.surface(make_event(0xb0, button_cc(Button::Row1), 0));
+    CHECK(melodee.studio().project().tracks[0].mix.level == 99);
+
+    auto& studio = melodee.studio();
+    {   // Track 5 a new kit; track 1 can not be made again.
+        std::lock_guard<std::mutex> guard(studio.lock);
+        CHECK(studio.new_track(4, app::TrackKind::Kit) && !studio.new_track(0, app::TrackKind::Kit));
+        studio.select(4);
+    }
+    CHECK(has(melodee.status(), "track=5 kind=kit tracks=2"));
+    ring_out(); // the pattern's last hit on the loop plays it to its end
+    melodee.audio_event(make_event(0x90, pad_note(0), 110));
+    CHECK(loudest(melodee, 10) == 0); // a new kit's pads are empty
+    melodee.audio_event(make_event(0x80, pad_note(0), 0));
+    // The track buttons: the four of track 5's bank; Row 1 is track 5, Row 2 track 6 (empty).
+    press(melodee, Button::Row2);
+    CHECK(has(melodee.status(), "track=6 kind=empty") && has(melodee.status(), "page=empty-play"));
+    // Its push: the new-track sheet; its push again: a kit, and Load opens for it.
+    press(melodee, Button::MainPush);
+    CHECK(has(melodee.status(), "page=new-track"));
+    press(melodee, Button::MainPush);
+    CHECK(has(melodee.status(), "track=6 kind=kit tracks=3") && has(melodee.status(), "page=load-samples"));
+    press(melodee, Button::Back);
+    {   // Track 1 copied onto track 9: its pads play the loop there.
+        std::lock_guard<std::mutex> guard(studio.lock);
+        CHECK(studio.copy_track(0, 8));
+        studio.select(8);
+    }
+    CHECK(has(melodee.status(), "track=9 kind=kit tracks=4"));
+    melodee.audio_event(make_event(0x90, pad_note(0), 110));
+    CHECK(loudest(melodee, 20) > to_s32(0.05f));
+    melodee.audio_event(make_event(0x80, pad_note(0), 0));
+    ring_out();
+    {   // Deleted: empty again.
+        std::lock_guard<std::mutex> guard(studio.lock);
+        studio.delete_track(8);
+    }
+    loudest(melodee, 2);
+    melodee.service(); // the packs handed back, freed
+    CHECK(has(melodee.status(), "track=9 kind=empty tracks=3") && has(melodee.status(), "page=empty-play"));
+    melodee.audio_event(make_event(0x90, pad_note(0), 110));
+    CHECK(loudest(melodee, 10) == 0);
+    melodee.audio_event(make_event(0x80, pad_note(0), 0));
+    // A track button held: the steps are the sixteen tracks.
+    auto hold = [&](bool down) { melodee.surface(make_event(0xb0, button_cc(Button::Row1), down ? 127 : 0)); };
+    auto step = [&](unsigned n) { melodee.surface(make_event(0x90, step_note(n), 127)); melodee.surface(make_event(0x80, step_note(n), 0)); };
+    hold(true);
+    step(0);
+    CHECK(has(melodee.status(), "track=1 kind=kit"));
+    melodee.surface(make_event(0xb0, button_cc(Button::Copy), 127)); // Copy held: track 1, then 11 (empty): copied at once
+    step(0);
+    step(10);
+    melodee.surface(make_event(0xb0, button_cc(Button::Copy), 0));
+    CHECK(has(melodee.status(), "tracks=4"));
+    melodee.surface(make_event(0xb0, button_cc(Button::Delete), 127)); // Delete held: track 11, asked first
+    step(10);
+    melodee.surface(make_event(0xb0, button_cc(Button::Delete), 0));
+    hold(false);
+    CHECK(has(melodee.status(), "page=delete-track") && has(melodee.status(), "tracks=4"));
+    press(melodee, Button::MainPush);
+    loudest(melodee, 2);
+    CHECK(has(melodee.status(), "page=kit-play") && has(melodee.status(), "tracks=3"));
+    hold(true); // an empty step: its new-track sheet
+    step(11);
+    hold(false);
+    CHECK(has(melodee.status(), "track=12 kind=empty") && has(melodee.status(), "page=new-track"));
+    press(melodee, Button::Back);
+    CHECK(has(melodee.status(), "page=empty-play"));
+    CHECK(melodee.save_now().empty());
+    // Saved whole: the three kits, the pattern, the tempo.
+    auto project = std::make_unique<melodee::Project>();
+    auto patterns = std::make_unique<melodee::PatternBank>();
+    app::PluginStates states;
+    CHECK(app::read_project_file(home + "/Projects/Move.mldp", *project, *patterns, states).empty());
+    CHECK(project->used_tracks() == 3 && project->tracks[4].engine == melodee::EngineKind::Sampler && project->tempo == 1220 && project->swing == 53);
+    CHECK(project->tracks[0].mix.level == 99);
+    CHECK(patterns->at[0][0].events.size() == 4);
+}
+
+void test_migration() {
+    // The first scope's project: the kit alone in Move.mldp, each sample's chop
+    // in Move.mldp.chops, the synth track in Move.mldp.synth. The first start
+    // folds them into the project and keeps the old files aside.
+    std::string folder = "build/test-samples", home = "build/test-home-migrate", loop = folder + "/loop.wav";
+    std::string path = home + "/Projects/Move.mldp";
+    std::filesystem::create_directories(folder);
+    std::filesystem::remove_all(home);
+    std::filesystem::create_directories(home + "/Projects");
+    CHECK(write_test_loop(loop));
+    {
+        auto project = std::make_unique<melodee::Project>();
+        auto patterns = std::make_unique<melodee::PatternBank>();
+        melodee::load_sound(project->tracks[0], melodee::EngineKind::Sampler, 0);
+        project->tracks[0].pads[0].sample = 0;
+        auto& ref = project->samples.edit(0);
+        std::snprintf(ref.path, sizeof ref.path, "%s", loop.c_str());
+        std::snprintf(ref.name, sizeof ref.name, "loop.wav");
+        app::PluginStates none;
+        auto bytes = app::project_file_bytes(*project, *patterns, none);
+        CHECK(app::write_whole(path, bytes.data(), bytes.size()).empty());
+        std::ofstream(path + ".chops") << "melodee-move chops 1\n0 0 0 1 2 2 0 500 500 0\n";
+        std::ofstream(path + ".synth") << "melodee-move synth 1\ntrack 1\noctave 1\nmodule fake\npreset 1\nparam level 0.13\n";
+    }
+    {
+        app::MelodeeApp melodee(folder, home, "build/test-modules");
+        Session session;
+        melodee.attach(session);
+        melodee.audio_opened(AudioFormat {});
+        CHECK(melodee.restore_now().empty());
+        CHECK(has(melodee.status(), "track=2 kind=synth") && has(melodee.status(), "synth=fake octave=1"));
+        CHECK(melodee.synth_value("level") == "0.13" && melodee.synth_value("preset") == "1");
+        CHECK(!std::filesystem::exists(path + ".synth") && std::filesystem::exists(path + ".synth.migrated"));
+        CHECK(!std::filesystem::exists(path + ".chops") && std::filesystem::exists(path + ".chops.migrated"));
+    }
+    auto project = std::make_unique<melodee::Project>();
+    auto patterns = std::make_unique<melodee::PatternBank>();
+    app::PluginStates states;
+    CHECK(app::read_project_file(path, *project, *patterns, states).empty());
+    CHECK(project->chops[0].used() && project->chops[0].slices.count == 2 && project->chops[0].mode == melodee::ChopMode(1));
+    const auto& synth = project->tracks[1];
+    app::SynthFile saved;
+    CHECK(synth.engine == melodee::EngineKind::Plugin && synth.plugin < melodee::max_plugins && app::read_synth_state(states[synth.plugin], saved));
+    CHECK(saved.module == "fake" && saved.preset == 1 && std::string(project->plugins[synth.plugin].path).find("fake") != std::string::npos);
 }
 
 } // namespace
@@ -918,6 +1200,8 @@ int main() {
     test_schwung_modules();
     test_canvas_page();
     test_synth_track();
+    test_tracks();
+    test_migration();
     std::cout << "move-tests: " << checks - failures << " of " << checks << " checks passed\n";
     return failures ? 1 : 0;
 }

@@ -344,12 +344,14 @@ void CanvasPage::midi(uint8_t status, uint8_t number, uint8_t value) {
     JS_SetPropertyStr(context, message, "data", data);
     JS_FreeValue(context, engine->call("onMidi", {engine->ctx, message}));
     JS_FreeValue(context, message);
+    if (host.changed) host.changed();
 }
 
 bool CanvasPage::back() {
     JSValue result = engine->call("handleBack", {engine->ctx});
     bool stay = JS_IsBool(result) && JS_ToBool(engine->context, result); // only `true` keeps the page, as Schwung reads it
     JS_FreeValue(engine->context, result);
+    if (host.changed) host.changed();
     return stay;
 }
 
@@ -360,6 +362,41 @@ void CanvasPage::text_entered(const std::string& text, bool cancelled) {
     JS_SetPropertyStr(context, answer, "cancelled", JS_NewBool(context, cancelled));
     JS_FreeValue(context, engine->call("onTextEntry", {engine->ctx, answer}));
     JS_FreeValue(context, answer);
+    if (host.changed) host.changed();
+}
+
+std::string CanvasPage::saved_state() const {
+    JSContext* context = engine->context;
+    JSValue text = JS_JSONStringify(context, engine->state, JS_UNDEFINED, JS_UNDEFINED);
+    std::string saved;
+    if (JS_IsException(text)) JS_FreeValue(context, JS_GetException(context)); // a cycle, a BigInt: not kept
+    else if (JS_IsString(text)) {
+        size_t length = 0;
+        if (const char* bytes = JS_ToCStringLen(context, &length, text)) {
+            saved.assign(bytes, length);
+            JS_FreeCString(context, bytes);
+        }
+    }
+    JS_FreeValue(context, text);
+    return saved == "{}" ? std::string() : saved;
+}
+
+void CanvasPage::restore_state(const std::string& json) {
+    if (json.empty()) return;
+    JSContext* context = engine->context;
+    JSValue saved = JS_ParseJSON(context, json.c_str(), json.size(), "<saved state>");
+    if (JS_IsException(saved)) { JS_FreeValue(context, JS_GetException(context)); return; }
+    JSPropertyEnum* names = nullptr;
+    uint32_t count = 0;
+    if (JS_IsObject(saved) && !JS_IsArray(context, saved)
+        && JS_GetOwnPropertyNames(context, &names, &count, saved, JS_GPN_STRING_MASK | JS_GPN_ENUM_ONLY) == 0) {
+        for (uint32_t n = 0; n < count; ++n) {
+            JS_SetProperty(context, engine->state, names[n].atom, JS_GetProperty(context, saved, names[n].atom));
+            JS_FreeAtom(context, names[n].atom);
+        }
+        js_free(context, names);
+    }
+    JS_FreeValue(context, saved);
 }
 
 } // namespace app

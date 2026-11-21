@@ -9,16 +9,35 @@ Three parts so far:
 - **move-base**, the runtime that hosts an app on the Move as
   [sample-base](../melodee-sample/base) hosts Melodee on the MPC Sample. It
   runs on a Move on Ableton's firmware (realtime, 1 late block in 98,000).
-- **Melodee** (`src/app/`), the first scope of the Rail design
-  ([docs/UI.md](docs/UI.md)): a kit track of 32 pads on Melodee's own
-  sampler and Chop, compiled unchanged from melodee-sample, and a synth
-  track playing one of Schwung's sound generators. It runs on a Move.
+- **Melodee** (`src/app/`) in the Rail design ([docs/UI.md](docs/UI.md)):
+  sixteen tracks on Melodee's own engine host and project, compiled
+  unchanged from melodee-sample: kits of 32 pads on Melodee's sampler and
+  Chop, synth tracks playing Schwung's sound generators, keygroup, MIDI and
+  audio tracks; Play, tempo and metronome; the whole project in Melodee's
+  `.mldp`. It runs on a Move. What is left of Melodee's features, and who
+  takes it on, is [docs/PARITY.md](docs/PARITY.md).
 - The **spike** (`--app spike`), which exercises every path through the
   runtime, with a latency meter.
 
-## Melodee, first scope
+## Melodee
 
-- **Play**: the last pad's sample. Knobs 1-8: tune, level, pan, start, end,
+- **Sixteen tracks**, as in Melodee, on its own `EngineHost` (sixteen
+  engines and mix strips, buses, master, the sequencer's clock, the
+  metronome) and `Project`. The track buttons are the four tracks of the
+  selected track's bank (1-4, 5-8, 9-12, 13-16), in their colours; hold one
+  to see all sixteen and pick one on the steps. With a track button held,
+  an empty step opens the new-track sheet (kit, synth, keygroup, MIDI,
+  audio), Copy + a step and another copies a track, Delete + a step deletes
+  one. A new project has a kit on track 1 and a synth on track 2.
+- **Transport and tempo**, on the Move's own keys (Ableton's manual):
+  Play plays and stops the patterns (the steps follow the playhead); Shift
+  + Step 5 the tempo (the jogwheel, Shift: tenths; push confirms), Shift +
+  Step 6 the metronome on or off (the jogwheel its level), Shift + Step 7
+  the groove. A track button held with the Volume knob sets that track's
+  volume; Mute mutes the selected track, Mute + a track button that one,
+  Shift + Mute + a track button solos it. Editing patterns comes next
+  (docs/PARITY.md, sequencer); a project from the MPC plays its patterns.
+- **Play** (a kit track): the last pad's sample. Knobs 1-8: tune, level, pan, start, end,
   attack, decay, cutoff (Shift: finer). Touch a knob to see it large.
 - **Load** (Menu): WAV, AIFF, FLAC, Ogg and MP3 files onto the last pad,
   read by Melodee's own `read_audio`. It opens on a list of places: My
@@ -32,7 +51,7 @@ Three parts so far:
   Right picks a slice, knobs 1 and 2 move its start and end. Push the
   jogwheel for **To Pads** (Poly, Mono, Thru), onto the first empty pads.
   Back or Loop leaves Chop without changing the pads.
-- **Synth** (Row 2; Row 1 is the kit again): one of Schwung's sound
+- **Synth** (a synth track, track 2 of a new project): one of Schwung's sound
   generators, the ones the Move's Schwung install has
   (`/data/UserData/schwung/modules/sound_generators`, or `--modules DIR`).
   Menu lists them, the jogwheel's push loads one. Pads are notes in rows of
@@ -56,20 +75,33 @@ Three parts so far:
   is done, Back cancels. A file the page hands over (Webstream's download)
   goes onto the first empty kit pad, to play and chop. An action such as
   play/pause or stop is a button: push its menu row, or turn its knob up.
+  What a page keeps for itself (Webstream's provider, where its menus are)
+  is saved with the module and comes back on the next start; using a page
+  counts as a change, saved three seconds on.
 - The master knob is the volume; Shift + Back goes back to Move.
-- **Saving**: the kit is a Melodee project, `/data/UserData/Melodee/Projects/Move.mldp`
-  (`--home` moves the folder), saved three seconds after the last change, as
-  Melodee autosaves on the MPC, and on the way out; the next start opens it.
-  Samples are kept by path; one that has gone keeps its pads, silent, until
-  it is back. Melodee keeps a sample's chop in the WAV file itself; here the
-  samples are the Move's own library, left untouched, so each chop goes
-  beside the project in `Move.mldp.chops`. Each file is written whole or not
-  at all (a temporary file, flushed, renamed). The synth track goes beside
-  it too, in `Move.mldp.synth`: the module by id, its preset and each
-  parameter's value; a module that has gone stays named until it is back.
+- **Saving**: the whole project is one Melodee project file,
+  `/data/UserData/Melodee/Projects/Move.mldp` (`--home` moves the folder),
+  saved three seconds after the last change, as Melodee autosaves on the
+  MPC, and on the way out; the next start opens it. Melodee on the MPC opens
+  it, and the Move opens the MPC's (where the samples' paths lead to the
+  same files). Samples are kept by path; one that has gone keeps its pads,
+  silent, until it is back. Melodee keeps a sample's chop in the WAV file
+  itself; here the samples are the Move's own library, left untouched, so
+  each chop goes into the project, in a section of the Move's own (`MVCH`)
+  that Melodee's reader skips. A synth track is a PLUGIN track: its entry of
+  the project's plug-ins names the module's folder, and the entry's state
+  (Melodee's PLUG section) holds the module by id, its preset and each
+  parameter's value; on the MPC the track stays named and silent, and a
+  module that has gone stays named until it is back. What is the Move's and
+  not the project's (the track played last, the metronome) is in
+  `/data/UserData/Melodee/Move.settings`. Each file is written whole or not
+  at all (a temporary file, flushed, renamed). A project saved by the first
+  scope (`Move.mldp` with `Move.mldp.chops` and `Move.mldp.synth` beside it)
+  is folded into one file on the first start; the old side files stay as
+  `*.migrated`.
 
-Not yet: more than one project, samples over 60 seconds, Record, Capture,
-Schwung's effects, more tracks, a sequencer.
+Not yet: more than one project, editing patterns, samples over 60 seconds,
+Record, Capture, Schwung's effects, mixer pages; docs/PARITY.md has the rest.
 
 ### How a Schwung module is hosted
 
@@ -161,7 +193,7 @@ the tap's click and the sound in the waveform is what you hear.
 | --- | --- |
 | `src/move/` | move-base. `app.h` the `App` interface (sample-base's hooks plus `audio_event`); `runtime.*` the threads; `host.*` what a host shares with them; `spi_host.cpp`, `spi_device.*`, `spi_protocol.*` the Move's device and a simulated one; `jack_host.cpp` the JACK host (libjack loaded at run time); `audio.h` blocks and the reblocker; `controls.*`, `lights.*`, `display.*`, `font.*`, `latency.h`, `tools.*` |
 | `src/ui/` | the interface kit for the Rail design (docs/UI.md), and its mockups (`--ui-mockups DIR`) |
-| `src/app/` | Melodee on the Move: `melodee_app.*` the app, `kit_player.*` Melodee's SamplerEngine on the audio thread, `project_store.*` saving, `schwung_api.h` and `module_host.*` Schwung's modules, `canvas_page.*` their own pages' scripts in QuickJS, `module_probe.*` trying them, `previews.*` its screens offline |
+| `src/app/` | Melodee on the Move: `melodee_app.*` the app (thin: what every screen shares), `studio.*` Melodee's `Project` and `EngineHost` and what the screens share, `screen.*` a screen and the registry, `screens/` one file a screen, `project_store.*` the project file, `schwung_api.h` and `module_host.*` Schwung's modules (behind Melodee's `PluginRunner`), `canvas_page.*` their own pages' scripts in QuickJS, `module_probe.*` trying them, `previews.*` its screens offline |
 | `src/spike/` | the spike app |
 | `module/` | the Schwung standalone tool: `module.json`, `standalone` |
 | `tests/` | unit tests, the device host against the simulated Move, and `fake_module/`, a stand-in Schwung module |
@@ -180,8 +212,9 @@ the newest Ableton's firmware has, libstdc++ is linked in, and the code is
 tuned for the Move's Cortex-A72. Then: the unit tests, the sound self-test,
 the screen previews, runs against the simulated Move (the spike: pad,
 jogwheel to LATENCY, the meter timing clicks through a 300-frame cable,
-Shift + Back; Melodee: load, chop, To Pads, saved and restored; the synth
-track with the stand-in module, saved and restored), and the packages:
+Shift + Back; Melodee: load, chop, To Pads, saved and restored; Play, the
+tempo and the metronome; the synth track with the stand-in module, saved
+and restored), and the packages:
 
 - `dist/melodee-move/`: the binary, the libraries Ableton's firmware lacks,
   a launcher and `run-stock.sh`;
@@ -261,6 +294,27 @@ card. The report stays in `.local/probe/`.
   frames (300 of cable plus the block a render waits for the next exchange);
   a pad went from read to rendered in 37 µs; the cycle's own work took 33 µs
   of 2902.
+- Sixteen tracks on Melodee's EngineHost, against the first scope's one
+  SamplerEngine, the same Melodee script five times each in the simulated
+  Move (Docker on a Mac, not realtime: its `late` counts are the
+  container's, the same for both): the cycle's own work 18-23 µs on average
+  before, 87-114 µs after; a pad from read to rendered 31-49 µs before,
+  52-243 µs after. The engine host takes about 6 µs a block while its
+  caches are warm (`build/bench`); the rest is its memory (sixteen tracks'
+  buffers, eases and meters each block) coming back cold after each 2.9 ms
+  wait. A pad still sounds in the block after the exchange it was read in:
+  this is CPU time, not delay. Resident memory 48 MB before, 222 MB after
+  (the engine host's buffers for Record, Audio Recall, renders and the
+  Looper).
+- On a Move (Ableton's firmware 4.1), the same project played by hand (a kit
+  of 21 samples, webstream on the synth track), the first scope's build
+  then this one: the cycle's own work 9-10 µs on average, 27 at most, before;
+  66-69 µs, 191 at most, after (2.4 % and 6.6 % of the 2902 µs block); a pad
+  from read to rendered 19 µs, 42 at most, before; 81-110 µs, 193 at most,
+  after; 3 late exchanges in 20,690 before, 3 in 31,024 after (225 pads);
+  resident memory 85 MB before, 259 MB after, with 1.1 GB left free. The
+  first start folded the first scope's project into one file, as
+  intended.
 - The package runs on a bare Ubuntu 22.04 (Ableton's glibc) with only its
   own libraries.
 - The JACK host against a dummy JACK server, earlier; the scripts' signal
@@ -298,9 +352,24 @@ to be designed again for this screen.
 
 ## Next
 
+- The engine host made lighter, on melodee-sample's branch
+  `engine-skip-empty-tracks` (until it is merged, build with
+  `MELODEE_SAMPLE` set to a checkout of it): an empty track's buffers are no
+  longer cleared every block, and a silent Pad FX punch records its history
+  a block at a time. In the simulated Move the cycle's work went from 87-114
+  µs to 16-19 µs with the first alone and 14-19 µs with both (three runs
+  each). On a Move it is less: the engine host alone, timed on the Move's
+  own CPU, 53.3 µs a block before and 37.6 after for a kit and a synth
+  (45.9 and 29.8 for an empty project); Melodee played by hand, the cycle's
+  work 57-59 µs on average, 124-166 at most (66-69 and 148-191 before), a
+  pad 59 µs from read to rendered, 9 late exchanges in 41,357 (Webstream
+  streaming, its page open), 285 MB resident. What is left is the engine
+  host's fixed work a block (the Looper, the input, the mix); melodee-sample
+  is the place to lighten it further.
 - The latency meter on a Move (LATENCY page, jogwheel push), against
   Ableton's firmware and Schwung.
-- The synth track played on a Move; Schwung's effects on a track.
+- Wave 2, from docs/PARITY.md: sequencer, sampling, kit depth, instruments,
+  mixer & effects, song & export, looper, MIDI & sync & undo & projects.
 
 ## Licence
 

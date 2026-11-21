@@ -2,8 +2,10 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # Build melodee-move for the Move (linux/arm64) in its build image, then:
 # the unit tests, the sound self-test, the screen previews, a run of the
-# whole runtime against a simulated Move (a pad, the jogwheel to LATENCY,
-# the meter timing clicks through a 300-frame cable, Shift + Back to quit),
+# whole runtime against a simulated Move (the spike: a pad, the jogwheel to
+# LATENCY, the meter timing clicks through a 300-frame cable, Shift + Back to
+# quit; Melodee: load, chop, To Pads, saved and restored, transport and
+# tempo, the synth track saved and restored),
 # and the packages in dist/. When Melodee's own page previews are at hand
 # (MELODEE_PREVIEWS, by default ../melodee-sample/build/melodee-preview),
 # also crush them to the Move's 128 x 64 screen in build/crushed.
@@ -36,18 +38,24 @@ EXPECTED='loop_frames=428/428'
 # hit at 400; Loop at 500 chops it (Auto: 16 slices), slice 2 at 520; two
 # pushes at 600 and 620 put them on pads from A02; Shift + Back at 1300.
 MELODEE_SCRIPT='50:0xb0,50,127;60:0xb0,3,127;400:0x90,68,110;430:0x80,68,0;500:0xb0,58,127;520:0x90,69,100;540:0x80,69,0;600:0xb0,3,127;620:0xb0,3,127;1300:0xb0,49,127;1301:0xb0,51,127'
-MELODEE_EXPECTED='page=play pad=A02 samples=1 slices=16 pads=17'
+MELODEE_EXPECTED='page=kit-play .*pad=A02 samples=1 pads=17 .*slices=16'
 # Saving: the run above quits within three seconds of its last change, so
-# it saves on the way out; the next start reads the kit back (A01 and the 16
-# slices, A02 last), knob 1 tunes A02 at 100, and the autosave follows three
-# seconds after.
+# it saves on the way out; the next start reads the project back (A01 and
+# the 16 slices, A02 last), knob 1 tunes A02 at 100, and the autosave
+# follows three seconds after.
 RESTORE_SCRIPT='100:0xb0,71,2'
-RESTORE_EXPECTED='page=play pad=A02 samples=1 slices=0 pads=17 .* saves=1 unsaved=0'
+RESTORE_EXPECTED='page=kit-play .*pad=A02 samples=1 pads=17 loading=0 saves=1 unsaved=0 .*slices=0'
+# Transport and tempo, on that project, with the Move's own keys: Play at
+# 100; Shift + Step 5 at 300 opens the tempo, the jogwheel two steps up
+# (122 BPM), its push confirms; Shift + Step 6 at 360 the metronome on; Back
+# at 380. Still playing at the end.
+TRANSPORT_SCRIPT='100:0xb0,85,127;101:0xb0,85,0;300:0xb0,49,127;301:0x90,20,127;302:0x80,20,0;303:0xb0,49,0;320:0xb0,14,2;340:0xb0,3,127;341:0xb0,3,0;360:0xb0,49,127;361:0x90,21,127;362:0x80,21,0;363:0xb0,49,0;380:0xb0,51,127;381:0xb0,51,0'
+TRANSPORT_EXPECTED='page=kit-play .*playing=1 tick=[1-9][0-9]* tempo=122.0 click=1'
 # The synth track: Row 2, Menu, the jogwheel's push loads the one module in
 # build/test-modules (the tests' stand-in), a pad plays it, knob 1 turns its
 # level up three, Up an octave. The next start has it back as it was.
 SYNTH_SCRIPT='50:0xb0,42,127;60:0xb0,50,127;80:0xb0,3,127;400:0x90,68,110;430:0x80,68,0;500:0xb0,71,3;520:0xb0,55,127'
-SYNTH_EXPECTED='track=synth synth=fake octave=1'
+SYNTH_EXPECTED='kind=synth .*synth=fake octave=1'
 SYNTH_FLAGS='--backend simulated --samples build/simulated-samples --home build/simulated-synth --modules build/test-modules'
 # shellcheck disable=SC2086
 docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE" && pwd):/melodee:ro" -e MELODEE=/melodee \
@@ -65,19 +73,22 @@ docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE
     { build/melodee-move --backend simulated --samples build/simulated-samples --home build/simulated-home --seconds 8 --script '$MELODEE_SCRIPT' 2> build/simulated-melodee.log || true; } &&
     tail -n 1 build/simulated-melodee.log &&
     grep -q 'Shift + Back' build/simulated-melodee.log &&
-    grep -q '$MELODEE_EXPECTED' build/simulated-melodee.log &&
+    grep -qE '$MELODEE_EXPECTED' build/simulated-melodee.log &&
     test -s build/simulated-home/Projects/Move.mldp &&
     { build/melodee-move --backend simulated --samples build/simulated-samples --home build/simulated-home --seconds 5 --script '$RESTORE_SCRIPT' 2> build/simulated-restore.log || true; } &&
     tail -n 1 build/simulated-restore.log &&
     grep -qE '$RESTORE_EXPECTED' build/simulated-restore.log &&
+    { build/melodee-move --backend simulated --samples build/simulated-samples --home build/simulated-home --seconds 3 --script '$TRANSPORT_SCRIPT' 2> build/simulated-transport.log || true; } &&
+    tail -n 1 build/simulated-transport.log &&
+    grep -qE '$TRANSPORT_EXPECTED' build/simulated-transport.log &&
     rm -rf build/simulated-synth &&
     { build/melodee-move $SYNTH_FLAGS --seconds 5 --script '$SYNTH_SCRIPT' 2> build/simulated-synth.log || true; } &&
     tail -n 1 build/simulated-synth.log &&
-    grep -q '$SYNTH_EXPECTED' build/simulated-synth.log &&
-    grep -q 'param level 0.53' build/simulated-synth/Projects/Move.mldp.synth &&
+    grep -qE '$SYNTH_EXPECTED' build/simulated-synth.log &&
+    grep -qa 'param level 0.53' build/simulated-synth/Projects/Move.mldp &&
     { build/melodee-move $SYNTH_FLAGS --seconds 3 2> build/simulated-synth-restore.log || true; } &&
     tail -n 1 build/simulated-synth-restore.log &&
-    grep -q '$SYNTH_EXPECTED' build/simulated-synth-restore.log &&
+    grep -qE '$SYNTH_EXPECTED' build/simulated-synth-restore.log &&
     build/melodee-move --melodee-previews build/melodee-previews --modules build/test-modules > /dev/null &&
     build/melodee-move --probe-modules build/test-modules &&
     tools/bundle.sh &&
