@@ -338,17 +338,19 @@ void test_setup_and_tracks() {
     CHECK(!studio.settings.pressure);
     press(melodee, Button::Back);
     CHECK(has(status(), "setup_level=0"));
-    turn_wheel(melodee, 2);           // FEATURES (PADS, LIGHTS, FEATURES): Basic
+    // FEATURES: Basic (PADS, LIGHTS, then move-midi's MIDI and MIDI SYNC where MIDI Config is here, FEATURES).
+    turn_wheel(melodee, studio.screen("midi-config") ? 4 : 2);
     press(melodee, Button::MainPush);
     CHECK(!studio.settings.full);
-    // Another area's lines (MIDI Config's key=value, the pad layout's word) kept as they were.
-    melodee.studio().settings_more["midi_port"] = "midi_port=2";
+    // Another area's lines (a key=value, the pad layout's word) kept as they were. (MIDI Config's
+    // own keys are move-midi's now: Studio::midi reads and writes them.)
+    melodee.studio().settings_more["other_area"] = "other_area=2";
     melodee.studio().settings_more["pads"] = "pads 1";
     CHECK(melodee.save_now().empty());
     {   // Kept in Move.settings.
         app::MelodeeApp again(folder, home);
         CHECK(again.studio().settings.response == 2 && !again.studio().settings.pressure && !again.studio().settings.full);
-        CHECK(again.studio().settings_more.count("midi_port") && again.studio().settings_more.at("pads") == "pads 1");
+        CHECK(again.studio().settings_more.count("other_area") && again.studio().settings_more.at("pads") == "pads 1");
     }
     turn_wheel(melodee, 2);           // ABOUT
     press(melodee, Button::MainPush);
