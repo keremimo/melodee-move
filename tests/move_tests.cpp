@@ -14,6 +14,7 @@
 #include "move/tools.h"
 #include "spike/spike_app.h"
 #include "app/canvas_page.h"
+#include <juce_core/juce_core.h>
 #include "app/melodee_app.h"
 #include "app/pad_layout.h"
 #include "app/project_store.h"
@@ -1110,9 +1111,11 @@ void test_tracks() {
     // The track buttons: the four of track 5's bank; Row 1 is track 5, Row 2 track 6 (empty).
     press(melodee, Button::Row2);
     CHECK(has(melodee.status(), "track=6 kind=empty") && has(melodee.status(), "page=empty-play"));
-    // Its push: the new-track sheet; its push again: a kit, and Load opens for it.
+    // Its push: the new-track sheet; its push again: a kit's sources (Melodee's Drum sources); LIBRARY: a kit, and Load opens for it.
     press(melodee, Button::MainPush);
     CHECK(has(melodee.status(), "page=new-track"));
+    press(melodee, Button::MainPush);
+    CHECK(has(melodee.status(), "page=kit-sources") && has(melodee.status(), "kit_source=library"));
     press(melodee, Button::MainPush);
     CHECK(has(melodee.status(), "track=6 kind=kit tracks=3") && has(melodee.status(), "page=load-samples"));
     press(melodee, Button::Back);
@@ -1216,6 +1219,494 @@ void test_migration() {
     app::SynthFile saved;
     CHECK(synth.engine == melodee::EngineKind::Plugin && synth.plugin < melodee::max_plugins && app::read_synth_state(states[synth.plugin], saved));
     CHECK(saved.module == "fake" && saved.preset == 1 && std::string(project->plugins[synth.plugin].path).find("fake") != std::string::npos);
+}
+
+void test_sampling() {
+    // Melodee's Sample Record on the Move's Sampling button (docs/UI.md
+    // "Sampling"): the jack picks mic or line, a pad records onto itself,
+    // another pad carries the take on onto it, the pad again ends it, a pad
+    // held ends it as it is let go; Audio Recall onto the next empty pad;
+    // Resample with the pads playing the kit; the input kept in the settings.
+    std::string folder = "build/test-samples", home = "build/test-home-sampling", loop = folder + "/loop.wav";
+    std::filesystem::create_directories(folder);
+    std::filesystem::remove_all(home);
+    CHECK(write_test_loop(loop));
+    std::string recorded = home + "/Samples/Recorded";
+    {
+        app::MelodeeApp melodee(folder, home, "build/test-no-modules");
+        Session session;
+        melodee.attach(session);
+        melodee.audio_opened(AudioFormat {});
+        CHECK(melodee.restore_now().empty());
+        CHECK(melodee.load_now(loop, 0).empty());
+        Lights lights;
+        AudioBlock in {}, out {};
+        // The input: a 330 Hz tone, half scale, or silence.
+        unsigned phase = 0;
+        auto blocks = [&](int count, bool tone) {
+            int32_t peak = 0;
+            for (int block = 0; block < count; ++block) {
+                for (unsigned f = 0; f < audio_frames; ++f, ++phase) {
+                    int32_t v = tone ? to_s32(0.5f * float(std::sin(6.2831853 * 330.0 * phase / 44100.0))) : 0;
+                    in[2 * f] = in[2 * f + 1] = v;
+                }
+                out.fill(0);
+                melodee.render(in, out);
+                peak = std::max(peak, peak_of(out));
+                if (block % 8 == 0) melodee.lights(lights, App::Clock::now());
+            }
+            return peak;
+        };
+        auto settle = [&] { // the service thread's turn: the take written and onto its pads
+            for (int n = 0; n < 200; ++n) {
+                melodee.service();
+                melodee.lights(lights, App::Clock::now());
+                if (has(melodee.status(), "rec=idle")) break;
+                std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            }
+        };
+        // The jack: no cable (the mic), the speaker.
+        melodee.surface(make_event(0xb0, audio_in_sense_cc, 0));
+        melodee.surface(make_event(0xb0, audio_out_sense_cc, 0));
+        CHECK(has(melodee.status(), "source=MIC in=mic out=speaker"));
+        press_button(melodee, Button::Sample);
+        CHECK(has(melodee.status(), "page=sampling "));
+        melodee.lights(lights, App::Clock::now());
+        CHECK(has(melodee.status(), "monitor=0")); // Auto, but the mic through the speaker: off, no howl
+        // A06 records at once; A07 carries it on; A07 again ends it.
+        tap_pad(melodee, 5);
+        blocks(2, true);
+        CHECK(has(melodee.status(), "rec=recording"));
+        blocks(200, true); // 0.58 s
+        tap_pad(melodee, 6);
+        blocks(100, true);
+        tap_pad(melodee, 6);
+        blocks(2, false);
+        settle();
+        CHECK(has(melodee.status(), "rec=idle") && has(melodee.status(), "last_take=TAKE 1"));
+        CHECK(std::filesystem::exists(recorded + "/TAKE 1.wav") && !std::filesystem::exists(recorded + "/TAKE 1.wav.part"));
+        CHECK(has(melodee.status(), "pad=A07 samples=2 pads=3"));
+        press_button(melodee, Button::Back);
+        CHECK(has(melodee.status(), "page=kit-play"));
+        // A06 plays the take's first part (the tone), A07 the rest.
+        auto play = [&](unsigned pad) {
+            melodee.audio_event(make_event(0x90, pad_note(pad), 110));
+            int32_t peak = blocks(20, false);
+            melodee.audio_event(make_event(0x80, pad_note(pad), 0));
+            blocks(400, false);
+            return peak;
+        };
+        CHECK(play(5) > to_s32(0.1f));
+        CHECK(play(6) > to_s32(0.1f));
+        // Held: A08 records while held, ends as it is let go.
+        press_button(melodee, Button::Sample);
+        melodee.surface(make_event(0x90, pad_note(7), 100));
+        blocks(100, true);
+        std::this_thread::sleep_for(std::chrono::milliseconds(450));
+        CHECK(has(melodee.status(), "rec=recording"));
+        melodee.surface(make_event(0x80, pad_note(7), 0));
+        blocks(2, true);
+        settle();
+        CHECK(has(melodee.status(), "last_take=TAKE 2") && has(melodee.status(), "pads=4"));
+        // Tapped: it records on after the tap is let go; Sampling ends it.
+        tap_pad(melodee, 8);
+        blocks(50, true);
+        CHECK(has(melodee.status(), "rec=recording"));
+        press_button(melodee, Button::Sample); // a take: ends; Sampling Mode stays
+        blocks(2, false);
+        settle();
+        CHECK(has(melodee.status(), "last_take=TAKE 3") && has(melodee.status(), "page=sampling "));
+        press_button(melodee, Button::Sample); // again: leaves
+        CHECK(has(melodee.status(), "page=kit-play"));
+        // Audio Recall: the last phrase of the ring onto the next empty pad after the last one (A09: A10).
+        blocks(300, false);
+        blocks(200, true);
+        blocks(400, false);
+        with_shift(melodee, [&] { press_button(melodee, Button::Sample); });
+        settle();
+        for (int n = 0; n < 50 && !std::filesystem::exists(recorded + "/RECALL 1.wav"); ++n) melodee.service();
+        CHECK(std::filesystem::exists(recorded + "/RECALL 1.wav"));
+        CHECK(has(melodee.status(), "pad=A10") && has(melodee.status(), "pads=6"));
+        press_button(melodee, Button::Back);
+        // A cable goes in: the line in.
+        melodee.surface(make_event(0xb0, audio_in_sense_cc, 127));
+        CHECK(has(melodee.status(), "source=LINE in=line"));
+        // RESAMPLE (knob 1: LINE, LINE L, LINE R, RESAMPLE); A12 is the take's, then A01 plays the kit into it.
+        press_button(melodee, Button::Sample);
+        melodee.surface(make_event(0xb0, knob_first_cc, 3));
+        CHECK(has(melodee.status(), "source=RSMP"));
+        tap_pad(melodee, 11);
+        melodee.lights(lights, App::Clock::now());
+        blocks(4, false);
+        CHECK(has(melodee.status(), "rec=recording"));
+        melodee.audio_event(make_event(0x90, pad_note(0), 110)); // the pads play the kit while it records
+        CHECK(blocks(40, false) > to_s32(0.05f));
+        melodee.audio_event(make_event(0x80, pad_note(0), 0));
+        press_button(melodee, Button::MainPush); // the push ends it
+        blocks(2, false);
+        settle();
+        CHECK(has(melodee.status(), "last_take=RESAMPLE 1"));
+        CHECK(std::filesystem::exists(recorded + "/RESAMPLE 1.wav"));
+        // LENGTH SEQ, stopped: the pad starts Play and the take is one pass of the kit's pattern (a bar, 2 s).
+        melodee.surface(make_event(0xb0, uint8_t(knob_first_cc + 4), 1));
+        tap_pad(melodee, 12);
+        blocks(4, false);
+        CHECK(has(melodee.status(), "playing=1"));
+        blocks(720, false);
+        settle();
+        CHECK(has(melodee.status(), "last_take=RESAMPLE 2"));
+        press_button(melodee, Button::Play);
+        melodee.surface(make_event(0xb0, uint8_t(knob_first_cc + 4), 127)); // FREE again
+        // START at -24 dB: armed, it waits through silence, the tone starts it.
+        melodee.surface(make_event(0xb0, knob_first_cc, 125)); // SOURCE back to the line (RESAMPLE, LINE R, LINE L, LINE)
+        CHECK(has(melodee.status(), "source=LINE "));
+        melodee.surface(make_event(0xb0, uint8_t(knob_first_cc + 3), 49));
+        tap_pad(melodee, 13);
+        blocks(100, false);
+        CHECK(has(melodee.status(), "rec=armed"));
+        blocks(100, true);
+        CHECK(has(melodee.status(), "rec=recording"));
+        press_button(melodee, Button::Sample);
+        blocks(2, false);
+        settle();
+        CHECK(has(melodee.status(), "last_take=TAKE 4"));
+        // Shift + the wheel: the SAMPLING settings; knob 1 Recall's cut on to FIRST.
+        with_shift(melodee, [&] { turn_wheel(melodee, 1); });
+        melodee.surface(make_event(0xb0, knob_first_cc, 1));
+        press_button(melodee, Button::Back);
+    }
+    // The input as set is kept with the Move's settings.
+    std::ifstream settings(home + "/Move.settings");
+    std::string text((std::istreambuf_iterator<char>(settings)), std::istreambuf_iterator<char>());
+    CHECK(has(text, "in_source 1") && has(text, "in_threshold 72") && has(text, "recall_grab 1"));
+    for (const char* kept : {"Recorded", "Edits", "Banks", "Looper", "Expansions", "Keygroups", "Stems"})
+        CHECK(std::filesystem::is_directory(home + "/Samples/" + kept));
+}
+
+void test_sample_files() {
+    // The browser's starred and recent files, its preview, Delete (asked;
+    // what the project plays kept); Trim and Save Sample; a kit's sources on
+    // the new-track sheet; an MPC expansion installed.
+    std::string folder = "build/test-samples-files", home = "build/test-home-files", loop = folder + "/loop.wav";
+    std::filesystem::remove_all(folder);
+    std::filesystem::remove_all(home);
+    std::filesystem::create_directories(folder);
+    CHECK(write_test_loop(loop) && write_test_loop(folder + "/spare.wav") && write_test_loop(folder + "/unused.wav"));
+    {   // An expansion: a zip with its Expansion.xml, a program and its preview, a sample.
+        juce::ZipFile::Builder zip;
+        auto add = [&](const char* name, const std::string& text) {
+            zip.addEntry(std::make_unique<juce::MemoryInputStream>(text.data(), text.size(), true), 0, name, juce::Time::getCurrentTime());
+        };
+        add("Expansion.xml", "<?xml version=\"1.0\"?><expansion><title>Test Drums</title></expansion>");
+        add("Kit.xpm", "<MPCVObject/>");
+        std::ifstream wav(loop, std::ios::binary);
+        std::string bytes((std::istreambuf_iterator<char>(wav)), std::istreambuf_iterator<char>());
+        add("Samples/Kick.wav", bytes);
+        add("[Previews]/Kit.xpm.wav", bytes);
+        juce::FileOutputStream out(juce::File::getCurrentWorkingDirectory().getChildFile(juce::String(folder + "/Test.xpn")));
+        double progress = 0;
+        CHECK(out.openedOk() && zip.writeToStream(out, &progress));
+    }
+    app::MelodeeApp melodee(folder, home, "build/test-no-modules");
+    Session session;
+    melodee.attach(session);
+    melodee.audio_opened(AudioFormat {});
+    CHECK(melodee.restore_now().empty());
+    CHECK(melodee.load_now(loop, 0).empty());
+    Lights lights;
+    AudioBlock in {}, out {};
+    auto settle = [&] {
+        for (int n = 0; n < 20; ++n) {
+            melodee.service();
+            out.fill(0);
+            melodee.render(in, out);
+            melodee.lights(lights, App::Clock::now());
+        }
+    };
+    // Load: the wheel's push on the pad. One place: straight in, its files by name (loop, spare, Test.xpn, unused).
+    press_button(melodee, Button::MainPush);
+    CHECK(has(melodee.status(), "page=load-samples") && has(melodee.status(), "browse=folder"));
+    settle();
+    CHECK(has(melodee.status(), "preview=loop.wav")); // it plays as the wheel lands
+    with_shift(melodee, [&] { press_button(melodee, Button::MainPush); }); // starred
+    CHECK(has(melodee.status(), "starred=1"));
+    turn_wheel(melodee, 1);
+    settle();
+    CHECK(has(melodee.status(), "preview=spare.wav"));
+    press_button(melodee, Button::MainPush); // spare.wav onto A01: into RECENT
+    settle();
+    CHECK(has(melodee.status(), "recent=1"));
+    CHECK(std::filesystem::exists(home + "/Starred.txt") && std::filesystem::exists(home + "/Recent.txt"));
+    // Delete: spare.wav is A01's now, so kept; loop.wav is in the project still (Melodee's rule), kept; unused.wav: asked, then gone.
+    press_button(melodee, Button::Delete);
+    CHECK(has(melodee.status(), "page=delete-file"));
+    press_button(melodee, Button::MainPush);
+    settle();
+    CHECK(std::filesystem::exists(folder + "/spare.wav"));
+    press_button(melodee, Button::Back); // out, and in again: STARRED and RECENT lead the top
+    press_button(melodee, Button::MainPush);
+    CHECK(has(melodee.status(), "page=load-samples"));
+    turn_wheel(melodee, -10);
+    turn_wheel(melodee, 2); // STARRED, RECENT, loop.wav
+    press_button(melodee, Button::Delete);
+    press_button(melodee, Button::MainPush);
+    settle();
+    CHECK(std::filesystem::exists(loop));
+    turn_wheel(melodee, 10); // unused.wav
+    press_button(melodee, Button::Delete);
+    press_button(melodee, Button::Back); // no
+    settle();
+    CHECK(std::filesystem::exists(folder + "/unused.wav"));
+    press_button(melodee, Button::Delete);
+    press_button(melodee, Button::MainPush); // yes
+    settle();
+    CHECK(!std::filesystem::exists(folder + "/unused.wav") && has(melodee.status(), "starred=1"));
+    // The expansion (the last row): installed into Samples/Expansions/<its title>, then opened there.
+    turn_wheel(melodee, 10);
+    press_button(melodee, Button::MainPush);
+    settle();
+    CHECK(std::filesystem::exists(home + "/Samples/Expansions/Test Drums/Samples/Kick.wav"));
+    CHECK(has(melodee.status(), "browse=folder"));
+    turn_wheel(melodee, -10); // Kit.xpm, first: its own preview plays
+    settle();
+    CHECK(has(melodee.status(), "preview=Kit.xpm"));
+    press_button(melodee, Button::Back);
+    CHECK(has(melodee.status(), "page=kit-play"));
+    // Trim: Sample Options, TRIM: the region a file of its own, A01 onto it.
+    auto options = [&](int row) {
+        with_shift(melodee, [&] { press_button(melodee, Button::MainPush); });
+        turn_wheel(melodee, row);
+        press_button(melodee, Button::MainPush);
+    };
+    melodee.surface(make_event(0xb0, uint8_t(knob_first_cc + 3), 20)); // knob 4: A01 starts later
+    options(2);
+    settle();
+    CHECK(std::filesystem::exists(home + "/Samples/Edits/SPARE-Trimmed.wav"));
+    CHECK(has(melodee.status(), "samples=3"));
+    // Save Sample: the name typed (the sample's own given), push: done.
+    options(4);
+    CHECK(has(melodee.status(), "typing=1"));
+    tap_pad(melodee, 7); // the keyboard's backspace, bottom right
+    press_button(melodee, Button::MainPush);
+    settle();
+    CHECK(std::filesystem::exists(home + "/Samples/SPARE-Trimme.wav"));
+    // A kit's sources: EMPTY makes a kit with nothing on it.
+    melodee.surface(make_event(0xb0, button_cc(Button::Row1), 127));
+    tap_step(melodee, 2);
+    melodee.surface(make_event(0xb0, button_cc(Button::Row1), 0));
+    melodee.lights(lights, App::Clock::now());
+    CHECK(has(melodee.status(), "track=3 kind=empty") && has(melodee.status(), "page=new-track"));
+    press_button(melodee, Button::MainPush);
+    turn_wheel(melodee, 1);
+    CHECK(has(melodee.status(), "kit_source=empty"));
+    press_button(melodee, Button::MainPush);
+    CHECK(has(melodee.status(), "track=3 kind=kit") && has(melodee.status(), "page=kit-play") && has(melodee.status(), "pads=0"));
+}
+
+void test_chop_depth() {
+    // Chop on the Move past the first scope: slices 33-64 on Plus, Delete +
+    // a pad, the slice options (Extract, Split, Merge, Remove all cuts), a
+    // manual take with the red pad, a step, To Pads KIT.
+    std::string folder = "build/test-samples", home = "build/test-home-chop", loop = folder + "/loop.wav";
+    std::filesystem::create_directories(folder);
+    std::filesystem::remove_all(home);
+    CHECK(write_test_loop(loop));
+    app::MelodeeApp melodee(folder, home, "build/test-no-modules");
+    Session session;
+    melodee.attach(session);
+    melodee.audio_opened(AudioFormat {});
+    CHECK(melodee.restore_now().empty());
+    CHECK(melodee.load_now(loop, 0).empty());
+    Lights lights;
+    AudioBlock in {}, out {};
+    auto settle = [&] {
+        for (int n = 0; n < 20; ++n) { melodee.service(); out.fill(0); melodee.render(in, out); melodee.lights(lights, App::Clock::now()); }
+    };
+    auto knob = [&](unsigned n, int detents) { melodee.surface(make_event(0xb0, uint8_t(knob_first_cc + n), uint8_t(detents < 0 ? 128 + detents : detents))); };
+    auto options = [&](int row) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(320)); // two Shift presses within 0.3 s would lock it (the Move's)
+        with_shift(melodee, [&] { press_button(melodee, Button::MainPush); });
+        CHECK(has(melodee.status(), "page=slice-options"));
+        turn_wheel(melodee, row);
+        press_button(melodee, Button::MainPush);
+    };
+    open_chop(melodee);
+    knob(2, 1);
+    knob(2, 1);  // type: Auto, Beats, Regions (a step a turn)
+    knob(3, 24); // 16 + 24: 40 slices
+    CHECK(has(melodee.status(), "slices=40 chop=Regions"));
+    press_button(melodee, Button::Up); // Plus: slices 33-40 on the pads
+    CHECK(has(melodee.status(), "bank=2"));
+    tap_pad(melodee, 2);
+    CHECK(has(melodee.status(), "slice=35"));
+    press_button(melodee, Button::Down);
+    CHECK(has(melodee.status(), "bank=1"));
+    melodee.surface(make_event(0xb0, button_cc(Button::Delete), 127)); // Delete + A02: its cut out
+    tap_pad(melodee, 1);
+    melodee.surface(make_event(0xb0, button_cc(Button::Delete), 0));
+    CHECK(has(melodee.status(), "slices=39"));
+    tap_step(melodee, 4); // the sample from its fifth sixteenth
+    tap_pad(melodee, 3);
+    options(0); // Extract: slice 4 onto the next empty pad
+    settle();
+    CHECK(std::filesystem::exists(home + "/Samples/Edits/LOOP-Slice 4.wav"));
+    CHECK(has(melodee.status(), "page=chop") && has(melodee.status(), "slices=39"));
+    options(1); // Split
+    CHECK(has(melodee.status(), "slices=40"));
+    options(2); // Merge
+    CHECK(has(melodee.status(), "slices=39"));
+    std::this_thread::sleep_for(std::chrono::milliseconds(320));
+    with_shift(melodee, [&] { turn_wheel(melodee, 1); }); // the start from hit to hit
+    CHECK(has(melodee.status(), "page=chop"));
+    options(3); // Remove all cuts: a manual take, from the first pad
+    CHECK(has(melodee.status(), "slices=1 chop=Manual") && has(melodee.status(), "manual_next=1"));
+    tap_pad(melodee, 0); // the region plays; the red moves to A02
+    CHECK(has(melodee.status(), "manual_next=2"));
+    std::this_thread::sleep_for(std::chrono::milliseconds(120));
+    tap_pad(melodee, 1); // the red pad cuts
+    CHECK(has(melodee.status(), "slices=2") && has(melodee.status(), "manual_next=3"));
+    std::this_thread::sleep_for(std::chrono::milliseconds(120));
+    tap_pad(melodee, 2);
+    CHECK(has(melodee.status(), "slices=3") && has(melodee.status(), "manual_next=4"));
+    tap_pad(melodee, 1); // a lit pad: plays again from its slice, the cut after it gone
+    CHECK(has(melodee.status(), "slices=2") && has(melodee.status(), "manual_next=3"));
+    knob(0, 1); // another control: the take stops short, the red stays
+    CHECK(has(melodee.status(), "manual_next=3"));
+    // To Pads KIT: a pad a sound.
+    knob(2, -1); // Threshold
+    press_button(melodee, Button::MainPush);
+    CHECK(has(melodee.status(), "page=to-pads"));
+    turn_wheel(melodee, 3);
+    press_button(melodee, Button::MainPush);
+    CHECK(has(melodee.status(), "page=kit-play"));
+}
+
+void test_audio_track() {
+    // An audio track (guide/audio-tracks.md): Sampling opens its INPUT, Rec
+    // arms it, Play records one pass of its pattern into "Move Audio/Take
+    // 001.wav", which the pattern then plays; its CLIP's level; the take back
+    // after a restart.
+    std::string folder = "build/test-samples", home = "build/test-home-audio";
+    std::filesystem::create_directories(folder);
+    std::filesystem::remove_all(home);
+    AudioBlock in {}, out {};
+    unsigned phase = 0;
+    Lights lights;
+    auto blocks = [&](app::MelodeeApp& melodee, int count, bool tone) {
+        int32_t peak = 0;
+        for (int block = 0; block < count; ++block) {
+            for (unsigned f = 0; f < audio_frames; ++f, ++phase) {
+                int32_t v = tone ? to_s32(0.4f * float(std::sin(6.2831853 * 220.0 * phase / 44100.0))) : 0;
+                in[2 * f] = in[2 * f + 1] = v;
+            }
+            out.fill(0);
+            melodee.render(in, out);
+            peak = std::max(peak, peak_of(out));
+            if (block % 16 == 0) { melodee.service(); melodee.lights(lights, App::Clock::now()); }
+        }
+        return peak;
+    };
+    {
+        app::MelodeeApp melodee(folder, home, "build/test-no-modules");
+        Session session;
+        melodee.attach(session);
+        melodee.audio_opened(AudioFormat {});
+        CHECK(melodee.restore_now().empty());
+        {
+            std::lock_guard<std::mutex> guard(melodee.studio().lock);
+            CHECK(melodee.studio().new_track(2, app::TrackKind::Audio));
+            melodee.studio().select(2);
+        }
+        melodee.surface(make_event(0xb0, audio_in_sense_cc, 127)); // a cable in: the line
+        CHECK(has(melodee.status(), "track=3 kind=audio") && has(melodee.status(), "page=audio-play"));
+        press_button(melodee, Button::Sample);
+        CHECK(has(melodee.status(), "page=audio-input"));
+        press_button(melodee, Button::Rec);
+        CHECK(has(melodee.status(), "audio_armed=1"));
+        blocks(melodee, 20, true);
+        press_button(melodee, Button::Play); // one pass of the pattern (a bar, 2 s at 120 BPM) from its top
+        blocks(melodee, 200, true);
+        CHECK(has(melodee.status(), "audio_arm=-2")); // recording
+        blocks(melodee, 700, true);
+        for (int n = 0; n < 50; ++n) blocks(melodee, 1, false);
+        CHECK(std::filesystem::exists(home + "/Projects/Move Audio/Take 001.wav"));
+        press_button(melodee, Button::Back);
+        CHECK(has(melodee.status(), "page=audio-play") && has(melodee.status(), "take=1 "));
+        CHECK(blocks(melodee, 800, false) > to_s32(0.1f)); // the pattern plays its take, the input silent
+        melodee.surface(make_event(0xb0, knob_first_cc, 124)); // knob 1: the level 4 x 0.5 dB down
+        CHECK(has(melodee.status(), "take_gain=-20"));
+        press_button(melodee, Button::Play);
+        CHECK(melodee.save_now().empty());
+    }
+    {   // Again: the take read back for the pattern, and played.
+        app::MelodeeApp melodee(folder, home, "build/test-no-modules");
+        Session session;
+        melodee.attach(session);
+        melodee.audio_opened(AudioFormat {});
+        CHECK(melodee.restore_now().empty());
+        CHECK(has(melodee.status(), "kind=audio") && has(melodee.status(), "take=1 ") && has(melodee.status(), "take_gain=-20"));
+        blocks(melodee, 20, false);
+        press_button(melodee, Button::Play);
+        CHECK(blocks(melodee, 800, false) > to_s32(0.08f));
+    }
+}
+
+void test_sampling_pad_layout() {
+    // Sampling and Chop by the pad's number in the pad layout (app/pad_layout.h):
+    // in Banks, the bottom row's fifth pad is B01 (the right bank's first), its
+    // second row's first A05; Audio Recall's next empty pad is in that order.
+    std::string folder = "build/test-samples", home = "build/test-home-layout", loop = folder + "/loop.wav";
+    std::filesystem::create_directories(folder);
+    std::filesystem::remove_all(home);
+    CHECK(write_test_loop(loop));
+    app::set_pad_layout(app::PadLayout::Banks);
+    {
+        app::MelodeeApp melodee(folder, home, "build/test-no-modules");
+        Session session;
+        melodee.attach(session);
+        melodee.audio_opened(AudioFormat {});
+        CHECK(melodee.restore_now().empty());
+        CHECK(melodee.load_now(loop, 0).empty());
+        Lights lights;
+        AudioBlock in {}, out {};
+        unsigned phase = 0;
+        auto blocks = [&](int count) {
+            for (int block = 0; block < count; ++block) {
+                for (unsigned f = 0; f < audio_frames; ++f, ++phase) in[2 * f] = in[2 * f + 1] = to_s32(0.5f * float(std::sin(6.2831853 * 330.0 * phase / 44100.0)));
+                out.fill(0);
+                melodee.render(in, out);
+                if (block % 8 == 0) melodee.lights(lights, App::Clock::now());
+            }
+        };
+        auto settle = [&] {
+            for (int n = 0; n < 200 && !has(melodee.status(), "rec=idle"); ++n) { melodee.service(); melodee.lights(lights, App::Clock::now()); }
+            for (int n = 0; n < 5; ++n) melodee.service();
+        };
+        press_button(melodee, Button::Sample);
+        tap_pad(melodee, 4); // physical bottom row, fifth: B01
+        blocks(150);
+        tap_pad(melodee, 8); // physical second row, first: A05, the take carried on onto it
+        blocks(150);
+        tap_pad(melodee, 8);
+        blocks(2);
+        settle();
+        CHECK(has(melodee.status(), "pad=A05 samples=2 pads=3") && has(melodee.status(), "last_take=TAKE 1"));
+        press_button(melodee, Button::Back);
+        with_shift(melodee, [&] { press_button(melodee, Button::Sample); }); // Audio Recall: the next empty after A05 is A06
+        settle();
+        for (int n = 0; n < 50 && !has(melodee.status(), "pad=A06"); ++n) melodee.service();
+        CHECK(has(melodee.status(), "pad=A06") && has(melodee.status(), "pads=4"));
+        press_button(melodee, Button::Back);
+        tap_pad(melodee, 0); // A01 again
+        open_chop(melodee);
+        melodee.surface(make_event(0xb0, uint8_t(knob_first_cc + 2), 1));
+        melodee.surface(make_event(0xb0, uint8_t(knob_first_cc + 2), 1)); // Regions, 16 slices
+        tap_pad(melodee, 4); // B01: slice 17 would be; 16 slices: the pad has none
+        CHECK(has(melodee.status(), "slices=16") && has(melodee.status(), "slice=1 "));
+        tap_pad(melodee, 9); // physical second row, second: A06, slice 6
+        CHECK(has(melodee.status(), "slice=6 "));
+    }
+    app::set_pad_layout(app::PadLayout::Rows);
 }
 
 } // namespace
@@ -1707,6 +2198,11 @@ int main() {
     test_kit_depth();
     test_looper_pads();
     test_looper();
+    test_sampling();
+    test_sample_files();
+    test_chop_depth();
+    test_audio_track();
+    test_sampling_pad_layout();
     std::cout << "move-tests: " << checks - failures << " of " << checks << " checks passed\n";
     return failures ? 1 : 0;
 }

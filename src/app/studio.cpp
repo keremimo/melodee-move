@@ -2,10 +2,12 @@
 #include "app/studio.h"
 #include "app/pad_layout.h"
 #include "app/prints.h"
+#include "app/sampling.h"
 #include "app/screen.h"
 #include "app/sequencer.h"
 #include "app/seq_edit.h"
 #include "app/song_desk.h"
+#include "melodee/engine/audio_player.h"
 #include "melodee/engine/engine_info.h"
 #include "melodee/model/scales.h"
 #include "melodee/shell/pad_gap.h"
@@ -191,6 +193,17 @@ std::unique_ptr<Sample> read_sample(const std::string& path, std::string& error,
     return sample;
 }
 
+std::unique_ptr<Sample> make_sample(const std::string& path, std::unique_ptr<melodee::SampleData> data) {
+    auto sample = std::make_unique<Sample>();
+    sample->name = fs::path(path).filename().string();
+    sample->path = path;
+    sample->data = std::move(data);
+    melodee::make_overview(*sample->data, sample->overview);
+    auto mono = melodee::model_mono(*sample->data);
+    sample->hit_count = melodee::find_hits_in(mono, sample->hits, sample->beats, &sample->autos);
+    return sample;
+}
+
 // ---------------------------------------------------------------- start and end
 
 Studio::Studio(std::string library_folder, std::string home_folder, std::string modules_folder)
@@ -206,6 +219,7 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
     fx_catalog = scan_modules(modules_root, "audio_fx");
     pad_went.fill({});
     melodee::dsp::device_rate.store(44100.0f); // the Move's; audio_opened() says if it is not
+    sampler_shell = std::make_unique<Sampling>(*this); // before the settings: its words are in Move.settings
     unsigned played = 0;
     read_settings(); // the Move's own: the project to open, the track played last, the metronome, Setup
     {
@@ -334,7 +348,8 @@ void Studio::forward() {
 void Studio::render(const move::AudioBlock& input, move::AudioBlock& output) {
     forward();
     module_input(input);
-    engine->render(output.data(), move::audio_frames, volume.load(std::memory_order_relaxed), input.data());
+    engine->render(output.data(), move::audio_frames, speaker_quiet.load(std::memory_order_relaxed) ? 0.0f : volume.load(std::memory_order_relaxed),
+                   input.data()); // Sampling: the speaker quiet while the mic would howl
     // Melodee's transport, for the modules that follow it (sequencer.h): stores only.
     set_module_transport(engine->playing(), engine->ticks() / double(melodee::ticks_per_quarter), audio_beats.load(std::memory_order_relaxed),
                          audio_unit.load(std::memory_order_relaxed));
@@ -381,13 +396,16 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
         if (input.pressed) {
             went = {};
             if (pads_typing.load(std::memory_order_relaxed)) return; // a letter, not a note
-            int track = audio_track.load(std::memory_order_relaxed);
-            auto kind = TrackKind(audio_kind.load(std::memory_order_relaxed));
+            int redirected = pads_track.load(std::memory_order_relaxed); // Sampling: a take of Melodee's own sound, the source plays
+            int track = redirected >= 0 ? redirected : audio_track.load(std::memory_order_relaxed);
+            auto kind = TrackKind((redirected >= 0 ? pads_kind : audio_kind).load(std::memory_order_relaxed));
             int16_t velocity = int16_t(full_level.load(std::memory_order_relaxed) ? 127
                 : std::max(1, velocity_of(pad_response.load(std::memory_order_relaxed), input.value))); // Full Level, else Setup's pad response
             int key = -1;
             int pitch_pad = -1, pitch_semitones = 0; // 16 Pitches: the last pad at a pitch
-            if (kind == TrackKind::Kit) {
+            if (kind == TrackKind::Kit && redirected >= 0) { // the source kit's pads by their number in the pad layout
+                key = int(melodee::sampler_first_note + logical_pad(input.index, pad_layout()));
+            } else if (kind == TrackKind::Kit) {
                 // The kit's pads: two banks of 16 from the lower in view; with
                 // 16 Pitches, the left 16 one bank as the MPC lays it and the
                 // right 16 the last pad at its pitches (Melodee's 16 Levels).
@@ -408,7 +426,7 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
                     key = int(melodee::sampler_first_note + (bank + logical_pad(input.index, pad_layout())) % melodee::sampler_pads);
                 }
             } else if (kind == TrackKind::Synth || kind == TrackKind::Keys || kind == TrackKind::Midi || kind == TrackKind::Plugin) {
-                key = note_for(input.index, audio_octave.load(std::memory_order_relaxed));
+                key = note_for(input.index, (redirected >= 0 ? pads_octave : audio_octave).load(std::memory_order_relaxed));
             }
             if (looping && at.track >= 0) { // the track's 16 on the Looper: a kit's bank of 16, or 16 notes up from C
                 bool note_track = kind == TrackKind::Synth || kind == TrackKind::Keys || kind == TrackKind::Midi || kind == TrackKind::Plugin;
@@ -426,7 +444,7 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
             stamp.velocity.store(velocity, std::memory_order_relaxed);
             stamp.position.store(engine->position_of(unsigned(track)), std::memory_order_relaxed);
             stamp.ticks.store(engine->ticks(), std::memory_order_relaxed);
-            if (pads_quiet.load(std::memory_order_relaxed)) return;  // another job (docs/MOVE_CONTROLS.md)
+            if (redirected < 0 && pads_quiet.load(std::memory_order_relaxed)) return; // another job (docs/MOVE_CONTROLS.md)
             if (key < 0) return;
             if (pitch_pad >= 0) { // the pad at a pitch: not repeated or arpeggiated
                 went = {track, key};
@@ -447,7 +465,8 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
         }
     } else if (input.kind == Kind::PadPressure && went.track >= 0 && went.key < 128 && pad_pressure.load(std::memory_order_relaxed)) {
         // Melodee's sampler takes no pressure; a note track's engine does.
-        if (TrackKind(audio_kind.load(std::memory_order_relaxed)) != TrackKind::Kit)
+        int redirected = pads_track.load(std::memory_order_relaxed);
+        if (TrackKind((redirected >= 0 ? pads_kind : audio_kind).load(std::memory_order_relaxed)) != TrackKind::Kit)
             engine->send({Type::Pressure, uint8_t(went.track), 0, uint16_t(went.key), int16_t(input.value)});
     }
 }
@@ -765,13 +784,12 @@ melodee::SampleChop* Studio::chop_of(unsigned slot) {
     return slot < melodee::sample_slots ? &song->chops.edit(slot) : nullptr;
 }
 
-std::string Studio::install(std::unique_ptr<Sample> sample, unsigned t, unsigned at, bool keep) {
-    if (song->tracks[t].engine != EngineKind::Sampler) return "NOT A KIT";
+int Studio::add_sample(std::unique_ptr<Sample> sample, std::string& error) {
     // The first slot no file of the project names.
     unsigned slot = 0;
     while (slot < melodee::sample_slots && (song->samples[slot].path[0] || (slot < samples.size() && samples[slot]))) ++slot;
-    if (slot >= melodee::sample_slots) return "MEMORY FULL";
-    if (!engine->offer_sample(slot, sample->data.get())) return "BUSY, TRY AGAIN";
+    if (slot >= melodee::sample_slots) { error = "MEMORY FULL"; return -1; }
+    if (!engine->offer_sample(slot, sample->data.get())) { error = "BUSY, TRY AGAIN"; return -1; }
     auto& ref = song->samples.edit(slot);
     copy_text(ref.path, sample->path);
     copy_text(ref.name, sample->name);
@@ -779,6 +797,27 @@ std::string Studio::install(std::unique_ptr<Sample> sample, unsigned t, unsigned
     ref.streamed = sample->streamed;
     if (slot >= samples.size()) samples.resize(slot + 1);
     samples[slot] = std::move(sample);
+    changed();
+    return int(slot);
+}
+
+const melodee::SampleData* Studio::sample_of_slot(unsigned slot) const {
+    return slot < samples.size() && samples[slot] ? samples[slot]->data.get() : nullptr;
+}
+
+void Studio::pads_play(int t) {
+    if (t >= 0) {
+        pads_kind.store(int(kind(unsigned(t))), std::memory_order_relaxed);
+        pads_octave.store(octave(unsigned(t)), std::memory_order_relaxed);
+    }
+    pads_track.store(t >= 0 ? t % int(melodee::track_count) : -1, std::memory_order_relaxed);
+}
+
+std::string Studio::install(std::unique_ptr<Sample> sample, unsigned t, unsigned at, bool keep) {
+    if (song->tracks[t].engine != EngineKind::Sampler) return "NOT A KIT";
+    std::string error;
+    int slot = add_sample(std::move(sample), error);
+    if (slot < 0) return error;
     if (layer_target.layer > 0 && layer_target.track == int(t) && layer_target.pad == int(at) && song->tracks[t].pads[at].used()) {
         // Onto a layer of the pad (LAYERS): it keeps its tune, level and velocities.
         melodee::PadSound sound = song->tracks[t].pads[at];
@@ -1190,6 +1229,7 @@ std::string Studio::settings_text() const {
     out << seq->settings_text();
     midi.write_settings(out);
     out << "loop_latency " << (loop_desk ? loop_desk->latency() : loop_latency_setting) << '\n';
+    out << sampler_shell->settings_text(); // Sampling's: Input Config, its settings, the starred and recent
     // The lines of other areas, as they were, unless one was written above.
     std::string text = out.str();
     for (const auto& [word, line] : settings_more)
@@ -1228,6 +1268,7 @@ void Studio::read_settings() {
         else if (word == "pads") set_pad_layout(value ? PadLayout::Banks : PadLayout::Rows);
         else if (word == "loop_latency") loop_latency_setting = int(std::min(value, 48000u));
         else if (midi.read_setting(word, int(value))) continue; // MIDI Config's keys
+        else if (sampler_shell->setting(word, value)) continue; // Sampling's
         else settings_more[word] = line; // another area's: kept as it is
     }
 }
@@ -1458,6 +1499,7 @@ void Studio::take_back() {
     const melodee::SampleData* sample = nullptr;
     std::vector<std::unique_ptr<Sample>> let_go;
     while (engine->take_retired(sample)) { // the samples are the studio's, kept for the run; another project's go now
+        sampler_shell->retired(sample); // a preview's goes
         std::lock_guard<std::mutex> guard(lock);
         auto at = std::find_if(samples_leaving.begin(), samples_leaving.end(), [sample](const auto& s) { return s && s->data.get() == sample; });
         if (at == samples_leaving.end()) continue;
@@ -1465,6 +1507,8 @@ void Studio::take_back() {
         samples_leaving.erase(at);
     }
     let_go.clear(); // freed outside the lock
+    melodee::AudioPack* audio_pack = nullptr;
+    while (engine->take_done_audio(audio_pack)) delete audio_pack; // an audio track's takes, replaced (the takes' frames are Sampling's)
     melodee::MidiOutEvent out;
     while (engine->take_midi(out)) {} // MIDI out: not yet on the Move
     // A Schwung track's runner, handed back: its track can go now.
@@ -1558,6 +1602,7 @@ void Studio::service() {
         arranger->printer().opened(); // the frozen tracks' prints read and sent (also each project opened)
     }
     hold_streams();
+    sampler_shell->service(); // a take drained into its file, Audio Recall copied out
     take_back();
     loop_desk->service(); // the Looper's memory and fits, its files, commits
     take_answers();
@@ -2375,6 +2420,7 @@ std::string Studio::status() const {
         line += " undo_last=" + step;
     }
     line += arranger->status();
+    line += sampler_shell->status();
     for (const auto& screen : screens) line += screen->status();
     line += seq->status();
     line += midi.status();

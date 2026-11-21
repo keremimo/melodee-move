@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // The Play screens of the tracks whose own screens come later (docs/PARITY.md,
-// wave 2): a keygroup, an audio track, another host's plug-in, and an empty
-// track (a MIDI track's is screens/midi_play.cpp). Each plays: a keygroup's
-// and a plug-in's pads are notes as a synth track's (Up / Down the octave);
-// an audio track's pads do nothing. An empty track says how to make one.
+// wave 2): a keygroup, another host's plug-in, and an empty track (a MIDI
+// track's is screens/midi_play.cpp, an audio track's sampling's:
+// screens/audio_track.cpp). Each plays: a keygroup's and a plug-in's pads
+// are notes as a synth track's (Up / Down the octave). An empty track says
+// how to make one.
 #include "app/screens/common.h"
 #include "melodee/engine/engine_info.h"
 
@@ -76,24 +77,6 @@ public:
     }
 };
 
-class AudioPlay final : public Screen {
-public:
-    using Screen::Screen;
-    bool job(bindings::Job job, const bindings::Use&) override { return job == bindings::Job::TurnKnob || job == bindings::Job::TurnKnobFine; }
-    void lights(move::Lights& lights) override {
-        for (unsigned at = 0; at < pad_count; ++at) lights.pad(at, move::colour::off);
-        steps_playhead(studio, lights);
-        for (auto button : {move::Button::Left, move::Button::Right, move::Button::Up, move::Button::Down, move::Button::Loop, move::Button::Menu, move::Button::Back})
-            lights.button(button, 0);
-    }
-    void draw(juce::Graphics& g) override {
-        ui::rail(g, "AUD", track_number(studio), "IN");
-        move::draw_text(g, ui::content_x + 1, 1, upper(studio.current().name).substr(0, 16));
-        move::draw_text_centred(g, ui::content_x, 22, ui::content_width, "AUDIO TRACK");
-        ui::detail(g, "RECORD: LATER", bar_beat(studio));
-    }
-};
-
 class EmptyPlay final : public Screen {
 public:
     using Screen::Screen;
@@ -116,7 +99,6 @@ public:
 
 RegisterScreen keys("keys-play", make<KeysPlay>, {}, kind_bit(TrackKind::Keys));
 RegisterScreen plugin("plugin-play", make<PluginPlay>, {}, kind_bit(TrackKind::Plugin));
-RegisterScreen audio("audio-play", make<AudioPlay>, {}, kind_bit(TrackKind::Audio));
 RegisterScreen empty("empty-play", make<EmptyPlay>, {}, kind_bit(TrackKind::Empty));
 
 } // namespace

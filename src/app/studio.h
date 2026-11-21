@@ -79,6 +79,8 @@ struct Sample {
 // place; a long MP3, FLAC, Ogg or AIFF decoded once into `cache` (Melodee/Cache,
 // shell/sample_cache.h) and read in place from there.
 std::unique_ptr<Sample> read_sample(const std::string& path, std::string& error, const melodee::SampleCache* cache = nullptr);
+// The same for frames already in memory (a take, Audio Recall), kept as `path`.
+std::unique_ptr<Sample> make_sample(const std::string& path, std::unique_ptr<melodee::SampleData> data);
 
 // Melodee's PLUGIN track's plug-in, for one of Schwung's modules: the
 // engine host calls it on the audio thread (engine/plugin_engine.h).
@@ -148,6 +150,7 @@ struct Settings {
 constexpr unsigned pad_fade_ms[4] {60, 100, 150, 250};
 constexpr const char* show_styles[5] {"PULSE", "SWEEP", "CHASE", "RIPPLE", "LEVELS"};
 class SongDesk;
+class Sampling;
 
 class Studio {
 public:
@@ -253,6 +256,9 @@ public:
     LayerTarget layer_target;
     // `keep`: the pad keeps its values, only its sample and region new (Trim Sample).
     std::string install(std::unique_ptr<Sample> sample, unsigned track, unsigned pad, bool keep = false); // empty on success
+    // A sample into the project's first free slot, offered to the engine: the slot, or -1 and why.
+    int add_sample(std::unique_ptr<Sample> sample, std::string& error);
+    const melodee::SampleData* sample_of_slot(unsigned slot) const;
     struct Job { std::string path; unsigned track, pad; bool keep = false; };
     std::vector<Job> jobs; // files to load (the service thread's)
     // A pad's region (or a layer's) written as a WAV, on the service thread
@@ -455,6 +461,14 @@ public:
     std::string status() const;
     // MIDI and sync (midi.h): MIDI Config, each track's MIDI OUT, the port.
     Midi midi;
+    // Sampling (src/app/sampling.h): Melodee's Sample Record, Input Config and Audio Recall.
+    Sampling& sampling() { return *sampler_shell; }
+    const Sampling& sampling() const { return *sampler_shell; }
+    // MIDI thread: the pads play track `track` (-1: the selected one, as ever), whatever the
+    // screen gives them to do: a take of Melodee's own sound plays the source from the pads.
+    void pads_play(int track);
+    // MIDI thread: the output quiet (the mic heard through the speaker would howl).
+    void quiet_speaker(bool quiet) { speaker_quiet.store(quiet, std::memory_order_relaxed); }
     // MIDI thread: whether a pad pressed now stays quiet, its job another
     // than its sound (bindings::pad_sounds()); the audio thread reads it.
     void quiet_pads(bool quiet) { pads_quiet.store(quiet, std::memory_order_relaxed); }
@@ -594,6 +608,10 @@ private:
     std::atomic<unsigned> audio_beats {4}, audio_unit {4}; // the time signature, for the modules' transport
     std::array<PadStamp, pad_count> stamps {};
     std::unique_ptr<Sequencer> seq;
+    // Sampling's: the pads on a track other than the selected one (-1 none), and the speaker quiet.
+    std::atomic<int> pads_track {-1}, pads_kind {0}, pads_octave {0};
+    std::atomic<bool> speaker_quiet {false};
+    std::unique_ptr<Sampling> sampler_shell;
     struct Went { int track = -1, key = -1, how = 0; };
     std::atomic<uint8_t> pad_response {1}; // Settings::response, for the audio thread's velocity
     std::atomic<bool> pad_pressure {true};

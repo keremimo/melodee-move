@@ -81,8 +81,13 @@ Three parts so far:
   AIFF, FLAC, Ogg and MP3 files onto the last pad,
   read by Melodee's own `read_audio`. It opens on a list of places: My
   Samples, Recordings, Ableton's Core Library (`/data/CoreLibrary/Samples`)
-  and all of `/data/UserData` (or only `--samples DIR`). The jogwheel picks,
-  its push opens a place or folder or loads, Back goes up, then back to the
+  and all of `/data/UserData` (or only `--samples DIR`); STARRED and RECENT
+  lead them, and MELODEE (its takes, edits, expansions). The jogwheel picks,
+  and each file plays as it lands (PREVIEW); its push opens a place or folder,
+  loads, or installs an MPC expansion (`.xpn`, into `Samples/Expansions`);
+  Shift + push stars a file; Delete asks, then deletes (in Melodee's folder
+  and the Move's User Library, never the Core Library or what the project
+  plays); a pad picks the pad it loads onto. Back goes up, then back to the
   places.
 - **Chop** (Shift + the wheel's push on the pad: Sample Options, Chop, where
   the Move has Slice): the last pad's sample, cut by Melodee's Auto, Beats,
@@ -90,7 +95,33 @@ Three parts so far:
   The pads play the slices, the steps show where the cuts fall, the pads or
   Left / Right pick a slice, knobs 1 and 2 move its start and end. Push the
   jogwheel for **To Pads** (Poly, Mono, Thru), onto the first empty pads.
-  Back leaves Chop without changing the pads.
+  Back leaves Chop without changing the pads. Past the first scope: Manual
+  (knob 3; the first pad plays, the red pad cuts), slices 33-64 on Plus and
+  Minus, knobs 1 and 2 close in on the cut and a moved cut plays its slice,
+  Shift + the wheel from hit to hit, Delete + a pad takes its cut out, a step
+  plays from its sixteenth, Shift + push the slice options (Extract, Split,
+  Merge, Remove all cuts), and To Pads KIT (a pad a sound). Sample Options
+  also has TRIM (the region a file of its own) and SAVE SAMPLE (named on the
+  pad keyboard).
+- **Sampling** (the Sampling button, on a kit; docs/UI.md "Sampling"):
+  Melodee's Sample Record. A pad records onto itself, at once or from
+  START's threshold, or one pass of the pattern with LENGTH SEQ; the pad
+  again, Sampling, the push or Play stopping ends it; held, it records until
+  let go; another pad carries the take on onto that pad. The wheel walks
+  SOURCE, GAIN, MONITOR, START, LENGTH; knobs 1-6 set them; Shift + the
+  wheel the SAMPLING settings. The Move's one input is the mic, or the line
+  in once a cable is in (CC 114): SOURCE offers what the jack has, then
+  RESAMPLE (Melodee's mix) and each TRACK, whose sound the pads then play.
+  The mic heard through the speaker turns Monitor off (CC 115). Takes are
+  written as they are recorded into `Samples/Recorded` (`TAKE n`,
+  `RESAMPLE n`), then onto their pads. **Audio Recall** is Shift + Sampling:
+  the input's last 25 s onto the next empty pad (`RECALL n`). A new track's
+  KIT asks where its first sound comes from: LIBRARY, EMPTY, INPUT.
+- **Audio tracks**: Sampling opens the track's INPUT (source, monitor, gain);
+  Rec arms it, and Play records one pass of its pattern into
+  `<project> Audio/Take NNN.wav`, which the pattern then plays. Its Play
+  screen has the take's CLIP (knobs 1-6: level, start, end, fades, reverse)
+  and, on Shift + the wheel, its WARP (warp, BPM, semitones, cents).
 - **Synth** (a synth track, track 2 of a new project): one of Schwung's sound
   generators, the ones the Move's Schwung install has
   (`/data/UserData/schwung/modules/sound_generators`, or `--modules DIR`).
@@ -520,6 +551,17 @@ card. The report stays in `.local/probe/`.
   32-56 µs on average, against 25-43 with it off in the same busy
   container; a pad from read to rendered 27-61 µs (15-41 off); resident
   memory 389 MB against 219 (its eight 22.5 MB buffers).
+- Sampling, in the simulated Move: a take of Melodee's own mix (RESAMPLE)
+  with the kit played through the pads onto A06, written to
+  `Samples/Recorded`, and Audio Recall onto A07 (`./build.sh`); the unit
+  tests take the mic and the line by the jack, takes across pads, a pad held,
+  START, LENGTH SEQ, the browser's star, recent, preview, Delete and an
+  expansion, Trim, Save, Chop's manual take and options, and an audio
+  track's take recorded, played and read back. Against the commit before
+  (the same Melodee script, five runs each, Docker on a Mac): the cycle's
+  own work 18-30 µs on average before, 19-29 after, 18-24 while a take
+  records; a pad from read to rendered 27-48 µs before, 22-43 after; no late
+  exchanges. Not measured on a Move yet.
 - The package runs on a bare Ubuntu 22.04 (Ableton's glibc) with only its
   own libraries.
 - The JACK host against a dummy JACK server, earlier; the scripts' signal

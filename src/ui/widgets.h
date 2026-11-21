@@ -51,7 +51,7 @@ void big_parameter(juce::Graphics& g, juce::Rectangle<int> area, std::string_vie
 // inverted, kept in view.
 void list(juce::Graphics& g, juce::Rectangle<int> area, const std::vector<std::string>& rows, int selected, int scale);
 
-// Two level bars, a threshold tick across both.
+// Two level bars, a threshold tick across both (none when it is below 0).
 void meter(juce::Graphics& g, juce::Rectangle<int> area, float left, float right, float threshold);
 
 // A sheet over the screen: a black box with a frame.

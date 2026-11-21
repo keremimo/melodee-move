@@ -140,6 +140,7 @@ void meter(juce::Graphics& g, juce::Rectangle<int> area, float left, float right
         g.drawRect(area.getX(), y, area.getWidth(), bar);
         g.fillRect(area.getX() + 1, y + 1, int(std::lround(std::clamp(level, 0.0f, 1.0f) * float(area.getWidth() - 2))), bar - 2);
     }
+    if (threshold < 0) return; // none: a take that starts at once
     int x = area.getX() + int(std::lround(std::clamp(threshold, 0.0f, 1.0f) * float(area.getWidth() - 1)));
     for (int y = area.getY() - 2; y < area.getBottom() + 2; ++y) {
         g.setColour((y & 1) ? off : on);

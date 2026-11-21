@@ -70,7 +70,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **16-track overview** while picking: each track's engine, pattern, mute (MELODEE.md › Pad lights) | done | track button held: screen and step lights | [ ] |
 | **Track types**: kit, keygroup, plug-in, MIDI and audio engines (MELODEE.md › Sound engines; guide/tracks.md) | done | new-track sheet | [ ] |
 | **New-track sheet**: the types as a carousel (its undo: MIDI & sync & undo & projects) (MELODEE.md › Playing, An empty track) | done | track button held + empty step; jogwheel, push | [ ] |
-| **Drum sources**: Card (opens the browser), Empty, Input (opens Record) (guide/tracks.md) | sampling | new-track sheet, second step | [ ] |
+| **Drum sources**: Card (opens the browser), Empty, Input (opens Record) (guide/tracks.md) | done | new-track sheet: KIT, then LIBRARY (Load), EMPTY, INPUT (Sampling) | [ ] |
 | **MIDI track ports** on the new-track sheet: Out jack, USB-C, All USB (guide/tracks.md) | n/a | one port on the Move: a device on USB-A and a computer on USB-C arrive together on cable 2, so there is nothing to pick (docs/MIDI.md) | — |
 | **Delete a track**: sound, kit, patterns; its mix strip stays; asks (its undo: MIDI & sync & undo & projects) (MELODEE.md › The panel, Pad Bank) | done | track button held + Delete + step | [ ] |
 | **Copy a track**: sound, kit, 128 patterns, motion; the target keeps its strip; a synth gets its own instance of the module (MELODEE.md › Across every page, Copy) | done | track button held + Copy + step, then a step | [ ] |
@@ -97,8 +97,8 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Track speed**: ×½, ×¾, ×1, ×1½, ×2 against the tempo (MELODEE.md › Playing, Tracks) | done | SEQ pages (Shift + Loop), PATTERN: SPD, knob 4 | [ ] |
 | **Keygroup track pages**: TRIM / ZONES, TUNE, AMP ENV, FILTER, FILT ENV, PLAY, ARP, CHORD (guide/instrument-and-midi-tracks.md) | instruments | Left / Right pages, knobs 1-8; Menu loads | [ ] |
 | **A keygroup of one sample** played from the note found in it (guide/instrument-and-midi-tracks.md) | instruments | pads as keys | [ ] |
-| **Audio track INPUT**: source, monitor, gain; armed by Seq Record, one pass of the pattern recorded (guide/audio-tracks.md) | sampling | Sample on an audio track; Rec arms; line in or mic | [ ] |
-| **Audio track takes**: CLIP (level, start, end), FADES (in, out, reverse), WARP (Stretch, Repitch, BPM, semi); kept in `<project> Audio` (guide/audio-tracks.md) | sampling | Left / Right pages, knobs | [ ] |
+| **Audio track INPUT**: source, monitor, gain; armed by Seq Record, one pass of the pattern recorded (guide/audio-tracks.md) | done | Sampling on an audio track opens INPUT (the wheel, knobs 1-3; the source MIC or LINE as the jack has it); Rec arms, Play records one pass | [ ] |
+| **Audio track takes**: CLIP (level, start, end), FADES (in, out, reverse), WARP (Stretch, Repitch, BPM, semi); kept in `<project> Audio` (guide/audio-tracks.md) | done | the audio track's Play screen: CLIP knobs 1-6 (with the fades and reverse), Shift + the wheel WARP knobs 1-4; takes held in memory once read | [ ] |
 
 ## Looper
 
@@ -189,7 +189,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **AUTO SAMPLE sheet**: KEYS (low, high, step), NOTE (layers, hold, tail), SOUND (tap, loop, level) (MELODEE.md › Print and freeze) | instruments | knobs 1-8 and a second page | [ ] |
 | **Auto sample an external instrument** on a MIDI track, heard at the input (MELODEE.md › Print and freeze, External instruments) | instruments | Shift + Step 11 on a MIDI track; USB MIDI out, line in | [ ] |
 | **Keygroup glide**: Mono, portamento, Legato, Mono Retrig (MELODEE.md › Print and freeze, Keygroup glide) | instruments | automatic | [ ] |
-| **Delete from storage**: a file, folder, program or plug-in; what the project plays is refused (MELODEE.md › Print and freeze, Deleting) | sampling | Delete on the Load page | [ ] |
+| **Delete from storage**: a file, folder, program or plug-in; what the project plays is refused (MELODEE.md › Print and freeze, Deleting) | done | Delete on the Load page, asked first; in Melodee's folder and the Move's User Library (Kerem), never the Core Library; a program with its `_[TrackData]`; plug-ins are Schwung's | [ ] |
 
 ## Sampler
 
@@ -200,9 +200,9 @@ Kerem has checked it there. `n/a` rows have no box.
 | **No count of samples**: memory is the limit; a load that would leave too little is refused, "Memory full" (MELODEE.md › Sampler) | done | automatic: Melodee's shell/sample_memory.h, 256 MB left free; `MEMORY FULL` | [ ] |
 | **Load samples**: WAV, AIFF, FLAC, Ogg, MP3, from places (My Samples, Recordings, Core Library, /data/UserData) (MELODEE.md › Sampler, Samples) | done | Menu; jogwheel, push; Back up | [ ] |
 | **Long samples streamed** from storage, up to 6 hours; long MP3, FLAC, Ogg, AIFF decoded once into Cache (MELODEE.md › Sampler) | done | automatic: over 10 s (up to 6 hours), or what memory has no room for, read in place by Melodee's stream pager; long MP3, FLAC, Ogg, AIFF via Cache | [ ] |
-| **PREVIEW**: each file plays as the cursor lands on it, streamed (MELODEE.md › Sampler, Samples) | sampling | Load page: Shift + push toggles | [ ] |
-| **Load onto a chosen pad** (the MPC: Shift + pad onto the next empty one) (MELODEE.md › Sampler, Samples) | sampling | Load page: tap a pad | [ ] |
-| **STARRED and RECENT**: star a file; the last 16 loaded (MELODEE.md › Sampler, Samples) | sampling | Load page: HERE > Star | [ ] |
+| **PREVIEW**: each file plays as the cursor lands on it, streamed (MELODEE.md › Sampler, Samples) | done | as the wheel lands (Kerem); on or off on Sampling's settings page; read whole (30 s at most) before it plays, not streamed | [ ] |
+| **Load onto a chosen pad** (the MPC: Shift + pad onto the next empty one) (MELODEE.md › Sampler, Samples) | done | Load page: a pad picks the pad it loads onto (pulsing), as the Move's browser | [ ] |
+| **STARRED and RECENT**: star a file; the last 16 loaded (MELODEE.md › Sampler, Samples) | done | Load page: Shift + push stars (Kerem); STARRED and RECENT lead the places; `Starred.txt`, `Recent.txt` in Melodee's folder | [ ] |
 | **SFZ instruments**: zones, round robin, layers, release samples, crossfades, keyswitches (MELODEE.md › Sampler) | instruments | Menu (load) | [ ] |
 | **MPC keygroup programs** `.xpm`, and MPC 3 programs `.xty` (MELODEE.md › Sampler) | instruments | Menu (load) | [ ] |
 | **EXS24 instruments** `.exs` (MELODEE.md › Sampler) | instruments | Menu (load) | [ ] |
@@ -210,7 +210,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **DecentSampler presets** `.dspreset` (MELODEE.md › Sampler) | instruments | Menu (load) | [ ] |
 | **An instrument on a kit pad**: its zones by key and velocity; ZONES page, zone tune and level trims (ZTRM) (MELODEE.md › Sampler, SFZ) | kit depth | not yet: an instrument reaches a pad by the instruments' loading of SFZ, programs and SoundFonts (`instruments` rows); ZONES (TRIM's place on such a pad, docs/ui/kit.png) is built once it can | [ ] |
 | **MPC drum programs**: LOAD KIT sheet, the whole kit or banks, layers, pad colours (MELODEE.md › Sampler) | done | the browser lists them tagged KIT; push: LOAD KIT (whole kit, or a program bank into each kit bank, LOAD BANKS); pads of 2-4 layers take them as their own, more (an instrument) wait for the instruments' loading | [ ] |
-| **MPC expansions** `.xpn`: installed into Expansions; program previews (MELODEE.md › Sampler) | sampling | Menu (load); push | [ ] |
+| **MPC expansions** `.xpn`: installed into Expansions; program previews (MELODEE.md › Sampler) | done | Load page: push installs into Samples/Expansions/<title>, then opens it; a program's `[Previews]` file plays as the wheel lands (its programs load with kit depth and instruments) | [ ] |
 | **Banks** `.mldb`: Save Bank, load into the bank in view (MELODEE.md › Sampler, Banks) | done | Shift held in the browser: Save Bank (the two banks in view); `.mldb` files listed tagged BANK, a push loads one into the bank of the pad in view | [ ] |
 | **Pad sound knobs**: tune, level, pan, start, end, attack, decay, cutoff (MELODEE.md › Sampler, sample pages) | done | PLAY page, knobs 1-8; Shift finer | [ ] |
 | **TRIM**: loop point, zoom at each handle, Loop Lock, Normalize (MELODEE.md › Sampler, Trim) | done | TRIM page: start, end, loop point, Loop Lock, gain; Shift + a touch: the handle close up; Normalize in Sample Options | [ ] |
@@ -230,25 +230,25 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Pad sends** into buses A-D, and the kit's send (MELODEE.md › Playing, A kit) | done | a kit's track item, Shift + turn: the last pad's own sends on knobs 1-4; the kit's (the track's) on its first page | [ ] |
 | **A pad's own chain** of four effects (MELODEE.md › Effects) | done | the Device View: after the pad, its own effects and their `+` (a dotted underline) | [ ] |
 | **Chop**: Auto, Beats, Regions, Threshold; a slice's start and end (MELODEE.md › Sampler, Chop) | done | Loop; knobs 1-4; jogwheel or Left / Right the slice | [ ] |
-| **Chop Manual**: pads tapped as it plays, cuts pulled onto hits (MELODEE.md › Sampler, Chop) | sampling | Chop: the type knob on Manual; pads | [ ] |
-| **Slices 33-64** on a second bank (MELODEE.md › Sampler, Chop) | sampling | Up / Down in Chop | [ ] |
-| **Chop close up**: the view follows the cut; a moved cut plays its slice; Shift + wheel jumps from hit to hit (MELODEE.md › Sampler, Chop) | sampling | jogwheel; Shift + jogwheel | [ ] |
-| **Extract, Split, Merge**; a slice taken out; every cut out (MELODEE.md › Sampler, Chop) | sampling | Copy (Extract); Delete; Delete + Loop | [ ] |
+| **Chop Manual**: pads tapped as it plays, cuts pulled onto hits (MELODEE.md › Sampler, Chop) | done | Chop: knob 3 on Manual; the first pad plays, the red pad cuts, a lit pad plays again from its slice | [ ] |
+| **Slices 33-64** on a second bank (MELODEE.md › Sampler, Chop) | done | Plus / Minus in Chop | [ ] |
+| **Chop close up**: the view follows the cut; a moved cut plays its slice; Shift + wheel jumps from hit to hit (MELODEE.md › Sampler, Chop) | done | knobs 1 and 2 close in on the cut (the wheel is the amount, as the Move's); Shift + the wheel from hit to hit | [ ] |
+| **Extract, Split, Merge**; a slice taken out; every cut out (MELODEE.md › Sampler, Chop) | done | Shift + push in Chop: Extract, Split, Merge, Remove all cuts; Delete + a pad takes its cut out | [ ] |
 | **CLEAN**: cut on the sample's drums stem (MELODEE.md › Sampler, Chop) | schwung | Schwung's separator writes the stems as files: Load the drums stem and Chop it | — |
 | **To Pads**: Poly, Mono, Thru (MELODEE.md › Sampler, Chop) | done | Chop: push; jogwheel | [ ] |
-| **To Pads KIT**: a pad a sound (MELODEE.md › Sampler, Chop) | sampling | To Pads sheet | [ ] |
+| **To Pads KIT**: a pad a sound (MELODEE.md › Sampler, Chop) | done | To Pads sheet, its fourth row | [ ] |
 | **To Pads PATTERN**: a note for each slice into the pattern (MELODEE.md › Sampler, Chop) | sequencer | Not yet on the sheet: To Pads is sampling's Chop (screens/chop.cpp); Sequencer::slices_to_pattern() lays the notes, tested, for its PATTERN choice | [ ] |
 | **Slices kept with the sample** (in its WAV on the MPC; here in the project, its own `MVCH` section, so the Move's library is never written) (MELODEE.md › Sampler, Chop) | done | automatic | [ ] |
 | **Zero Snap and 2 ms edge fades** on every cut (MELODEE.md › Sampler, Chop) | done | automatic | [ ] |
 | **A sample's note** found as it loads: a pitch, or a chord's root (MELODEE.md › Sampler) | instruments | automatic | [ ] |
-| **Trim Sample**: the region into a new file, the pad onto all of it (MELODEE.md › Sampler) | sampling | Shift + Step 13 | [ ] |
-| **Save Sample** under a name (MELODEE.md › Sampler) | sampling | HERE > Save sample; pad keyboard | [ ] |
-| **Input Config**: source, rec length (Free, Seq, 1-16 bars), threshold, gain, Post / Pre FX, monitor Off / Auto / On, Rec Input FX (MELODEE.md › Sampler) | sampling | Shift + Sample; knobs; the Move's mic or line in | [ ] |
+| **Trim Sample**: the region into a new file, the pad onto all of it (MELODEE.md › Sampler) | done | Sample Options (Shift + push on the pad): TRIM (Shift + Step 13 is the Move-free Song) | [ ] |
+| **Save Sample** under a name (MELODEE.md › Sampler) | done | Sample Options: SAVE SAMPLE, its name on the pad keyboard | [ ] |
+| **Input Config**: source, rec length (Free, Seq, 1-16 bars), threshold, gain, Post / Pre FX, monitor Off / Auto / On, Rec Input FX (MELODEE.md › Sampler) | done | Sampling: the wheel walks SOURCE, GAIN, MONITOR, START, LENGTH, TAP (Post / Pre FX), knobs 1-6; the source as the jack has it (Kerem). Rec Input FX waits for Knob FX (mixer & effects) | [ ] |
 | **USB audio in** (USB, USB L, USB R) (MELODEE.md › Sampler, Input Config) | n/a | no USB audio on the Move's stock firmware | — |
-| **Record**: tap a pad to record onto it; threshold start; Seq length; other pads cut the take; written as recorded, up to 6 hours (MELODEE.md › Sampler, Record) | sampling | Sample (armed), then a pad | [ ] |
-| **Sampling Melodee's own sound**: a track or Resample as the source, the pads playing it (MELODEE.md › Sampler, Record) | sampling | Input Config source | [ ] |
-| **Audio Recall**: the input's last 25 s onto the next empty pad (MELODEE.md › Sampler) | sampling | Capture | [ ] |
-| **Resample**: the pattern with every track onto a pad; on Song, the whole song (MELODEE.md › Sampler) | sampling | Shift + Step 11, then a pad | [ ] |
+| **Record**: tap a pad to record onto it; threshold start; Seq length; other pads cut the take; written as recorded, up to 6 hours (MELODEE.md › Sampler, Record) | done | Sampling, then a pad (held: until let go); another pad carries the take on onto it; the file holds it all, a pad plays its first 60 s until long samples stream (kit depth) | [ ] |
+| **Sampling Melodee's own sound**: a track or Resample as the source, the pads playing it (MELODEE.md › Sampler, Record) | done | SOURCE RESAMPLE or TRACK n; once a pad picks the take's, the pads play the source | [ ] |
+| **Audio Recall**: the input's last 25 s onto the next empty pad (MELODEE.md › Sampler) | done | Shift + Sampling (Kerem; Capture is Melodee's Recall of notes) | [ ] |
+| **Resample**: the pattern with every track onto a pad; on Song, the whole song (MELODEE.md › Sampler) | done | Sampling, SOURCE RESAMPLE, LENGTH SEQ, then a pad: Play starts, one pass of the pattern (Shift + Step 11 is the Move's Repeat). On Song, the whole song comes with song & export | [ ] |
 | **Stems**: drums, bass, music and vocals onto four empty pads; BEST (MELODEE.md › Sampler, Stems) | schwung | Schwung's separator; Load the stems it writes onto pads | — |
 | **Stems program**: melodee-stems and its 80 MB model built for the Move's A72; the memory check (MELODEE.md › Sampler, Stems) | schwung | Schwung's own, already built for the Move | — |
 
@@ -333,7 +333,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Screen Mirror**: the MPC as a USB webcam of its screen (MELODEE.md › Project and system) | n/a | no USB video gadget on the Move's kernel; a screen view on the web page could stand in | — |
 | **AUDIO settings**: sample rate 44.1, 48, 96 kHz; buffer 256-1024 frames (MELODEE.md › Project and system) | n/a | the Move runs 44.1 kHz in blocks of 128 frames, set by its XMOS link | — |
 | **USB volume** (MELODEE.md › Project and system) | n/a | no USB audio | — |
-| **SAMPLING settings**: Recall grab, gap, trim end; Take auto end, after, silence below (MELODEE.md › Project and system) | sampling | Settings | [ ] |
+| **SAMPLING settings**: Recall grab, gap, trim end; Take auto end, after, silence below (MELODEE.md › Project and system) | done | Sampling's settings page (Shift + the wheel), kept in Move.settings | [ ] |
 | **ABOUT**: each core's load, dropouts, storage room and stream misses, plug-ins' cost; versions, licence (MELODEE.md › Project and system) | done | Setup > ABOUT: the audio cycle's share and longest, late exchanges, room left, synths and their slow calls, the build | [ ] |
 | **Usage log**: what the hands do, no names, a file each start (MELODEE.md › Files on the card; guide/settings.md) | done | Setup > USAGE LOG: Usage/usage-<start>.txt, a line a job (the time, the screen, the job), no names, written every 10 s | [ ] |
 | **Name sheet**: pads type like phone keys (MELODEE.md › Project and system) | done | the Move's own typing (Kerem): the wheel walks a strip, push types, OK ends; pads letters, steps digits; Back deletes, held cancels | [ ] |
@@ -409,7 +409,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Everything under one folder** (MELODEE.md › Files on the card) | done | /data/UserData/Melodee; `--home` moves it | [ ] |
 | **Folders named from outside** (`$MELODEE_*` on a host) (MELODEE.md › Files on the card) | done | `--home`, `--samples`, `--modules` | [ ] |
 | **Settings file**: settings, MIDI and Input Config, the project to open at start, the last one (MELODEE.md › Files on the card) | done | Move.settings: Setup's settings, the metronome, the track played last, start= and last= (MIDI and Input Config: move-midi's, sampling's) | [ ] |
-| **Samples folders**: Recorded, Edits, Banks, Looper, Expansions, Keygroups, Stems (MELODEE.md › Files on the card) | sampling | /data/UserData/Melodee/Samples | [ ] |
+| **Samples folders**: Recorded, Edits, Banks, Looper, Expansions, Keygroups, Stems (MELODEE.md › Files on the card) | done | /data/UserData/Melodee/Samples, made at start; MELODEE among the browser's places | [ ] |
 | **Cache**: decoded long samples and instrument files, 4 GB, aged out after 30 days (MELODEE.md › Files on the card) | done | /data/UserData/Melodee/Cache (Melodee's shell/sample_cache.h: tidied at start, 4 GB, 30 days) | [ ] |
 | **Export folders**: Mixdowns, Stems, MIDI, MPC 3 (MELODEE.md › Files on the card; guide/song.md) | done | /data/UserData/Melodee/Mixdowns, Stems, MIDI, MPC 3 (Kerem, 2026-11-20) | [ ] |
 | **SysEx folder** (MELODEE.md › Files on the card) | done | /data/UserData/Melodee/SysEx | [ ] |
@@ -489,9 +489,9 @@ sections, each on Shift + Step n.
 
 | Status | Rows |
 | --- | --- |
-| `done` | 220 |
+| `done` | 242 |
 | `sequencer` | 4 |
-| `sampling` | 22 |
+| `sampling` | 0 |
 | `kit depth` | 2 |
 | `instruments` | 25 |
 | `mixer & effects` | 2 |
@@ -538,5 +538,5 @@ tempo) touches, and where each stands now.
 | **Wheel, its push, Shift + wheel** | choose, confirm, finer (20, 10.1) | the same on every screen | done | [ ] |
 | **Back** | leave a menu or view (20) | the same | done | [ ] |
 | **Undo, Shift + Undo** | undo, redo (20) | the same, every step named; held, the undo list | done | [ ] |
-| **Capture** | the last notes played into a clip (14.3) | not yet | sampling | [ ] |
-| **Sample** ("Sampling") | Sampling mode (15.1) | not yet | sampling | [ ] |
+| **Capture** | the last notes played into a clip (14.3) | Melodee's Recall of notes (MOVE_CONTROLS.md, Decisions) | sequencer | [ ] |
+| **Sample** ("Sampling") | Sampling mode (15.1) | Melodee's Sample Record (a pad records onto itself), Audio Recall on Shift + Sampling; an audio track's INPUT | done | [ ] |
