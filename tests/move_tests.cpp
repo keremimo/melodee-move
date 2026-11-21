@@ -2038,8 +2038,11 @@ void test_looper() {
         run(1);
         CHECK(loop_field(melodee.status(), 1) == "EMPTY");
         app::set_pad_layout(app::PadLayout::Rows);
-        // A bar from the input with the metronome on, the round trip set.
-        CHECK(studio.loops().remote("length 1 1") == "ok");
+        // A bar from the input with the metronome on, the round trip set: the length over the control channel
+        // (`melodee-move --ctl 'melodee-looper ...'`), as over SSH.
+        CHECK(has(melodee.command("melodee-looper status"), " looper=on"));
+        CHECK(melodee.command("melodee-looper length 1 1") == "ok");
+        CHECK(melodee.command("melodee-looper length 9 1").rfind("error", 0) == 0);
         CHECK(studio.loops().remote("latency " + std::to_string(round_trip)) == "ok");
         studio.set_click(true, 100);
         press(melodee, Button::Rec); // Rec: records the selected loop (armed: stopped)
