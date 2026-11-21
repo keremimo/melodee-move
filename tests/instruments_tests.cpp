@@ -476,15 +476,6 @@ void test_instrument_keys() {
         CHECK(studio.project().tracks[4].layout == melodee::PadLayout::Chromatic);
         studio.set_transpose(4, 30);
         CHECK(studio.project().tracks[4].transpose == 12);
-        // A module track's macros (a PLUGIN track, its engine parameters): FILTER clamps at -100..100.
-        CHECK(studio.new_track(5, app::TrackKind::Synth));
-        studio.set_macro(5, 0, -150);
-        studio.set_macro(5, 1, 40);
-        CHECK(studio.project().tracks[5].params[melodee::plugin_track::Macro1] == -100);
-        CHECK(studio.project().tracks[5].params[melodee::plugin_track::Macro2] == 40);
-        studio.set_wheel(5, 200);
-        studio.set_bend(5, -100);
-        CHECK(studio.project().tracks[5].wheel == 127 && studio.project().tracks[5].bend == -64);
     }
     // A chord stored into a progression: saved as Mine 1, the track on Prog.
     {
@@ -694,16 +685,26 @@ void test_screens() {
         CHECK(studio.project().tracks[2].bank == 1 && app::pad_notes(studio.project(), studio.current(), 0).keys[0] == 52);
         studio.set_keys(2, app::KeysMode::InKey, false);
     }
-    // A module track: MACRO first; knob 1 the FILTER macro. Then its menu's AUTO SAMPLE, the check, sampling, the new track.
+    // A module track: the module's page first, knob 1 its level, no
+    // FILTER (Kerem, 2026-11-20). Then its menu's AUTO SAMPLE, the check,
+    // sampling, the new track.
     {
         std::lock_guard<std::mutex> guard(studio.lock);
         studio.select(1);
     }
     CHECK(melodee.load_module_now("fake").empty());
+    auto level = [&] {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        auto* track = studio.module_track(1);
+        auto* param = track && track->module ? track->module->param("level") : nullptr;
+        return param ? param->value : -1.0;
+    };
+    double before = level();
     knob(0, -10);
+    CHECK(before >= 0.1 && std::abs(level() - (before - 0.1)) < 1e-6); // ten steps of 0.01 down
     {
         std::lock_guard<std::mutex> guard(studio.lock);
-        CHECK(studio.project().tracks[1].params[melodee::plugin_track::Macro1] == -10);
+        CHECK(studio.project().tracks[1].params[melodee::plugin_track::Macro1] == 0);
     }
     shifted([&] { button(Button::MainPush); }); // the module's menu
     wheel(40);                                   // its last row: AUTO SAMPLE

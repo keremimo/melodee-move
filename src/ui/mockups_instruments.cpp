@@ -4,8 +4,9 @@
 // DecentSampler preset, or one sample played from the note found in it) with
 // their pages; the Move's Keys & Scale (Shift + Step 9) with Melodee's own
 // layouts (Chords, Prog, Drums) and the chord builder; the ARP and CHORD
-// pages of every note track; the FILTER / ECHO / SPACE macro knobs, the mod
-// wheel and pitch bend on module tracks; the auto sampler. The Move's keys
+// pages of every note track; the auto sampler. A module track's knobs are
+// the module's own (Kerem, 2026-11-20: no FILTER / ECHO / SPACE on the
+// Move). The Move's keys
 // keep Ableton's meaning (docs/MOVE_CONTROLS.md): Shift + Step 9 is Keys &
 // Scale, 10 Full Velocity, 11 Repeat and Arp; Plus and Minus the octave,
 // Shift + Plus / Minus a scale degree (Control Live's); the wheel walks the
@@ -317,24 +318,6 @@ std::vector<Screen> instruments_screens() {
             move::draw_text(g, content_x + 42, 24, "PAD A03");
             detail(g, "36-67", "+/-: 16");
         }},
-        // A module track's macros: Melodee's three knobs on every plug-in, and the panel's wheel and bend.
-        {"macro", "SYNTH: MACRO, THE FIRST OF ITS PAGES", [](juce::Graphics& g) {
-            rail(g, "OBXD", "2", "1/6");
-            items(g, {"OBXD", "012", "FX1", "FX2"}, 1);
-            page_title(g, "MACRO", "C2");
-            page_cells(g, {"FILTER", "ECHO", "SPACE", "MOD", "BEND", "", "", ""}, {0.5f, 0.25f, 0.4f, 0.0f, 0.5f, 0, 0, 0});
-            detail(g, "BRASS LEAD", "012");
-        }},
-        {"macro-filter", "FILTER: LOW PASS LEFT, HIGH PASS RIGHT", [](juce::Graphics& g) {
-            rail(g, "KNOB", "1", "OBXD");
-            big_parameter(g, content(4, 44), "FILTER", "LP 40", 0.3f);
-            g.fillRect(content_x + content_width / 2, 44, 1, 8);
-        }},
-        {"macro-bend", "BEND: LET GO, IT GOES BACK TO THE MIDDLE", [](juce::Graphics& g) {
-            rail(g, "KNOB", "5", "OBXD");
-            big_parameter(g, content(4, 44), "PITCH BEND", "+7", 0.61f);
-            g.fillRect(content_x + content_width / 2, 44, 1, 8);
-        }},
         // The auto sampler: a module (or an instrument outside) into an MPC keygroup program.
         {"auto-check", "AUTO SAMPLE: THE CHECK FIRST", [](juce::Graphics& g) {
             rail(g, "AUTO", "2", "CHK");
@@ -542,7 +525,7 @@ juce::Image sheet(const std::vector<Screen>& screens, const std::vector<Lights>&
     g.setColour(juce::Colour(0xffd8f0ff));
     move::draw_text(g, gap, 20, "MELODEE ON MOVE: INSTRUMENTS", 4);
     g.setColour(juce::Colour(0xff8a96a3));
-    move::draw_text(g, gap, 60, "KEYGROUPS, KEYS & SCALE, ARP, CHORD, MACROS, AUTO SAMPLE. DOCS/UI.MD", 2);
+    move::draw_text(g, gap, 60, "KEYGROUPS, KEYS & SCALE, ARP, CHORD, AUTO SAMPLE. DOCS/UI.MD", 2);
     auto place = [&](size_t n, int from) { return juce::Point<int>(gap + int(n % 2) * (screen_w + gap), from + int(n / 2) * (screen_h + caption + gap)); };
     for (size_t n = 0; n < screens.size(); ++n) {
         auto at = place(n, top);

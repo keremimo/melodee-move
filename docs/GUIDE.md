@@ -65,8 +65,8 @@ Threshold.
 - **Menu** lists them; push the jogwheel to load one.
 - **Pads** are notes in rows of fourths, C2 at the bottom left. **Up /
   Down** move an octave. Pressure is aftertouch.
-- **Knobs 1-8** are the module's page; **Left / Right** its pages; the
-  **jogwheel** turns its presets.
+- **Knobs 1-8** are the module's page, where the track opens; **Left /
+  Right** its pages; the **jogwheel** turns its presets.
 - **Push the jogwheel** for the module's menu: turn to a row, push to edit a
   value or open a level or list. **Back** goes up, then closes the menu.
 - A module's own page (Radio Garden, Webstream) is one of its pages: push to

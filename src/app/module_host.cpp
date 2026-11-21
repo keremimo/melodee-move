@@ -433,9 +433,11 @@ void LoadedModule::read_parameters() {
         if (canvases[n].page_first) pages.insert(pages.begin(), std::move(page));
         else pages.push_back(std::move(page));
     }
-    // A knob or menu entry chain_params does not describe: a plain 0-1.
+    // A knob or menu entry chain_params does not describe: a plain 0-1. A
+    // page the module draws is no value (Webstream's menu lists "browse").
     auto plain = [&](const std::string& key) {
         if (key.empty() || param(key) || std::find(selectors.begin(), selectors.end(), key) != selectors.end()) return;
+        if (std::any_of(canvases.begin(), canvases.end(), [&](const ModuleCanvas& canvas) { return canvas.key == key; })) return;
         ModuleParam p;
         p.key = p.name = key;
         params.push_back(p);

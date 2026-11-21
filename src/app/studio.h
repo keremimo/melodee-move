@@ -498,15 +498,12 @@ public:
     // Shift + Plus / Minus: a note track's pads a note of the key up or down
     // (Control Live's scale step); the Move's, not kept in the project.
     int key_shift(unsigned track) const { return shifts[track % melodee::track_count]; }
-    // A note track's sound and playing (docs/UI.md, "Instruments"): the
-    // macro knobs of a module track (engine/macros.h: FILTER -100..100, ECHO
-    // and SPACE 0..100), its mod wheel (0..127) and pitch bend (-64..63, not
-    // kept), Keys & Scale (the project's key and scale, the track's mode,
-    // rows and transpose), CHORD, a progression (Prog) and a chord stored
-    // into it. Under `lock`; each sends what the engine needs.
-    void set_macro(unsigned track, unsigned slot, int value);
-    void set_wheel(unsigned track, int value);
-    void set_bend(unsigned track, int value);
+    // A note track's playing (docs/UI.md, "Instruments"): Keys & Scale (the
+    // project's key and scale, the track's mode, rows and transpose), CHORD,
+    // a progression (Prog) and a chord stored into it. Under `lock`; each
+    // sends what the engine needs. A module track's knobs are the module's:
+    // Melodee's FILTER, ECHO and SPACE are not on the Move (a project's are
+    // let go as it opens, drop_module_macros()).
     void set_key(unsigned root, unsigned scale);
     void set_keys(unsigned track, KeysMode mode, bool fourths);
     void set_transpose(unsigned track, int semitones);

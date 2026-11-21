@@ -93,9 +93,9 @@ SAMPLING_SCRIPT='50:0xb0,3,127;51:0xb0,3,0;60:0xb0,3,127;61:0xb0,3,0;300:0xb0,11
 SAMPLING_EXPECTED='pad=A07 samples=3 pads=3 .*rec=idle source=RSMP .*last_take=RESAMPLE 1'
 # The synth track: Track 2 tapped at 50, the wheel's push at 60 lists the
 # modules (none loaded yet), its push at 80 loads the one in
-# build/test-modules (the tests' stand-in), a pad plays it, Shift + the wheel
-# past MACRO to its first page, knob 1 turns its level up three, Plus an
-# octave. The next start has it back as it was.
+# build/test-modules (the tests' stand-in), a pad plays it, knob 1 turns its
+# level up three (a track opens on the module's first page), Plus an octave.
+# The next start has it back as it was.
 # MIDI on the Move's USB port (cable 2; docs/MIDI.md), on that project with
 # MIDI clock out and Pad MIDI Out on: a note and its release in on cable 2
 # at 100 and 130 (A01 plays), Play at 200 (Start and the clock go out), a CC
@@ -103,7 +103,7 @@ SAMPLING_EXPECTED='pad=A07 samples=3 pads=3 .*rec=idle source=RSMP .*last_take=R
 # pad's note out, nothing dropped.
 MIDI_SCRIPT='100:x0x90,36,100;130:x0x80,36,0;200:0xb0,85,127;201:0xb0,85,0;300:x0xb0,7,100;400:0x90,68,110;430:0x80,68,0'
 MIDI_EXPECTED='playing=1 .* melodee_midi_in=3 melodee_midi_out=[1-9][0-9]+ melodee_midi_dropped=0'
-SYNTH_SCRIPT='50:0xb0,42,127;51:0xb0,42,0;60:0xb0,3,127;61:0xb0,3,0;80:0xb0,3,127;81:0xb0,3,0;400:0x90,68,110;430:0x80,68,0;480:0xb0,49,127;481:0xb0,14,1;482:0xb0,49,0;500:0xb0,71,3;520:0xb0,55,127;521:0xb0,55,0'
+SYNTH_SCRIPT='50:0xb0,42,127;51:0xb0,42,0;60:0xb0,3,127;61:0xb0,3,0;80:0xb0,3,127;81:0xb0,3,0;400:0x90,68,110;430:0x80,68,0;500:0xb0,71,3;520:0xb0,55,127;521:0xb0,55,0'
 SYNTH_EXPECTED='kind=synth .*synth=fake octave=1'
 SYNTH_FLAGS='--backend simulated --samples build/simulated-samples --home build/simulated-synth --modules build/test-modules'
 # The mix: build/mixer-tests writes a project of sixteen kit tracks with six

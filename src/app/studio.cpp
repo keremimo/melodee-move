@@ -11,6 +11,7 @@
 #include "app/auto_sampler.h"
 #include "app/instruments.h"
 #include "melodee/engine/engine_info.h"
+#include "melodee/engine/macros.h"
 #include "melodee/model/scales.h"
 #include "melodee/shell/pad_gap.h"
 #include "melodee/shell/project_kits.h"
@@ -82,6 +83,20 @@ std::string folder_of(const std::string& id, const void* context) {
     for (const auto& info : studio.catalog)
         if (info.id == id) return info.dir;
     return (fs::path(studio.modules_root) / "sound_generators" / id).string();
+}
+
+// A project's FILTER, ECHO and SPACE on its Schwung module tracks let go,
+// before the engine reads it: the Move's module tracks have no such knobs
+// (Kerem, 2026-11-20), so none may sound with no knob to turn it back. A
+// plug-in another host plays keeps its own.
+void drop_module_macros(melodee::Project& project, const PluginStates& states) {
+    for (auto& track : project.tracks) {
+        if (track.engine != EngineKind::Plugin) continue;
+        SynthFile saved;
+        bool ours = track.plugin < melodee::max_plugins && read_synth_state(states[track.plugin], saved);
+        if (!ours && track.plugin < melodee::max_plugins && project.plugins[track.plugin].used()) continue;
+        for (unsigned slot = 0; slot < melodee::macro_slots; ++slot) track.params[melodee::plugin_track::Macro1 + slot] = 0;
+    }
 }
 
 // Setup's pad response: a hit's velocity, soft (more of the range from a
@@ -269,6 +284,7 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
     static Studio* running = nullptr; // the one studio a process runs: its modules' MIDI out goes to its port
     running = this;
     set_external_midi([](const uint8_t* packets, int length) { return running ? running->midi.module_send(packets, length) : 0; });
+    drop_module_macros(*song, states);
     setup_modules_from(states, prints);
     setup_fx(states); // Schwung's effects in the chains: loaded by the service thread
     engine = std::make_unique<melodee::EngineHost>();
@@ -2191,6 +2207,7 @@ std::string Studio::open_project(const std::string& file, bool fresh) {
     } else if (auto failed = read_project_file(file, *next, *next_bank, states, &next_extras, &next_prints); !failed.empty()) {
         return failed;
     }
+    drop_module_macros(*next, states);
     auto pack = std::make_unique<melodee::ProjectPack>(*next, *next_bank); // allocates: here, never on the audio thread
     {
         std::lock_guard<std::mutex> guard(lock);

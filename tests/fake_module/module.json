@@ -100,7 +100,8 @@
             {
               "level": "tables",
               "label": "Tables"
-            }
+            },
+            "browse"
           ]
         },
         "env": {

@@ -978,11 +978,11 @@ Arp, Plus and Minus the octave, Shift + Plus / Minus a scale degree
   General MIDI's name).
 - **Full Velocity** (Shift + Step 10): every pad at 127, as on the Move; its
   step lights bright while Shift is held.
-- **Macros on a module track**: the first of its pages is **MACRO**:
-  FILTER (low pass left, high pass right, off in the middle), ECHO and SPACE
-  (Melodee's three knobs on every plug-in, saved with the track), MOD (the
-  mod wheel) and BEND (pitch bend, back to the middle when the knob is let
-  go).
+- **A module track's knobs are the module's own**: a track opens on the
+  module's first page (Webstream's and Radio Garden's Browse, where they ask
+  for it first); ARP and CHORD follow its pages. Melodee's FILTER, ECHO and
+  SPACE macros are not on the Move (Kerem, 2026-11-20: Schwung's controls
+  take the knobs); a project's are let go as it opens.
 - **Auto sample**: a module track (or a MIDI track's instrument, heard at
   the line in) played a key at a time into an MPC keygroup program on a new
   keygroup track. The check runs first (CHECKING, then what it found);
@@ -1000,7 +1000,6 @@ Arp, Plus and Minus the octave, Shift + Plus / Minus a scale degree
 | Progressions | `LOAD` / track / `PROG` | the progressions | `PUSH: OK` |
 | Store a chord | `PROG` / / `STOR` | the chord's name large | `BACK: NO` |
 | Drums | the track's / track / `DRUM` | the note and its voice | `36-67` |
-| Macro | the module / track / page | FILTER, ECHO, SPACE, MOD, BEND | the preset |
 | Auto sample | `AUTO` / track / page or progress | the keys to sample, eight knobs, the note recorded | samples, time, room |
 
 ## Screens in code

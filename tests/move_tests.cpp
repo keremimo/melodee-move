@@ -20,6 +20,7 @@
 #include "app/project_store.h"
 #include "melodee/model/project_file.h"
 #include "melodee/engine/engine_info.h"
+#include "melodee/engine/macros.h"
 #include "melodee/engine/sampler.h"
 #include "melodee/model/scales.h"
 #include <algorithm>
@@ -645,6 +646,32 @@ void test_main_volume() {
     CHECK(percent(second) == 75);
 }
 
+void test_module_macros() {
+    // Melodee's FILTER, ECHO and SPACE are not on the Move's module tracks
+    // (Kerem, 2026-11-20): a project's, as Melodee saves them, are let go as
+    // it opens, so none sounds with no knob to turn it back.
+    std::string folder = "build/test-samples", home = "build/test-home-macros";
+    std::filesystem::create_directories(folder);
+    std::filesystem::remove_all(home);
+    {
+        app::MelodeeApp first(folder, home);
+        Session session;
+        first.attach(session);
+        CHECK(first.restore_now().empty());
+        {
+            std::lock_guard<std::mutex> guard(first.studio().lock);
+            auto& synth = first.studio().project().tracks[1]; // a new project's synth track
+            CHECK(synth.engine == melodee::EngineKind::Plugin);
+            synth.params[melodee::plugin_track::Macro1] = -40;
+            synth.params[melodee::plugin_track::Macro3] = 70;
+        }
+        CHECK(first.save_now().empty());
+    }
+    app::MelodeeApp second(folder, home);
+    const auto& synth = second.studio().project().tracks[1];
+    CHECK(synth.params[melodee::plugin_track::Macro1] == 0 && synth.params[melodee::plugin_track::Macro3] == 0);
+}
+
 
 void test_schwung_modules() {
     // Schwung's module API, against the tests' stand-in module
@@ -662,12 +689,13 @@ void test_schwung_modules() {
     CHECK(loaded && error.empty());
     if (!loaded) { std::cerr << "fake module: " << error << '\n'; return; }
     // Its parameters: chain_params' four (a file path is no knob), attack,
-    // described in its menu instead, and the table chosen from a list, first.
+    // described in its menu instead, and the table chosen from a list, first;
+    // its page, which root's menu lists as Webstream's does, no value.
     CHECK(loaded->params.size() == 7 && !loaded->param("sample") && !loaded->param("") && !loaded->param("browse"));
     CHECK(loaded->params.front().key == "table" && loaded->params.front().selector);
     // Its menu: root, then the levels root links to.
     CHECK(loaded->levels.size() == 3 && loaded->levels[0].name == "Fake" && loaded->levels[1].id == "env" && loaded->levels[2].id == "tables");
-    CHECK(loaded->levels[0].items.size() == 4 && loaded->levels[0].items[2].kind == app::MenuItem::Kind::Level
+    CHECK(loaded->levels[0].items.size() == 5 && loaded->levels[0].items[2].kind == app::MenuItem::Kind::Level
           && loaded->levels[0].items[2].label == "Envelope");
     CHECK(loaded->levels[2].items_param == "table_list" && loaded->levels[2].navigate_to == "root");
     // Its knob pages: an empty knob kept in its place, the preset list no
@@ -926,9 +954,7 @@ void test_synth_track() {
         loudest(melodee, 3);
         melodee.service();
         CHECK(melodee.synth_value("preset") == "1" && melodee.synth_value("level") == "0.1");
-        with_shift(melodee, [&] { turn_wheel(melodee, 1); }); // past MACRO, Melodee's first page (Kerem, 2026-11-20), to the module's
-        std::this_thread::sleep_for(std::chrono::milliseconds(350)); // the next Shift no double press (that locks it)
-        melodee.surface(make_event(0xb0, knob_first_cc, 3)); // knob 1: level, up three
+        melodee.surface(make_event(0xb0, knob_first_cc, 3)); // knob 1: level, up three (a track opens on the module's page)
         CHECK(melodee.synth_value("level") == "0.13");
         // Shift + the wheel's push: the module's menu. Root's rows: the
         // preset, level, Waveform, Envelope >, Tables >.
@@ -997,8 +1023,8 @@ void test_synth_track() {
         second.audio_event(make_event(0x80, pad_note(0), 0));
         loudest(second, 1);
 
-        // The module's own page: Shift + the wheel to it, after MACRO, Fake and Envelope.
-        with_shift(second, [&] { turn_wheel(second, 1); turn_wheel(second, 1); turn_wheel(second, 1); });
+        // The module's own page: Shift + the wheel to it, after Fake and Envelope.
+        with_shift(second, [&] { turn_wheel(second, 1); turn_wheel(second, 1); });
         CHECK(has(second.status(), "canvas=browse entered=0"));
         std::this_thread::sleep_for(std::chrono::milliseconds(60)); // no audio thread: the page's reads go to the module directly
         juce::Image screen(juce::Image::ARGB, 128, 64, true);
@@ -1033,6 +1059,18 @@ void test_synth_track() {
         auto with_page = saved_state(project);
         CHECK(with_page.pages.size() == 1 && with_page.pages[0].first == "browse" && with_page.pages[0].second.find("\"depth\":0") != std::string::npos);
         CHECK(std::none_of(with_page.values.begin(), with_page.values.end(), [](const auto& value) { return value.first == "browse"; }));
+        // On ARP, the menu's Browse row (where root lists it, as Webstream's
+        // does) opens its page entered, never ARP again.
+        std::this_thread::sleep_for(std::chrono::milliseconds(350)); // the next Shift no double press (that locks it)
+        with_shift(second, [&] { turn_wheel(second, 1); }); // past Browse: ARP
+        CHECK(has(second.status(), "menu=- canvas=- entered=0"));
+        std::this_thread::sleep_for(std::chrono::milliseconds(350));
+        with_shift(second, [&] { press(second, Button::MainPush); });
+        CHECK(has(second.status(), "menu=root"));
+        second.surface(make_event(0xb0, main_knob_cc, 40));  // the last row: AUTO SAMPLE
+        second.surface(make_event(0xb0, main_knob_cc, 127)); // one back: Browse, once
+        press(second, Button::MainPush);
+        CHECK(has(second.status(), "menu=- canvas=browse entered=1"));
     }
     {
         // Its module gone: the track keeps naming it, and saves it so.
@@ -2314,6 +2352,7 @@ int main() {
     test_melodee_app();
     test_saving();
     test_main_volume();
+    test_module_macros();
     test_schwung_modules();
     test_canvas_page();
     test_synth_track();

@@ -250,7 +250,7 @@ int write_previews(const std::string& directory, const std::string& modules) {
 
     // Instruments (docs/UI.md, "Instruments"): an SFZ on a keygroup track,
     // its pages (Shift + the wheel), its browser, Keys & Scale (Shift + Step
-    // 9), the synth's MACRO and its AUTO SAMPLE sheet.
+    // 9), the synth's own page and its AUTO SAMPLE sheet.
     press(move::Button::Back);
     press(move::Button::Back);
     {
@@ -281,9 +281,9 @@ int write_previews(const std::string& directory, const std::string& modules) {
     ok = save(melodee, folder, "keys-load") && ok;
     press(move::Button::Back);
     ok = shift_step(8, "keys-scale") && ok;
-    press(move::Button::Row2); // the synth: MACRO, its first page
+    press(move::Button::Row2); // the synth: the module's first page, where a track opens
     std::this_thread::sleep_for(std::chrono::milliseconds(1600));
-    ok = save(melodee, folder, "synth-macro") && ok;
+    ok = save(melodee, folder, "synth-page") && ok;
     std::this_thread::sleep_for(std::chrono::milliseconds(320));
     shifted(move::Button::MainPush); // its menu, the last row: AUTO SAMPLE
     send(0xbf, move::main_knob_cc, 40);

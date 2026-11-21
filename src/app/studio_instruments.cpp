@@ -184,38 +184,11 @@ void Studio::note_pad(const move::Input& input, Went& went, int track, int16_t v
 
 } // namespace app
 
-#include "melodee/engine/macros.h"
 #include "melodee/model/progression.h"
 #include "melodee/shell/progression_file.h"
 #include <filesystem>
 
 namespace app {
-
-void Studio::set_macro(unsigned t, unsigned slot, int value) {
-    t %= melodee::track_count;
-    slot %= melodee::macro_slots;
-    auto& track = song->tracks[t];
-    if (track.engine != EngineKind::Plugin) return;
-    const auto& info = melodee::macro_param(melodee::macro_kind(track.params[melodee::plugin_track::Kind1 + slot], slot));
-    value = std::clamp(value, int(info.min), int(info.max));
-    track.params[melodee::plugin_track::Macro1 + slot] = int16_t(value);
-    send({Type::Param, uint8_t(t), 0, uint16_t(melodee::plugin_track::Macro1 + slot), int16_t(value)});
-    changed();
-}
-
-void Studio::set_wheel(unsigned t, int value) {
-    t %= melodee::track_count;
-    value = std::clamp(value, 0, 127);
-    song->tracks[t].wheel = uint8_t(value);
-    send({Type::Wheel, uint8_t(t), 0, 0, int16_t(value * 1000 / 127)});
-}
-
-void Studio::set_bend(unsigned t, int value) {
-    t %= melodee::track_count;
-    value = std::clamp(value, -64, 63);
-    song->tracks[t].bend = int8_t(value);
-    send({Type::Bend, uint8_t(t), 0, 0, int16_t(value * 128)});
-}
 
 void Studio::set_key(unsigned root, unsigned scale) {
     song->root = uint8_t(root % 12);

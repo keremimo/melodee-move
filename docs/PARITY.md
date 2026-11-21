@@ -78,7 +78,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Stage**: each track's home pages, B1 source, B2 how it plays, B3 where it goes (MELODEE.md › Playing) | done | Shift + the jogwheel: a kit's nine pad pages (TRIM, LAYERS, TUNE, AMP ENV, PLAY, CLOUD, MIX, FILTER, KIT FILT, docs/UI.md "Kits"), a module's pages; the Play screen's knobs first | [ ] |
 | **Synth presets**: walked, loaded a moment after the last turn (MELODEE.md › Playing, A synth) | done | jogwheel (Schwung modules) | [ ] |
 | **Synth EDIT**: the instrument's own parameters and page map (MELODEE.md › Playing, Edit) | done | knobs 1-8, Left / Right; push: the module's menu | [ ] |
-| **Macro knobs FILTER, ECHO, SPACE** on every plug-in track, saved, recorded as motion (MELODEE.md › Playing, A synth) | done | MACRO, a module track's first page (Shift + turn): FILTER, ECHO, SPACE on knobs 1-3, kept with the track; written as motion once Seq Record writes motion (sequencer) | [ ] |
+| **Macro knobs FILTER, ECHO, SPACE** on every plug-in track, saved, recorded as motion (MELODEE.md › Playing, A synth) | n/a | Dropped (Kerem, 2026-11-20): the MPC Sample's; a module track's knobs are Schwung's controls, and a project's macros are let go as it opens | [ ] |
 | **ARP**: Up, Down, Up-down, Random, Order; rate 1/4-1/32T; octaves; gate; hold (MELODEE.md › Playing) | done | ARP page (Shift + turn), knobs 1-6; Shift + Step 11's Arp styles with the sequencer's Repeat | [ ] |
 | **CHORD**: a pad a chord of the scale; type, voicing, inversion, hold (MELODEE.md › Playing) | done | CHORD page (Shift + turn), knobs 1-5 | [ ] |
 | **MIX → SENDS → FX pages** of a track: level, pan, send A, meter; four sends and returns; the chain's slot in hand (MELODEE.md › Playing) | done | the Device View's track item: knobs 1-6 level, pan, sends A-D, its meter and CPU share; its effects the next items; the returns on the Mixer | [ ] |
@@ -277,8 +277,8 @@ Kerem has checked it there. `n/a` rows have no box.
 | --- | --- | --- | --- |
 | **The fader follows the pot turned last**, PIN keeps it (MELODEE.md › Fader) | n/a | no fader; every value has a knob on its page | — |
 | **Fader page**: what it follows, favourites, stock targets (Pad Volume to Kit Volume) (MELODEE.md › Fader) | n/a | no fader; the pad pages' knobs hold those values; Shift + Step 9 goes to Note Repeat | — |
-| **Mod wheel** from the panel (MELODEE.md › Fader) | done | MACRO's MOD, knob 4 on a module track | [ ] |
-| **Pitch bend** from the panel, back to the middle when let go (MELODEE.md › Fader) | done | MACRO's BEND, knob 5, back to the middle when the knob is let go | [ ] |
+| **Mod wheel** from the panel (MELODEE.md › Fader) | n/a | Went with the MACRO page (Kerem, 2026-11-20); a MIDI controller's still reaches the module | [ ] |
+| **Pitch bend** from the panel, back to the middle when let go (MELODEE.md › Fader) | n/a | Went with the MACRO page (Kerem, 2026-11-20); a MIDI controller's still reaches the module | [ ] |
 | **Fader takeover**: Pickup, Scaled, Instant (MELODEE.md › Fader) | n/a | relative knobs have nothing to pick up | — |
 | **The fader's lane and light**: Seq Record writes it, Erase + fader clears it; its light shows its value (MELODEE.md › Fader) | n/a | no fader; knobs record motion (Sequencing) | — |
 

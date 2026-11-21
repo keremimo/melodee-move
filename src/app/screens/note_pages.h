@@ -2,23 +2,22 @@
 #pragma once
 #include "app/screens/common.h"
 #include "melodee/engine/arp.h"
-#include "melodee/engine/macros.h"
 #include "melodee/model/chords.h"
 #include "melodee/model/midi_track.h"
 
 // The pages every note track's Play screen has (docs/UI.md, "Instruments"):
-// MACRO on a module track (Melodee's FILTER, ECHO and SPACE, the mod wheel,
-// pitch bend), and ARP and CHORD on every note track (a keygroup, a synth,
-// a MIDI track). Each is eight knobs; the knobs write the track's own
-// fields and the studio sends what the engine needs. Shared by the Play
-// screens (keys_play.cpp, synth_play.cpp; a MIDI track's screen may take
-// them too).
+// ARP and CHORD on every note track (a keygroup, a synth, a MIDI track).
+// Each is eight knobs; the knobs write the track's own fields and the
+// studio sends what the engine needs. Shared by the Play screens
+// (keys_play.cpp, synth_play.cpp; a MIDI track's screen may take them too).
+// A module track's knobs are otherwise the module's own: Melodee's FILTER,
+// ECHO and SPACE are not on the Move (Kerem, 2026-11-20).
 namespace app::screens {
 
-enum class NotePage : uint8_t { Macro, Arp, Chord };
+enum class NotePage : uint8_t { Arp, Chord };
 inline const char* note_page_title(NotePage page) {
-    static const char* titles[] {"MACRO", "ARP", "CHORD"};
-    return titles[unsigned(page) % 3];
+    static const char* titles[] {"ARP", "CHORD"};
+    return titles[unsigned(page) % 2];
 }
 
 // Knob n of a page: its cell name, its value as shown, its bar.
@@ -26,19 +25,6 @@ inline Knob note_page_knob(const Studio& studio, unsigned t, NotePage page, unsi
     const auto& track = studio.project().tracks[t % melodee::track_count];
     auto on_off = [](bool on) { return std::string(on ? "ON" : "OFF"); };
     switch (page) {
-    case NotePage::Macro: {
-        if (n < melodee::macro_slots) {
-            const auto kind = melodee::macro_kind(track.params[melodee::plugin_track::Kind1 + n], n);
-            const auto& info = melodee::macro_param(kind);
-            int value = track.params[melodee::plugin_track::Macro1 + n];
-            std::string shown = std::to_string(value);
-            if (kind == melodee::MacroKind::Filter) shown = value < 0 ? "LP " + std::to_string(100 + value) : value > 0 ? "HP " + std::to_string(value) : "OFF";
-            return {info.label, shown, float(value - info.min) / float(std::max(1, info.max - info.min))};
-        }
-        if (n == 3) return {"MOD", std::to_string(track.wheel), track.wheel / 127.0f};
-        if (n == 4) return {"BEND", (track.bend > 0 ? "+" : "") + std::to_string(track.bend), (track.bend + 64) / 127.0f};
-        return {};
-    }
     case NotePage::Arp:
         switch (n) {
         case 0: return {"ON", on_off(track.arp), track.arp ? 1.0f : 0.0f};
@@ -71,11 +57,6 @@ inline void note_page_turn(Studio& studio, unsigned t, NotePage page, unsigned n
     auto step = [&](auto& field, int low, int high) { field = std::decay_t<decltype(field)>(std::clamp(int(field) + delta, low, high)); };
     auto flip = [&](bool& field) { field = delta > 0; };
     switch (page) {
-    case NotePage::Macro:
-        if (n < melodee::macro_slots) studio.set_macro(t, n, track.params[melodee::plugin_track::Macro1 + n] + delta);
-        else if (n == 3) studio.set_wheel(t, track.wheel + delta);
-        else if (n == 4) studio.set_bend(t, track.bend + delta);
-        return;
     case NotePage::Arp:
         switch (n) {
         case 0: flip(track.arp); break;
