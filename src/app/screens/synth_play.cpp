@@ -187,6 +187,15 @@ public:
         } else ui::detail(g, upper(module.info().name).substr(0, 12), where);
     }
 
+    bool knob_lane(unsigned which, unsigned& param, unsigned& pad) const override {
+        if (const_cast<SynthPlay*>(this)->melodee_page()) return false;
+        auto* track = const_cast<Studio&>(studio).module_track();
+        if (!track || !track->module || browsing || track->menu_open || shown_canvas(*track) >= 0) return false;
+        if (focus == 0) return fx.mix_lane(studio.track(), which, param, pad);
+        auto effects = fx.track_items();
+        pad = 0;
+        return focus >= 2 && size_t(focus - 2) < effects.size() && fx.lane(effects[size_t(focus - 2)], which, param);
+    }
     Knob knob(unsigned which) const override {
         if (const NotePage* own = const_cast<SynthPlay*>(this)->melodee_page()) return note_page_knob(studio, studio.track(), *own, which);
         auto* track = const_cast<Studio&>(studio).module_track();

@@ -149,6 +149,15 @@ public:
         ui::detail(g, name, where.empty() ? length_of(frames) : where);
     }
 
+    bool knob_lane(unsigned which, unsigned& param, unsigned& pad) const override {
+        if (focus == 0) return fx.mix_lane(studio.track(), which, param, pad); // not the pad's LEVEL or PAN by name
+        if (focus >= 2) {
+            auto effects = fx.track_items();
+            pad = 0;
+            return size_t(focus - 2) < effects.size() && fx.lane(effects[size_t(focus - 2)], which, param);
+        }
+        return false; // the sound's knobs: the kit's lanes by their names (sequencer.cpp)
+    }
     Knob knob(unsigned which) const override {
         if (focus == 0) return fx.mix_knob(studio.track(), which);
         if (focus >= 2) {

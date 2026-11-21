@@ -10,6 +10,8 @@
 #include "app/mixing.h"
 #include "app/pad_layout.h"
 #include "app/project_store.h"
+#include "app/screen.h"
+#include "app/sequencer.h"
 #include "melodee/engine/engine_info.h"
 #include "move/audio.h"
 #include "move/controls.h"
@@ -20,6 +22,7 @@
 #include <cmath>
 #include <filesystem>
 #include <iostream>
+#include <set>
 #include <string>
 
 using namespace move;
@@ -681,6 +684,84 @@ void write_bench_project(const std::string& home, const std::string& loop, bool 
 
 } // namespace
 
+// Mix in Motion (Melodee's): with Seq Record on, the selected track's level, pan and sends, the returns and the master
+// chain's parameters, turned on the Mixer, a chain or the Device View, write lanes of its pattern; another track's do
+// not, and the track item's LEVEL is the track's, not the pad's.
+void test_motion(Rig& rig) {
+    auto& studio = rig.studio();
+    auto& seq = studio.sequencer();
+    studio.select(0);
+    {
+        auto& p = seq.pattern(); // a bar to record over
+        p = melodee::Pattern {};
+        p.length = studio.project().bar_ticks();
+        p.free = false;
+        seq.sync(0, seq.number(0));
+    }
+    seq.workflow.count_in = false;
+    seq.record(true);
+    rig.blocks(8);
+    CHECK(seq.recording() && studio.playing());
+    auto points = [&](unsigned lane) {
+        unsigned n = 0;
+        for (const auto& m : seq.pattern().motion) n += m.param == lane;
+        return n;
+    };
+    shift_step(rig, 3);
+    CHECK(page_of(rig) == "mixer");
+    wheel(rig, -10); // VOL
+    turn(rig, knob_first_cc, 2);     // track 1's level: the selected track's
+    rig.blocks(8);
+    turn(rig, knob_first_cc + 1, 2); // track 2's: not this pattern's
+    rig.blocks(8);
+    wheel(rig, 1); // PAN
+    turn(rig, knob_first_cc, 3);
+    rig.blocks(8);
+    wheel(rig, 1); // SEND A
+    turn(rig, knob_first_cc, 4);
+    rig.blocks(8);
+    wheel(rig, 10); // MAIN: RETURN A on knob 1
+    turn(rig, knob_first_cc, -2);
+    rig.blocks(8);
+    CHECK(points(melodee::motion_level) == 1 && points(melodee::motion_pan) == 1);
+    CHECK(points(melodee::motion_send(0)) == 1 && points(melodee::motion_return(0)) == 1);
+    // The master's chain: an effect's parameter.
+    mixing::set_effect(studio, mixing::master, 0, EffectKind::Filter);
+    press(rig, Button::MainPush);
+    CHECK(page_of(rig) == "chain" && has(rig.melodee.status(), "chain=MAIN"));
+    turn(rig, knob_first_cc, 5);
+    rig.blocks(8);
+    CHECK(points(melodee::motion_master_fx(0, 0)) == 1);
+    press(rig, Button::Back);
+    press(rig, Button::Back);
+    // The Device View's track item (the wheel to it): knob 2 is the track's pan, not the pad's; on the kit's pad sends
+    // (Shift + turn there), that pad's own SEND B.
+    for (int n = 0; n < 4; ++n) wheel(rig, -1);
+    bool pad_sends = studio.top()->knob(1).name != "PAN";
+    turn(rig, knob_first_cc + 1, -3);
+    rig.blocks(8);
+    CHECK(points(melodee::motion_pad_param(melodee::PadParam::Pan)) == 0);
+    if (pad_sends) CHECK(points(melodee::motion_pad_param(melodee::PadParam::SendB)) == 1 && points(melodee::motion_pan) == 1);
+    else CHECK(points(melodee::motion_pan) == 2);
+    // Shift + turn: the other of the two, so both are seen.
+    button(rig, Button::Shift, true);
+    wheel(rig, pad_sends ? -1 : 1);
+    button(rig, Button::Shift, false);
+    CHECK((studio.top()->knob(1).name != "PAN") != pad_sends);
+    turn(rig, knob_first_cc + 1, -3);
+    rig.blocks(8);
+    CHECK(points(melodee::motion_pan) == 2 && points(melodee::motion_pad_param(melodee::PadParam::SendB)) == 1);
+    button(rig, Button::Shift, true);
+    wheel(rig, pad_sends ? 1 : -1); // as it was
+    button(rig, Button::Shift, false);
+    seq.record(false);
+    studio.stop();
+    rig.blocks(4);
+    mixing::set_effect(studio, mixing::master, 0, EffectKind::None);
+    seq.clear_pattern(0, seq.number(0));
+    wheel(rig, 1); // back on the sound
+}
+
 int main() {
     std::string samples = "build/test-samples-mixer", home = "build/test-home-mixer", modules = "build/test-modules";
     std::filesystem::create_directories(samples);
@@ -700,6 +781,7 @@ int main() {
         test_keys(rig);
         test_screens(rig);
         test_layouts(rig);
+        test_motion(rig);
         // Left for the file: an Echo keyed... a Compressor on track 2 keyed by bus C, a send, a return, the
         // compressor, Knob FX, a pad muted, the Schwung effect on track 1 at gain 1.
         mixing::set_send(rig.studio(), 0, 1, 40);

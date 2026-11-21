@@ -309,6 +309,18 @@ public:
         }
     }
 
+    // Mix in Motion (Melodee's): the selected track's level, pan and sends, and the returns, as lanes of its pattern.
+    bool knob_lane(unsigned which, unsigned& param, unsigned& pad) const override {
+        pad = 0;
+        if (page == 6) {
+            if (which >= 4) return false; // the compressor: no lane in Melodee
+            param = melodee::motion_return(which);
+            return true;
+        }
+        if (unsigned(half) * 8 + which != studio.track()) return false; // another track's: not the selected pattern's lane
+        param = page == 0 ? melodee::motion_level : page == 1 ? melodee::motion_pan : melodee::motion_send(unsigned(page - 2));
+        return true;
+    }
     Knob knob(unsigned which) const override {
         if (page == 6) {
             if (which < 4) return {std::string("RETURN ") + char('A' + int(which)), std::to_string(studio.project().buses[which].level),
@@ -443,6 +455,15 @@ public:
         draw_comp(g);
     }
 
+    // Mix in Motion: the master chain's parameters and a bus's return, as lanes of the selected track's pattern.
+    bool knob_lane(unsigned which, unsigned& param, unsigned& pad) const override {
+        auto all = const_cast<Chain*>(this)->items();
+        const Entry& at = all[size_t(std::min(focus, int(all.size()) - 1))];
+        pad = 0;
+        if (at.kind == Entry::Effect) return fx.lane(at.item, which, param);
+        if (at.kind == Entry::Head && which == 0) { param = melodee::motion_return(studio.desk.chain - melodee::track_count); return true; }
+        return false;
+    }
     Knob knob(unsigned which) const override {
         auto all = const_cast<Chain*>(this)->items();
         const Entry& at = all[size_t(std::min(focus, int(all.size()) - 1))];

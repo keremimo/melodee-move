@@ -8,6 +8,7 @@
 #include "ui/track_style.h"
 #include "ui/widgets.h"
 #include "melodee/engine/arp.h"
+#include "melodee/engine/effect_info.h"
 #include "melodee/engine/engine_info.h"
 #include "melodee/model/lane_value.h"
 #include "melodee/model/generators.h"
@@ -496,11 +497,19 @@ bool Sequencer::knob_lane(unsigned knob, Lane& lane) const {
         lane.low = range.min;
         lane.high = range.max;
     } else if (param == melodee::motion_pan) {
-        lane.low = -64; lane.high = 63;
+        lane.low = -50; lane.high = 50; // Mix::pan
+    } else if (param >= melodee::motion_send(0) && param <= melodee::motion_send(3)) {
+        lane.low = 0; lane.high = 100;  // Mix::sends
+    } else if ((param >= melodee::motion_fx_base && param < melodee::motion_pad_base) ||
+               (param >= melodee::motion_master_fx_base && param < melodee::motion_return_base)) { // an effect's: its range
+        bool master = param >= melodee::motion_master_fx_base;
+        unsigned at = param - (master ? melodee::motion_master_fx_base : melodee::motion_fx_base);
+        const auto& chain = master ? studio.project().master : studio.project().tracks[t % melodee::track_count].fx;
+        const auto& info = melodee::effect_info(melodee::EffectKind(chain.slots[(at / 6) % chain.slots.size()].kind)).params[at % 6];
+        lane.low = info.min; lane.high = info.max;
     } else {
         lane.low = 0; lane.high = 127;
     }
-    (void)t;
     return true;
 }
 
