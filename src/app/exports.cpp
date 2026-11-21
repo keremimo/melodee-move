@@ -133,6 +133,20 @@ std::string Exports::start(Kind what) {
             now.file = folder_of(what) + "/" + now.name + ".xpj";
             now.busy = true;
         }
+        // Synth tracks with notes go as their prints: those printed first (tick()).
+        mpc3_pending = 0;
+        for (unsigned t = 0; t < melodee::track_count; ++t) {
+            if (studio.kind(t) != TrackKind::Synth || desk.printer().deep(t) || !desk.printer().printable(t)) continue;
+            auto with = desk.printer().with_notes(t);
+            if (with[0] | with[1]) mpc3_pending |= 1u << t;
+        }
+        if (mpc3_pending && !studio.project_path().empty()) {
+            mpc3_waiting = true;
+            cancelled.store(false);
+            running.store(true, std::memory_order_release);
+            return {};
+        }
+        mpc3_pending = 0;
         mpc3_project = std::make_unique<melodee::Project>(project);
         mpc3_bank = std::make_unique<melodee::PatternBank>(studio.patterns());
         mpc3_prints = std::make_unique<melodee::PrintTable>(desk.printer().table());
@@ -197,8 +211,50 @@ std::string Exports::start(Kind what) {
     return {};
 }
 
+void Exports::tick() {
+    if (!mpc3_waiting) return;
+    auto& printer = studio.desk().printer();
+    printer.tick(); // the last prints' records in the table first
+    if (printer.busy()) return;
+    while (mpc3_pending) {
+        unsigned t = unsigned(__builtin_ctz(mpc3_pending));
+        mpc3_pending &= mpc3_pending - 1;
+        Printer::Job job;
+        job.track = t;
+        auto with = printer.with_notes(t);
+        for (unsigned p = 0; p < melodee::pattern_count; ++p) if (with[p / 64] >> (p % 64) & 1) job.patterns.push_back(uint8_t(p));
+        job.freeze = false;
+        if (!printer.start(std::move(job)).empty()) continue; // a module missing: that track is left out (the report says)
+        std::lock_guard<std::mutex> guard(lock);
+        now.said = "PRINTING TRACK " + std::to_string(t + 1);
+        return;
+    }
+    // Every print made: the project, as it is now, written on the export thread.
+    mpc3_waiting = false;
+    mpc3_project = std::make_unique<melodee::Project>(studio.project());
+    mpc3_bank = std::make_unique<melodee::PatternBank>(studio.patterns());
+    mpc3_prints = std::make_unique<melodee::PrintTable>(printer.table());
+    mpc3_prints_dir = melodee::prints_folder(studio.project_path());
+    {
+        std::lock_guard<std::mutex> guard(lock);
+        now.said.clear();
+        job_waiting = true;
+    }
+    wake.notify_all();
+}
+
 void Exports::cancel() {
     if (!running.load()) return;
+    if (mpc3_waiting) { // its prints called off: nothing written
+        studio.desk().printer().cancel();
+        mpc3_waiting = false;
+        mpc3_pending = 0;
+        running.store(false, std::memory_order_release);
+        std::lock_guard<std::mutex> guard(lock);
+        now.busy = false;
+        now.error = "stopped";
+        return;
+    }
     cancelled.store(true);
     if (kind != Kind::Mpc3) studio.send({Type::Stop}); // the render stops with the song
 }

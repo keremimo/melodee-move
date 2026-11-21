@@ -46,7 +46,10 @@ public:
     // MIDI thread, under the studio's lock. Empty: started (or done at once:
     // a MIDI file, a new pattern); else why not.
     std::string start(Kind kind);
-    void cancel(); // a mixdown or stems stopped: its files dropped
+    void cancel(); // a mixdown or stems stopped: its files dropped; an MPC 3 export's prints called off
+    // MPC 3: synth tracks go as their prints, made first, a track at a time (the print host skips unchanged ones),
+    // then the project is written. Often, under the lock (SongDesk::tick()).
+    void tick();
     bool busy() const { return running.load(std::memory_order_acquire); }
 
     // What the screen shows. Any thread.
@@ -89,6 +92,8 @@ private:
     std::unique_ptr<melodee::PatternBank> mpc3_bank;
     std::unique_ptr<melodee::PrintTable> mpc3_prints;
     std::string mpc3_prints_dir;
+    uint32_t mpc3_pending = 0;     // synth tracks still to print
+    bool mpc3_waiting = false;     // printing them first
     double song_seconds = 0;
     unsigned exported = 0;
     std::thread thread;

@@ -5,7 +5,10 @@
 // /data/UserData (or only --samples DIR). The jogwheel picks, its push opens
 // a place or folder or loads, Back goes up, then back to the places.
 #include "app/screens/common.h"
+#include "app/song_desk.h"
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 
 namespace app::screens {
 namespace {
@@ -24,6 +27,12 @@ constexpr MovePlace move_places[] {
 bool is_sound_file(const fs::path& path) {
     auto extension = upper(path.extension().string());
     return extension == ".WAV" || extension == ".AIF" || extension == ".AIFF" || extension == ".FLAC" || extension == ".OGG" || extension == ".MP3";
+}
+
+// A Standard MIDI File: its notes load onto the track's pattern playing (song_desk.h, as Melodee's browser loads one).
+bool is_midi_file(const fs::path& path) {
+    auto extension = upper(path.extension().string());
+    return extension == ".MID" || extension == ".MIDI" || extension == ".SMF";
 }
 
 class LoadSamples final : public Screen {
@@ -58,6 +67,12 @@ public:
                 const auto& entry = entries[size_t(cursor)];
                 auto path = (fs::path(folder) / entry.name).string();
                 if (entry.folder) { folder = path; cursor = 0; list_folder(); }
+                else if (is_midi_file(path)) { // its notes onto the pattern playing
+                    std::ifstream in(path, std::ios::binary);
+                    std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+                    auto failed = studio.desk().load_midi(bytes, studio.track());
+                    studio.say(failed.empty() ? "NOTES ONTO " + pattern_name(studio.current().pattern) : failed.substr(0, 16));
+                }
                 else { studio.jobs.push_back({path, studio.track(), studio.pad()}); studio.say("LOADING"); }
             }
             return true;
@@ -83,7 +98,9 @@ public:
         }
         std::vector<std::string> rows;
         for (const auto& entry : entries) rows.push_back(entry.folder ? entry.name + " >" : entry.name);
-        ui::list(g, ui::content(0, ui::height), rows, cursor, 1);
+        bool midi = cursor < int(entries.size()) && is_midi_file(entries[size_t(cursor)].name);
+        ui::list(g, ui::content(0, midi ? 52 : ui::height), rows, cursor, 1);
+        if (midi) ui::detail(g, "PUSH: ONTO " + pattern_name(studio.current().pattern));
     }
 
 private:
@@ -110,7 +127,7 @@ private:
             auto name = item.path().filename().string();
             if (name.empty() || name[0] == '.') continue;
             if (item.is_directory(error)) entries.push_back({name, true});
-            else if (is_sound_file(item.path())) entries.push_back({name, false});
+            else if (is_sound_file(item.path()) || is_midi_file(item.path())) entries.push_back({name, false});
         }
         std::sort(entries.begin(), entries.end(), [](const Entry& a, const Entry& b) {
             if (a.folder != b.folder) return a.folder;

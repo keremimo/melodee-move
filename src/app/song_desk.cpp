@@ -320,6 +320,7 @@ void SongDesk::launched(unsigned t, unsigned p) {
 // Each bar the clips being written grow by one, so the song always holds the
 // bar after the one playing; past 16 bars a new clip carries on.
 void SongDesk::tick() {
+    exporter->tick(); // an MPC 3 export's prints, then the export
     bool on = record_on && song_playing();
     if (!on) {
         if (recording_tracks) finish_launches();

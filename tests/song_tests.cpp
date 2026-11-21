@@ -487,6 +487,77 @@ void test_wav_out() {
     CHECK(info.format == 1 && info.bits == 24 && info.frames == 1000 && info.rate == 48000);
 }
 
+// A synth track (a Schwung module, the tests' stand-in) printed by its own
+// instance of the module in the print host; a deep freeze lets the live
+// module go once the print plays, and unfreezing thaws it back as it was.
+void test_synth_freeze() {
+    std::string folder = "build/test-samples", home = "build/test-home-song-synth", loop = folder + "/loop.wav";
+    write_project(home, loop);
+    Rig rig(folder, home, "build/test-modules");
+    {
+        std::lock_guard<std::mutex> guard(rig.studio().lock);
+        CHECK(rig.studio().new_track(2, app::TrackKind::Synth));
+    }
+    CHECK(rig.studio().load_module_now(2, "fake").empty());
+    auto& printer = rig.desk().printer();
+    {
+        std::lock_guard<std::mutex> guard(rig.studio().lock);
+        auto& pattern = rig.studio().patterns().at[2][0];
+        pattern.length = rig.studio().project().bar_ticks();
+        melodee::Event e;
+        e.key = 60;
+        e.length = 48;
+        e.velocity = 110;
+        pattern.events.push_back(e);
+        rig.desk().sync_pattern(2, 0);
+        CHECK(printer.printable(2));
+        app::Printer::Job job;
+        job.track = 2;
+        job.deep = true;
+        CHECK(printer.start(job).empty());
+    }
+    CHECK(rig.until([&] { std::lock_guard<std::mutex> g(rig.studio().lock); return printer.frozen(2); }, 60));
+    auto a1 = wav_info(home + "/Projects/Move Prints/" + melodee::print_file_name(2, 0));
+    CHECK(a1.format == 3 && a1.frames > 0);
+    {   // The print is the module's sound: not silent.
+        std::vector<float> frames;
+        unsigned rate = 0, channels = 0;
+        CHECK(app::read_float_wav(home + "/Projects/Move Prints/" + melodee::print_file_name(2, 0), frames, rate, channels));
+        float loudest = 0;
+        for (float f : frames) loudest = std::max(loudest, std::fabs(f));
+        CHECK(loudest > 0.01f);
+    }
+    // Deep: the module let go once the print plays and the engine sleeps.
+    CHECK(rig.until([&] {
+        std::lock_guard<std::mutex> g(rig.studio().lock);
+        auto* module = rig.studio().module_track(2);
+        return module && !module->module;
+    }, 60));
+    {
+        std::lock_guard<std::mutex> guard(rig.studio().lock);
+        CHECK(printer.deep(2) && has(rig.studio().status(), "deep=1"));
+        CHECK(rig.studio().module_track(2)->saved.module == "fake");
+        CHECK(printer.unfreeze(2).empty() && printer.thawing(2));
+    }
+    // Thawed: the module loads again, then the track plays live.
+    CHECK(rig.until([&] { std::lock_guard<std::mutex> g(rig.studio().lock); return !printer.frozen(2); }, 200));
+    {
+        std::lock_guard<std::mutex> guard(rig.studio().lock);
+        auto* module = rig.studio().module_track(2);
+        CHECK(module && module->module && module->module->info().id == "fake");
+        // MPC 3: the synth track goes as its prints, made first (A1's unchanged: kept).
+        CHECK(rig.desk().exports().start(app::Exports::Kind::Mpc3).empty());
+    }
+    for (int wait = 0; wait < 1500 && rig.desk().exports().busy(); ++wait) {
+        rig.render(8);
+        rig.app.service();
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    auto shown = rig.desk().exports().shown();
+    CHECK(shown.done && shown.error.empty() && fs::exists(home + "/MPC 3/Tune.xpj"));
+    CHECK(has(rig.app.status(), "print_skipped=1"));
+}
+
 // Song, EXPORT and PRINT driven by the Move's own controls, through the
 // bindings table (docs/MOVE_CONTROLS.md, "Song", "Print and freeze").
 void test_song_screens() {
@@ -644,6 +715,8 @@ int main() {
     test_exports();
     std::cerr << "test_print_and_freeze\n";
     test_print_and_freeze();
+    std::cerr << "test_synth_freeze\n";
+    test_synth_freeze();
     std::cerr << "test_song_screens\n";
     test_song_screens();
     std::cout << "song-tests: " << checks - failures << " of " << checks << " checks passed\n";

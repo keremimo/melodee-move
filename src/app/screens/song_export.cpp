@@ -81,7 +81,7 @@ public:
             auto slash = shown.file.find('/');
             move::draw_text(g, ui::content_x + 2, 12, upper(slash == std::string::npos ? shown.name : shown.file.substr(slash + 1)).substr(0, 16));
             if (shown.kind == Kind::Mpc3) {
-                move::draw_text(g, ui::content_x + 2, 28, "WRITING...");
+                move::draw_text(g, ui::content_x + 2, 28, shown.said.empty() ? "WRITING..." : upper(shown.said).substr(0, 16));
             } else {
                 ui::progress(g, {ui::content_x + 2, 26, ui::content_width - 4, 9}, shown.fraction);
                 std::string clock = shown.tail > 0 ? "TAIL " + clock_of(shown.tail) : clock_of(shown.seconds) + " OF " + clock_of(shown.total);
