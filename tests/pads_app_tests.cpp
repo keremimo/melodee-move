@@ -222,6 +222,12 @@ void test_synth_notes() {
         melodee.render(in, out);
         return held;
     };
+    // Keys & Scale's Chromatic in 4ths (move-instruments; a new Set plays
+    // In-Key in octaves), so the notes are the pad map's arithmetic alone.
+    {
+        std::lock_guard<std::mutex> guard(melodee.studio().lock);
+        melodee.studio().set_keys(1, app::KeysMode::Chromatic, true);
+    }
     // Rows: right a semitone, up a fourth, C2 (48) bottom left.
     CHECK(note(0) == "48");
     CHECK(note(4) == "52");
