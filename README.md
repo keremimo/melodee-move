@@ -196,11 +196,11 @@ names another folder) Melodee's pages are crushed to 128 x 64 in
 **From Schwung's Tools menu** (Schwung installed, root SSH to the Move):
 
 ```sh
-tools/install-schwung-tool.sh move.local --previews ../melodee-sample/build/melodee-preview
+tools/install-schwung-tool.sh move.local
 ```
 
-Restart Move, then Tools > Melodee Spike. Schwung stops Move, runs the
-spike and starts Move again when Shift + Back ends it. Output goes to
+Then Tools > Melodee (Shift + Volume + Step 13). Schwung stops Move, runs Melodee
+and starts Move again when Shift + Back ends it. Output goes to
 `melodee-move.log` in the tool's folder. Schwung runs tools as the `ableton`
 user, which may not take realtime priority (`realtime=no` in the log); run
 over SSH for realtime. `--remove` takes the tool out again.

@@ -4,10 +4,12 @@
 # (/data/UserData/schwung/modules/tools/melodee-move, owned by ableton as
 # every module is), so Schwung's Tools menu can launch it with the Move to
 # itself. It adds only that folder: --remove takes it out again. Schwung
-# finds new modules when it starts, so restart Move (or the Move) after.
+# reads its tools folder each time the Tools menu opens, so no restart.
 #
 #   tools/install-schwung-tool.sh [HOST] [--previews DIR] [--remove]
 set -eu
+# macOS tar would add AppleDouble ._ files for extended attributes.
+export COPYFILE_DISABLE=1
 cd "$(dirname "$0")/.."
 HOST=move.local
 PREVIEWS=""
@@ -32,4 +34,4 @@ if [ -n "$PREVIEWS" ]; then
     (cd "$PREVIEWS" && ls -- *.png | grep -v '@2x' | tar -cf - -T -) | ssh "root@$HOST" "tar -C $REMOTE/previews -xf -"
 fi
 ssh "root@$HOST" "chown -R ableton:users $REMOTE"
-echo "Installed $REMOTE. Restart Move, then open Schwung's Tools menu: Melodee Spike."
+echo "Installed $REMOTE. Open Schwung's Tools menu (Shift + Volume + Step 13): Melodee."

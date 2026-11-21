@@ -12,6 +12,8 @@
 # previews (320 x 240 PNGs, such as melodee-sample's build/melodee-preview)
 # for the spike to show crushed on the Move's screen.
 set -eu
+# macOS tar would add AppleDouble ._ files for extended attributes.
+export COPYFILE_DISABLE=1
 cd "$(dirname "$0")/.."
 HOST=move.local
 PREVIEWS=""
