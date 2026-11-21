@@ -9,7 +9,8 @@
 // a track, four buses and six on the master before its compressor. Shift +
 // Step 4 (no Move job) opens the Mixer: Melodee's MIX hub, its pages along
 // the top the wheel walks: the sixteen tracks' levels, pans and sends, the
-// main out, Knob FX, Pad FX and Flex Beat.
+// main out. Shift + Step 4 again: Knob FX, again Pad FX, again Flex Beat
+// (Kerem, 2026-11-20).
 #include "ui/mockups.h"
 #include "move/controls.h"
 #include "move/display.h"
@@ -67,11 +68,11 @@ std::vector<Strip> track_strips(unsigned first, int which) { // which: 0 level, 
 }
 
 // The hub's pages along the top: the wheel walks them.
-std::vector<Item> hub() { return {{"VOL"}, {"PAN"}, {"SNDA"}, {"SNDB"}, {"SNDC"}, {"SNDD"}, {"MAIN"}, {"KFX"}, {"PFX"}, {"FLEX"}}; }
+std::vector<Item> hub() { return {{"VOL"}, {"PAN"}, {"SNDA"}, {"SNDB"}, {"SNDC"}, {"SNDD"}, {"MAIN"}}; }
 
-// The kit's Device View: the kit, its pad A05, A05's own effect, the track's
-// two, and the plus that adds the next.
-std::vector<Item> kit_items() { return {{"KIT"}, {"A05"}, {"CRSH", true}, {"ECHO"}, {"ROOM"}, {"+"}}; }
+// The kit's Device View: the kit, its pad A05, A05's own effect and the
+// plus that adds its next, the track's two and the plus that adds the next.
+std::vector<Item> kit_items() { return {{"KIT"}, {"A05"}, {"CRSH", true}, {"+", true}, {"ECHO"}, {"ROOM"}, {"+"}}; }
 
 std::vector<float> pump(int columns) { // a compressor ducking under four kicks
     std::vector<float> out(size_t(columns), 0.0f);
@@ -98,12 +99,12 @@ std::vector<Screen> mixer_screens() {
         // The Device View, with the effects in it.
         {"play-fx", "PLAY: WHEEL ON AN EFFECT, KNOBS ITS SIX", [](juce::Graphics& g) {
             rail(g, "KIT", "1", "FX1");
-            mix::item_row(g, kit_items(), 3);
+            mix::item_row(g, kit_items(), 4);
             cells(g, "ECHO", "TIME", {"TIME", "FEEDBACK", "MIX", "TONE", "SYNC", "", "", ""}, {0.6f, 0.4f, 0.3f, 0.6f, 0.7f, 0, 0, 0});
         }},
         {"play-add", "PAST THE LAST EFFECT: THE PLUS", [](juce::Graphics& g) {
             rail(g, "KIT", "1", "FX3");
-            mix::item_row(g, kit_items(), 5);
+            mix::item_row(g, kit_items(), 6);
             move::draw_text_centred(g, content_x, 16, content_width, "ADD AN", 2);
             move::draw_text_centred(g, content_x, 32, content_width, "EFFECT", 2);
             detail(g, "2/6", "PUSH: BROWSE");
@@ -217,23 +218,22 @@ std::vector<Screen> mixer_screens() {
             mix::reduction(g, content(11, 40), pump(content_width), 4, 70);
             detail(g, "KEY 1", "-4.5DB");
         }},
-        // Melodee's performance effects, the hub's last pages.
-        {"knob-fx", "KNOB FX: KNOB 8 SLIDES A TO B", [](juce::Graphics& g) {
+        // Melodee's performance effects: Shift + Step 4 again, and again, and again.
+        {"knob-fx", "SHIFT + STEP 4 AGAIN: KNOB FX", [](juce::Graphics& g) {
             rail(g, "KFX", "A", "ON");
-            mix::item_row(g, hub(), 7);
-            cells(g, "LP FILTER", "EDIT A", {"CUTOFF", "RESO", "DRIVE", "", "", "", "A/B", "A>B"},
-                  {0.3f, 0.6f, 0.2f, 0, 0, 0, 0, 0.45f});
+            move::draw_text(g, content_x + 1, 1, "LP FILTER");
+            move::draw_text(g, width - move::text_width("EDIT A") - 1, 1, "EDIT A");
+            g.fillRect(content_x, 9, content_width, 1);
+            knob_cells(g, content(12, height - 12), {"CUTOFF", "RESO", "DRIVE", "", "", "", "A/B", "A>B"}, {0.3f, 0.6f, 0.2f, 0, 0, 0, 0, 0.45f});
         }},
-        {"pad-fx", "PAD FX: HOLD PADS, PRESSURE IS DEPTH", [](juce::Graphics& g) {
+        {"pad-fx", "AGAIN: PAD FX, PRESSURE IS DEPTH", [](juce::Graphics& g) {
             rail(g, "PFX", "1", "MST");
-            mix::item_row(g, hub(), 8);
-            move::draw_text(g, content_x + 1, 11, "LOOP 8 + PHONE");
-            mix::punch_lanes(g, content(21, 31), {{4, 7, true}, {9, 13, false}, {12, 15, false}}, 12);
+            move::draw_text(g, content_x + 1, 1, "LOOP 8 + PHONE");
+            mix::punch_lanes(g, content(12, 40), {{4, 7, true}, {9, 13, false}, {12, 15, false}}, 12);
             detail(g, "Q1/16", "PUSH: KEEP");
         }},
-        {"flex", "FLEX BEAT: A PAD PICKS, BAR BY BAR", [](juce::Graphics& g) {
+        {"flex", "AGAIN: FLEX BEAT, A PAD PICKS", [](juce::Graphics& g) {
             rail(g, "FLEX", "7", "");
-            mix::item_row(g, hub(), 9);
             move::draw_text_centred(g, content_x, 15, content_width, "BACKSPIN", 2);
             move::draw_text_centred(g, content_x, 34, content_width, "ONE SHOT  MIX 90");
             detail(g, "Q ON", "PADS 1-16");
@@ -388,7 +388,7 @@ juce::Image panel_image(const Panel& p, int w, int h) {
     round(815, 126, 20, lit(Button::Capture), "CA");
     round(867, 126, 20, lit(Button::Sample), "SA");
     round(815, 185, 20, lit(Button::Loop), "LP");
-    round(867, 185, 20, lit(Button::Mute), "M");
+    round(867, 185, 20, lit(Button::Mute), "MU");
     round(815, 243, 20, lit(Button::Delete), "X");
     round(867, 243, 20, lit(Button::Copy), "CP");
     round(815, 301, 20, lit(Button::Undo), "UN");

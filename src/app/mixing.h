@@ -76,6 +76,9 @@ void set_return(Studio& studio, unsigned bus, int value);
 // Mute, Melodee's Unmute everything): the tracks' and the pads'.
 void set_pad_send(Studio& studio, unsigned track, unsigned pad, unsigned bus, int value);
 void toggle_pad_mute(Studio& studio, unsigned track, unsigned pad);
+// Melodee's pad solo: every other kit pad with a sound muted; on the pad
+// soloed already, the kit back as it was.
+void solo_pad(Studio& studio, unsigned track, unsigned pad);
 void unmute_all(Studio& studio);
 float level_db(int level); // 0..127 as Melodee shows it, -inf at 0
 std::string level_text(int level); // "-1.4DB", "0.0DB", "-INF"
@@ -103,6 +106,7 @@ void knob_fx_on(Studio& studio, bool on);
 void knob_fx_bypass(Studio& studio);
 void knob_fx_track(Studio& studio, unsigned track);          // on or off for that track
 void knob_fx_pad(Studio& studio, unsigned track, unsigned pad); // on or off for that kit pad
+bool knob_fx_all(Studio& studio); // every track on, or (all on already) every one off; true: now on
 
 // ---------------------------------------------------------------- Pad FX and Flex Beat
 //
@@ -135,6 +139,8 @@ struct Performance {
 struct Desk {
     melodee::EffectSlot clipboard {};
     bool clipped = false;
+    unsigned chain = 0, slot = 0; // the effect the browser and its options are for (the screens')
+    bool show_effects = false;    // the Mixer's push: the track's Play screen opens on its effects
     Performance perform;
 };
 

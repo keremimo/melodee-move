@@ -83,6 +83,10 @@ private:
     bindings::Job last_job = bindings::Job::Nothing; // for the status line
     int touched = -1; // a touched knob, for a moment
     Clock::time_point touched_until {};
+    // The main meter (the Move's VU meter): while the Volume knob is touched,
+    // and a moment after it is turned or let go.
+    Clock::time_point meter_until {};
+    void draw_meter(juce::Graphics& g);
 };
 
 } // namespace app

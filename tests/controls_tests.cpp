@@ -82,7 +82,8 @@ void test_doc_and_table(const std::string& doc) {
 // Every row answers its own use somewhere it applies, with its job.
 void test_every_row_answers() {
     const Screen real[] {Screen::Play, Screen::Loop, Screen::Session, Screen::Overview, Screen::Browser, Screen::List,
-                         Screen::Chop, Screen::ToPads, Screen::Sampling, Screen::Typing, Screen::Canvas, Screen::Tracks};
+                         Screen::Chop, Screen::ToPads, Screen::Sampling, Screen::Typing, Screen::Canvas, Screen::Tracks,
+                         Screen::Mixer, Screen::KnobFx, Screen::PadFx, Screen::Flex};
     for (const auto& row : table()) {
         std::vector<Screen> screens;
         if (row.screen == Screen::Any || row.screen == Screen::Everywhere) {

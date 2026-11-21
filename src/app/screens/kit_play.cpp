@@ -8,6 +8,7 @@
 // pad edited (Shift + a pad picks it quietly); a pad held + the Volume knob
 // its level.
 #include "app/screens/common.h"
+#include "app/screens/device_fx.h"
 
 namespace app::screens {
 namespace {
@@ -18,19 +19,28 @@ class KitPlay final : public Screen {
 public:
     using Screen::Screen;
 
+    void input(const move::Input& input) override { fx.input(input); }
+
     bool job(bindings::Job job, const bindings::Use& use) override {
         using bindings::Job;
+        // The track item's mix and the effects (device_fx.h): the knobs, the
+        // push and Shift + push are theirs there.
+        auto effects = fx.track_items();
+        focus = std::min(focus, 1 + int(effects.size()));
+        if (focus >= 2 && fx.job(effects[size_t(focus - 2)], job, use)) return true;
+        if (focus == 0 && fx.mix_job(studio.track(), job, use)) return true;
         switch (job) {
         case Job::PlayPad: case Job::SelectPadQuietly: studio.select_pad(unsigned(use.index)); return true;
         case Job::MutePad: mixing::toggle_pad_mute(studio, studio.track(), unsigned(use.index)); return true; // Mute held + pad (the Move's 16.5)
+        case Job::SoloPad: mixing::solo_pad(studio, studio.track(), unsigned(use.index)); return true;          // Shift + Mute held + pad (Melodee's)
         case Job::TurnKnob: turn(unsigned(use.index), use.delta, false); return true;
         case Job::TurnKnobFine: turn(unsigned(use.index), use.delta, true); return true;
         case Job::PadLevel: turn(1, use.delta, false); return true;
-        case Job::Focus: focus = std::clamp(focus + (use.delta > 0 ? 1 : -1), 0, 3); return true;
+        case Job::Focus: focus = std::clamp(focus + (use.delta > 0 ? 1 : -1), 0, 1 + int(effects.size())); return true;
         case Job::ShowFocus: studio.say(item(focus)); return true;
         case Job::OpenBrowser:
             if (focus == 1) studio.open("load-samples");
-            else studio.say(focus == 0 ? "KITS: NOT YET" : "EFFECTS: NOT YET");
+            else studio.say("KITS: NOT YET");
             return true;
         case Job::SampleOptions:
             if (studio.sample_of_pad()) studio.open("sample-options");
@@ -56,8 +66,13 @@ public:
     }
 
     void draw(juce::Graphics& g) override {
-        ui::rail(g, "KIT", track_number(studio), pad_label(studio.pad()));
-        items(g, {item(0), item(1), item(2), item(3)}, focus);
+        auto effects = fx.track_items();
+        if (studio.desk.show_effects) { focus = 2; studio.desk.show_effects = false; } // from the Mixer's push
+        focus = std::min(focus, 1 + int(effects.size()));
+        ui::rail(g, "KIT", track_number(studio), focus == 0 ? fx.mix_bottom() : focus >= 2 ? fx.rail_bottom(effects[size_t(focus - 2)]) : pad_label(studio.pad()));
+        fx.draw_row(g, item(0), item(1), effects, focus);
+        if (focus == 0) { fx.draw_mix(g, studio.track()); return; }
+        if (focus >= 2) { fx.draw(g, effects[size_t(focus - 2)]); return; }
         const Sample* sample = studio.sample_of_pad();
         if (!sample) {
             move::draw_text_centred(g, ui::content_x, 22, ui::content_width, "EMPTY", 2);
@@ -77,6 +92,11 @@ public:
     }
 
     Knob knob(unsigned which) const override {
+        if (focus == 0) return fx.mix_knob(studio.track(), which);
+        if (focus >= 2) {
+            auto effects = fx.track_items();
+            return size_t(focus - 2) < effects.size() ? fx.knob(effects[size_t(focus - 2)], which) : Knob {};
+        }
         const Sample* sample = studio.sample_of_pad();
         uint32_t frames = sample ? std::max<uint32_t>(1, sample->data->model_frames()) : 1;
         const PadSound& sound = studio.current().pads[studio.pad()];
@@ -105,7 +125,8 @@ public:
     std::string knob_owner() const override { return pad_label(studio.pad()); }
 
 private:
-    int focus = 1; // the Device View's item the wheel is on: 0 the kit, 1 the pad, 2-3 the effects
+    int focus = 1; // the Device View's item the wheel is on: 0 the kit (its mix), 1 the pad, 2 on its effects
+    DeviceFx fx {studio};
     std::string item(int which) const {
         switch (which) {
         case 0: return "KIT";

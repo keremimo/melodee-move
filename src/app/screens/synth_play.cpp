@@ -13,6 +13,7 @@
 // Schwung runs it (canvas_page.h): push to enter it, then the wheel and its
 // push are the page's, Back goes up and out.
 #include "app/screens/common.h"
+#include "app/screens/device_fx.h"
 #include <juce_core/juce_core.h>
 #include <limits>
 #include <map>
@@ -42,12 +43,20 @@ public:
 
     void input(const move::Input& input) override {
         if (input.kind == move::Input::Kind::Pad && input.index < pad_count) held[input.index] = input.pressed;
+        fx.input(input);
     }
 
     bool job(bindings::Job job, const bindings::Use& use) override {
         using bindings::Job;
         auto* track = studio.module_track();
         if (!track) return false;
+        // The track item's mix and the effects (device_fx.h), but never under
+        // the module's menu, its presets or its own page.
+        auto effects = fx.track_items();
+        focus = std::min(focus, 1 + int(effects.size()));
+        bool device = !browsing && !track->menu_open && shown_canvas(*track) < 0;
+        if (device && focus >= 2 && fx.job(effects[size_t(focus - 2)], job, use)) return true;
+        if (device && focus == 0 && fx.mix_job(studio.track(), job, use)) return true;
         switch (job) {
         case Job::PlayNote: return true; // its sound went from the audio thread
         case Job::TurnKnob: turn(*track, unsigned(use.index), use.delta, false); return true;
@@ -60,11 +69,10 @@ public:
             return true;
         }
         // The Device View.
-        case Job::Focus: focus = std::clamp(focus + (use.delta > 0 ? 1 : -1), 0, 3); return true;
+        case Job::Focus: focus = std::clamp(focus + (use.delta > 0 ? 1 : -1), 0, 1 + int(effects.size())); return true;
         case Job::ShowFocus: studio.say(item(*track, focus)); return true;
         case Job::OpenBrowser:
-            if (focus >= 2) studio.say("EFFECTS: NOT YET");
-            else if (focus == 1 && track->module && !track->module->preset_param.empty()) browsing = true;
+            if (focus == 1 && track->module && !track->module->preset_param.empty()) browsing = true;
             else studio.open("load-modules");
             return true;
         case Job::ModuleMenu:
@@ -136,8 +144,14 @@ public:
         auto& module = *track->module;
         // The rail as docs/UI.md has a module's page: module, track, page.
         const ModulePage* page = track->page < module.pages.size() ? &module.pages[track->page] : nullptr;
-        ui::rail(g, upper(module.info().abbrev).substr(0, 4), track_number(studio), std::to_string(track->page + 1) + "/" + std::to_string(module.pages.size()));
-        items(g, {item(*track, 0), item(*track, 1), item(*track, 2), item(*track, 3)}, focus);
+        auto effects = fx.track_items();
+        if (studio.desk.show_effects) { focus = 2; studio.desk.show_effects = false; } // from the Mixer's push
+        focus = std::min(focus, 1 + int(effects.size()));
+        ui::rail(g, upper(module.info().abbrev).substr(0, 4), track_number(studio),
+                 focus == 0 ? "MIX" : focus >= 2 ? fx.rail_bottom(effects[size_t(focus - 2)]) : std::to_string(track->page + 1) + "/" + std::to_string(module.pages.size()));
+        fx.draw_row(g, item(*track, 0), item(*track, 1), effects, focus);
+        if (focus == 0) { fx.draw_mix(g, studio.track()); return; }
+        if (focus >= 2) { fx.draw(g, effects[size_t(focus - 2)]); return; }
         std::string title = upper(page ? page->name : module.info().name).substr(0, 12), lowest = note_name(studio.note_for(0, studio.octave(studio.track())));
         move::draw_text(g, ui::content_x + 1, 11, title);
         move::draw_text(g, ui::width - int(lowest.size()) * move::glyph_advance, 11, lowest); // the bottom-left pad's note
@@ -159,6 +173,11 @@ public:
 
     Knob knob(unsigned which) const override {
         auto* track = const_cast<Studio&>(studio).module_track();
+        if (track && track->module && !browsing && !track->menu_open && shown_canvas(*track) < 0) {
+            if (focus == 0) return fx.mix_knob(studio.track(), which);
+            auto effects = fx.track_items();
+            if (focus >= 2) return size_t(focus - 2) < effects.size() ? fx.knob(effects[size_t(focus - 2)], which) : Knob {};
+        }
         if (!track || !track->module || track->page >= track->module->pages.size()) return {};
         const auto& keys = track->module->pages[track->page].knobs;
         if (which >= keys.size()) return {};
@@ -180,7 +199,8 @@ public:
     }
 
 private:
-    int focus = 1;          // the Device View's item the wheel is on: 0 the module, 1 its preset, 2-3 the effects
+    int focus = 1;          // the Device View's item the wheel is on: 0 the module (its mix), 1 its preset, 2 on its effects
+    DeviceFx fx {studio};
     bool browsing = false;  // its presets, the wheel walking them
 
     std::string item(ModuleTrack& track, int which) const {

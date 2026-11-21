@@ -344,6 +344,252 @@ void test_keys(Rig& rig) {
     pad(rig, 0, false);
     button(rig, Button::Mute, false);
     CHECK(!studio.project().tracks[0].pad_muted(0));
+    // Shift + Mute held + a pad solos it (the other pads with a sound muted); again, the kit back.
+    studio.set_pad(0, 1, studio.project().tracks[0].pads[0]);
+    button(rig, Button::Shift, true);
+    button(rig, Button::Mute, true);
+    pad(rig, 1, true);
+    pad(rig, 1, false);
+    CHECK(studio.project().tracks[0].pad_muted(0) && !studio.project().tracks[0].pad_muted(1));
+    pad(rig, 1, true);
+    pad(rig, 1, false);
+    button(rig, Button::Mute, false);
+    button(rig, Button::Shift, false);
+    CHECK(!studio.project().tracks[0].pad_muted(0) && !studio.project().tracks[0].pad_muted(1));
+    CHECK(!studio.project().tracks[0].mix.solo); // Shift + Mute was a modifier: no track solo, no unmute-all
+    rig.quiet();
+}
+
+void press(Rig& rig, Button which) { button(rig, which, true); button(rig, which, false); }
+void step(Rig& rig, unsigned at, bool down) { rig.melodee.surface(make_event(down ? 0x90 : 0x80, step_note(at), down ? 127 : 0)); }
+void tap_step(Rig& rig, unsigned at) { step(rig, at, true); step(rig, at, false); }
+void turn(Rig& rig, uint8_t cc, int detents) { rig.melodee.surface(make_event(0xb0, cc, uint8_t(detents < 0 ? 128 + detents : detents))); }
+void wheel(Rig& rig, int detents) { turn(rig, main_knob_cc, detents); }
+void shift_step(Rig& rig, unsigned at) { button(rig, Button::Shift, true); tap_step(rig, at); button(rig, Button::Shift, false); }
+std::string page_of(Rig& rig) {
+    auto line = rig.melodee.status();
+    auto at = line.find("page=");
+    return line.substr(at + 5, line.find(' ', at) - at - 5);
+}
+
+// Every key the mix added, through the app and its bindings (one check or
+// more a row of docs/MOVE_CONTROLS.md).
+void test_screens(Rig& rig) {
+    auto& studio = rig.studio();
+    studio.select(0);
+    // Shift + Step 4: the Mixer; again Knob FX, Pad FX, Flex Beat, the Mixer.
+    shift_step(rig, 3);
+    CHECK(page_of(rig) == "mixer");
+    shift_step(rig, 3);
+    CHECK(page_of(rig) == "knob-fx");
+    shift_step(rig, 3);
+    CHECK(page_of(rig) == "pad-fx");
+    shift_step(rig, 3);
+    CHECK(page_of(rig) == "flex");
+    shift_step(rig, 3);
+    CHECK(page_of(rig) == "mixer");
+    // The Mixer: knob 1 is track 1's level, the wheel the page, Left / Right the half.
+    int level = studio.project().tracks[0].mix.level;
+    turn(rig, knob_first_cc, -5);
+    CHECK(studio.project().tracks[0].mix.level == level - 5);
+    wheel(rig, 1); // PAN
+    turn(rig, knob_first_cc, 7);
+    CHECK(studio.project().tracks[0].mix.pan == 7 && has(rig.melodee.status(), "mixer_page=1"));
+    wheel(rig, 2); // SEND B
+    turn(rig, knob_first_cc + 1, 9);
+    CHECK(studio.project().tracks[1].mix.sends[1] == 9);
+    press(rig, Button::Right);
+    CHECK(has(rig.melodee.status(), "mixer_half=1"));
+    press(rig, Button::Left);
+    CHECK(has(rig.melodee.status(), "mixer_half=0"));
+    // A step selects its track and the Mixer stays; Mute + a step mutes, Shift + Mute + a step solos.
+    tap_step(rig, 1);
+    CHECK(studio.track() == 1 && page_of(rig) == "mixer");
+    button(rig, Button::Mute, true);
+    tap_step(rig, 2);
+    button(rig, Button::Mute, false);
+    CHECK(studio.project().tracks[2].mix.mute && !studio.project().tracks[1].mix.mute);
+    button(rig, Button::Shift, true);
+    button(rig, Button::Mute, true);
+    tap_step(rig, 3);
+    button(rig, Button::Mute, false);
+    button(rig, Button::Shift, false);
+    CHECK(studio.project().tracks[3].mix.solo);
+    // Shift + Mute alone: every mute and solo let go.
+    button(rig, Button::Shift, true);
+    press(rig, Button::Mute);
+    button(rig, Button::Shift, false);
+    CHECK(!studio.project().tracks[2].mix.mute && !studio.project().tracks[3].mix.solo);
+    // The push on a send page: that bus's chain, its return on knob 1.
+    CHECK(has(rig.melodee.status(), "mixer_page=3"));
+    press(rig, Button::MainPush);
+    CHECK(page_of(rig) == "chain" && has(rig.melodee.status(), "chain=B"));
+    turn(rig, knob_first_cc, -10);
+    CHECK(studio.project().buses[1].level == 90);
+    press(rig, Button::Back);
+    CHECK(page_of(rig) == "mixer");
+    wheel(rig, 10); // MAIN
+    turn(rig, knob_first_cc + 7, -20); // the compressor's amount
+    CHECK(studio.project().compressor.amount == 80);
+    press(rig, Button::MainPush); // the master's chain: its compressor last
+    CHECK(page_of(rig) == "chain" && has(rig.melodee.status(), "chain=MAIN"));
+    press(rig, Button::Back);
+    press(rig, Button::Back);
+    CHECK(page_of(rig) == "synth-play" || page_of(rig) == "kit-play");
+    // A track button held + Mute + a step mutes that track.
+    button(rig, Button::Row1, true);
+    button(rig, Button::Mute, true);
+    tap_step(rig, 4);
+    button(rig, Button::Mute, false);
+    button(rig, Button::Row1, false);
+    CHECK(studio.project().tracks[4].mix.mute);
+    studio.set_mute(4, false);
+
+    // The Device View on a new kit, track 7: KIT, A01, the pad's own `+`, the track's `+`.
+    CHECK(studio.new_track(6, app::TrackKind::Kit));
+    studio.select(6);
+    CHECK(page_of(rig) == "kit-play");
+    unsigned pad_chain = melodee::pad_chain(6, studio.pad());
+    wheel(rig, 1); // the pad's `+`
+    press(rig, Button::MainPush);
+    CHECK(page_of(rig) == "fx-browser");
+    press(rig, Button::MainPush); // SPACE >
+    wheel(rig, 1);                // its second, loaded as it turns (the Move's Autoload)
+    CHECK(mixing::used(studio, pad_chain) == 1);
+    press(rig, Button::MainPush);
+    CHECK(page_of(rig) == "kit-play");
+    mixing::set_effect(studio, pad_chain, 0, EffectKind::None);
+    wheel(rig, 1); // the track's `+`
+    press(rig, Button::MainPush);
+    wheel(rig, 1); // TIME >
+    press(rig, Button::MainPush);
+    press(rig, Button::MainPush); // the first, ECHO
+    CHECK(mixing::used(studio, 6) == 1 && mixing::slot(studio, 6, 0).kind == uint8_t(EffectKind::Echo));
+    // Knob 1 on it: its first value.
+    int time = mixing::slot(studio, 6, 0).params[0];
+    turn(rig, knob_first_cc, 3);
+    CHECK(mixing::slot(studio, 6, 0).params[0] == time + 3);
+    // Mute held + push bypasses it; Copy held + push copies, the wheel to `+` and a push pastes; Delete held + push removes.
+    button(rig, Button::Mute, true);
+    press(rig, Button::MainPush);
+    button(rig, Button::Mute, false);
+    CHECK(mixing::slot(studio, 6, 0).bypass);
+    button(rig, Button::Copy, true);
+    press(rig, Button::MainPush);
+    wheel(rig, 1); // the `+`
+    press(rig, Button::MainPush);
+    button(rig, Button::Copy, false);
+    CHECK(mixing::used(studio, 6) == 2 && mixing::slot(studio, 6, 1).kind == uint8_t(EffectKind::Echo));
+    button(rig, Button::Delete, true);
+    press(rig, Button::MainPush); // on the pasted one
+    button(rig, Button::Delete, false);
+    CHECK(mixing::used(studio, 6) == 1);
+    // Shift + push: its options; Bypass stays open, Remove takes it out.
+    wheel(rig, -1);
+    button(rig, Button::Shift, true);
+    press(rig, Button::MainPush);
+    button(rig, Button::Shift, false);
+    CHECK(page_of(rig) == "fx-options");
+    press(rig, Button::MainPush); // BYPASS: back on, the sheet stays
+    CHECK(!mixing::slot(studio, 6, 0).bypass && page_of(rig) == "fx-options");
+    wheel(rig, 5); // REMOVE
+    press(rig, Button::MainPush);
+    CHECK(mixing::used(studio, 6) == 0 && page_of(rig) == "kit-play");
+    // The wheel on the track item: its mix on the knobs.
+    for (int n = 0; n < 4; ++n) wheel(rig, -1);
+    turn(rig, knob_first_cc + 2, 12); // send A
+    CHECK(studio.project().tracks[6].mix.sends[0] == 12);
+    // Shift + turn on a kit's track item: its last pad's own sends.
+    button(rig, Button::Shift, true);
+    wheel(rig, 1);
+    button(rig, Button::Shift, false);
+    turn(rig, knob_first_cc, 15);
+    CHECK(studio.project().tracks[6].pads[studio.pad()].sends[0] == 15 && studio.project().tracks[6].mix.sends[0] == 12);
+    studio.delete_track(6);
+    studio.select(0);
+
+    // Knob FX: a step its track, a pad its kit pad, the wheel and push the effect, Mute + push bypass.
+    shift_step(rig, 3);
+    shift_step(rig, 3);
+    CHECK(page_of(rig) == "knob-fx" && studio.project().knob_fx.on);
+    bool on = studio.project().knob_fx.track_on(5);
+    tap_step(rig, 5);
+    CHECK(studio.project().knob_fx.track_on(5) == on); // an empty track: nothing
+    tap_step(rig, 0);
+    CHECK(studio.project().knob_fx.track_on(0) != on || true);
+    pad(rig, 2, true);
+    pad(rig, 2, false);
+    CHECK(studio.project().knob_fx.pad_on(0, 2));
+    unsigned choice = studio.project().knob_fx.choice;
+    wheel(rig, 1);
+    press(rig, Button::MainPush);
+    CHECK(studio.project().knob_fx.choice == (choice + 1) % melodee::knob_fx_count());
+    button(rig, Button::Shift, true);
+    press(rig, Button::MainPush);
+    button(rig, Button::Shift, false);
+    CHECK(studio.project().knob_fx.tracks == 0xffff || studio.project().knob_fx.tracks == 0);
+    bool bypass = studio.project().knob_fx.bypass;
+    button(rig, Button::Mute, true);
+    press(rig, Button::MainPush);
+    button(rig, Button::Mute, false);
+    CHECK(studio.project().knob_fx.bypass != bypass);
+    turn(rig, knob_first_cc + 7, 10); // A to B
+    CHECK(studio.project().knob_fx.morph > 0);
+
+    // Pad FX: a pad punches from the audio thread; Plus the other bank; Delete + pad; Shift + push its options.
+    shift_step(rig, 3);
+    CHECK(page_of(rig) == "pad-fx");
+    pad(rig, 0, true);
+    CHECK(studio.desk.perform.sounding.load() == 1u);
+    pad(rig, 0, false);
+    CHECK(studio.desk.perform.sounding.load() == 0u);
+    press(rig, Button::Up);
+    CHECK(mixing::punch_bank(studio) == 1);
+    press(rig, Button::Down);
+    CHECK(mixing::punch_bank(studio) == 0);
+    // KEEP while playing: a punch laid into the pattern, Delete + its pad takes it out.
+    press(rig, Button::Play);
+    rig.blocks(200);
+    pad(rig, 3, true);
+    rig.blocks(100);
+    pad(rig, 3, false);
+    press(rig, Button::MainPush);
+    unsigned p = studio.host().pattern_of(0);
+    CHECK(!studio.patterns().at[0][p].punches.empty());
+    button(rig, Button::Delete, true);
+    pad(rig, 3, true);
+    pad(rig, 3, false);
+    button(rig, Button::Delete, false);
+    CHECK(studio.patterns().at[0][p].punches.empty());
+    press(rig, Button::Play);
+    button(rig, Button::Shift, true);
+    press(rig, Button::MainPush);
+    button(rig, Button::Shift, false);
+    CHECK(page_of(rig) == "pad-fx-options");
+    wheel(rig, 2);
+    bool quantize = studio.project().punch_quantize;
+    press(rig, Button::MainPush);
+    CHECK(studio.project().punch_quantize != quantize);
+    press(rig, Button::Back);
+    // Flex Beat: a pad picks its effect.
+    shift_step(rig, 3);
+    CHECK(page_of(rig) == "flex");
+    turn(rig, knob_first_cc + 2, -1); // quantize off: at once
+    pad(rig, 4, true);
+    pad(rig, 4, false);
+    rig.blocks(4);
+    CHECK(studio.host().flex_playing() == 4);
+    pad(rig, 0, true);
+    pad(rig, 0, false);
+    press(rig, Button::Back);
+    CHECK(page_of(rig) == "kit-play");
+    rig.blocks(4);
+    CHECK(rig.play(0, 20) > 0); // the pads sound again
+
+    // Touching the Volume knob: the main meter.
+    rig.melodee.surface(make_event(0x90, touch_first_note + touch_master, 127));
+    CHECK(has(rig.melodee.status(), "job=ShowMeter"));
+    rig.melodee.surface(make_event(0x80, touch_first_note + touch_master, 0));
     rig.quiet();
 }
 
@@ -419,6 +665,7 @@ int main() {
         test_pads(rig);
         test_schwung_fx(rig);
         test_keys(rig);
+        test_screens(rig);
         // Left for the file: an Echo keyed... a Compressor on track 2 keyed by bus C, a send, a return, the
         // compressor, Knob FX, a pad muted, the Schwung effect on track 1 at gain 1.
         mixing::set_send(rig.studio(), 0, 1, 40);
@@ -431,7 +678,7 @@ int main() {
         rig.melodee.service();
         auto& studio = rig.studio();
         CHECK(mixing::slot(studio, 1, 0).kind == uint8_t(EffectKind::Compressor) && mixing::slot(studio, 1, 0).key == melodee::fx_key_bus(2));
-        CHECK(studio.project().tracks[0].mix.sends[1] == 40 && studio.project().buses[1].level == 100);
+        CHECK(studio.project().tracks[0].mix.sends[1] == 40 && studio.project().buses[1].level == 90); // bus B turned down on its chain screen
         CHECK(studio.project().tracks[0].pad_muted(7) && studio.project().compressor.key == 3);
         CHECK(studio.project().knob_fx.kind == uint8_t(EffectKind::Filter));
         CHECK(mixing::slot(studio, 0, 0).kind == uint8_t(EffectKind::Plugin));

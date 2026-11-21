@@ -8,6 +8,8 @@
 #include <chrono>
 #include <iostream>
 #include "app/module_host.h"
+#include "app/mixing.h"
+#include <cstdlib>
 #include <thread>
 
 namespace app {
@@ -26,6 +28,91 @@ bool save(MelodeeApp& melodee, const juce::File& folder, const char* name) {
     juce::FileOutputStream output(file);
     bool ok = output.openedOk() && juce::PNGImageFormat().writeImageToStream(move::frame_image(move::pack(image), 4), output);
     if (ok) std::cout << file.getFullPathName() << '\n';
+    return ok;
+}
+
+// The mix and effects (docs/UI.md, "Mixer and effects"), as the app draws
+// them: the Device View's mix and effects, the browser and options, the
+// Mixer's pages, a bus's and the master's chains, Knob FX, Pad FX, Flex Beat,
+// the main meter.
+template <class Send, class Press>
+bool mixer_previews(MelodeeApp& melodee, const juce::File& folder, Send& send, Press& press) {
+    auto& studio = melodee.studio();
+    bool ok = true;
+    auto wheel = [&](int detents) { for (int n = 0; n < std::abs(detents); ++n) send(0xbf, move::main_knob_cc, uint8_t(detents < 0 ? 127 : 1)); };
+    auto shift_step = [&](unsigned step) {
+        send(0xbf, move::button_cc(move::Button::Shift), 127);
+        send(0x9f, move::step_note(step), 127);
+        send(0x8f, move::step_note(step), 0);
+        send(0xbf, move::button_cc(move::Button::Shift), 0);
+    };
+    {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        unsigned pad = melodee::pad_chain(studio.track(), studio.pad());
+        mixing::set_effect(studio, pad, 0, melodee::EffectKind::Crush);
+        mixing::set_effect(studio, studio.track(), 0, melodee::EffectKind::Echo);
+        mixing::set_effect(studio, studio.track(), 1, melodee::EffectKind::Room);
+        mixing::set_effect(studio, mixing::bus(0), 0, melodee::EffectKind::Room);
+        mixing::set_effect(studio, mixing::master, 0, melodee::EffectKind::Drive);
+        mixing::set_send(studio, studio.track(), 0, 30);
+    }
+    wheel(-1);
+    ok = save(melodee, folder, "play-mix") && ok;
+    wheel(2);
+    ok = save(melodee, folder, "play-pad-fx") && ok;
+    wheel(2);
+    ok = save(melodee, folder, "play-fx") && ok;
+    wheel(2);
+    ok = save(melodee, folder, "play-add") && ok;
+    wheel(-2);
+    press(move::Button::MainPush);
+    ok = save(melodee, folder, "fx-families") && ok;
+    press(move::Button::MainPush); // SPACE: the Room there already, not this family's? Back
+    press(move::Button::Back);
+    wheel(1);
+    press(move::Button::MainPush);
+    ok = save(melodee, folder, "fx-time") && ok;
+    press(move::Button::Back);
+    press(move::Button::Back);
+    send(0xbf, move::button_cc(move::Button::Shift), 127);
+    press(move::Button::MainPush);
+    send(0xbf, move::button_cc(move::Button::Shift), 0);
+    ok = save(melodee, folder, "fx-options") && ok;
+    press(move::Button::Back);
+    shift_step(3);
+    ok = save(melodee, folder, "mixer-vol") && ok;
+    wheel(1);
+    ok = save(melodee, folder, "mixer-pan") && ok;
+    wheel(1);
+    ok = save(melodee, folder, "mixer-send") && ok;
+    press(move::Button::MainPush);
+    ok = save(melodee, folder, "bus-chain") && ok;
+    press(move::Button::Back);
+    wheel(4);
+    ok = save(melodee, folder, "mixer-main") && ok;
+    press(move::Button::MainPush);
+    wheel(2);
+    ok = save(melodee, folder, "main-chain") && ok;
+    press(move::Button::Back);
+    shift_step(3);
+    ok = save(melodee, folder, "knob-fx") && ok;
+    shift_step(3);
+    ok = save(melodee, folder, "pad-fx") && ok;
+    shift_step(3);
+    ok = save(melodee, folder, "flex") && ok;
+    press(move::Button::Back);
+    send(0x9f, move::touch_first_note + move::touch_master, 127);
+    ok = save(melodee, folder, "meter") && ok;
+    send(0x8f, move::touch_first_note + move::touch_master, 0);
+    std::this_thread::sleep_for(std::chrono::milliseconds(700));
+    {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        mixing::set_effect(studio, melodee::pad_chain(studio.track(), studio.pad()), 0, melodee::EffectKind::None);
+        mixing::set_effect(studio, studio.track(), 0, melodee::EffectKind::None);
+        mixing::set_effect(studio, studio.track(), 0, melodee::EffectKind::None);
+    }
+    wheel(-10);
+    wheel(1);
     return ok;
 }
 
@@ -111,6 +198,7 @@ int write_previews(const std::string& directory, const std::string& modules) {
     ok = save(melodee, folder, "new-track") && ok;
     press(move::Button::Back);
     press(move::Button::Row1);
+    ok = mixer_previews(melodee, folder, send, press) && ok; // docs/ui/mixer.png's screens, as built
     if (modules.empty()) return ok ? 0 : 1;
 
     // The synth track: empty, its modules, the first one loaded, a knob.

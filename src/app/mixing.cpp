@@ -250,6 +250,23 @@ void toggle_pad_mute(Studio& studio, unsigned t, unsigned pad) {
     studio.changed();
 }
 
+void solo_pad(Studio& studio, unsigned t, unsigned pad) {
+    t %= melodee::track_count;
+    pad %= melodee::sampler_pads;
+    auto& track = studio.project().tracks[t];
+    bool alone = !track.pad_muted(pad);
+    for (unsigned n = 0; n < melodee::sampler_pads && alone; ++n)
+        if (n != pad && track.pads[n].used() && !track.pad_muted(n)) alone = false;
+    for (unsigned n = 0; n < melodee::sampler_pads; ++n) {
+        if (!track.pads[n].used() && n != pad) continue;
+        bool on = alone ? false : n != pad;
+        if (track.pad_muted(n) == on) continue;
+        track.set_pad_muted(n, on);
+        studio.send({Type::PadMute, uint8_t(t), 0, uint16_t(n), int16_t(on)});
+    }
+    studio.changed();
+}
+
 void unmute_all(Studio& studio) {
     for (unsigned t = 0; t < melodee::track_count; ++t) {
         auto& track = studio.project().tracks[t];
@@ -419,6 +436,15 @@ void knob_fx_pad(Studio& studio, unsigned t, unsigned pad) {
     k.set_pad(t, pad, !k.pad_on(t, pad));
     send_knob_targets(studio, t);
     studio.changed();
+}
+
+bool knob_fx_all(Studio& studio) {
+    auto& k = studio.project().knob_fx;
+    bool all = k.tracks == 0xffff;
+    k.tracks = all ? 0 : 0xffff;
+    send_knob_targets(studio, studio.track());
+    studio.changed();
+    return !all;
 }
 
 // ---------------------------------------------------------------- Pad FX and Flex Beat
