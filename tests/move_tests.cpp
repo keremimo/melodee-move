@@ -1661,13 +1661,13 @@ void test_sampling_pad_layout() {
     std::filesystem::create_directories(folder);
     std::filesystem::remove_all(home);
     CHECK(write_test_loop(loop));
-    app::set_pad_layout(app::PadLayout::Banks);
     {
         app::MelodeeApp melodee(folder, home, "build/test-no-modules");
         Session session;
         melodee.attach(session);
         melodee.audio_opened(AudioFormat {});
         CHECK(melodee.restore_now().empty());
+        app::set_pad_layout(app::PadLayout::Banks); // after Move.settings is read (Rows unless it says Banks), as Setup sets it
         CHECK(melodee.load_now(loop, 0).empty());
         Lights lights;
         AudioBlock in {}, out {};
