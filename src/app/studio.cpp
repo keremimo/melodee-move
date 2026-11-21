@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "app/studio.h"
+#include "app/pad_layout.h"
 #include "app/screen.h"
 #include "melodee/engine/engine_info.h"
 #include "melodee/shell/sample_decode.h"
@@ -232,8 +233,8 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
     if ((input.kind == Kind::Pad || input.kind == Kind::PadPressure) && !pads_typing.load(std::memory_order_relaxed)
         && !(went.track >= 0 && !(input.kind == Kind::Pad && input.pressed))
         && !(input.kind == Kind::Pad && input.pressed && pads_quiet.load(std::memory_order_relaxed))
-        && mixing::audio_pad(desk.perform, *engine, input.index, input.kind == Kind::Pad && input.pressed, input.value,
-                             input.kind == Kind::PadPressure))
+        && mixing::audio_pad(desk.perform, *engine, logical_pad(input.index, pad_layout()), input.kind == Kind::Pad && input.pressed,
+                             input.value, input.kind == Kind::PadPressure)) // the punch or Flex pad by its number in the layout
         return;
     if (input.kind == Kind::Pad) {
         if (input.pressed) {

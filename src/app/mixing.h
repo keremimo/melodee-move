@@ -159,7 +159,9 @@ void release_punches(Studio& studio);            // every punch lets go
 void flex(Studio& studio, unsigned what, int value); // Command::FlexBeat: 0 the pad, 1 mode, 2 mix, 3 quantize
 
 // Audio thread: a pad's press, release or pressure while the pads are
-// punches or Flex Beat's: the engine's command at once. True: taken.
+// punches or Flex Beat's: the engine's command at once. True: taken. `pad`
+// is its number in the pad layout (pad_layout.h: logical_pad), as are the
+// punches' pads, `sounding` and Flex Beat's pads 1-16.
 bool audio_pad(Performance& performance, melodee::EngineHost& engine, unsigned pad, bool pressed, int value, bool pressure);
 
 } // namespace mixing

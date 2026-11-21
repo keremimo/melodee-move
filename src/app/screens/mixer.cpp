@@ -13,6 +13,7 @@
 //   chain        a bus's chain (its return first) or the master's (its
 //                compressor last), as a Device View
 //   knob-fx, pad-fx, flex   Shift + Step 4 again, and again, and again
+#include "app/pad_layout.h"
 #include "app/screens/common.h"
 #include "app/screens/device_fx.h"
 #include "melodee/engine/pad_fx_info.h"
@@ -560,7 +561,7 @@ public:
         case Job::KnobFxAll: studio.say(mixing::knob_fx_all(studio) ? "ALL TRACKS" : "NO TRACKS"); return true;
         case Job::BypassEffect: mixing::knob_fx_bypass(studio); return true;
         case Job::KnobFxTrack: if (studio.kind(unsigned(use.index)) != TrackKind::Empty) mixing::knob_fx_track(studio, unsigned(use.index)); return true;
-        case Job::KnobFxPad: mixing::knob_fx_pad(studio, studio.track(), unsigned(use.index)); return true;
+        case Job::KnobFxPad: mixing::knob_fx_pad(studio, studio.track(), logical_pad(uint8_t(use.index), pad_layout())); return true;
         case Job::TurnKnob: case Job::TurnKnobFine: {
             unsigned which = unsigned(use.index);
             if (which < 6) mixing::knob_fx_turn(studio, which, use.delta, job == Job::TurnKnobFine);
@@ -582,7 +583,7 @@ public:
         if (studio.kind() == TrackKind::Kit) {
             const auto& track = studio.current();
             for (unsigned at = 0; at < pad_count; ++at)
-                lights.pad(at, k.pad_on(studio.track(), at) ? move::colour::white : track.pads[at].used() ? ui::track_colour(studio.track()).dim : move::colour::off);
+                lights.pad(physical_pad(uint8_t(at), pad_layout()), k.pad_on(studio.track(), at) ? move::colour::white : track.pads[at].used() ? ui::track_colour(studio.track()).dim : move::colour::off);
         }
         lights.button(move::Button::Back, move::white_dim);
         lights.button(move::Button::Mute, k.bypass ? move::white_bright : move::white_dim);
@@ -644,7 +645,7 @@ public:
         // The take, as Melodee keeps it (model/pattern.h PunchSpan): each punch
         // from its press to its release, in the sequencer's ticks.
         if (input.kind != move::Input::Kind::Pad || input.index >= 32 || studio.top() != this) return;
-        int kind = mixing::punch_on(mixing::punch_bank(studio), input.index);
+        int kind = mixing::punch_on(mixing::punch_bank(studio), logical_pad(input.index, pad_layout()));
         if (kind < 0 || !studio.playing()) return;
         uint64_t now = studio.host().ticks();
         if (input.pressed) {
@@ -670,7 +671,7 @@ public:
         case Job::PunchBank: mixing::punch_bank(studio, use.delta ? use.delta : 1); return true;
         case Job::KeepPunches: keep(); return true;
         case Job::PunchOptions: studio.push("pad-fx-options"); return true;
-        case Job::ClearKept: clear_kept(unsigned(use.index)); return true;
+        case Job::ClearKept: clear_kept(logical_pad(uint8_t(use.index), pad_layout())); return true;
         case Job::TurnKnob: case Job::TurnKnobFine: turn(unsigned(use.index), use.delta); return true;
         case Job::Mixer: studio.open("flex"); return true;
         case Job::Back: studio.close(); return true;
@@ -683,7 +684,7 @@ public:
         uint32_t sounding = studio.desk.perform.sounding.load(std::memory_order_relaxed);
         for (unsigned pad = 0; pad < 32; ++pad) {
             int kind = mixing::punch_on(bank, pad);
-            lights.pad(pad, kind < 0 ? move::colour::off : (sounding >> pad) & 1 ? move::colour::white
+            lights.pad(physical_pad(uint8_t(pad), pad_layout()), kind < 0 ? move::colour::off : (sounding >> pad) & 1 ? move::colour::white
                            : melodee::punch_is_mpc(melodee::PunchKind(kind)) ? move::colour::orange : move::colour::cyan);
         }
         // Where the kept punches fall in the bar, the playhead green.
@@ -874,7 +875,7 @@ public:
     void lights(move::Lights& lights) override {
         unsigned playing = studio.host().flex_playing();
         for (unsigned pad = 0; pad < 32; ++pad)
-            lights.pad(pad, pad >= melodee::flex_pads ? move::colour::off : pad == playing && pad ? move::colour::white
+            lights.pad(physical_pad(uint8_t(pad), pad_layout()), pad >= melodee::flex_pads ? move::colour::off : pad == playing && pad ? move::colour::white
                            : pad == 0 ? move::colour::dark_grey : move::colour::violet);
         steps_playhead(studio, lights);
         lights.button(move::Button::Back, move::white_dim);

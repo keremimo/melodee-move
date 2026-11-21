@@ -8,6 +8,7 @@
 // it saved and opened again.
 #include "app/melodee_app.h"
 #include "app/mixing.h"
+#include "app/pad_layout.h"
 #include "app/project_store.h"
 #include "melodee/engine/engine_info.h"
 #include "move/audio.h"
@@ -593,6 +594,38 @@ void test_screens(Rig& rig) {
     rig.quiet();
 }
 
+// In the MPC's two banks (pad_layout.h, Banks) a pad's job follows its
+// number: Flex Beat's 1-16 and Pad FX's first sixteen are the left bank, a
+// kit pad its number.
+void test_layouts(Rig& rig) {
+    auto& studio = rig.studio();
+    app::set_pad_layout(app::PadLayout::Banks);
+    studio.select(0);
+    shift_step(rig, 3);
+    shift_step(rig, 3);
+    CHECK(page_of(rig) == "knob-fx");
+    bool on = studio.project().knob_fx.pad_on(0, 5);
+    pad(rig, 9, true); // the second row's second pad: number 6
+    pad(rig, 9, false);
+    CHECK(studio.project().knob_fx.pad_on(0, 5) != on);
+    shift_step(rig, 3);
+    CHECK(page_of(rig) == "pad-fx");
+    pad(rig, 4, true); // the bottom row's fifth pad: 17, the right bank's first
+    CHECK(studio.desk.perform.sounding.load() == 1u << 16);
+    pad(rig, 4, false);
+    shift_step(rig, 3);
+    CHECK(page_of(rig) == "flex");
+    pad(rig, 8, true); // the second row's first: 5
+    pad(rig, 8, false);
+    rig.blocks(4);
+    CHECK(studio.host().flex_playing() == 4);
+    pad(rig, 0, true);
+    pad(rig, 0, false);
+    press(rig, Button::Back);
+    app::set_pad_layout(app::PadLayout::Rows);
+    rig.quiet();
+}
+
 // Two projects for timing the cycle in the simulated Move (docs/PARITY.md,
 // mixer & effects: process_us with a busy chain on all sixteen tracks):
 // sixteen kit tracks each playing the loop on every beat, and, in the busy
@@ -666,6 +699,7 @@ int main() {
         test_schwung_fx(rig);
         test_keys(rig);
         test_screens(rig);
+        test_layouts(rig);
         // Left for the file: an Echo keyed... a Compressor on track 2 keyed by bus C, a send, a return, the
         // compressor, Knob FX, a pad muted, the Schwung effect on track 1 at gain 1.
         mixing::set_send(rig.studio(), 0, 1, 40);

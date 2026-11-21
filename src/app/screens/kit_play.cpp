@@ -7,6 +7,7 @@
 // attack, decay, cutoff (Shift: finer); the pads play the kit and pick the
 // pad edited (Shift + a pad picks it quietly); a pad held + the Volume knob
 // its level.
+#include "app/pad_layout.h"
 #include "app/screens/common.h"
 #include "app/screens/device_fx.h"
 
@@ -31,8 +32,8 @@ public:
         if (focus == 0 && fx.mix_job(studio.track(), job, use)) return true;
         switch (job) {
         case Job::PlayPad: case Job::SelectPadQuietly: studio.select_pad(unsigned(use.index)); return true;
-        case Job::MutePad: mixing::toggle_pad_mute(studio, studio.track(), unsigned(use.index)); return true; // Mute held + pad (the Move's 16.5)
-        case Job::SoloPad: mixing::solo_pad(studio, studio.track(), unsigned(use.index)); return true;          // Shift + Mute held + pad (Melodee's)
+        case Job::MutePad: mixing::toggle_pad_mute(studio, studio.track(), logical_pad(uint8_t(use.index), pad_layout())); return true; // Mute held + pad (16.5)
+        case Job::SoloPad: mixing::solo_pad(studio, studio.track(), logical_pad(uint8_t(use.index), pad_layout())); return true;        // Shift + Mute held + pad
         case Job::TurnKnob: turn(unsigned(use.index), use.delta, false); return true;
         case Job::TurnKnobFine: turn(unsigned(use.index), use.delta, true); return true;
         case Job::PadLevel: turn(1, use.delta, false); return true;
@@ -56,7 +57,7 @@ public:
         auto colour = ui::track_colour(studio.track()).bright;
         static const uint8_t dim_white = move::nearest_colour({96, 96, 96});
         for (unsigned at = 0; at < pad_count; ++at)
-            lights.pad(at, track.pad_muted(at) ? dim_white : track.pads[at].used() ? (at == studio.pad() ? colour::white : colour)
+            lights.pad(physical_pad(uint8_t(at), pad_layout()), track.pad_muted(at) ? dim_white : track.pads[at].used() ? (at == studio.pad() ? colour::white : colour)
                          : at == studio.pad() ? colour::dark_grey : colour::off); // a muted pad dim white, as on the Move
         steps_playhead(studio, lights);
         // Left / Right (bars), Plus / Minus (pad banks), Loop (Loop Mode) and
