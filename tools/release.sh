@@ -77,8 +77,14 @@ SHA256=$(shasum -a 256 "$OUT/$ASSET" | cut -d' ' -f1)
 echo "$SHA256  $ASSET" > "$OUT/$ASSET.sha256"
 git show "$COMMIT:release.json" > "$OUT/release.json"
 {
-    git show "$COMMIT:CHANGELOG.md" | awk -v v="## $VERSION " 'index($0, v) == 1 { on = 1; next } /^## / { on = 0 } on'
+    # The version's section, without its heading or the blank lines around it.
+    git show "$COMMIT:CHANGELOG.md" | awk -v v="## $VERSION " '
+        index($0, v) == 1 { on = 1; next }
+        /^## / { on = 0 }
+        on && $0 == "" { blank++; next }
+        on { if (text && blank) printf "\n"; blank = 0; text = 1; print }'
     cat << EOF
+
 ### Install
 
 In Schwung Manager (http://move.local:7700), **Modules**: Melodee, under
