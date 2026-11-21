@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #pragma once
 #include "app/screens/common.h"
+#include "app/pad_layout.h"
 #include "melodee/model/scales.h"
 #include <chrono>
 #include <cmath>
@@ -42,8 +43,8 @@ inline void kit_pads(const Studio& studio, move::Lights& lights, int blinking = 
     auto sounding = studio.sounding();
     for (unsigned at = 0; at < pad_count; ++at) {
         int kit = studio.kit_pad_at(at);
-        if (kit < 0) { // a pitch
-            unsigned pitch = pad_row(at) * 4 + pad_column(at) - 4;
+        if (kit < 0) { // a pitch: the right bank, MPC style
+            unsigned pitch = logical_pad(uint8_t(at), PadLayout::Banks) - 16;
             bool root = melodee::level_scale_step(studio.project(), pitch) % 12 == 0;
             lights.pad(at, root ? ui::track_colour(studio.track()).bright : colour::light_grey);
             continue;

@@ -15,6 +15,7 @@
 #include "spike/spike_app.h"
 #include "app/canvas_page.h"
 #include "app/melodee_app.h"
+#include "app/pad_layout.h"
 #include "app/project_store.h"
 #include "melodee/model/project_file.h"
 #include "melodee/engine/engine_info.h"
@@ -1239,6 +1240,13 @@ void test_kit_depth() {
     CHECK(has(status(), " bank=0 "));
     tap_pad(melodee, 0);
     CHECK(has(status(), "pad=A01 "));
+    {   // The pad layout (app/pad_layout.h): in Banks the right 4x4 is the second bank.
+        app::set_pad_layout(app::PadLayout::Banks);
+        std::lock_guard<std::mutex> guard(studio.lock);
+        CHECK(studio.kit_pad_at(4) == 16 && studio.kit_pad_at(8) == 4 && studio.kit_pad_at(31) == 31);
+        app::set_pad_layout(app::PadLayout::Rows);
+        CHECK(studio.kit_pad_at(4) == 4 && studio.kit_pad_at(8) == 8);
+    }
     // Copy held: A01 then A06 (empty) copies; then onto A06 again asks first.
     hold(Button::Copy, [&] { tap_pad(melodee, 0); tap_pad(melodee, 5); });
     CHECK(used(5));

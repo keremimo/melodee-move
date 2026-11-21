@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "app/studio.h"
 #include "app/screen.h"
+#include "app/pad_layout.h"
 #include "melodee/engine/engine_info.h"
 #include "melodee/model/scales.h"
 #include "melodee/shell/pad_gap.h"
@@ -312,19 +313,20 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
                 // The kit's pads: two banks of 16 from the lower in view; with
                 // 16 Pitches, the left 16 one bank as the MPC lays it and the
                 // right 16 the last pad at its pitches (Melodee's 16 Levels).
+                // (The user's pad layout: app/pad_layout.h; 16 Pitches is two MPC banks in either.)
                 unsigned bank = unsigned(audio_bank.load(std::memory_order_relaxed)) * 16;
-                unsigned row = move::pad_row(input.index), column = move::pad_column(input.index);
                 if (audio_pitches.load(std::memory_order_relaxed)) {
-                    if (column >= 4) {
-                        int semitones = audio_semitones[row * 4 + column - 4].load(std::memory_order_relaxed);
+                    unsigned n = logical_pad(input.index, PadLayout::Banks);
+                    if (n >= 16) {
+                        int semitones = audio_semitones[n - 16].load(std::memory_order_relaxed);
                         int pad = audio_levels_pad.load(std::memory_order_relaxed);
                         went = {track, melodee::pad_note(int(melodee::sampler_first_note) + pad, semitones)};
                         engine->send({Type::PadNote, uint8_t(track), uint8_t(semitones + 64), uint16_t(pad), velocity});
                         return;
                     }
-                    key = int(melodee::sampler_first_note + (bank + row * 4 + column) % melodee::sampler_pads);
+                    key = int(melodee::sampler_first_note + (bank + n) % melodee::sampler_pads);
                 } else {
-                    key = int(melodee::sampler_first_note + (bank + input.index) % melodee::sampler_pads);
+                    key = int(melodee::sampler_first_note + (bank + logical_pad(input.index, pad_layout())) % melodee::sampler_pads);
                 }
             } else if (kind == TrackKind::Synth || kind == TrackKind::Keys || kind == TrackKind::Midi || kind == TrackKind::Plugin) {
                 key = note_for(input.index, audio_octave.load(std::memory_order_relaxed));
@@ -496,9 +498,12 @@ void Studio::select_pad(unsigned at) {
 
 int Studio::kit_pad_at(unsigned move_pad) const {
     const auto& track = current();
-    unsigned bank = track.bank * 16u, row = move::pad_row(move_pad), column = move::pad_column(move_pad);
-    if (track.levels) return column >= 4 ? -1 : int((bank + row * 4 + column) % melodee::sampler_pads);
-    return int((bank + move_pad) % melodee::sampler_pads);
+    unsigned bank = track.bank * 16u;
+    if (track.levels) { // the left bank the kit, the right one the pitches, MPC style in either layout
+        unsigned n = logical_pad(uint8_t(move_pad), PadLayout::Banks);
+        return n >= 16 ? -1 : int((bank + n) % melodee::sampler_pads);
+    }
+    return int((bank + logical_pad(uint8_t(move_pad), pad_layout())) % melodee::sampler_pads);
 }
 
 int Studio::move_pad_of(unsigned kit_pad) const {
