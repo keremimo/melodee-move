@@ -793,6 +793,14 @@ void test_song_screens() {
     snap(app, "unfreeze");
     press(app, Button::MainPush);
     CHECK(has(status(), "frozen=0") && has(status(), "page=kit-play"));
+    // Note/Session held + Sampling, from the patterns grid (Melodee's Seq held + Sample Record): PRINT for the selected
+    // track, its patterns on the pads; Note/Session let go leaves it open.
+    hold(app, Button::Menu, true);
+    press(app, Button::Sample);
+    hold(app, Button::Menu, false);
+    CHECK(has(status(), "page=print") && has(status(), "print_sheet=2") && has(status(), "track=2 "));
+    press(app, Button::Back);
+    CHECK(has(status(), "page=kit-play"));
 }
 
 } // namespace

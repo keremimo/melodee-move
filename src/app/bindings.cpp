@@ -315,6 +315,7 @@ std::vector<Binding> make_table() {
 
         // Print and freeze: the PRINT sheet
         {"Track button held + Sampling", S::Any, T::Any, H::track, C::Sampling, G::Press, J::Print, St::Done},
+        {"Note/Session held + Sampling", S::Any, T::Any, H::note, C::Sampling, G::Press, J::Print, St::Done}, // the pattern layer's freeze
         {"Pad (Print)", S::Print, T::Any, H::none, C::Pad, G::Press, J::PrintPattern, St::Done},
         {"Plus or Minus (Print)", S::Print, T::Any, H::none, C::Plus, G::Press, J::PrintBank, St::Done},
         {"Plus or Minus (Print)", S::Print, T::Any, H::none, C::Minus, G::Press, J::PrintBank, St::Done},
@@ -470,6 +471,7 @@ uint16_t Gestures::held(Control for_control) const {
         case Control::Delete: bits |= held::del; break;
         case Control::Mute: bits |= held::mute; break;
         case Control::Loop: bits |= held::loop; break;
+        case Control::NoteSession: if (for_control == Control::Sampling) bits |= held::note; break;
         default: break;
         }
     }
