@@ -74,6 +74,7 @@ docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE
     make -j4 &&
     build/move-tests &&
     build/controls-tests &&
+    build/pad-layout-tests &&
     build/song-tests &&
     build/melodee-move --self-test build/self-test.wav &&
     build/melodee-move --preview build/preview &&

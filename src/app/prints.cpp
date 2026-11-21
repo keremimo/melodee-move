@@ -164,7 +164,7 @@ std::string Printer::start(Job job) {
     if (studio.kind(t) == TrackKind::Synth) {
         auto* module = studio.module_track(t);
         work->synth = true;
-        work->values = studio.synth_file(t);
+        work->values = studio.module_state(t);
         auto found = std::find_if(studio.catalog.begin(), studio.catalog.end(), [&](const ModuleInfo& m) { return m.id == work->values.module; });
         if (found == studio.catalog.end() || !module) return "MODULE MISSING";
         work->module = *found;
@@ -298,7 +298,7 @@ void Printer::tick() {
             if (!asleep && now - deep_since[t] < deep_wait) continue;
             deep_pending &= ~(1u << t);
             if (auto* module = studio.module_track(t); module && module->module) {
-                module->saved = studio.synth_file(t); // as it was, for the thaw
+                module->saved = studio.module_state(t); // as it was, for the thaw
                 if (module->player.set_module(nullptr)) module->leaving.push_back(std::move(module->module));
             }
         }

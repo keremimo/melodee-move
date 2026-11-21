@@ -368,14 +368,7 @@ bool Studio::copy_track(unsigned from, unsigned to) {
         // Its own instance of the same module, set as the one copied.
         auto& module = make_module_track(to);
         copy.plugin = melodee::no_plugin;
-        if (auto* source = modules[from].get(); source->module) {
-            module.saved.module = source->module->info().id;
-            module.saved.preset = source->module->preset_param.empty() ? -1 : source->module->preset;
-            for (const auto& param : source->module->params)
-                if (param.key != source->module->preset_param && !param.trigger()) module.saved.values.emplace_back(param.key, param.text());
-        } else {
-            module.saved = source->saved;
-        }
+        module.saved = module_state(from);
         module.job = module.saved.module;
         module.job_restores = true;
     } else if (copy.engine == EngineKind::Plugin) {
@@ -535,6 +528,7 @@ CanvasPage::Host Studio::canvas_host(unsigned t) {
         }
         pads_typing.store(true);
     };
+    host.changed = [this] { changed(); }; // saved three seconds on, with the module (module_state())
     host.open_file = [this](const std::string& file) { // a download: onto the first empty pad of a kit, to play and chop
         for (unsigned kit = 0; kit < melodee::track_count; ++kit) {
             if (song->tracks[kit].engine != EngineKind::Sampler) continue;
@@ -607,23 +601,30 @@ std::string Studio::settings_text() const {
     return out.str();
 }
 
-SynthFile Studio::synth_file(unsigned t) const {
+SynthFile Studio::module_state(unsigned t) const {
     SynthFile file;
-    t %= melodee::track_count;
-    const auto* module = modules[t].get();
-    if (!module) return file;
+    const auto* track = modules[t % melodee::track_count].get();
     file.track = t;
     file.octave = octave(t);
-    if (module->module) {
-        file.module = module->module->info().id;
-        file.preset = module->module->preset_param.empty() ? -1 : module->module->preset;
-        for (const auto& param : module->module->params)
-            if (param.key != module->module->preset_param && !param.trigger()) file.values.emplace_back(param.key, param.text());
-    } else { // a module that would not load this time (or a deep freeze let go) stays named, for when it is back
-        file.module = module->saved.module;
-        file.preset = module->saved.preset;
-        file.values = module->saved.values;
+    if (!track) return file;
+    if (!track->module) { // a module that would not load this time stays named, for when it is back
+        file.module = track->saved.module;
+        file.preset = track->saved.preset;
+        file.values = track->saved.values;
+        file.pages = track->saved.pages;
+        return file;
     }
+    const auto& module = *track->module;
+    auto is_page = [&](const std::string& key) {
+        return std::any_of(module.canvases.begin(), module.canvases.end(), [&](const ModuleCanvas& canvas) { return canvas.key == key; });
+    };
+    file.module = module.info().id;
+    file.preset = module.preset_param.empty() ? -1 : module.preset;
+    for (const auto& param : module.params) // not a page's own key: it is a page, not a value
+        if (param.key != module.preset_param && !param.trigger() && !is_page(param.key)) file.values.emplace_back(param.key, param.text());
+    for (size_t n = 0; n < track->canvas_pages.size() && n < module.canvases.size(); ++n)
+        if (track->canvas_pages[n])
+            if (auto state = track->canvas_pages[n]->saved_state(); !state.empty()) file.pages.emplace_back(module.canvases[n].key, state);
     return file;
 }
 
@@ -633,7 +634,7 @@ PluginStates Studio::plugin_states() const {
     for (unsigned t = 0; t < melodee::track_count; ++t) {
         const auto* module = modules[t].get();
         if (!module || module->entry == melodee::no_plugin) continue;
-        states[module->entry] = synth_state(synth_file(t));
+        states[module->entry] = synth_state(module_state(t));
     }
     return states;
 }
@@ -895,6 +896,9 @@ std::string Studio::load_module_now(unsigned t, const std::string& id, const Syn
     // may take its time (Surge reads its patches).
     std::string error;
     auto loaded = LoadedModule::load(info, error);
+    auto is_page = [&](const std::string& key) {
+        return loaded && std::any_of(loaded->canvases.begin(), loaded->canvases.end(), [&](const ModuleCanvas& canvas) { return canvas.key == key; });
+    };
     if (loaded && saved && saved->module == id) {
         // A bank (an items list's choice) first, then the preset in it, then
         // each parameter.
@@ -908,8 +912,8 @@ std::string Studio::load_module_now(unsigned t, const std::string& id, const Syn
             loaded->preset = saved->preset;
             for (auto& param : loaded->params) param.take(loaded->get_now(param.key));
         }
-        for (const auto& [key, value] : saved->values)
-            if (ModuleParam* param = loaded->param(key); param && key != loaded->preset_param && !param->selector) {
+        for (const auto& [key, value] : saved->values) // not a page's own key (an older save has `param browse 0`)
+            if (ModuleParam* param = loaded->param(key); param && key != loaded->preset_param && !param->selector && !is_page(key)) {
                 loaded->set_now(key, value);
                 param->take(value);
             }
@@ -923,6 +927,9 @@ std::string Studio::load_module_now(unsigned t, const std::string& id, const Syn
             std::string failed;
             started.push_back(CanvasPage::load(canvas.script, canvas_host(t), failed));
             if (!started.back()) std::fprintf(stderr, "melodee-move: %s's page %s would not start: %s\n", id.c_str(), canvas.key.c_str(), failed.c_str());
+            else if (saved && saved->module == id) // the page as it was left: its provider, where its menus were
+                for (const auto& [key, state] : saved->pages)
+                    if (key == canvas.key) started.back()->restore_state(state);
         }
     std::unique_lock<std::mutex> guard(lock);
     auto* track = modules[t].get();

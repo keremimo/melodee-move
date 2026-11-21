@@ -239,7 +239,7 @@ public:
     const SongDesk& desk() const { return *song_desk; }
     // Each Schwung track's module as its PLUG entry keeps it (under `lock`).
     PluginStates plugin_states() const;
-    SynthFile synth_file(unsigned track) const;
+    SynthFile module_state(unsigned track) const; // a Schwung track's module as it is now: values, preset, its pages' state
     const Sample* sample_in(unsigned slot) const { return slot < samples.size() ? samples[slot].get() : nullptr; }
 
 private:
