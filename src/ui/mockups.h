@@ -76,6 +76,9 @@ std::vector<Screen> sequencer_screens();
 bool write_sequencer_mockups(const std::string& directory);
 // The web page's screens on the Move (mockups_web.cpp): web.png and web/.
 std::vector<Screen> web_screens();
+// A synth track on a module with a page of its own, Webstream: its Device
+// View, effects and menu (mockups_synth.cpp): synth.png and synth/.
+std::vector<Screen> synth_screens();
 
 } // namespace mockup
 } // namespace ui

@@ -10,8 +10,11 @@
 // eight at a time), Shift + the wheel its pages. Shift + push opens the
 // module's menu: turn to a row, push to edit a value or open a level or a
 // list; Back goes up, then closes it. A page the module draws itself runs as
-// Schwung runs it (canvas_page.h): push to enter it, then the wheel and its
-// push are the page's, Back goes up and out.
+// Schwung runs it (canvas_page.h), but is a door until pushed (Kerem,
+// 2026-11-20, docs/ui/synth.png): outside it the Device View stays, its
+// knobs work and the wheel walks the items (the mix, the effects, the plus);
+// push goes in, then the wheel and its push are the page's, Back goes up and
+// out.
 #include "app/screens/note_pages.h"
 #include "app/screens/device_fx.h"
 #include <juce_core/juce_core.h>
@@ -36,7 +39,7 @@ public:
         auto* track = const_cast<Studio&>(studio).module_track();
         if (!track || !track->module) return bindings::Screen::Play;
         if (browsing) return bindings::Screen::Browser;
-        if (shown_canvas(*track) >= 0) return bindings::Screen::Canvas;
+        if (shown_canvas(*track) >= 0 && track->canvas_entered) return bindings::Screen::Canvas; // a door until pushed
         if (track->menu_open) return bindings::Screen::List;
         return bindings::Screen::Play;
     }
@@ -71,7 +74,8 @@ public:
         case Job::Focus: focus = std::clamp(focus + (use.delta > 0 ? 1 : -1), 0, 1 + int(effects.size())); return true;
         case Job::ShowFocus: studio.say(item(*track, focus)); return true;
         case Job::OpenBrowser:
-            if (focus == 1 && track->module && !track->module->preset_param.empty()) browsing = true;
+            if (focus == 1 && shown_canvas(*track) >= 0) track->canvas_entered = true; // in through the door: the page's own push from here
+            else if (focus == 1 && track->module && !track->module->preset_param.empty()) browsing = true;
             else studio.open("load-modules");
             return true;
         case Job::ModuleMenu:
@@ -138,14 +142,19 @@ public:
             ui::detail(g, track && !track->saved.module.empty() ? upper(track->saved.module + " MISSING").substr(0, 16) : "PUSH: MODULES");
             return;
         }
-        if (int shown = shown_canvas(*track); shown >= 0) { draw_canvas(g, *track, shown); return; }
+        if (studio.desk.show_effects) { // from the Mixer's push: the effects, out of any page or menu
+            focus = 2;
+            studio.desk.show_effects = false;
+            browsing = track->menu_open = track->canvas_entered = false;
+            track->canvas_open = -1;
+        }
+        if (int shown = shown_canvas(*track); shown >= 0 && track->canvas_entered) { draw_canvas(g, *track, shown); return; }
         if (track->menu_open) { draw_menu(g, *track); return; }
         if (browsing) { draw_presets(g, *track); return; }
         auto& module = *track->module;
         // The rail as docs/UI.md has a module's page: module, track, page.
         const ModulePage* page = track->page < module.pages.size() ? &module.pages[track->page] : nullptr;
         auto effects = fx.track_items();
-        if (studio.desk.show_effects) { focus = 2; studio.desk.show_effects = false; } // from the Mixer's push
         focus = std::min(focus, 1 + int(effects.size()));
         ui::rail(g, upper(module.info().abbrev).substr(0, 4), track_number(studio),
                  focus == 0 ? "MIX" : focus >= 2 ? fx.rail_bottom(effects[size_t(focus - 2)]) : std::to_string(position(*track) + 1) + "/" + std::to_string(module.pages.size() + 2));
@@ -174,6 +183,7 @@ public:
             auto drum = pad_notes(studio.project(), studio.current(), unsigned(last_pad));
             if (drum.count) { ui::detail(g, drum_name(drum.keys[0]).substr(0, 16)); return; }
         }
+        if (shown_canvas(*track) >= 0) { ui::detail(g, upper(module.info().name).substr(0, 10), "PUSH: IN"); return; } // its own page's door
         if (!module.preset_param.empty()) {
             char number[16];
             std::snprintf(number, sizeof number, "%03d", std::clamp(module.preset + 1, 0, 999));
@@ -256,9 +266,11 @@ private:
         ui::detail(g, upper(module.info().abbrev).substr(0, 6), "PUSH: OK");
     }
 
-    // The module's own page on screen, else -1.
+    // The module's own page on screen (entered, or its door), else -1: never
+    // while the wheel is on the track's mix or its effects.
     int shown_canvas(const ModuleTrack& track) const {
         if (!track.module || studio.top() != this) return -1;
+        if (focus != 1 && !track.canvas_entered && track.canvas_open < 0) return -1;
         if (own_page[studio.track()] && track.canvas_open < 0 && !track.menu_open) return -1; // ARP, CHORD
         auto valid = [&](int index) { return index >= 0 && index < int(track.canvas_pages.size()) ? index : -1; };
         if (track.canvas_open >= 0) return valid(track.canvas_open);
@@ -469,6 +481,7 @@ private:
                 for (size_t n = 0; n < module.pages.size(); ++n)
                     if (module.pages[n].canvas == row.index) track.page = unsigned(n);
                 own_page[studio.track()] = 0;
+                focus = 1; // the module's item: Back comes out to its door
                 track.menu_open = false;
             } else track.canvas_open = row.index; // over the menu, until it is left
             track.canvas_entered = true;

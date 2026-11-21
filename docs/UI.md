@@ -106,10 +106,17 @@ list, an items list) is never a knob; a `null` in `knobs` is an empty knob,
 and knobs past eight go to the level's next page.
 
 A page the module draws itself (a `canvas` parameter: Radio Garden's
-browser, Webstream's search) takes the whole screen, its own script drawing
-it as under Schwung, with a footer line for the module and `PUSH: IN` /
-`BACK: OUT`. Pushed, the page has the jogwheel until Back brings you out of
-its top level. A page asking for text gets the keyboard screen: its title,
+browser, Webstream's search) is a door until pushed (Kerem, 2026-11-20):
+outside it the Device View stays, the page's title over its knobs (they
+work) and `PUSH: IN` under them, and the wheel walks the items as on any
+page, to the track's mix, the effects and the `+`. Pushed, the page takes
+the whole screen, its own script drawing it as under Schwung, with a footer
+line for the module and `BACK: OUT`, and has the jogwheel until Back brings
+you out of its top level, to its door. The menu's row for the page goes
+straight in. `docs/ui/synth.png` is the sheet (`src/ui/mockups_synth.cpp`),
+on Webstream.
+
+![A synth track on Webstream](ui/synth.png) A page asking for text gets the keyboard screen: its title,
 the text so far, and the pads lit as keys (letters grey, space blue,
 backspace red), the steps as digits.
 
@@ -745,7 +752,9 @@ sheet (`src/ui/mockups_projects.cpp`); the screens draw with the same code
   pad asks, the pad again deletes (Delete alone asks for the one picked).
 - **The question** before a loss (Melodee's one sheet): what is asked, one
   or two lines of what goes, a chip saying whether undo brings it back
-  (`UNDO BRINGS BACK`, or `NO UNDO` inverted), push yes, Back no. Deleting
+  (`UNDO BRINGS BACK`, or `NO UNDO` inverted), push yes, Back no; a touch
+  (the wheel's, a knob's) answers nothing, so a hand off and back on leaves
+  it asked. Deleting
   or replacing a track, a project, or a synth's module all ask here.
 - **Undo**: Undo takes the last step back and says which (`UNDO TUNE A05`),
   Shift + Undo redoes. **Undo held** opens the undo list: the steps

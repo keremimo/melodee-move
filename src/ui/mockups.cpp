@@ -232,6 +232,7 @@ int write_mockups(const std::string& directory) {
         {"rail", "MELODEE ON MOVE: RAIL", "SAMPLER, CHOP AND SCHWUNG MODULES. DOCS/UI.MD", rail_screens(), {}},
         {"tracks", "MELODEE ON MOVE: TRACKS", "16 TRACKS, TRANSPORT, TEMPO ON THE MOVE'S OWN KEYS. DOCS/UI.MD", tracks_screens(), tracks_panels()},
         {"web", "MELODEE ON MOVE: WEB PAGE", "ITS ADDRESS AND WI-FI PAIRING. DOCS/UI.MD", web_screens(), {}},
+        {"synth", "MELODEE ON MOVE: SYNTH TRACK", "WEBSTREAM: ITS PAGE A DOOR, THE WHEEL THE DEVICE VIEW'S. DOCS/UI.MD", synth_screens(), {}},
     };
     bool ok = true;
     for (const auto& set : sets) {

@@ -1054,15 +1054,17 @@ void test_synth_track() {
         second.audio_event(make_event(0x80, pad_note(0), 0));
         loudest(second, 1);
 
-        // The module's own page: Shift + the wheel to it, after Fake and Envelope.
+        // The module's own page: Shift + the wheel to it, after Fake and
+        // Envelope. A door until pushed (docs/ui/synth.png): the Play
+        // screen's, its knobs root's; push in, and the page draws.
         with_shift(second, [&] { turn_wheel(second, 1); turn_wheel(second, 1); });
         CHECK(has(second.status(), "canvas=browse entered=0"));
+        press(second, Button::MainPush); // in: the host's push, not the page's
+        CHECK(has(second.status(), "entered=1") && has(second.status(), "typing=0"));
         std::this_thread::sleep_for(std::chrono::milliseconds(60)); // no audio thread: the page's reads go to the module directly
         juce::Image screen(juce::Image::ARGB, 128, 64, true);
         { juce::Graphics g(screen); g.setColour(juce::Colours::white); second.draw(g); }
         CHECK(second.canvas_pixel(0, 0) && second.canvas_pixel(13, 30) && second.canvas_pixel(1, 41)); // its block, level 0.13, std
-        press(second, Button::MainPush); // in: the host's push, not the page's
-        CHECK(has(second.status(), "entered=1") && has(second.status(), "typing=0"));
         second.surface(make_event(0xb0, main_knob_cc, 1)); // the page's: the level to 0.9
         CHECK(second.synth_value("level") == "0.9");
         press(second, Button::MainPush); // the page's: a level down, and it asks for text
@@ -1102,6 +1104,25 @@ void test_synth_track() {
         second.surface(make_event(0xb0, main_knob_cc, 127)); // one back: Browse, once
         press(second, Button::MainPush);
         CHECK(has(second.status(), "menu=- canvas=browse entered=1"));
+        // Back: out to its door, where the wheel walks the Device View again
+        // (Kerem, 2026-11-20, docs/ui/synth.png): past the module to the
+        // plus, an effect added there, knob 1 its own; back to the door.
+        press(second, Button::Back);
+        CHECK(has(second.status(), "canvas=browse entered=0"));
+        second.surface(make_event(0xb0, main_knob_cc, 1)); // the plus
+        CHECK(has(second.status(), "page=synth-play") && has(second.status(), "canvas=- entered=0"));
+        press(second, Button::MainPush);
+        CHECK(has(second.status(), "page=fx-browser"));
+        press(second, Button::MainPush); // SPACE >
+        press(second, Button::MainPush); // its first
+        CHECK(has(second.status(), "page=synth-play") && has(second.status(), "effects=1"));
+        auto& chain = second.studio().project().chain(1);
+        CHECK(chain.count() == 1);
+        int first_value = chain.slots[0].params[0];
+        second.surface(make_event(0xb0, knob_first_cc, 3)); // knob 1: the effect's, not the module's
+        CHECK(chain.slots[0].params[0] != first_value && second.synth_value("level") == "0.9");
+        second.surface(make_event(0xb0, main_knob_cc, 127)); // back to the module: its door
+        CHECK(has(second.status(), "canvas=browse entered=0"));
     }
     {
         // Its module gone: the track keeps naming it, and saves it so.
@@ -1125,6 +1146,58 @@ void test_synth_track() {
     CHECK(back.pages.size() == 1 && back.pages[0].first == "browse" && back.pages[0].second == text.pages[0].second);
     app::read_synth("something else\nmodule x\n", back);
     CHECK(back.module.empty());
+}
+
+void test_module_replace() {
+    // Another module over the one loaded asks first; a hand off the wheel
+    // (or a knob) and back on is no answer, the push still says yes.
+    std::string folder = "build/test-samples", home = "build/test-home-replace", modules = "build/test-modules-two";
+    std::filesystem::remove_all(home);
+    std::filesystem::remove_all(modules);
+    auto generators = std::filesystem::path(modules) / "sound_generators";
+    std::filesystem::create_directories(generators);
+    std::filesystem::copy("build/test-modules/sound_generators/fake", generators / "fake", std::filesystem::copy_options::recursive);
+    std::filesystem::copy("build/test-modules/sound_generators/fake", generators / "fake2", std::filesystem::copy_options::recursive);
+    {
+        auto manifest = generators / "fake2" / "module.json";
+        std::ifstream in(manifest);
+        std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        in.close();
+        text.replace(text.find("\"fake\""), 6, "\"fake2\"");
+        text.replace(text.find("Fake Synth"), 10, "Fake Two");
+        std::ofstream(manifest) << text;
+    }
+    app::MelodeeApp melodee(folder, home, modules);
+    Session session;
+    melodee.attach(session);
+    melodee.audio_opened(AudioFormat {});
+    CHECK(melodee.restore_now().empty());
+    auto touch = [&](unsigned which, bool on) { melodee.surface(make_event(on ? 0x90 : 0x80, uint8_t(touch_first_note + which), on ? 127 : 0)); };
+    press_button(melodee, Button::Row2);
+    press_button(melodee, Button::MainPush); // no module: the list
+    press_button(melodee, Button::MainPush); // Fake Synth
+    melodee.service();
+    CHECK(has(melodee.status(), "synth=fake "));
+    turn_wheel(melodee, -1); // the wheel to the module
+    press_button(melodee, Button::MainPush);
+    CHECK(has(melodee.status(), "page=load-modules"));
+    turn_wheel(melodee, 1); // Fake Two
+    touch(touch_main, true);
+    press_button(melodee, Button::MainPush);
+    CHECK(has(melodee.status(), "page=question"));
+    touch(touch_main, false); // the hand off the wheel
+    touch(touch_main, true);  // and back
+    CHECK(has(melodee.status(), "page=question"));
+    touch(touch_main, false);
+    touch(0, true); // a knob's touch
+    touch(0, false);
+    with_shift(melodee, [&] { touch(1, true); touch(1, false); });
+    touch(touch_master, true);
+    touch(touch_master, false);
+    CHECK(has(melodee.status(), "page=question"));
+    press_button(melodee, Button::MainPush); // yes, untouched
+    melodee.service();
+    CHECK(has(melodee.status(), "synth=fake2 "));
 }
 
 void test_tracks() {
@@ -2387,6 +2460,7 @@ int main() {
     test_schwung_modules();
     test_canvas_page();
     test_synth_track();
+    test_module_replace();
     test_tracks();
     test_step_icons();
     test_migration();
