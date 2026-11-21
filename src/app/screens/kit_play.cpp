@@ -21,7 +21,7 @@ public:
     bool job(bindings::Job job, const bindings::Use& use) override {
         using bindings::Job;
         switch (job) {
-        case Job::PlayPad: case Job::SelectPadQuietly: studio.select_pad(unsigned(use.index)); return true;
+        case Job::PlayPad: case Job::SelectPadQuietly: studio.select_pad(pad_number(use.index)); return true;
         case Job::TurnKnob: turn(unsigned(use.index), use.delta, false); return true;
         case Job::TurnKnobFine: turn(unsigned(use.index), use.delta, true); return true;
         case Job::PadLevel: turn(1, use.delta, false); return true;
@@ -44,7 +44,7 @@ public:
         const auto& track = studio.current();
         auto colour = ui::track_colour(studio.track()).bright;
         for (unsigned at = 0; at < pad_count; ++at)
-            lights.pad(at, track.pads[at].used() ? (at == studio.pad() ? colour::white : colour) : at == studio.pad() ? colour::dark_grey : colour::off);
+            light_pad(lights, at, track.pads[at].used() ? (at == studio.pad() ? colour::white : colour) : at == studio.pad() ? colour::dark_grey : colour::off);
         steps_playhead(studio, lights);
         // Left / Right (bars), Plus / Minus (pad banks), Loop (Loop Mode) and
         // Note/Session (Patterns) wait for wave 2.

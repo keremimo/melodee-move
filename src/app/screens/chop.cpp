@@ -52,7 +52,7 @@ public:
         using bindings::Job;
         switch (job) {
         case Job::PlaySlice:
-            if (unsigned(use.index) < slices.count) selected = unsigned(use.index);
+            if (pad_number(use.index) < slices.count) selected = pad_number(use.index);
             return true;
         case Job::TurnKnob: case Job::TurnKnobFine: turn(unsigned(use.index), use.delta); return true;
         case Job::ChopAmount: turn(3, use.delta); return true; // the wheel: the amount, as the Move's the number of slices
@@ -70,7 +70,7 @@ public:
         const Sample* sample = studio.sample_of(track, pad);
         uint32_t frames = sample ? std::max<uint32_t>(1, sample->data->model_frames()) : 1;
         for (unsigned at = 0; at < pad_count; ++at)
-            lights.pad(at, at < slices.count ? (at == selected ? colour::white : at % 2 ? colour::brown_yellow : colour::orange) : colour::off);
+            light_pad(lights, at, at < slices.count ? (at == selected ? colour::white : at % 2 ? colour::brown_yellow : colour::orange) : colour::off);
         // The sample in 16 parts, lit where a cut falls.
         for (unsigned step = 0; step < step_count; ++step) {
             bool cut = false;

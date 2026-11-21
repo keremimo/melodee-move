@@ -131,7 +131,9 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
     } else {
         migrated = migrate(path, *song, states, folder_of, this, played);
     }
-    // The Move's own settings: the track played last, the metronome.
+    // The Move's own settings: the track played last, the metronome, the
+    // pad layout (Rows unless the file says Banks).
+    set_pad_layout(PadLayout::Rows);
     if (std::ifstream in(settings_path); in) {
         std::string line;
         if (std::getline(in, line) && line == settings_header)
@@ -143,6 +145,7 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
                 if (word == "track") played = value % melodee::track_count;
                 else if (word == "click") click_on = value != 0;
                 else if (word == "click_level") click_volume = std::min(value, 100u);
+                else if (word == "pads") set_pad_layout(value ? PadLayout::Banks : PadLayout::Rows);
             }
     }
     selected = played;
@@ -236,7 +239,7 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
             int track = audio_track.load(std::memory_order_relaxed);
             auto kind = TrackKind(audio_kind.load(std::memory_order_relaxed));
             if (kind != TrackKind::Kit && kind != TrackKind::Audio && kind != TrackKind::Empty) { note_pad(input, went, track); return; } // app/keys.h
-            int key = kind == TrackKind::Kit ? int(melodee::sampler_first_note + input.index)
+            int key = kind == TrackKind::Kit ? int(melodee::sampler_first_note + logical_pad(input.index, pad_layout()))
                     : kind == TrackKind::Synth || kind == TrackKind::Keys || kind == TrackKind::Midi || kind == TrackKind::Plugin
                         ? note_for(input.index, audio_octave.load(std::memory_order_relaxed)) : -1;
             if (key < 0) return;
@@ -298,7 +301,8 @@ void Studio::set_octave(unsigned t, int value) {
 }
 
 int Studio::note_for(unsigned at, int octave_now) const {
-    return std::clamp(synth_base_note + 12 * octave_now + int(move::pad_column(at)) + 5 * int(move::pad_row(at)), 0, 127);
+    // Rows: right a semitone, up a fourth; Banks: 1-32 up the semitones (pad_layout.h).
+    return std::clamp(synth_base_note + 12 * octave_now + pad_steps(uint8_t(at), pad_layout(), 5), 0, 127);
 }
 
 void Studio::select(unsigned t) {
@@ -611,6 +615,7 @@ void Studio::close() {
 std::string Studio::settings_text() const {
     std::ostringstream out;
     out << settings_header << '\n' << "track " << selected << '\n' << "click " << int(click_on) << '\n' << "click_level " << click_volume << '\n';
+    out << "pads " << int(pad_layout() == PadLayout::Banks) << '\n';
     return out.str();
 }
 

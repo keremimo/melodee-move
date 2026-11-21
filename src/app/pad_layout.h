@@ -32,6 +32,32 @@ constexpr uint8_t physical_pad(uint8_t logical, PadLayout layout) {  // for ligh
     return uint8_t((in_bank / 4) * 8 + bank * 4 + in_bank % 4);
 }
 
+// Notes, as Kerem chose (2026-11-20, reading (a)): how many steps of the
+// pads' scale (semitones Chromatic, the key's notes In-Key) a pad's note
+// lies above the bottom-left pad's.
+// - Rows: a column one step, a row `a_row` steps up (5: chromatic fourths;
+//   In-Key in 4ths the key's notes within a fourth; in octaves its count).
+// - Banks: the pad's number, 1-16 up the left bank and 17-32 on up the
+//   right, as the MPC's pads run up a scale; `a_row` is not used.
+// Octaves (Up / Down) and Shift + Plus / Minus move the bottom-left pad;
+// the roots light wherever their pads fall.
+constexpr int pad_steps(uint8_t physical, PadLayout layout, int a_row) {
+    if (layout == PadLayout::Banks) return logical_pad(physical, layout);
+    return physical % 8 + a_row * (physical / 8);
+}
+
+// The typing keyboard (a module's page asking for text, a name): the keys
+// in reading order from the top left, across the eight columns in Rows,
+// through the left bank and then the right, four a row, in Banks. Delete
+// ('\b') is the bottom-right pad in both. 0 for no pad.
+constexpr const char* typing_keys = "abcdefghijklmnopqrstuvwxyz -.'&\b";
+constexpr char typing_key(uint8_t physical, PadLayout layout) {
+    if (physical >= 32) return 0;
+    if (layout == PadLayout::Rows) return typing_keys[(3 - physical / 8) * 8 + physical % 8];
+    uint8_t number = logical_pad(physical, layout), in_bank = number % 16;
+    return typing_keys[(number / 16) * 16 + (3 - in_bank / 4) * 4 + in_bank % 4];
+}
+
 PadLayout pad_layout();                 // the current choice, an atomic: safe on the audio thread
 void set_pad_layout(PadLayout layout);  // the MIDI or service thread's: Setup, the settings file
 const char* pad_layout_name(PadLayout layout); // "rows", "banks": the settings file's words
