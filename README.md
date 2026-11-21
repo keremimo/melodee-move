@@ -138,6 +138,20 @@ Three parts so far:
   thread), Flex Beat. Mute held + a kit pad mutes it, Shift + Mute alone
   lets every mute go; touching the Volume knob shows the main meter.
 - The master knob is the volume; Shift + Back goes back to Move.
+- **The web page** (`src/web/`), while Melodee runs:
+  **http://move.local:8080** (Ableton's own page keeps port 80, Schwung's
+  manager 7700 and its mirror 7681). **Screen** mirrors the Move's screen
+  live; **Files** is Melodee's folder (`/data/UserData/Melodee`): play,
+  download, upload, rename, delete, new folders, nothing outside it;
+  **Guide** is [docs/GUIDE.md](docs/GUIDE.md), the Move's controls. A
+  browser on the USB cable opens it at once. One on Wi-Fi asks for a code:
+  the Move shows six digits for 90 seconds, the browser types them and is
+  paired until Melodee stops; Back on the Move, time running out or five
+  wrong tries refuse (a browser refused waits five minutes to ask again).
+  Shift + Capture shows the page's addresses. Load lists
+  Melodee's folder as a place (MELODEE), so a sample uploaded there loads
+  onto a pad. The page runs on threads of its own, never the audio thread;
+  `--web-port` moves it, `--no-web` leaves it off.
 - **Saving**: the whole project is one Melodee project file,
   `/data/UserData/Melodee/Projects/Move.mldp` (`--home` moves the folder),
   saved three seconds after the last change, as Melodee autosaves on the
@@ -266,6 +280,7 @@ the tap's click and the sound in the waveform is what you hear.
 | --- | --- |
 | `src/move/` | move-base. `app.h` the `App` interface (sample-base's hooks plus `audio_event`); `runtime.*` the threads; `host.*` what a host shares with them; `spi_host.cpp`, `spi_device.*`, `spi_protocol.*` the Move's device and a simulated one; `jack_host.cpp` the JACK host (libjack loaded at run time); `audio.h` blocks and the reblocker; `controls.*`, `lights.*`, `display.*`, `font.*`, `latency.h`, `tools.*` |
 | `src/ui/` | the interface kit for the Rail design (docs/UI.md), and its mockups (`--ui-mockups DIR`) |
+| `src/web/` | Melodee's web page: `http.*` the server, `pairing.*` who may use it (the USB cable, or a code), `web_page.*` its answers and Melodee's folder, `web_layer.*` the page around the app (the screen's frames, its screens on the Move, Shift + Capture), `screens.*` those screens, `web_bundle.*` and `static/` the page itself |
 | `src/app/` | Melodee on the Move: `melodee_app.*` the app (thin: what every screen shares), `studio.*` Melodee's `Project` and `EngineHost` and what the screens share, `sequencer.*` and `seq_edit.*` the sequencer, `screen.*` a screen and the registry, `screens/` one file a screen, `project_store.*` the project file, `schwung_api.h` and `module_host.*` Schwung's modules (behind Melodee's `PluginRunner`), `canvas_page.*` their own pages' scripts in QuickJS, `module_probe.*` trying them, `previews.*` its screens offline |
 | `src/spike/` | the spike app |
 | `module/` | the Schwung standalone tool: `module.json`, `standalone` |
@@ -282,12 +297,16 @@ Needs Docker and Python 3.
 
 It builds `build/melodee-move` for linux/arm64 on Ubuntu 22.04: glibc 2.35 is
 the newest Ableton's firmware has, libstdc++ is linked in, and the code is
-tuned for the Move's Cortex-A72. Then: the unit tests, the sound self-test,
+tuned for the Move's Cortex-A72. Then: the unit tests (and the web page's,
+`build/web-tests`), the sound self-test,
 the screen previews, runs against the simulated Move (the spike: pad,
 jogwheel to LATENCY, the meter timing clicks through a 300-frame cable,
 Shift + Back; Melodee: load, chop, To Pads, saved and restored; Play, the
 tempo and the metronome; the pad layout set to MPC banks and kept; the
-synth track with the stand-in module, saved and restored), and the packages:
+synth track with the stand-in module, saved and restored; the web page,
+driven by `tests/web_check.py` as a browser on the Move and one as on
+Wi-Fi, which pairs with the code it reads off the mirrored screen), and
+the packages:
 
 - `dist/melodee-move/`: the binary, the libraries Ableton's firmware lacks,
   a launcher and `run-stock.sh`;
@@ -445,7 +464,32 @@ On a Move (Ableton's firmware 4.1, Schwung installed):
 - `--probe-modules` with pictures: Radio Garden's and Webstream's own pages
   start and draw in QuickJS, in Schwung's font, and follow the jogwheel.
 
-Not yet tested on a Move: typing into a page, a download onto a kit pad.
+Not yet tested on a Move: typing into a page, a download onto a kit pad,
+the web page (what to check: below).
+
+The web page, in `./build.sh`'s simulated run: the page and its guide; from
+the Move itself the status, the screen's stream and Melodee's folder (a
+folder made, a sample uploaded, read back whole, renamed, deleted; the
+folder itself refused); from the machine's own address, as on Wi-Fi,
+everything but the page refused (401), a code asked for, read off the
+mirrored screen, one wrong try (4 left), then paired: status, an upload and
+the screen let in, and the cookie refused from another address.
+
+### The web page on a Move
+
+1. The log's `web page at http://move.local:8080 (USB ...: open; Wi-Fi ...:
+   asks a code)` line names a `usb0` address: the USB network gadget's
+   interface is `usb*` on the Move as assumed. `tools/probe-stock.sh` lists
+   what listens (8080 free) and the addresses.
+2. On the USB cable, http://move.local:8080 (or the USB address that Shift +
+   Capture shows) opens with no code. If `move.local` resolves to the Wi-Fi
+   address instead, the page asks for a code: use the USB address.
+3. On Wi-Fi: the code on the Move, a wrong one, Back refusing, then pairing.
+4. The Screen tab follows the Move while you play; `late` stays where it was
+   without the page open.
+5. Files: upload a WAV into Melodee's folder, then Menu > MELODEE loads it
+   onto a pad. Run from Schwung's Tools menu after a run over SSH: files the
+   page made as root belong to the Move's user, so they can be renamed.
 
 ## What the crush shows
 

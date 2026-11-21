@@ -161,4 +161,11 @@ if ps w 2>/dev/null | grep -qE '[j]ackd' && have jack_lsp; then
     if have timeout; then show "JACK_NO_START_SERVER=1 timeout 5 jack_lsp -t"; else show "JACK_NO_START_SERVER=1 jack_lsp -t"; fi
 fi
 
+section "Network: addresses, listening ports, the USB network"
+# Melodee's web page takes 8080 (src/web/web_page.h): what else listens, and
+# the addresses a browser reaches the Move at, on the USB cable and Wi-Fi.
+show "ip -4 addr 2>/dev/null || ifconfig 2>/dev/null"
+show "netstat -tlnp 2>/dev/null || netstat -tln 2>/dev/null || cat /proc/net/tcp"
+show "grep -vh '^#' /etc/dnsmasq.conf /etc/dnsmasq.d/* 2>/dev/null | grep -v '^\$'"
+
 printf '\n== Done. Nothing on the Move was changed.\n'

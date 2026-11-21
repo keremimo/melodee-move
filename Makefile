@@ -2,6 +2,7 @@
 # melodee-move: the Move runtime (src/move/), the spike app (src/spike/) and
 # their tests, built for linux/arm64 in tools/Dockerfile (./build.sh).
 TARGET := build/melodee-move
+.DEFAULT_GOAL := all
 TESTS := build/move-tests
 # The sequencer (docs/UI.md, "Sequencer"): its pattern edits and its keys
 # through the app, apart from move-tests.
@@ -56,6 +57,10 @@ MELODEE_SOURCES := $(wildcard $(MELODEE)/src/melodee/engine/*.cpp $(MELODEE)/src
     $(MELODEE)/src/melodee/shell/sample_decode.cpp $(MELODEE)/src/melodee/shell/sample_cache.cpp \
     $(addprefix $(MELODEE)/src/melodee/shell/,project_kits.cpp mpc_program.cpp mpc_project.cpp mpc_wav_slices.cpp) \
     $(MELODEE)/src/melodee/shell/midi_route.cpp $(MELODEE)/src/melodee/shell/mtc_in.cpp
+# web/web_server.cpp and web/card_files.cpp: the helpers of Melodee's page on
+# the MPC (JSON text, safe names, paths kept in a folder, file types), plain
+# C++, for the page on the Move (src/web/).
+MELODEE_SOURCES += $(MELODEE)/src/melodee/web/web_server.cpp $(MELODEE)/src/melodee/web/card_files.cpp
 MELODEE_OBJECTS := $(patsubst $(MELODEE)/src/%.cpp,build/obj/melodee-sample/%.o,$(MELODEE_SOURCES))
 MELODEE_LIBRARY := build/melodee.a
 CPPFLAGS += $(MELODEE_INCLUDES)
@@ -77,13 +82,27 @@ CPPFLAGS += -isystem $(QUICKJS)
 build/obj/quickjs/%.o: $(QUICKJS)/%.c
 	@mkdir -p $(@D)
 	$(CC) $(QUICKJS_CFLAGS) -c $< -o $@
-SHARED_OBJECTS := $(patsubst src/%.cpp,build/obj/%.o,$(wildcard src/move/*.cpp src/ui/*.cpp src/spike/*.cpp src/app/*.cpp src/app/screens/*.cpp))
+SHARED_OBJECTS := $(patsubst src/%.cpp,build/obj/%.o,$(wildcard src/move/*.cpp src/ui/*.cpp src/spike/*.cpp src/app/*.cpp src/app/screens/*.cpp src/web/*.cpp))
+
+# Melodee's web page (src/web/): its files, with the guide and Rubik, in one
+# bundle the binary carries (tools/web_bundle.py, .incbin in web_bundle.cpp),
+# and the version it shows, module/module.json's.
+WEB_BUNDLE := build/gen/web_bundle.bin
+VERSION := $(shell sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' module/module.json)
+$(WEB_BUNDLE): tools/web_bundle.py $(wildcard src/web/static/*) docs/GUIDE.md
+	@mkdir -p $(@D)
+	MELODEE=$(MELODEE) python3 tools/web_bundle.py $@
+build/obj/web/web_bundle.o: $(WEB_BUNDLE)
+build/obj/web/web_page.o: CPPFLAGS += -DMELODEE_MOVE_VERSION=\"v$(VERSION)\"
+WEB_TESTS := build/web-tests
+$(WEB_TESTS): build/obj/tests/web_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS) $(MELODEE_LIBRARY)
+	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
 # A stand-in Schwung module for the tests, where Schwung keeps its synths.
 FAKE_MODULE := build/test-modules/sound_generators/fake
 # And a stand-in audio effect, where Schwung keeps them (<id>/<id>.so).
 FAKE_FX := build/test-modules/audio_fx/fake-fx
-all: $(TARGET) $(TESTS) $(SEQUENCER_TESTS) $(CONTROLS_TESTS) $(MIDI_TESTS) $(MIXER_TESTS) $(PAD_TESTS) $(PADS_APP_TESTS) $(FAKE_MODULE)/dsp.so $(FAKE_MODULE)/module.json $(FAKE_MODULE)/page.js \
+all: $(TARGET) $(TESTS) $(WEB_TESTS) $(SEQUENCER_TESTS) $(CONTROLS_TESTS) $(MIDI_TESTS) $(MIXER_TESTS) $(PAD_TESTS) $(PADS_APP_TESTS) $(FAKE_MODULE)/dsp.so $(FAKE_MODULE)/module.json $(FAKE_MODULE)/page.js \
     $(FAKE_FX)/fake-fx.so $(FAKE_FX)/module.json
 $(FAKE_FX)/fake-fx.so: tests/fake_fx/fake-fx.c
 	@mkdir -p $(@D)
@@ -143,5 +162,5 @@ $(foreach m,$(MODULE_C),$(eval $(call c_module_rule,$(m))))
 juce: $(JUCE_OBJECTS)
 .PHONY: all clean juce
 clean:
-	rm -rf build/obj $(TARGET) $(TESTS) $(SEQUENCER_TESTS) $(CONTROLS_TESTS) $(MIDI_TESTS) $(MIXER_TESTS) $(PAD_TESTS) $(PADS_APP_TESTS)
+	rm -rf build/obj $(TARGET) $(TESTS) $(WEB_TESTS) $(SEQUENCER_TESTS) $(CONTROLS_TESTS) $(MIDI_TESTS) $(MIXER_TESTS) $(PAD_TESTS) $(PADS_APP_TESTS)
 -include $(shell find build/obj -name '*.d' 2>/dev/null)

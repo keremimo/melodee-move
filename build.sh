@@ -7,7 +7,7 @@
 # quit; Melodee: load, chop, To Pads, saved and restored, transport and
 # tempo, MIDI in and out on the USB port, the sequencer's steps, Play and
 # Rec, the pad layout set to MPC banks and kept, the synth track saved and
-# restored, the busy mix playing),
+# restored, the busy mix playing, the web page),
 # and the packages in dist/. When Melodee's own page previews are at hand
 # (MELODEE_PREVIEWS, by default ../melodee-sample/build/melodee-preview),
 # also crush them to the Move's 128 x 64 screen in build/crushed.
@@ -102,6 +102,11 @@ LOOPER_SCRIPT='20:0xb0,49,127;21:0x90,21,127;22:0x80,21,0;23:0xb0,49,0;40:0xb0,5
 LOOPER_EXPECTED='page=looper .*looper=on .*loop_latency=428 .*loop1=PLAY,len=88200,bars=1,layers=1,src=input'
 LOOPER_RESTORED='looper=on .*loop_latency=428 .*loop1=(PLAY|STOP),len=88200,'
 LOOPER_FLAGS='--backend simulated --loopback 300 --samples build/simulated-samples --home build/simulated-looper'
+# The web page (src/web/): Melodee runs while tests/web_check.py opens its
+# page as a browser on the Move itself (let in, as one on the USB cable) and
+# as one at the machine's own address (as on Wi-Fi: refused until it types
+# the code it reads off the Move's mirrored screen).
+WEB_FLAGS='--backend simulated --samples build/simulated-samples --home build/simulated-web --web-port 8080 --seconds 12'
 # shellcheck disable=SC2086
 docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE" && pwd):/melodee:ro" -e MELODEE=/melodee \
     $MOUNT melodee-move-builder sh -c "
@@ -113,6 +118,7 @@ docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE
     build/midi-tests &&
     build/pad-layout-tests &&
     build/pads-app-tests &&
+    build/web-tests &&
     build/melodee-move --self-test build/self-test.wav &&
     build/melodee-move --preview build/preview &&
     { build/melodee-move --app spike --backend simulated --loopback 300 --seconds 8 --script '$SCRIPT' 2> build/simulated.log || true; } &&
@@ -168,6 +174,10 @@ docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE
     { build/melodee-move $LOOPER_FLAGS --seconds 2 2> build/simulated-looper-restore.log || true; } &&
     tail -n 1 build/simulated-looper-restore.log &&
     grep -qE '$LOOPER_RESTORED' build/simulated-looper-restore.log &&
+    rm -rf build/simulated-web &&
+    { build/melodee-move $WEB_FLAGS 2> build/simulated-web.log & } &&
+    python3 -I tests/web_check.py 8080 src/move/font.cpp &&
+    wait &&
     build/melodee-move --melodee-previews build/melodee-previews --modules build/test-modules > /dev/null &&
     build/melodee-move --probe-modules build/test-modules &&
     tools/bundle.sh &&

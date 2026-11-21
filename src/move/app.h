@@ -104,7 +104,9 @@ public:
     // Any thread: extra `key=value` fields for the status line.
     virtual std::string status() const { return {}; }
 
-    void attach(const Session& session) { attached = &session; }
+    // Before any hook runs. Virtual so an app that wraps another (the web
+    // page's layer, src/web/web_layer.h) attaches it too.
+    virtual void attach(const Session& session) { attached = &session; }
 
 protected:
     const Session& session() const { return *attached; }

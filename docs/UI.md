@@ -767,6 +767,36 @@ hold the code to it. In short:
 - **Knob lights**: lit for the knobs the screen uses, dark for the rest.
 - **Buttons**: lit where they do something on this screen.
 
+## The web page
+
+Melodee's web page (`src/web/`, [GUIDE.md](GUIDE.md), "The web page") at
+**http://move.local:8080** has three tabs: **Screen**, the Move's screen
+live, as the MPC's USB webcam shows the MPC's; **Files**, Melodee's folder
+(`/data/UserData/Melodee`); **Guide**, the Move's controls. On the Move it
+adds the screens below, drawn by the web layer over whatever the app shows
+(`src/web/screens.*`); `docs/ui/web.png` is the sheet.
+
+![The web page's screens](ui/web.png)
+
+| Screen | Rail | Subject | Detail |
+| --- | --- | --- | --- |
+| Where the page is (Shift + Capture) | `WEB` / port / `PORT` | the USB address, the Wi-Fi address (`NO CABLE`, `NOT JOINED`) | browsers paired, `BACK` |
+| A Wi-Fi browser's code | `PAIR` / seconds left / `SEC` | the six digits large, the browser's address | `BACK: REFUSE` |
+| Paired | `PAIR` / `OK` / `WIFI` | `PAIRED`, the browser's address | `UNTIL YOU QUIT` |
+| Refused | `PAIR` / `NO` / `WIFI` | `REFUSED`, why: Back, time up, five wrong codes | `ASK AGAIN THERE` |
+
+Who may use the page, as Kerem chose on 2026-11-20: a browser on the USB
+cable at once (it came in on the `usb*` interface's address, from that
+network); any other only after typing the code the Move shows, until
+melodee-move stops. The code shows 90 seconds; five wrong tries or Back
+refuse it, and that browser may not ask again for five minutes, so a device
+on the Wi-Fi cannot keep taking the screen and buttons with codes. While the address or a code shows, the buttons and the jogwheel
+are the sheet's (Back closes or refuses); pads, steps and knobs still play.
+Paired and Refused show three seconds and take nothing.
+
+Shift + Capture is taken because the other sessions' proposals use Shift +
+Menu (a track list) and Shift + Play (tempo); it can move once those settle.
+
 ## Open questions
 
 - ~~The pad pages' exact contents.~~ Settled with kit depth: nine pages on

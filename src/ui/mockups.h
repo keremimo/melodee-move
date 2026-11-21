@@ -10,8 +10,9 @@
 // The Rail design's screens (docs/UI.md): drawn with the UI kit at the
 // screen's real 128 x 64 one bit, as PNGs four times size, and a sheet of
 // each set, the design's reference: rail.png (the first scope), tracks.png
-// (tracks, transport and tempo). A set's screens are in a file of its own
-// (mockups.cpp, mockups_tracks.cpp), so screens for new areas go in new
+// (tracks, transport and tempo), web.png (the web page's screens on the
+// Move). A set's screens are in a file of its own
+// (mockups.cpp, mockups_tracks.cpp, mockups_web.cpp), so screens for new areas go in new
 // files without touching the others.
 namespace ui {
 
@@ -63,6 +64,8 @@ std::vector<Panel> tracks_panels();
 // and sequencer/.
 std::vector<Screen> sequencer_screens();
 bool write_sequencer_mockups(const std::string& directory);
+// The web page's screens on the Move (mockups_web.cpp): web.png and web/.
+std::vector<Screen> web_screens();
 
 } // namespace mockup
 } // namespace ui

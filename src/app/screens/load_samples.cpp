@@ -16,6 +16,7 @@ namespace fs = std::filesystem;
 struct MovePlace { const char* name; const char* path; const char* tag; };
 constexpr MovePlace move_places[] {
     {"MY SAMPLES", "/data/UserData/UserLibrary/Samples", "SMP"},
+    {"MELODEE", "/data/UserData/Melodee", "MLD"}, // what the web page uploads
     {"RECORDINGS", "/data/UserData/UserLibrary/Recordings", "REC"},
     {"CORE LIBRARY", "/data/CoreLibrary/Samples", "CORE"},
     {"ALL USER DATA", "/data/UserData", "ALL"},

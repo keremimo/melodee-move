@@ -7,7 +7,11 @@ builds against the same juce::Graphics here as on the MPC Sample.
 
 QuickJS is the release Schwung builds (its libs/quickjs/quickjs-2025-04-26,
 identical file for file), so a Schwung module's page script runs on the same
-engine here as under Schwung."""
+engine here as under Schwung.
+
+Rubik (SIL OFL 1.1) is the face of Melodee's web page, pinned to the
+google/fonts revision melodee-sample embeds; the page carries it
+(tools/web_bundle.py)."""
 from pathlib import Path
 import hashlib
 import subprocess
@@ -20,6 +24,26 @@ JUCE_REVISION = "d60b7a78030661574a615b586d9325ba7a7fa7dd"
 QUICKJS_VERSION = "2025-04-26"
 QUICKJS_URL = f"https://bellard.org/quickjs/quickjs-{QUICKJS_VERSION}.tar.xz"
 QUICKJS_SHA256 = "2f20074c25166ef6f781f381c50d57b502cb85d470d639abccebbef7954c83bf"
+FONTS_REVISION = "5bb28733cec313b63fbd415b574b5ae35c8aa8b8"  # google/fonts, as melodee-sample
+RUBIK = {
+    "Rubik-VF.ttf": ("Rubik%5Bwght%5D.ttf", "1b3a7437ba2af80e465e773ed60c5036d1ba6ace492d89046dbcf18fb31e4e88"),
+    "OFL.txt": ("OFL.txt", "472cbe7c25441df63e9c7864b43eb3c0f4b3df950c66a76224e6cfe1eae843fb"),
+}
+
+
+def prepare_rubik(root=ROOT):
+    folder = Path(root) / "build/deps/rubik"
+    folder.mkdir(parents=True, exist_ok=True)
+    for name, (remote, digest) in RUBIK.items():
+        path = folder / name
+        if path.exists() and hashlib.sha256(path.read_bytes()).hexdigest() == digest:
+            continue
+        url = f"https://raw.githubusercontent.com/google/fonts/{FONTS_REVISION}/ofl/rubik/{remote}"
+        with urllib.request.urlopen(url, timeout=60) as response:
+            data = response.read()
+        if hashlib.sha256(data).hexdigest() != digest:
+            raise RuntimeError(f"Rubik {name} hash mismatch")
+        path.write_bytes(data)
 
 
 def prepare_quickjs(root=ROOT):
@@ -55,3 +79,4 @@ def prepare(root=ROOT):
 if __name__ == "__main__":
     prepare()
     prepare_quickjs()
+    prepare_rubik()
