@@ -22,6 +22,9 @@ bool write_controls_mockups(const std::string& directory);
 // MIDI and sync (docs/UI.md, "MIDI and sync"): midi.png and midi/
 // (mockups_midi.cpp).
 bool write_midi_mockups(const std::string& directory);
+// Projects, Setup, undo, naming and track options: projects.png and
+// projects/ (mockups_projects.cpp).
+bool write_projects_mockups(const std::string& directory);
 
 namespace mockup {
 

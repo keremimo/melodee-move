@@ -5,6 +5,7 @@
 #include "app/module_probe.h"
 #include "app/previews.h"
 #include "move/runtime.h"
+#include "move/remote.h"
 #include "move/tools.h"
 #include "spike/spike_app.h"
 #include "ui/mockups.h"
@@ -28,6 +29,8 @@ void usage() {
         "         modules in --modules, by default /data/UserData/schwung/modules), or the\n"
         "         spike (--previews: Melodee's pages crushed). spi is the Move's own device on Ableton's firmware,\n"
         "         jack is jackd -d move on Armbian, simulated a stand-in for the device (--loopback, --script)\n"
+        "       melodee-move --ctl 'COMMAND' [--home DIR | --control SOCKET]  a command for the running one:\n"
+        "                                              status, melodee-press shift+step1, melodee-render serial\n"
         "       melodee-move --self-test FILE.wav       render offline, fail if silent\n"
         "       melodee-move --preview DIR              the screen as PNGs\n"
         "       melodee-move --melodee-previews DIR [--modules DIR]  Melodee's screens as PNGs\n"
@@ -52,7 +55,7 @@ int main(int argc, char** argv) {
     // and one dying stream must not take Melodee with it.
     std::signal(SIGPIPE, SIG_IGN);
     try {
-        std::string previews, samples, home, modules, melodee_previews, which = "melodee";
+        std::string previews, samples, home, modules, melodee_previews, which = "melodee", ctl;
         move::RunOptions options;
         for (int n = 1; n < argc; ++n) {
             std::string argument = argv[n];
@@ -75,8 +78,12 @@ int main(int argc, char** argv) {
             else if (argument == "--backend" && has_value) options.backend = backend_named(argv[++n]);
             else if (argument == "--loopback" && has_value) options.simulated_loopback_frames = unsigned(std::stoul(argv[++n]));
             else if (argument == "--script" && has_value) options.simulated_script = argv[++n];
+            else if (argument == "--control" && has_value) options.control_path = argv[++n];
+            else if (argument == "--ctl" && has_value) ctl = argv[++n];
             else { usage(); return 2; }
         }
+        // A command for the running melodee-move (move/remote.h), over its socket in Melodee's folder.
+        if (!ctl.empty()) return move::send_command(options.control_path.empty() ? app::control_path(home) : options.control_path, ctl);
         if (!melodee_previews.empty()) return app::write_previews(melodee_previews, modules);
         if (which == "spike") {
             SpikeApp app(previews);
@@ -84,6 +91,7 @@ int main(int argc, char** argv) {
         }
         if (which != "melodee") { usage(); return 2; }
         auto app = std::make_unique<app::MelodeeApp>(samples, home, modules);
+        if (options.control_path.empty()) options.control_path = app::control_path(home);
         return move::run_app(*app, options);
     } catch (const std::exception& error) {
         std::cerr << "melodee-move: " << error.what() << '\n';

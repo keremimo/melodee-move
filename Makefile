@@ -41,10 +41,12 @@ MELODEE ?= ../melodee-sample
 MELODEE_INCLUDES := -I$(MELODEE)/src -I$(MELODEE)/base/src
 # shell/sample_decode.cpp: Melodee's own reader for WAV, and AIFF, FLAC, Ogg
 # and MP3 through JUCE, as on the MPC; shell/midi_route.cpp and mtc_in.cpp:
-# where MIDI in goes, and MTC in (src/app/midi.*).
+# where MIDI in goes, and MTC in (src/app/midi.*); shell/mpc_project.cpp and
+# what it needs: MPC Sample and MPC 3 projects (.xpj) opened as a copy.
 MELODEE_SOURCES := $(wildcard $(MELODEE)/src/melodee/engine/*.cpp $(MELODEE)/src/melodee/model/*.cpp) \
     $(MELODEE)/src/melodee/shell/sample_decode.cpp \
-    $(MELODEE)/src/melodee/shell/midi_route.cpp $(MELODEE)/src/melodee/shell/mtc_in.cpp
+    $(MELODEE)/src/melodee/shell/midi_route.cpp $(MELODEE)/src/melodee/shell/mtc_in.cpp \
+    $(MELODEE)/src/melodee/shell/mpc_project.cpp $(MELODEE)/src/melodee/shell/mpc_wav_slices.cpp $(MELODEE)/src/melodee/shell/mpc_program.cpp
 MELODEE_OBJECTS := $(patsubst $(MELODEE)/src/%.cpp,build/obj/melodee-sample/%.o,$(MELODEE_SOURCES))
 MELODEE_LIBRARY := build/melodee.a
 CPPFLAGS += $(MELODEE_INCLUDES)
@@ -85,6 +87,12 @@ $(TARGET): build/obj/main.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS)
 $(TESTS): build/obj/tests/move_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS) $(MELODEE_LIBRARY)
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 $(MIDI_TESTS): build/obj/tests/midi_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS) $(MELODEE_LIBRARY)
+	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
+# Undo, projects and the system (tests/projects_tests.cpp), a binary of
+# their own.
+PROJECTS_TESTS := build/projects-tests
+all: $(PROJECTS_TESTS)
+$(PROJECTS_TESTS): build/obj/tests/projects_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS) $(MELODEE_LIBRARY)
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 $(CONTROLS_TESTS): build/obj/tests/controls_tests.o build/obj/app/bindings.o
 	$(CXX) -static-libstdc++ -static-libgcc $^ -pthread -o $@

@@ -246,6 +246,7 @@ int write_mockups(const std::string& directory) {
     }
     ok = write_controls_mockups(directory) && ok;
     ok = write_midi_mockups(directory) && ok;
+    ok = write_projects_mockups(directory) && ok;
     return ok ? 0 : 1;
 }
 

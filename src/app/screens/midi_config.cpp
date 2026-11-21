@@ -143,11 +143,8 @@ private:
     bool editing = false, panicked = false;
 };
 
-// Setup (Shift + Step 2) is move-projects' (its MIDI and MIDI SYNC rows push
-// this screen). Until it is merged, Setup opens MIDI Config here;
-// midi-tests fails once a "setup" screen is registered beside this
-// Trigger, so the merge takes it out.
-RegisterScreen config("midi-config", make<MidiConfig>, {{bindings::Job::Setup}});
+// Opened from Setup's MIDI and MIDI SYNC rows (move-projects' screens/setup.cpp).
+RegisterScreen config("midi-config", make<MidiConfig>);
 
 } // namespace
 } // namespace app::screens

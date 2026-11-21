@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "move/runtime.h"
+#include "move/remote.h"
+#include <cstring>
 #include "move/display.h"
 #include "move/host.h"
 #include "move/spi_device.h"
@@ -173,6 +175,29 @@ int run_app(App& app, const RunOptions& options) {
         host->display.publish();
     });
 
+    // The control channel: status, presses played into the input, the app's commands.
+    ControlChannel channel;
+    if (!options.control_path.empty()) {
+        std::string failed;
+        if (!channel.open(options.control_path, failed)) std::cerr << "melodee-move: no control channel at " << options.control_path << ": " << failed << '\n';
+    }
+    auto answer = [&](const std::string& line) -> std::string {
+        if (line == "status") return status_line(session, app);
+        for (const char* verb : {"melodee-press ", "press "}) {
+            if (line.compare(0, std::strlen(verb), verb)) continue;
+            std::vector<Injected> messages;
+            std::string failed;
+            if (!press_messages(line.substr(std::strlen(verb)), messages, failed)) return failed;
+            for (const auto& message : messages) {
+                if (!host->injected.push(message.bytes)) return "busy";
+                std::this_thread::sleep_for(std::chrono::milliseconds(message.wait_ms));
+            }
+            return "ok";
+        }
+        auto reply = app.command(line);
+        return reply.empty() ? "unknown: " + line : reply;
+    };
+
     auto started = App::Clock::now();
     auto next_status = started + status_interval;
     const char* reason = "stopped";
@@ -184,6 +209,7 @@ int run_app(App& app, const RunOptions& options) {
         auto now = App::Clock::now();
         if (options.seconds > 0 && now - started >= std::chrono::duration<double>(options.seconds)) { reason = "time"; break; }
         app.service();
+        channel.poll(answer);
         if (now >= next_status) { std::cerr << status_line(session, app) << '\n'; next_status = now + status_interval; }
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }

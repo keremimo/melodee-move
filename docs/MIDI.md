@@ -63,6 +63,9 @@ reader (`shell/midi_route.cpp`, `shell/mtc_in.cpp`) are compiled unchanged.
   hands it over; the audio thread sends it from F0 to F7 in pieces of three
   bytes, four pieces an exchange (4.1 KB/s, a little past DIN's 3.1), the
   clocks between them and everything else waiting behind it.
+- **MIDI Config** opens from Setup's MIDI and MIDI SYNC rows (Shift + Step
+  2); a track's MIDI IN and MIDI OUT are rows of its options (Shift + a
+  track button), both screens move-projects'.
 - **In**, on the MIDI thread: notes on MIDI Config's in channel play the
   selected track (a kit hears 36 as A01), a track's own channel (its MIDI IN)
   plays it whichever is selected, each at the frame it came in at; pressure,
@@ -80,15 +83,15 @@ reader (`shell/midi_route.cpp`, `shell/mtc_in.cpp`) are compiled unchanged.
 - **Panic**: every note Melodee holds ends; All Sound Off, All Notes Off and
   the bend centred on all sixteen channels. MIDI Config's PANIC row and
   `melodee-midi panic`; no Move key (Kerem, 2026-11-20).
-- **`melodee-midi`** (in the package, over SSH): `melodee-midi 90 3c 64`
-  puts a message into the input as if it came in on the port;
-  `melodee-midi panic` is MIDI Config's Panic. It writes a line into the
-  FIFO `/tmp/melodee-move-midi` (`$MELODEE_MIDI_FIFO`), which the service
-  thread reads.
+- **`melodee-midi`** (over SSH, through the runtime's control socket):
+  `melodee-move --ctl 'melodee-midi 90 3c 64'` puts a message into the
+  input as if it came in on the port; `--ctl 'melodee-midi panic'` is MIDI
+  Config's Panic (`MelodeeApp::command()`, under the studio's lock).
 - **Files**: MIDI Config in `Move.settings`, under Melodee's own keys
-  (`midi_in_channel`, `midi_sync_out`, ...); each track's MIDI OUT in the
+  (`midi_in_channel`, `midi_sync_out`, ...), written with Setup's settings; each track's MIDI OUT in the
   project's `MVMO` section (a section of the Move's own, which Melodee's
-  reader skips; MIDI IN is Melodee's track channel, `MIDC`); a MIDI track's
+  reader skips, read again as each project opens; MIDI IN is Melodee's
+  track channel, `MIDC`); a MIDI track's
   drum map and SysEx file in Melodee's `MIDT`; SysEx files in
   `/data/UserData/Melodee/SysEx`; sounds in `/data/UserData/Melodee/Sounds`
   (`.mlds`, starred ones listed in `Starred.txt`).

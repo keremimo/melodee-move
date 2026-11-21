@@ -216,18 +216,20 @@ it. `docs/ui/midi.png` is the sheet (`src/ui/mockups_midi.cpp`).
   and the ones saved (`Melodee/Sounds`, `.mlds`), starred ones marked `*`;
   each loads as the wheel turns, push or Back done. Shift held: SAVE SOUND,
   STAR or UNSTAR, SHOW (all, starred, recent).
-- **MIDI Config** (Setup, Shift + Step 2: its MIDI and MIDI SYNC rows): in
+- **MIDI Config** (Setup, Shift + Step 2: its MIDI and MIDI SYNC rows push it; Back goes back to Setup): in
   and out channels, pad MIDI in and out, sync in and out (MIDI clock or
   MTC), Thru, program change, the Remote channel and CCs, PANIC. The wheel
   picks a row, push edits it (`[MTC]`), the wheel sets it, push again done;
   push on PANIC sends it. The rail's bottom says `IN` and `OUT` as MIDI
   passes; the detail line `EXT CLOCK` and the tempo heard, or `EXT MTC`,
   while following.
-- **Track options** (Shift + a track button, as on the Move): its colour,
-  **MIDI IN** (AUTO, or a channel 1-16 that plays this track whichever is
-  selected; AUTO: the selected track hears MIDI Config's in channel) and
+- **Track options** (Shift + a track button, as on the Move; move-projects'
+  screen, Projects and system below): its colour and name, and the MIDI
+  rows: **MIDI IN** (AUTO, or a channel 1-16 that plays this track whichever
+  is selected; AUTO: the selected track hears MIDI Config's in channel) and
   **MIDI OUT** (AUTO, or the channel its notes go out on; a MIDI track's is
-  its DEVICE channel). The wheel, push, as in MIDI Config.
+  its DEVICE channel). Push edits, the wheel turns, push keeps it (an undo
+  step), Back leaves it as it was; the detail line says what the row means.
 - **Tempo, following MIDI clock**: the BPM heard, `MIDI CLOCK IN`, and `EXT`
   on the detail line; the wheel does nothing then.
 
@@ -239,12 +241,93 @@ it. `docs/ui/midi.png` is the sheet (`src/ui/mockups_midi.cpp`).
 | Sound options (Shift held) | `OPT` / track / `SND` | SAVE SOUND, STAR, SHOW | |
 | MIDI Config | `MIDI` / / `IN`, `OUT` | its rows, the one edited `[ ]` | `EXT CLOCK` tempo, `EXT MTC` |
 | Panic pushed | `MIDI` / / `OUT` | `PANIC`, what went | `BACK: MIDI` |
-| Track options | `TRK` / track / `OPT` | colour, MIDI IN, MIDI OUT | what the row means |
+| Track options (move-projects') | `TRK` / track / `OPT` | colour, name, MIDI IN, MIDI OUT | on the MIDI rows, what the row means |
 
 Lights: a MIDI track's pads as a synth's on Keys (every C in the track's
 colour, a held pad white), as a kit's on Drums (32 pads, Plus and Minus the
 next 16, the last pad white); MIDI Config and the track options keep the
 pads playing the track and light Back.
+
+## Projects and system
+
+Projects, Setup, undo, naming and a track's options, as the Move has them
+(Shift + Step 1, Shift + Step 2, Undo, Shift + a track button) and Kerem
+chose (docs/MOVE_CONTROLS.md, Decisions). `docs/ui/projects.png` is the
+sheet (`src/ui/mockups_projects.cpp`); the screens draw with the same code
+(`src/ui/system_draw.*`), so each is its mockup.
+
+![Projects and system](ui/projects.png)
+
+- **Projects** (Shift + Step 1, the Move's Set Overview): a folder's
+  projects on the 32 pads, the top row first, each in its colour, folders
+  grey, the one picked pulsing, an empty pad white when picked. A project
+  keeps its pad (the folder's `.move-pads`); one put there from elsewhere
+  takes the first free pad; Plus and Minus page through 32 at a time. The
+  screen names the pad's project large, its tracks and tempo, OPEN on the
+  one open (UNSAVED while it has changes), AT START on the one opened at
+  start. A pad picks; **Back or a track button opens it** (the sound fades,
+  the audio thread waits while it is built, the Loading sheet counts its
+  samples and synths, the sound comes back); an empty pad, then Back, makes
+  a new project there; Play opens the one picked and plays it (the Move's
+  preview). The wheel walks the pads. A folder's push goes in, Back comes
+  out. MPC projects (`.xpj`) open as a copy, saved as a `.mldp` beside it.
+- **Options** (the wheel's push, or Shift + a pad): the open project's SAVE
+  (the sample slots nothing plays freed), SAVE AS NEW, RENAME, COLOUR,
+  DUPLICATE, MOVE TO FOLDER, NEW FOLDER, OPEN AT START; another's OPEN,
+  LOAD KIT (its first kit onto the selected track, its patterns left: one
+  undo), RENAME, COLOUR, DUPLICATE, MOVE TO FOLDER, OPEN AT START, DELETE.
+- **Copy and Delete**, as the Move: Copy + a pad, then a pad copies it
+  there (asking before it replaces one, the pad again says yes); Delete + a
+  pad asks, the pad again deletes (Delete alone asks for the one picked).
+- **The question** before a loss (Melodee's one sheet): what is asked, one
+  or two lines of what goes, a chip saying whether undo brings it back
+  (`UNDO BRINGS BACK`, or `NO UNDO` inverted), push yes, Back no. Deleting
+  or replacing a track, a project, or a synth's module all ask here.
+- **Undo**: Undo takes the last step back and says which (`UNDO TUNE A05`),
+  Shift + Undo redoes. **Undo held** opens the undo list: the steps
+  undone, then the steps done, newest first, each with its track and age,
+  then START; the cursor opens on the state in hand (a notch at its right),
+  the rows above it struck through (undone once it is reached); the wheel
+  or Plus / Minus move it, a push goes there, Back closes it.
+- **UNSAVED**: a black mark in the rail's top right corner while the
+  project has changes not saved yet (autosave takes it away).
+- **The name sheet** (rename, save as new, a track's name, a module page's
+  text): the Move's own typing. The wheel walks a strip of characters (the
+  one in the box inverted), its push types it; the strip ends with SP, DL
+  and OK. The pads type letters at once (letters grey, space blue, delete
+  red), the steps digits; Back deletes, held cancels; Shift is upper case.
+  The rail says `NAME`, the case, and how much of the room the name takes.
+- **Setup** (Shift + Step 2): PADS (response soft, medium, hard, full;
+  pressure), LIGHTS (pad lights colour, white, off; pad fade; brightness
+  low to max, as the Move's; the light show and its style: Pulse, Sweep,
+  Chase, Ripple, Levels, in time with the tempo), MIDI and SYNC (move-midi),
+  WEB PAGE (move-web), FEATURES (Full, or Basic: the Move's own pages,
+  tracks, modules, the mixer and Song), USAGE LOG, ABOUT (the audio cycle's
+  share and longest, late exchanges, room left, synths and their slow
+  calls, the build), BACK TO MOVE. A push opens a door or edits a value
+  (`[MED]`: the wheel turns it, a push keeps it, Back leaves it as it was);
+  a value of two flips at once. Step 2 flashes while it is open.
+- **A track's options** (Shift + a track button): its COLOUR (the wheel
+  turns it, the track button and the pads showing it as it turns) and its
+  NAME; move-midi adds its MIDI channels. Both are undo steps.
+
+| Screen | Rail | Subject | Detail |
+| --- | --- | --- | --- |
+| Projects | `PROJ` / pad / page | the folder; the project's name large, tracks and tempo, OPEN, UNSAVED | `BACK: OPEN` `PLAY`; `PUSH: OPTIONS`; `PUSH: IN`; `BACK: NEW` |
+| Options | `OPT` / / `PRJ` or `FLDR` | the rows | |
+| Question | the verb / the number / what | the question, what goes, the undo chip | `PUSH YES` or `PAD: YES`, `BACK NO` |
+| Loading | `LOAD` / / `PRJ` | the name, a bar, samples and synths read | the file being read |
+| Undo list | `UNDO` / steps to go / steps kept | the steps, the state in hand marked | `PUSH: UNDO 2`, `PUSH: REDO 1` |
+| Name sheet | `NAME` / case / length | the title, the name and its room, the strip | `PUSH TYPE`, `BACK <` |
+| Setup | `SETP`, `PADS`, `LGHT` | the rows, values at the right | |
+| About | `ABT` / / `SETP` | CPU, late, free, synths, version | `BACK` |
+| Track options | `TRK` / track / `OPT` | COLOUR, NAME (and MIDI) | |
+
+Lights: the projects on the pads (above); the question's pad red, the rest
+dark; the name sheet's keys; Undo bright on the undo list; Setup's Step 2
+flashing; a track's colour on its button as it is turned. Setup's
+brightness dims every light as it is sent (`move::Lights::set_brightness`);
+its pad lights and the light show draw over a Play screen's pads.
 
 ## Screens in code
 

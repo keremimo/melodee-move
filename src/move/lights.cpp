@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "move/lights.h"
+#include <algorithm>
 #include <limits>
 
 namespace move {
@@ -56,6 +57,36 @@ Rgb palette_rgb(uint8_t index) {
 Lights::Lights() {
     note_want.fill(unset); note_sent.fill(unset);
     cc_want.fill(unset); cc_sent.fill(unset);
+    for (const auto& info : buttons)
+        if (info.led == LedKind::Rgb) cc_rgb[info.cc & 127] = true;
+    for (unsigned n = 0; n < 128; ++n) dimmed[n] = uint8_t(n);
+}
+
+uint8_t Lights::pad_wanted(unsigned index) const {
+    if (index >= pad_count) return 0;
+    uint8_t want = note_want[pad_note(index)];
+    return want == unset ? 0 : want;
+}
+
+uint8_t Lights::step_wanted(unsigned index) const {
+    if (index >= step_count) return 0;
+    uint8_t want = note_want[step_note(index)];
+    return want == unset ? 0 : want;
+}
+
+void Lights::set_brightness(uint8_t level) {
+    level = std::min<uint8_t>(level, 3);
+    if (level == brightness) return;
+    brightness = level;
+    static const float scale[4] {0.25f, 0.5f, 0.75f, 1.0f};
+    for (unsigned n = 0; n < 128; ++n) {
+        auto rgb = palette_rgb(uint8_t(n));
+        auto down = [&](uint8_t c) { return uint8_t(float(c) * scale[level]); };
+        dimmed[n] = n ? nearest_colour({down(rgb.r), down(rgb.g), down(rgb.b)}) : 0;
+        if (n && !dimmed[n]) dimmed[n] = uint8_t(n); // never out altogether: a dim colour stays lit
+    }
+    note_sent.fill(unset); // everything again, at the new level
+    cc_sent.fill(unset);
 }
 
 void Lights::pad(unsigned index, uint8_t palette_index) {

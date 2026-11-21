@@ -269,14 +269,10 @@ void test_in() {
     CHECK(count_of(rig.blocks(2), 0x92, 48) == 1);
     rig.in_message({0x88, 48, 0});
     CHECK(count_of(rig.blocks(2), 0x82, 48) == 1);
-    // melodee-midi: a line into the FIFO, read by the service thread, as if from the port.
-    rig.melodee->service();
-    CHECK(std::filesystem::is_fifo(app::Midi::remote_path()));
-    {
-        std::ofstream fifo(app::Midi::remote_path());
-        fifo << "98 30 46\n" << "panic\n";
-    }
-    rig.melodee->service();
+    // melodee-midi over the control socket (App::command()): as if from the port; then Panic.
+    CHECK(rig.melodee->command("melodee-midi 98 30 46").rfind("in=", 0) == 0);
+    CHECK(rig.melodee->command("melodee-midi panic") == "panic");
+    CHECK(rig.melodee->command("melodee-midi 30 zz").rfind("usage", 0) == 0);
     auto remote = rig.blocks(6);
     CHECK(count_of(remote, 0x92, 48) == 1);
     CHECK(rig.melodee->status().find("melodee_midi_panics=1") != std::string::npos);
@@ -513,9 +509,10 @@ void test_screens() {
     { std::lock_guard<std::mutex> hold(studio.lock); CHECK(studio.current().params[mt::Program] == 12); }
     hand.press(Button::Back);
     CHECK(has(*rig.melodee, "page=midi-play"));
-    // Shift + track button 1 (track 1 of the bank): selected, its options; MIDI IN 5.
+    // Shift + track button 1 (track 1 of the bank): its options (move-projects'), MIDI IN 5.
     hand.shift([&] { hand.press(Button::Row1); });
-    CHECK(has(*rig.melodee, "page=track-options") && has(*rig.melodee, "track=1 "));
+    CHECK(has(*rig.melodee, "page=track-options") && has(*rig.melodee, "options_track=1 "));
+    hand.wheel(2); // past COLOUR and NAME
     hand.press(Button::MainPush);
     hand.wheel(5);
     snap(*rig.melodee, "track-options");
@@ -528,10 +525,18 @@ void test_screens() {
         std::lock_guard<std::mutex> hold(studio.lock);
         CHECK(studio.project().tracks[0].midi_channel == 5 && studio.midi.track_out[0] == 9 && studio.midi.out_channel(studio, 0) == 9);
     }
+    // Back while editing leaves the channel as it was.
+    hand.press(Button::MainPush);
+    hand.wheel(3);
     hand.press(Button::Back);
-    CHECK(has(*rig.melodee, "page=kit-play"));
-    // Shift + Step 2: MIDI Config (Setup's MIDI row, once Setup is merged); SYNC IN to CLOCK; PANIC.
+    { std::lock_guard<std::mutex> hold(studio.lock); CHECK(studio.midi.track_out[0] == 9); }
+    hand.press(Button::Back);
+    CHECK(has(*rig.melodee, "page=midi-play"));
+    // Shift + Step 2: Setup (move-projects'); its MIDI row: MIDI Config. SYNC IN to CLOCK; PANIC.
     hand.shift([&] { hand.step(1); });
+    CHECK(has(*rig.melodee, "page=setup"));
+    hand.wheel(2); // PADS, LIGHTS, MIDI
+    hand.press(Button::MainPush);
     CHECK(has(*rig.melodee, "page=midi-config"));
     snap(*rig.melodee, "config");
     hand.wheel(4);
@@ -547,8 +552,10 @@ void test_screens() {
     snap(*rig.melodee, "config-panic");
     hand.press(Button::Back); // the list again
     CHECK(has(*rig.melodee, "page=midi-config") && has(*rig.melodee, "midi_panicked=0"));
+    hand.press(Button::Back); // back to Setup, then out
+    CHECK(has(*rig.melodee, "page=setup"));
     hand.press(Button::Back);
-    CHECK(has(*rig.melodee, "page=kit-play"));
+    CHECK(has(*rig.melodee, "page=midi-play"));
     // Tempo while MIDI clock leads: the tempo heard.
     uint64_t at = now_ns();
     rig.in_message({0xfa}, at);
@@ -611,7 +618,6 @@ void test_setup_trigger() {
 
 int main() {
     std::filesystem::create_directories("build/test-midi");
-    setenv("MELODEE_MIDI_FIFO", "build/test-midi/fifo", 1); // not the Move's own
     std::filesystem::create_directories("build/test-samples");
     std::filesystem::create_directories("build/test-no-modules");
     test_packets();

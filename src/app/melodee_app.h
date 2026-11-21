@@ -30,6 +30,10 @@
 // in the cycle they were read (Studio::audio_event()).
 namespace app {
 
+// Where the running Melodee listens for commands (move/remote.h): its
+// folder's melodee-move.sock (`home` empty: /data/UserData/Melodee).
+std::string control_path(const std::string& home);
+
 class MelodeeApp : public move::App {
 public:
     explicit MelodeeApp(std::string library = {}, std::string home = {}, std::string modules = {});
@@ -45,6 +49,8 @@ public:
     void draw(juce::Graphics& g) override;                                          // screen thread
     void service() override;                                                        // service thread
     std::string status() const override;
+    bool finished() const override; // Setup's Back to Move
+    std::string command(const std::string& line) override; // melodee-render; the rest is the runtime's
 
     // For tests and tools.
     Studio& studio() { return *own; }
@@ -74,7 +80,27 @@ private:
     bool holding() const { return rows_down.any(); } // a track button is down
     unsigned held_track() const;     // the first track button down, as a track
     void draw_volume(juce::Graphics& g);
+    void settings_lights(move::Lights& lights, Clock::time_point now); // Setup's pad lights and the light show
     Screen* tracks() const;            // the sixteen tracks, while a track button is held
+
+    // Undo steps (Studio::close_step()): a press closes one; a turn keeps
+    // its step open while the same control turns, until another control or
+    // two seconds still.
+    void close_gesture();
+    std::string step_name(bindings::Job job, const bindings::Use& use) const;
+    bool gesture_open = false;
+    bindings::Control gesture_control = bindings::Control::Count;
+    int gesture_index = 0;
+    std::string gesture_name;
+    Clock::time_point gesture_at {};
+
+    // Setup's About, from the runtime's session; the usage log.
+    Clock::time_point machine_at {};
+    uint64_t machine_calls = 0, machine_ns = 0;
+    Clock::time_point started = Clock::now(), usage_at {};
+    long long started_unix = 0;
+    std::string usage;
+    size_t usage_written = 0;
 
     std::unique_ptr<Studio> own;
     bindings::Gestures gestures;

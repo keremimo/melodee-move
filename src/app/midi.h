@@ -97,11 +97,12 @@ public:
 
     // ---------------------------------------------------------- service thread
     // The SysEx files asked for, read (bounded) and handed to the audio
-    // thread; the ones it has sent, freed. And `melodee-midi` (MELODEE.md,
-    // Remote): lines written into the FIFO at remote_path(), "panic" or a
-    // message in hex ("90 3c 64"), taken as if they came in on the port.
+    // thread; the ones it has sent, freed.
     void service(Studio& studio);
-    static std::string remote_path(); // $MELODEE_MIDI_FIFO, else /tmp/melodee-move-midi
+    // `melodee-midi` (MELODEE.md › Remote, through the runtime's control
+    // socket, App::command()): "panic", or a message in hex ("90 3c 64"),
+    // taken as if it came in on the port. Under the studio's lock. The reply.
+    std::string command(Studio& studio, const std::string& arguments);
 
     // ---------------------------------------------------------- audio thread
     // Marks the audio thread (audio_opened()): a module's MIDI out from it
@@ -144,12 +145,6 @@ private:
     unsigned sysex_size = 0;
     bool sysex_open = false;
     std::vector<unsigned> sysex_asked; // tracks whose SysEx the service thread is to read
-    // Service thread: melodee-midi's FIFO (read end, and a write end of our
-    // own so it never reads as closed), the line coming in.
-    void remote(Studio& studio);
-    int remote_in = -1, remote_keep = -1;
-    bool remote_tried = false;
-    std::string remote_line;
 
     // Audio thread.
     void deliver(const melodee::MidiOutEvent& event);

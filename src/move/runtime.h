@@ -26,6 +26,8 @@ struct RunOptions {
     // long, and control messages to play (spi_device.h, FakeSpiDevice).
     unsigned simulated_loopback_frames = 300;
     std::string simulated_script;
+    // The control channel's socket (move/remote.h); empty: none.
+    std::string control_path;
 };
 
 int run_app(App& app, const RunOptions& options);

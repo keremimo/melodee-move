@@ -82,11 +82,40 @@ Three parts so far:
   What a page keeps for itself (Webstream's provider, where its menus are)
   is saved with the module and comes back on the next start; using a page
   counts as a change, saved three seconds on.
+- **Projects** (Shift + Step 1, the Move's Set Overview): a folder's
+  projects on the 32 pads, each keeping its pad, folders grey, the one
+  picked pulsing. A pad picks; Back or a track button opens it (the sound
+  fades out, the audio thread waits while it is built, a Loading sheet
+  counts its files, the sound comes back); an empty pad, then Back, makes a
+  new one there; Play opens and plays it. The wheel's push (or Shift + a
+  pad) has its options: Save (the sample slots nothing plays freed), Save
+  as new, Rename, Colour, Duplicate, Move to folder, New folder, Open at
+  start; on another, Open, Load kit (its first kit onto the selected
+  track), Delete. Copy + a pad, then a pad copies one; Delete + a pad asks,
+  the pad again deletes it. MPC projects (`.xpj`) open as a copy. A mark in
+  the rail's corner says the open project has changes not saved yet.
+- **Undo** (Undo; Shift + Undo redoes; held, the undo list): the last 32
+  steps of anything in the project, each named on the screen (`UNDO TUNE
+  A05`). A press is a step, a knob's turns are one (until another control
+  or two seconds still), a load is one; mutes, the octave and the pad
+  played are not. docs/MOVE_CONTROLS.md, "Undo steps", says how a screen
+  marks one.
+- **Setup** (Shift + Step 2) is Melodee's Settings: the pads' response and
+  pressure, pad lights, pad fade, the lights' brightness, a light show in
+  time with the tempo, Basic or Full, a usage log (`Usage/`, what the hands
+  do, no names), About, and Back to Move. **Shift + a track button** is the
+  track's options: its colour and name. Names are typed the Move's way: the
+  wheel walks the characters, its push types one, OK at the end of the
+  strip; the pads type letters at once.
+- Before anything is lost (a track deleted or replaced, a project deleted,
+  a synth's module replaced) one question sheet asks, saying what goes and
+  whether undo brings it back.
 - The master knob is the volume; Shift + Back goes back to Move.
-- **Saving**: the whole project is one Melodee project file,
-  `/data/UserData/Melodee/Projects/Move.mldp` (`--home` moves the folder),
-  saved three seconds after the last change, as Melodee autosaves on the
-  MPC, and on the way out; the next start opens it. Melodee on the MPC opens
+- **Saving**: the whole project is one Melodee project file in
+  `/data/UserData/Melodee/Projects` (`--home` moves the folder; the first
+  one is `Move.mldp`), saved three seconds after the last change, as
+  Melodee autosaves on the MPC, and on the way out; the next start opens
+  the one set to open at start, else the one open last. Melodee on the MPC opens
   it, and the Move opens the MPC's (where the samples' paths lead to the
   same files). Samples are kept by path; one that has gone keeps its pads,
   silent, until it is back. Melodee keeps a sample's chop in the WAV file
@@ -115,9 +144,10 @@ Three parts so far:
   slots, EXPRESS, PADS, AUDIO, SYSEX) on the knobs, Shift + the wheel
   walking them, its Sounds (`.mlds`) on the wheel's push. MIDI goes out with
   the exchange that carries the audio it is heard in (a block, 2.9 ms);
-  `melodee-midi` puts a message in, or Panics, over SSH.
+  `melodee-move --ctl 'melodee-midi 90 3c 64'` puts a message in,
+  `--ctl 'melodee-midi panic'` Panics (Remote, below).
 
-Not yet: more than one project, editing patterns, samples over 60 seconds,
+Not yet: editing patterns, samples over 60 seconds,
 Record, Capture, Schwung's effects, mixer pages; docs/PARITY.md has the rest.
 
 ### How a Schwung module is hosted
@@ -161,6 +191,28 @@ each module's own pages and draws them there as PNGs.
 Melodee's engine and model are compiled from a melodee-sample checkout
 beside this one (`../melodee-sample`, or `MELODEE_SAMPLE`), unchanged.
 `build/melodee-move --melodee-previews DIR` draws its real screens.
+
+### Remote
+
+`melodee-move --ctl 'COMMAND'` (over SSH, on the Move) talks to the running
+Melodee through its socket, `/data/UserData/Melodee/melodee-move.sock`
+(`--home DIR` or `--control SOCKET` for another), as `device.py ctl` does
+on the MPC:
+
+- `status`: the status line, now;
+- `melodee-press SPEC`: presses played into the Move's input as if a hand
+  made them (they reach the pads' audio path and the controls alike):
+  `play`, `shift+step1`, `delete+pad5`, `track1+copy+step3`, `wheel+2`,
+  `knob1-3`, `volume+5`, `hold-shift` / `release-shift`, `long-undo`;
+  buttons are `play rec shift back note-session capture sampling loop mute
+  undo copy delete plus minus left right wheel-push track1`..`track4`, pads
+  `pad1`..`pad32` (bottom left first), steps `step1`..`step16`;
+- `melodee-render serial|parallel`: the render workers left asleep or used;
+- `melodee-midi HEX...` / `melodee-midi panic`: a message into MIDI in as if
+  it came on the USB port (`90 3c 64`), or MIDI Config's Panic (docs/MIDI.md).
+
+The runtime (`src/move/remote.*`) owns the socket; an app answers its own
+commands through `App::command()`.
 
 ## Two ways onto the Move
 

@@ -43,6 +43,10 @@ public:
 
     int wake_descriptor() const { return wake_fd; }
     SpscRing<MidiIn, 1024> midi_in;
+    // Messages for the Move's input from the control channel (remote.h), one
+    // producer (the runtime's service thread): the audio thread takes them
+    // in its cycle as it takes the device's own.
+    SpscRing<std::array<uint8_t, 3>, 256> injected;
     SpscRing<LedMessage, 1024> leds;
     TripleBuffer<DisplayMessage> display;
 
@@ -53,6 +57,7 @@ protected:
     // port. Pads go to App::audio_event() at once; everything is queued for
     // the MIDI thread. Sets `arrived` when the MIDI thread should wake.
     void incoming(const uint8_t* bytes, size_t size, bool external, uint64_t timestamp_ns, bool& arrived);
+    void take_injected(uint64_t timestamp_ns, bool& arrived); // audio thread: the control channel's presses
     static uint64_t monotonic_ns();
 
     App& app;

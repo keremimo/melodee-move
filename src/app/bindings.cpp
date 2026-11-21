@@ -36,16 +36,16 @@ std::vector<Binding> make_table() {
         {"Pad (Sampling)", S::Sampling, T::Any, H::none, C::Pad, G::Press, J::RecordPad, St::Wave2, sampling},
         {"Pad (Session)", S::Session, T::Any, H::none, C::Pad, G::Press, J::LaunchPattern, St::Wave2, sequencer},
         {"Shift + Pad (Session)", S::Session, T::Any, H::shift, C::Pad, G::Press, J::PasteBounced, St::Wave2, song},
-        {"Pad (Overview)", S::Overview, T::Any, H::none, C::Pad, G::Press, J::SelectProject, St::Wave2, projects},
-        {"Shift + Pad (Overview)", S::Overview, T::Any, H::shift, C::Pad, G::Press, J::ProjectOptions, St::Wave2, projects},
+        {"Pad (Overview)", S::Overview, T::Any, H::none, C::Pad, G::Press, J::SelectProject, St::Done},
+        {"Shift + Pad (Overview)", S::Overview, T::Any, H::shift, C::Pad, G::Press, J::ProjectOptions, St::Done},
         {"Pad held + Volume knob", S::Play, T::Kit, H::pad, C::Volume, G::Turn, J::PadLevel, St::Done},
-        {"Pad held + Volume knob (Overview)", S::Overview, T::Any, H::pad, C::Volume, G::Turn, J::ProjectVolume, St::Wave2, projects},
+        {"Pad held + Volume knob (Overview)", S::Overview, T::Any, H::pad, C::Volume, G::Turn, J::ProjectVolume, St::Done},
         {"Copy held + Pad (Play, kit)", S::Play, T::Kit, H::copy, C::Pad, G::Press, J::CopyPad, St::Wave2, kit_depth},
         {"Copy held + Pad (Session)", S::Session, T::Any, H::copy, C::Pad, G::Press, J::CopyPattern, St::Wave2, sequencer},
-        {"Copy held + Pad (Overview)", S::Overview, T::Any, H::copy, C::Pad, G::Press, J::CopyProject, St::Wave2, projects},
+        {"Copy held + Pad (Overview)", S::Overview, T::Any, H::copy, C::Pad, G::Press, J::CopyProject, St::Done},
         {"Delete held + Pad (Play, kit)", S::Play, T::Kit, H::del, C::Pad, G::Press, J::ClearPad, St::Wave2, sequencer},
         {"Delete held + Pad (Session)", S::Session, T::Any, H::del, C::Pad, G::Press, J::DeletePattern, St::Wave2, sequencer},
-        {"Delete held + Pad (Overview)", S::Overview, T::Any, H::del, C::Pad, G::Press, J::DeleteProject, St::Wave2, projects},
+        {"Delete held + Pad (Overview)", S::Overview, T::Any, H::del, C::Pad, G::Press, J::DeleteProject, St::Done},
         {"Delete held + Pad (Chop)", S::Chop, T::Any, H::del, C::Pad, G::Press, J::RemoveCut, St::Wave2, sampling},
         {"Mute held + Pad (Play, kit)", S::Play, T::Kit, H::mute, C::Pad, G::Press, J::MutePad, St::Wave2, mixer},
         {"Step held + Pad", S::Play, T::Any, H::step, C::Pad, G::Press, J::NoteOnStep, St::Wave2, sequencer},
@@ -85,8 +85,8 @@ std::vector<Binding> make_table() {
         {"Track button held + Step", S::Any, T::Any, H::track, C::Step, G::Press, J::PickTrack, St::Done},
 
         // Shift + steps
-        {"Shift + Step 1", S::Any, T::Any, H::shift, C::Step, G::Press, J::Projects, St::Wave2, projects, step(1)},
-        {"Shift + Step 2", S::Any, T::Any, H::shift, C::Step, G::Press, J::Setup, St::Wave2, projects, step(2)},
+        {"Shift + Step 1", S::Any, T::Any, H::shift, C::Step, G::Press, J::Projects, St::Done, "", step(1)},
+        {"Shift + Step 2", S::Any, T::Any, H::shift, C::Step, G::Press, J::Setup, St::Done, "", step(2)},
         {"Shift + Step 3", S::Any, T::Any, H::shift, C::Step, G::Press, J::Workflow, St::Wave2, sequencer, step(3)},
         {"Shift + Step 4", S::Any, T::Any, H::shift, C::Step, G::Press, J::Mixer, St::Wave2, mixer, step(4)},
         {"Shift + Step 5", S::Any, T::Any, H::shift, C::Step, G::Press, J::Tempo, St::Done, "", step(5)},
@@ -114,6 +114,8 @@ std::vector<Binding> make_table() {
         {"Step (Tracks)", S::Tracks, T::Any, H::none, C::Step, G::Press, J::PickTrack, St::Done},
         {"Copy held + Step (Tracks)", S::Tracks, T::Any, H::copy, C::Step, G::Press, J::CopyTrack, St::Done},
         {"Delete held + Step (Tracks)", S::Tracks, T::Any, H::del, C::Step, G::Press, J::ClearTrack, St::Done},
+        {"Track button held + Shift + Copy held + Step", S::Any, T::Any, H::track | H::shift | H::copy, C::Step, G::Press, J::MoveTrack, St::Done},
+        {"Shift + Copy held + Step (Tracks)", S::Tracks, T::Any, H::shift | H::copy, C::Step, G::Press, J::MoveTrack, St::Done},
 
         // Knobs
         {"Knob", S::Any, T::Any, H::none, C::Knob, G::Turn, J::TurnKnob, St::Done},
@@ -152,13 +154,16 @@ std::vector<Binding> make_table() {
         {"Wheel turn (Canvas)", S::Canvas, T::Any, H::none, C::WheelTurn, G::Turn, J::CanvasTurn, St::Done},
         {"Wheel push (Canvas)", S::Canvas, T::Any, H::none, C::WheelPush, G::Press, J::CanvasPush, St::Done},
         {"Wheel push (Typing)", S::Typing, T::Any, H::none, C::WheelPush, G::Press, J::TypeDone, St::Done},
+        {"Wheel turn (Typing)", S::Typing, T::Any, H::none, C::WheelTurn, G::Turn, J::TypeTurn, St::Done},
+        {"Wheel turn (Overview)", S::Overview, T::Any, H::none, C::WheelTurn, G::Turn, J::PickProject, St::Done},
+        {"Wheel push (Overview)", S::Overview, T::Any, H::none, C::WheelPush, G::Press, J::ProjectOptions, St::Done},
         {"Loop held + Wheel turn", S::Play, T::Any, H::loop, C::WheelTurn, G::Turn, J::LoopLength, St::Wave2, sequencer},
         {"Shift + Loop held + Wheel turn", S::Play, T::Any, H::shift | H::loop, C::WheelTurn, G::Turn, J::LoopLengthFine, St::Wave2, sequencer},
 
         // Transport
         {"Play", S::Any, T::Any, H::none, C::Play, G::Press, J::PlayStop, St::Done},
         {"Shift + Play", S::Any, T::Any, H::shift, C::Play, G::Press, J::Restart, St::Done},
-        {"Play (Overview)", S::Overview, T::Any, H::none, C::Play, G::Press, J::PreviewProject, St::Wave2, projects},
+        {"Play (Overview)", S::Overview, T::Any, H::none, C::Play, G::Press, J::PreviewProject, St::Done},
         {"Rec", S::Any, T::Any, H::none, C::Rec, G::Press, J::Record, St::Core},
         {"Rec (Sampling)", S::Sampling, T::Audio, H::none, C::Rec, G::Press, J::RecordAudio, St::Wave2, sampling},
 
@@ -172,14 +177,15 @@ std::vector<Binding> make_table() {
         {"Loop", S::Play, T::Any, H::none, C::Loop, G::Tap, J::LoopMode, St::Wave2, sequencer},
         {"Shift + Loop", S::Any, T::Any, H::shift, C::Loop, G::Press, J::Nothing, St::Free},
         {"Mute", S::Play, T::Any, H::none, C::Mute, G::Tap, J::MuteSelected, St::Done},
-        {"Undo", S::Any, T::Any, H::none, C::Undo, G::Tap, J::Undo, St::Wave2, projects},
-        {"Shift + Undo", S::Any, T::Any, H::shift, C::Undo, G::Press, J::Redo, St::Wave2, projects},
-        {"Undo held", S::Any, T::Any, H::none, C::Undo, G::Hold, J::UndoList, St::Wave2, projects},
+        {"Undo", S::Any, T::Any, H::none, C::Undo, G::Tap, J::Undo, St::Done},
+        {"Shift + Undo", S::Any, T::Any, H::shift, C::Undo, G::Press, J::Redo, St::Done},
+        {"Undo held", S::Any, T::Any, H::none, C::Undo, G::Hold, J::UndoList, St::Done},
         {"Copy", S::Play, T::Any, H::none, C::Copy, G::Tap, J::DuplicatePattern, St::Wave2, sequencer},
         {"Shift + Copy", S::Any, T::Any, H::shift, C::Copy, G::Press, J::Nothing, St::Free},
         {"Delete", S::Play, T::Any, H::none, C::Delete, G::Tap, J::DeleteCurrentPattern, St::Wave2, sequencer},
         {"Delete (Typing)", S::Typing, T::Any, H::none, C::Delete, G::Press, J::TypeBackspace, St::Done},
         {"Shift + Delete", S::Any, T::Any, H::shift, C::Delete, G::Press, J::Nothing, St::Free},
+        {"Delete (Overview)", S::Overview, T::Any, H::none, C::Delete, G::Tap, J::DeleteSelection, St::Done},
 
         // Note/Session, Back, Shift
         {"Note/Session", S::Any, T::Any, H::none, C::NoteSession, G::Tap, J::ToggleSession, St::Wave2, sequencer},
@@ -217,6 +223,8 @@ std::vector<Binding> make_table() {
         {"Left or Right (Session)", S::Session, T::Any, H::none, C::Right, G::Press, J::PatternPage, St::Wave2, sequencer},
         {"Left or Right (Chop)", S::Chop, T::Any, H::none, C::Left, G::Press, J::SliceStep, St::Done},
         {"Left or Right (Chop)", S::Chop, T::Any, H::none, C::Right, G::Press, J::SliceStep, St::Done},
+        {"Plus or Minus (Overview)", S::Overview, T::Any, H::none, C::Plus, G::Press, J::ProjectPage, St::Done},
+        {"Plus or Minus (Overview)", S::Overview, T::Any, H::none, C::Minus, G::Press, J::ProjectPage, St::Done},
     };
 }
 
