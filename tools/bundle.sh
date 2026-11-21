@@ -24,7 +24,20 @@ mkdir -p "$OUT/licenses"
 [ -f build/deps/rubik/OFL.txt ] && cp build/deps/rubik/OFL.txt "$OUT/licenses/Rubik-OFL.txt"
 cp tools/launcher.sh "$OUT/melodee-move"
 cp tools/run-stock.sh "$OUT/run-stock.sh"
+# USB audio (docs/USB_AUDIO.md): the script that turns it on, and the kernel
+# modules tools/kernel-modules.sh built, when it has: unmodified, with the
+# configuration they were built with and the kernel's licence.
+cp tools/usb-audio.sh "$OUT/usb-audio.sh"
+if [ -f build/kmod/usb_f_uac2.ko ] && [ -f build/kmod/GPL-2.0.txt ]; then
+    mkdir -p "$OUT/kmod"
+    for module in snd snd-timer snd-pcm u_audio usb_f_uac2; do cp "build/kmod/$module.ko" "$OUT/kmod/"; done
+    cp build/kmod/kernel.config "$OUT/kmod/kernel.config"
+    cp build/kmod/GPL-2.0.txt "$OUT/licenses/Linux-GPL-2.0.txt"
+fi
 cp -R "$OUT/bin" "$OUT/lib" "$OUT/licenses" "$TOOL/"
+[ -d "$OUT/kmod" ] && cp -R "$OUT/kmod" "$TOOL/"
+cp "$OUT/usb-audio.sh" "$TOOL/"
 cp module/module.json module/standalone "$TOOL/"
-chmod 755 "$OUT/melodee-move" "$OUT/run-stock.sh" "$TOOL/standalone" "$OUT/bin/melodee-move" "$TOOL/bin/melodee-move"
-echo "bundle: $OUT ($(ls "$OUT/lib" | wc -l) libraries), $TOOL"
+chmod 755 "$OUT/melodee-move" "$OUT/run-stock.sh" "$OUT/usb-audio.sh" "$TOOL/usb-audio.sh" "$TOOL/standalone" \
+    "$OUT/bin/melodee-move" "$TOOL/bin/melodee-move"
+echo "bundle: $OUT ($(ls "$OUT/lib" | wc -l) libraries$([ -d "$OUT/kmod" ] && echo ', USB audio modules')), $TOOL"

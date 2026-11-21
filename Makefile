@@ -158,6 +158,12 @@ $(INSTRUMENTS_TESTS): build/obj/tests/instruments_tests.o $(SHARED_OBJECTS) $(JU
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 $(CONTROLS_TESTS): build/obj/tests/controls_tests.o build/obj/app/bindings.o
 	$(CXX) -static-libstdc++ -static-libgcc $^ -pthread -o $@
+# USB audio to a computer (src/move/usb_audio.*): the writer alone, against a
+# stand-in for the gadget's PCM.
+USB_TESTS := build/usb-tests
+all: $(USB_TESTS)
+$(USB_TESTS): build/obj/tests/usb_tests.o build/obj/move/usb_audio.o
+	$(CXX) -static-libstdc++ -static-libgcc $^ -pthread -o $@
 $(PAD_TESTS): build/obj/tests/pad_layout_tests.o build/obj/app/pad_layout.o
 	$(CXX) -static-libstdc++ -static-libgcc $^ -pthread -o $@
 $(PADS_APP_TESTS): build/obj/tests/pads_app_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS) $(MELODEE_LIBRARY)

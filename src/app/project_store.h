@@ -25,12 +25,26 @@ namespace app {
 
 using PluginStates = std::array<std::vector<uint8_t>, melodee::max_plugins>;
 
+// USB submixes (docs/USB_AUDIO.md): what a computer records on channels
+// 3-18, eight stereo pairs. Each track and each bus A-D is on one, 1-8, or
+// on none, 0; it stays in the main mix either way. Unless a project says
+// otherwise, tracks 1-8 are on submixes 1-8 and the rest on none.
+constexpr unsigned usb_stems = melodee::track_count + melodee::bus_count; // tracks, then buses A-D
+constexpr uint8_t usb_default(unsigned stem) { return stem < 8 ? uint8_t(stem + 1) : uint8_t(0); }
+constexpr std::array<uint8_t, usb_stems> usb_defaults() {
+    std::array<uint8_t, usb_stems> submix {};
+    for (unsigned n = 0; n < usb_stems; ++n) submix[n] = usb_default(n);
+    return submix;
+}
+
 // The Move's own part of a project, beside Melodee's: kept in the file's
-// Move section ("MVPJ", text: `colour N`, `track_colour T N`), which
-// Melodee's reader skips, and covered by undo (history.h).
+// Move section ("MVPJ", text: `colour N`, `track_colour T N`, `usb T N`,
+// `usb_bus B N`), which Melodee's reader skips, and covered by undo
+// (history.h).
 struct MoveExtras {
     std::array<uint8_t, melodee::track_count> track_colour {}; // a palette index; 0: the track's own (ui/track_style.h)
     uint8_t colour = 0;                                         // the project's, on its Set Overview pad; 0: none picked
+    std::array<uint8_t, usb_stems> usb_submix = usb_defaults(); // each track's and bus's USB submix, 1-8; 0: none
     uint8_t spare[15] {};
 };
 

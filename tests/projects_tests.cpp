@@ -423,11 +423,54 @@ void test_setup_and_tracks() {
 
 } // namespace
 
+// USB submixes (docs/USB_AUDIO.md): each track's and bus's, kept in the
+// Move's section where it is not the default, read back, undone.
+void test_usb_submixes() {
+    auto project = std::make_unique<melodee::Project>();
+    auto bank = std::make_unique<melodee::PatternBank>();
+    app::PluginStates none;
+    app::MoveExtras extras;
+    // The default: tracks 1-8 on submixes 1-8, the rest and the buses on none.
+    CHECK(extras.usb_submix[0] == 1 && extras.usb_submix[7] == 8 && extras.usb_submix[8] == 0 && extras.usb_submix[16] == 0);
+    auto plain = app::project_file_bytes(*project, *bank, none, &extras);
+    std::string plain_text(plain.begin(), plain.end());
+    CHECK(plain_text.find("\nusb") == std::string::npos); // defaults are not written
+
+    extras.usb_submix[2] = 0;                           // track 3 on none
+    extras.usb_submix[10] = 5;                          // track 11 on submix 5
+    extras.usb_submix[melodee::track_count + 1] = 8;    // bus B on submix 8
+    auto bytes = app::project_file_bytes(*project, *bank, none, &extras);
+    std::string text(bytes.begin(), bytes.end());
+    CHECK(text.find("\nusb 2 0\n") != std::string::npos && text.find("\nusb 10 5\n") != std::string::npos &&
+          text.find("\nusb_bus 1 8\n") != std::string::npos && text.find("\nusb 0 ") == std::string::npos);
+    auto back = std::make_unique<melodee::Project>();
+    auto back_bank = std::make_unique<melodee::PatternBank>();
+    app::MoveExtras read;
+    read.usb_submix.fill(7);
+    CHECK(app::read_project_bytes(bytes, *back, *back_bank, none, &read).empty());
+    CHECK(read.usb_submix == extras.usb_submix);
+    // A project from before submixes: the defaults.
+    app::MoveExtras old;
+    old.usb_submix.fill(7);
+    CHECK(app::read_project_bytes(plain, *back, *back_bank, none, &old).empty());
+    CHECK(old.usb_submix == app::usb_defaults());
+
+    // A change is a step of its own, undone and redone.
+    app::Live live {*project, *bank, extras};
+    app::History history;
+    history.reset(live);
+    extras.usb_submix[4] = 2;
+    CHECK(history.close(live, "5 USB", 4, app::History::Clock::now()));
+    CHECK(history.undo(live) && extras.usb_submix[4] == 5);
+    CHECK(history.redo(live) && extras.usb_submix[4] == 2);
+}
+
 int main() {
     test_history();
     test_undo_app();
     test_projects();
     test_setup_and_tracks();
+    test_usb_submixes();
     std::cout << "projects-tests: " << checks - failures << "/" << checks << " checks passed\n";
     return failures ? 1 : 0;
 }

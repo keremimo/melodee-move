@@ -4,6 +4,7 @@
 #include "app/prints.h"
 #include "app/sampling.h"
 #include "app/screen.h"
+#include "app/usb_submix.h"
 #include "app/sequencer.h"
 #include "app/seq_edit.h"
 #include "app/song_desk.h"
@@ -307,6 +308,9 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
         if (modules[t] && modules[t]->entry != melodee::no_plugin) engine->offer_plugin(modules[t]->entry, &modules[t]->runner);
     pad_response.store(settings.response);
     pad_pressure.store(settings.pressure);
+    usb_full.store(settings.usb_full);
+    for (unsigned n = 0; n < usb_stems; ++n) usb_route[n].store(move_extras.usb_submix[n]); // the project's USB submixes
+    usb_published = move_extras.usb_submix;
     send({Type::Click, 0, 0, uint16_t(click_volume), int16_t(click_on)});
     loop_desk = std::make_unique<LoopDesk>(*this);
     loop_desk->set_latency(loop_latency_setting);
@@ -347,6 +351,7 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
 }
 
 Studio::~Studio() {
+    usb->stop(); // silence to the computer, then its device closed
     if (arranger) arranger->stop(); // the print host and the exports' thread, before the engine host goes
     for (auto& module : modules) if (module) module->player.stop();
     for (auto& module : modules_leaving) if (module) module->player.stop();
@@ -376,8 +381,18 @@ void Studio::forward() {
 void Studio::render(const move::AudioBlock& input, move::AudioBlock& output) {
     forward();
     module_input(input);
+    // While a computer records over USB (docs/USB_AUDIO.md): the tracks' and
+    // buses' taps for the submixes, and the main mix at full volume unless
+    // Setup's USB VOLUME says KNOB. Nothing is tapped otherwise.
+    static_assert(usb_stems == melodee::StemRing::stem_count && move::audio_frames == melodee::EngineHost::block, "the live stems' rows");
+    const bool to_usb = usb->accepting(), full = to_usb && usb_full.load(std::memory_order_relaxed);
+    engine->set_live_stems(to_usb ? usb_taps.data() : nullptr);
     engine->render(output.data(), move::audio_frames, speaker_quiet.load(std::memory_order_relaxed) ? 0.0f : volume.load(std::memory_order_relaxed),
-                   input.data()); // Sampling: the speaker quiet while the mic would howl
+                   input.data(), nullptr, nullptr, full ? usb_fixed.data() : nullptr); // Sampling: the speaker quiet while the mic would howl
+    if (to_usb) {
+        sum_submixes(usb_taps.data(), usb_route.data(), usb_stems, move::audio_frames, usb_submix.data());
+        usb->push(full ? usb_fixed.data() : output.data(), usb_submix.data(), move::audio_frames);
+    }
     // Melodee's transport, for the modules that follow it (sequencer.h): stores only.
     set_module_transport(engine->playing(), engine->ticks() / double(melodee::ticks_per_quarter), audio_beats.load(std::memory_order_relaxed),
                          audio_unit.load(std::memory_order_relaxed));
@@ -1044,6 +1059,7 @@ bool Studio::move_track(unsigned from, unsigned to) {
     std::swap(bank->at[from], bank->at[to]);
     std::swap(modules[from], modules[to]);             // each module keeps its entry: the track names it
     std::swap(move_extras.track_colour[from], move_extras.track_colour[to]);
+    std::swap(move_extras.usb_submix[from], move_extras.usb_submix[to]); // its USB submix goes with it
     apply_track(from);
     apply_track(to);
     if (selected == from || selected == to) select(selected == from ? to : from);
@@ -1268,7 +1284,7 @@ std::string Studio::settings_text() const {
         << "pad_lights " << unsigned(settings.pad_lights) << '\n' << "pad_fade " << unsigned(settings.pad_fade) << '\n'
         << "brightness " << unsigned(settings.brightness) << '\n' << "light_show " << int(settings.light_show) << '\n'
         << "show_style " << unsigned(settings.show_style) << '\n' << "full " << int(settings.full) << '\n'
-        << "usage_log " << int(settings.usage_log) << '\n' << "last " << path << '\n';
+        << "usage_log " << int(settings.usage_log) << '\n' << "usb_full " << int(settings.usb_full) << '\n' << "last " << path << '\n';
     if (!settings.start.empty()) out << "start " << settings.start << '\n';
     // The other areas' own: the pad layout, the sequencer's, MIDI Config, the Looper's input delay.
     out << "pads " << int(pad_layout() == PadLayout::Banks) << '\n';
@@ -1310,6 +1326,7 @@ void Studio::read_settings() {
         else if (word == "show_style") settings.show_style = uint8_t(std::min(value, 4u));
         else if (word == "full") settings.full = value != 0;
         else if (word == "usage_log") settings.usage_log = value != 0;
+        else if (word == "usb_full") settings.usb_full = value != 0;
         else if (word == "last") last_path = rest;
         else if (word == "start") settings.start = rest;
         else if (word == "pads") set_pad_layout(value ? PadLayout::Banks : PadLayout::Rows);
@@ -1325,9 +1342,35 @@ void Studio::volume_changed() {
     settings_at = Clock::now();
 }
 
+// USB audio (docs/USB_AUDIO.md). The writer's thread starts once ALSA is
+// there (tools/usb-audio.sh loads it, as root, at any time; looked for each
+// second): until then, and on a Move without it, nothing runs. Each stem's
+// submix goes to the audio thread whenever the project's differs from what
+// it has: an edit, an undo, another project, a track moved.
+void Studio::usb_service() {
+    auto now = Clock::now();
+    if (!usb_started && now >= usb_looked) {
+        usb_looked = now + std::chrono::seconds(1);
+        std::error_code error;
+        if (fs::exists("/proc/asound/cards", error)) {
+            usb->start();
+            usb_started = true;
+        }
+    }
+    std::array<uint8_t, usb_stems> wanted;
+    {
+        std::lock_guard<std::mutex> guard(lock);
+        wanted = move_extras.usb_submix;
+    }
+    if (wanted == usb_published) return;
+    usb_published = wanted;
+    for (unsigned n = 0; n < usb_stems; ++n) usb_route[n].store(wanted[n], std::memory_order_relaxed);
+}
+
 void Studio::settings_changed() {
     pad_response.store(settings.response, std::memory_order_relaxed);
     pad_pressure.store(settings.pressure, std::memory_order_relaxed);
+    usb_full.store(settings.usb_full, std::memory_order_relaxed);
     dirty = true; // written with the project at the next save (Move.settings beside it)
     changed_at = Clock::now();
 }
@@ -1670,6 +1713,7 @@ void Studio::service() {
         arranger->printer().opened(); // the frozen tracks' prints read and sent (also each project opened)
     }
     hold_streams();
+    usb_service();
     sampler_shell->service(); // a take drained into its file, Audio Recall copied out
     take_back();
     loop_desk->service(); // the Looper's memory and fits, its files, commits
@@ -2514,6 +2558,7 @@ std::string Studio::status() const {
     }
     line += arranger->status();
     line += sampler_shell->status();
+    line += ' ' + usb->status(); // USB audio to a computer (docs/USB_AUDIO.md)
     line += instruments_status();
     for (const auto& screen : screens) line += screen->status();
     line += seq->status();

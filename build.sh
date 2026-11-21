@@ -141,6 +141,7 @@ docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE
     build/move-tests &&
     build/sequencer-tests &&
     build/controls-tests &&
+    build/usb-tests &&
     build/mixer-tests &&
     build/midi-tests &&
     build/projects-tests &&

@@ -16,6 +16,7 @@
 #include "move/host.h"
 #include "move/tools.h"
 #include "melodee/engine/effect_info.h"
+#include "fake_pcm.h"
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
@@ -599,6 +600,74 @@ void test_screens(Rig& rig) {
     rig.quiet();
 }
 
+// USB audio to a computer (docs/USB_AUDIO.md), the whole way: Melodee's
+// engine, its live stems, the submixes and the writer, into a stand-in for
+// the gadget's PCM. Track 1, on submix 1 by default, is heard on channels
+// 1-2 and 3-4, the other pairs silent; moved to submix 4 it follows (9-10);
+// on none it leaves the submixes but not the main mix. Nothing is tapped
+// while the computer does not record.
+void test_usb(Rig& rig) {
+    auto& studio = rig.studio();
+    studio.select(0);
+    rig.quiet();
+    auto owned = std::make_unique<FakePcm>();
+    FakePcm& pcm = *owned;
+    studio.use_usb_out(std::make_unique<UsbAudioOut>(std::move(owned)));
+    auto& usb = studio.usb_out();
+    double t = 1.0;
+    usb.cycle(usb_time(t), 0); // opened, filled with silence
+    pcm.take(224);
+    usb.cycle(usb_time(t += 0.005), 0);
+    CHECK(usb.accepting() && has(studio.status(), "usb_audio=running usb_channels=18"));
+    // A block rendered while the computer records: as many frames taken, the writer's cycle.
+    auto block = [&] {
+        rig.out.fill(0);
+        rig.melodee.render(rig.in, rig.out);
+        pcm.take(audio_frames);
+        usb.cycle(usb_time(t += audio_frames / 44100.0), 0);
+    };
+    // Recording on until the Move is quiet, and what it had sent on its way (the ring and the device's buffer).
+    auto quiet = [&] {
+        for (int n = 0, still = 0; n < 6000 && still < 100; ++n) { block(); still = peak_of(rig.out) ? 0 : still + 1; }
+        for (int n = 0; n < 40; ++n) block();
+    };
+    // The pad played, held `blocks` blocks: where its frames start in what the computer has.
+    auto play = [&](unsigned pad, unsigned blocks) {
+        unsigned from = pcm.frames();
+        rig.melodee.audio_event(make_event(0x90, pad_note(pad), 110));
+        for (unsigned n = 0; n < blocks + 60; ++n) {
+            if (n == blocks) rig.melodee.audio_event(make_event(0x80, pad_note(pad), 0));
+            block();
+        }
+        return from;
+    };
+    unsigned from = play(0, 40);
+    CHECK(pcm.peak(0, from) > 0.05 && pcm.peak(1, from) > 0.05); // the main mix
+    CHECK(pcm.peak(2, from) > 0.05 && pcm.peak(3, from) > 0.05); // submix 1
+    bool others = true;
+    for (unsigned c = 4; c < usb_channels; ++c) others = others && pcm.peak(c, from) == 0;
+    CHECK(others);
+
+    studio.extras().usb_submix[0] = 4;
+    rig.melodee.service(); // the route to the audio thread
+    quiet();
+    from = play(0, 40);
+    CHECK(pcm.peak(8, from) > 0.05 && pcm.peak(9, from) > 0.05 && pcm.peak(2, from) == 0);
+
+    studio.extras().usb_submix[0] = 0;
+    rig.melodee.service();
+    quiet();
+    from = play(0, 40);
+    others = true;
+    for (unsigned c = 2; c < usb_channels; ++c) others = others && pcm.peak(c, from) == 0;
+    CHECK(others && pcm.peak(0, from) > 0.05);
+
+    studio.extras().usb_submix[0] = app::usb_default(0);
+    rig.melodee.service();
+    studio.use_usb_out(std::make_unique<UsbAudioOut>(gadget_pcm())); // the real one again, not started
+    CHECK(!studio.usb_out().accepting());
+}
+
 // In the MPC's two banks (pad_layout.h, Banks) a pad's job follows its
 // number: Flex Beat's 1-16 and Pad FX's first sixteen are the left bank, a
 // kit pad its number.
@@ -705,6 +774,7 @@ int main() {
         test_keys(rig);
         test_screens(rig);
         test_layouts(rig);
+        test_usb(rig);
         // Left for the file: an Echo keyed... a Compressor on track 2 keyed by bus C, a send, a return, the
         // compressor, Knob FX, a pad muted, the Schwung effect on track 1 at gain 1.
         mixing::set_send(rig.studio(), 0, 1, 40);

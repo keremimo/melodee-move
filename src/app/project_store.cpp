@@ -134,6 +134,10 @@ std::vector<uint8_t> project_file_bytes(const melodee::Project& project, const m
         if (extras->colour) out << "colour " << unsigned(extras->colour) << '\n';
         for (unsigned t = 0; t < melodee::track_count; ++t)
             if (extras->track_colour[t]) out << "track_colour " << t << ' ' << unsigned(extras->track_colour[t]) << '\n';
+        for (unsigned n = 0; n < usb_stems; ++n) // USB submixes, where they are not the default
+            if (extras->usb_submix[n] != usb_default(n))
+                out << (n < melodee::track_count ? "usb " : "usb_bus ") << (n < melodee::track_count ? n : n - melodee::track_count) << ' '
+                    << unsigned(extras->usb_submix[n]) << '\n';
         section(move_tag, out.str());
     }
     return bytes;
@@ -176,6 +180,9 @@ std::string read_project_bytes(const std::vector<uint8_t>& bytes, melodee::Proje
                     fields >> word >> a;
                     if (word == "colour") extras->colour = uint8_t(std::min(a, 127u));
                     else if (word == "track_colour" && (fields >> b) && a < melodee::track_count) extras->track_colour[a] = uint8_t(std::min(b, 127u));
+                    else if (word == "usb" && (fields >> b) && a < melodee::track_count) extras->usb_submix[a] = uint8_t(std::min(b, 8u));
+                    else if (word == "usb_bus" && (fields >> b) && a < melodee::bus_count)
+                        extras->usb_submix[melodee::track_count + a] = uint8_t(std::min(b, 8u));
                 }
         }
         at += 8 + size;

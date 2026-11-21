@@ -15,6 +15,7 @@
 #include "app/project_store.h"
 #include "move/app.h"
 #include "move/queues.h"
+#include "move/usb_audio.h"
 #include "melodee/engine/auto_chop.h"
 #include "melodee/engine/engine_host.h"
 #include "melodee/engine/onsets.h"
@@ -147,11 +148,12 @@ struct Settings {
     uint8_t show_style = 0;  // Pulse, Sweep, Chase, Ripple, Levels
     bool full = true;        // Full, or Basic: the Move's own pages, tracks, modules, the mixer and Song
     bool usage_log = false;  // what the hands do, a file each start (Usage/)
+    bool usb_full = true;    // USB VOLUME: a computer records the main mix at full volume, or as the Volume knob has it
     std::string start;       // the project opened at start; empty: the one open last
     bool operator==(const Settings& o) const {
         return response == o.response && pressure == o.pressure && pad_lights == o.pad_lights && pad_fade == o.pad_fade &&
                brightness == o.brightness && light_show == o.light_show && show_style == o.show_style && full == o.full &&
-               usage_log == o.usage_log && start == o.start;
+               usage_log == o.usage_log && usb_full == o.usb_full && start == o.start;
     }
 };
 constexpr unsigned pad_fade_ms[4] {60, 100, 150, 250};
@@ -384,6 +386,11 @@ public:
     History history;
     MoveExtras& extras() { return move_extras; }
     const MoveExtras& extras() const { return move_extras; }
+    // USB audio to a computer (docs/USB_AUDIO.md): its writer. A test gives
+    // one of its own (a stand-in PCM, driven a cycle at a time) before the
+    // audio thread runs; it is never started here.
+    move::UsbAudioOut& usb_out() { return *usb; }
+    void use_usb_out(std::unique_ptr<move::UsbAudioOut> out) { usb->stop(); usb = std::move(out); usb_started = true; }
     std::string last_step; // the step undone or redone last, for the status line
     unsigned step_us = 0, step_us_peak = 0; // the last close's time and the longest (MIDI thread)
 
@@ -698,6 +705,20 @@ private:
     // the engine behind the commands before and says which park it was.
     std::atomic<bool> park_asked {false};
     std::atomic<uint32_t> park_serial {0};
+    // USB audio to a computer (docs/USB_AUDIO.md): the writer, started once
+    // the gadget's sound card is there; each stem's submix for the audio
+    // thread, copied from the project by the service thread; the audio
+    // thread's taps, submixes and full-volume mix.
+    std::unique_ptr<move::UsbAudioOut> usb = std::make_unique<move::UsbAudioOut>(move::gadget_pcm());
+    bool usb_started = false;                      // service thread
+    Clock::time_point usb_looked {};               // service thread: /proc/asound looked for
+    std::array<std::atomic<uint8_t>, usb_stems> usb_route {};
+    std::array<uint8_t, usb_stems> usb_published {}; // service thread: what usb_route holds
+    std::atomic<bool> usb_full {true};             // Settings::usb_full
+    std::array<float, usb_stems * 2 * move::audio_frames> usb_taps {};
+    std::array<float, 2 * move::usb_submixes * move::audio_frames> usb_submix {};
+    move::AudioBlock usb_fixed {};
+    void usb_service();                            // service thread: start the writer, publish the routes
     bool rebuild_wanted = false; // under `lock`: the engine rebuilt from the project, parked
     std::array<Went, pad_count> pad_went {};
     // Schwung's effects by plug-in entry, and those handed back by the
