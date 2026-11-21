@@ -73,7 +73,7 @@ PADS_EXPECTED='page=kit-play .*pad=B01 .*layout=banks'
 # the pad pages (TRIM), knob 1 moves the start, Back at 780; Copy held with
 # A01 then B16 at 900 copies A01 onto the empty B16 (18 pads).
 KIT_SCRIPT='100:0xb0,55,127;101:0xb0,55,0;160:0xb0,54,127;161:0xb0,54,0;240:0xb0,49,127;241:0x90,23,127;242:0x80,23,0;243:0xb0,49,0;300:0x90,72,100;330:0x80,72,0;480:0xb0,49,127;481:0x90,23,127;482:0x80,23,0;483:0xb0,49,0;700:0xb0,49,127;701:0xb0,14,1;702:0xb0,49,0;720:0xb0,71,2;780:0xb0,51,127;781:0xb0,51,0;900:0xb0,60,127;901:0x90,68,100;902:0x80,68,0;903:0x90,99,100;904:0x80,99,0;905:0xb0,60,0'
-KIT_EXPECTED='page=kit-play .*pads=18 .* bank=0 pitches=0 copy_from=-1'
+KIT_EXPECTED='page=kit-play .*pads=18 .* bank=0 first=A01 pitches=0 copy_from=-1'
 # The synth track: Track 2 tapped at 50, the wheel's push at 60 lists the
 # modules (none loaded yet), its push at 80 loads the one in
 # build/test-modules (the tests' stand-in), a pad plays it, knob 1 turns its

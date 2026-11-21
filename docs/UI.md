@@ -264,8 +264,11 @@ the screens were built; the screens are `src/app/screens/kit_play.cpp`,
 
 - **128 pads in eight banks** (A-H), as Melodee's kits. The 32 pads are two
   banks, the lower one bottom; **Plus and Minus move them 16 pads** (A-B,
-  B-C ... G-H), a message naming the pads in view (`PADS C01-D16`), Plus
-  and Minus lit where they can move. The rail's pad (`C05`) carries its
+  B-C ... G-H), **Shift + Plus and Minus four** (Control Live's four pads:
+  A05-C04), a message naming the pads in view (`PADS C01-D16`), Plus and
+  Minus lit where they can move. The bank the view starts in is kept with
+  the kit; the four-pad step only for the run. With the Banks pad layout
+  (`app/pad_layout.h`) the 32 are two MPC 4x4 banks side by side. The rail's pad (`C05`) carries its
   bank's letter.
 - **The pad pages** (Melodee's Stage, the Move's parameter banks): **Shift +
   turn** from Play walks nine pages of the last pad, past either end back to

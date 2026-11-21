@@ -372,7 +372,8 @@ while Shift is held.
 | Plus or Minus (Play, synth) | The octave | The same | done |
 | Plus or Minus (Play, kit) | No job without 16 Pitches (Control Live's Drum mode: the next or previous 16 pads) | The next or previous 16 pads of the kit's 8 banks | done |
 | Plus or Minus (16 Pitches) | The pitches' octave | The same | done |
-| Shift + Plus or Minus | No job (Control Live: a scale degree; four pads) | A synth a scale degree, a kit four pads | wave 2: instruments |
+| Shift + Plus or Minus (Play, synth) | No job (Control Live: a scale degree) | The pads a note of the key up or down (a semitone on Chromatic); a note track's, not kept | wave 2: instruments |
+| Shift + Plus or Minus (Play, kit) | No job (Control Live: four pads) | The kit's pads in view four pads up or down (with 16 Pitches, the left bank's); the bank they start in kept with the kit | done |
 | Plus or Minus (Session) | No job (Control Live: the session ring a scene) | The bank of four tracks | done |
 | Plus or Minus (Chop) | No job | Slices 33-64 | wave 2: sampling |
 | Left or Right (Play) | The clip's previous or next bar (or page of steps) | The pattern's bar (today the page, which moves to Shift + turn) | done |

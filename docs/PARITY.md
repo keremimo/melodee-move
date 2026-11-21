@@ -196,7 +196,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | Feature | Status | Move controls | ✓ |
 | --- | --- | --- | --- |
 | **One kit of 32 pads** on Melodee's SamplerEngine, A01-B16 (MELODEE.md › Sampler) | done | pads | [ ] |
-| **Kits of 128 pads** in banks (the MPC's A-H of 16; here four of 32) (MELODEE.md › Sampler) | done | the 32 pads two of eight banks of 16 (Kerem, 2026-11-20); Plus / Minus move 16; the rail's pad names its bank | [ ] |
+| **Kits of 128 pads** in banks (the MPC's A-H of 16; here four of 32) (MELODEE.md › Sampler) | done | the 32 pads two of eight banks of 16 (Kerem, 2026-11-20); Plus / Minus move 16, Shift + Plus / Minus four; the rail's pad names its bank | [ ] |
 | **No count of samples**: memory is the limit; a load that would leave too little is refused, "Memory full" (MELODEE.md › Sampler) | done | automatic: Melodee's shell/sample_memory.h, 256 MB left free; `MEMORY FULL` | [ ] |
 | **Load samples**: WAV, AIFF, FLAC, Ogg, MP3, from places (My Samples, Recordings, Core Library, /data/UserData) (MELODEE.md › Sampler, Samples) | done | Menu; jogwheel, push; Back up | [ ] |
 | **Long samples streamed** from storage, up to 6 hours; long MP3, FLAC, Ogg, AIFF decoded once into Cache (MELODEE.md › Sampler) | done | automatic: over 10 s (up to 6 hours), or what memory has no room for, read in place by Melodee's stream pager; long MP3, FLAC, Ogg, AIFF via Cache | [ ] |
@@ -226,7 +226,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Cloud**: a pad as a grain cloud; position, size, density, scan, spread (MELODEE.md › Playing, A kit) | done | CLOUD page: on, position, size, density, scan, spread | [ ] |
 | **Kit filter**: one filter after every pad (MELODEE.md › Sampler) | done | KIT FILT page: type, cutoff, resonance | [ ] |
 | **COLOUR**: a pad's light colour, the track's, one of sixteen, or the kit's own (MELODEE.md › Playing, A kit) | done | MIX page, knob 4: the track's, one of the sixteen track colours, or the pad's own; pad lights | [ ] |
-| **Full Level**: every hit at 127 (MELODEE.md › Shift + pads) | kit depth | not here: Shift + Step 10 is the Move's Full Velocity, the `instruments` row in MOVE_CONTROLS.md; one flag in Studio::audio_event for every track, kits too | [ ] |
+| **Full Level**: every hit at 127 (MELODEE.md › Shift + pads) | kit depth | not here: Shift + Step 10 is the Move's Full Velocity, built by move-instruments (its branch); the kit's sends here (pads and 16 Pitches) already read its flag, `Studio::full_level`, so it covers kits once merged | [ ] |
 | **Pad sends** into buses A-D, and the kit's send (MELODEE.md › Playing, A kit) | done | a kit's track item, Shift + turn: the last pad's own sends on knobs 1-4; the kit's (the track's) on its first page | [ ] |
 | **A pad's own chain** of four effects (MELODEE.md › Effects) | done | the Device View: after the pad, its own effects and their `+` (a dotted underline) | [ ] |
 | **Chop**: Auto, Beats, Regions, Threshold; a slice's start and end (MELODEE.md › Sampler, Chop) | done | Loop; knobs 1-4; jogwheel or Left / Right the slice | [ ] |

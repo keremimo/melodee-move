@@ -214,6 +214,12 @@ public:
     int move_pad_of(unsigned kit_pad) const;   // the Move pad showing a kit pad; -1 out of view
     unsigned pad_bank() const { return song->tracks[selected].bank; }
     void set_pad_bank(int bank);               // the lower bank in view, 0..6 (0..7 with 16 Pitches)
+    // The first kit pad in view: the bank's first, moved four pads at a time by
+    // Shift + Plus / Minus (the Move's Control Live: four pads). The bank is
+    // kept with the kit (Track::bank); the four pads past it only for the run.
+    unsigned pad_first() const;
+    void set_pad_first(int first);
+    unsigned pads_in_view() const { return pitches() ? 16u : pad_count; }
     bool pitches() const;                      // 16 Pitches on the selected kit
     void set_pitches(bool on);
     void set_pitches_octave(int octave);       // melodee's kit Levels octave, kit_level_octave as it is
@@ -562,7 +568,11 @@ private:
     // go there too.
     std::atomic<int> audio_track {0}, audio_kind {0}, audio_octave {0};
     // A kit's: the lower bank in view, 16 Pitches on, its pad and each pitch's semitones.
-    std::atomic<int> audio_bank {0}, audio_levels_pad {0};
+    std::atomic<int> audio_first {0}, audio_levels_pad {0}; // the first kit pad in view
+    std::array<uint8_t, melodee::track_count> pad_nudge {}; // Shift + Plus / Minus: 0, 4, 8 or 12 pads past the bank's first
+    // Shift + Step 10, the Move's Full Velocity: every pad at 127 (move-instruments
+    // declares the same member and its job; keep one at the merge).
+    std::atomic<bool> full_level {false};
     std::atomic<bool> audio_pitches {false}, audio_slices {false};
     std::array<std::atomic<int>, 16> audio_semitones {};
     std::atomic<bool> pads_typing {false};

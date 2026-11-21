@@ -82,6 +82,10 @@ public:
             studio.set_pad_bank(int(studio.pad_bank()) + (use.control == bindings::Control::Plus ? 1 : -1));
             studio.say("PADS " + banks_in_view(studio));
             return true;
+        case Job::ScaleStep: // Shift + Plus / Minus on a kit: four pads (the Move's Control Live)
+            studio.set_pad_first(int(studio.pad_first()) + (use.control == bindings::Control::Plus ? 4 : -4));
+            studio.say("PADS " + banks_in_view(studio));
+            return true;
         case Job::PitchesOctave: {
             int octave = studio.current().octave + (use.control == bindings::Control::Plus ? 1 : -1);
             studio.set_pitches_octave(octave);
@@ -104,10 +108,10 @@ public:
         steps_playhead(studio, lights);
         // Plus and Minus where they move the banks (or 16 Pitches' octave).
         bool pitches = studio.pitches();
-        int octave = studio.current().octave, bank = int(studio.pad_bank());
-        int top = int(melodee::sampler_banks) - (pitches ? 1 : 2);
-        lights.button(Button::Up, (pitches ? octave < melodee::kit_highest_octave : bank < top) ? white_dim : 0);
-        lights.button(Button::Down, (pitches ? octave > melodee::kit_lowest_octave : bank > 0) ? white_dim : 0);
+        int octave = studio.current().octave, first = int(studio.pad_first());
+        int top = int(melodee::sampler_pads - studio.pads_in_view());
+        lights.button(Button::Up, (pitches ? octave < melodee::kit_highest_octave : first < top) ? white_dim : 0);
+        lights.button(Button::Down, (pitches ? octave > melodee::kit_lowest_octave : first > 0) ? white_dim : 0);
         lights.button(Button::Copy, copy_down ? white_bright : white_dim);
         lights.button(Button::Delete, white_dim);
         // Left / Right (bars), Loop (Loop Mode) and Note/Session (Patterns) wait for wave 2.
@@ -178,7 +182,7 @@ public:
     }
     std::string knob_owner() const override { return pad_label(studio.pad()); }
     std::string status() const override {
-        return " bank=" + std::to_string(studio.pad_bank()) + " pitches=" + std::to_string(int(studio.pitches())) +
+        return " bank=" + std::to_string(studio.pad_bank()) + " first=" + pad_label(studio.pad_first()) + " pitches=" + std::to_string(int(studio.pitches())) +
                " copy_from=" + std::to_string(copy_from);
     }
     // Delete + a knob's touch with no motion: the value as a new pad has it (Melodee's Erase + pot).
