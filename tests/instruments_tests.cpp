@@ -585,6 +585,110 @@ void test_auto_sampler() {
     CHECK(!fs::exists(folder + "/Gone/Gone.xpm"));
 }
 
+bool has(const std::string& text, const std::string& part) { return text.find(part) != std::string::npos; }
+
+void test_screens() {
+    // The instrument screens through the Move's own controls (docs/MOVE_CONTROLS.md, docs/UI.md "Instruments").
+    const std::string home = "build/test-home-screens";
+    fs::remove_all(home);
+    fs::create_directories(home + "/Projects");
+    app::MelodeeApp melodee("build/test-instruments", home, "build/test-modules");
+    Session session;
+    melodee.attach(session);
+    melodee.audio_opened(AudioFormat {});
+    CHECK(melodee.restore_now().empty());
+    auto& studio = melodee.studio();
+    auto cc = [&](uint8_t number, uint8_t value) { melodee.surface(make_event(0xb0, number, value)); };
+    auto button = [&](Button b) { cc(button_cc(b), 127); cc(button_cc(b), 0); };
+    auto shifted = [&](auto&& what) { cc(button_cc(Button::Shift), 127); what(); cc(button_cc(Button::Shift), 0); std::this_thread::sleep_for(std::chrono::milliseconds(320)); };
+    auto wheel = [&](int detents) { cc(main_knob_cc, uint8_t(detents > 0 ? detents : 128 + detents)); };
+    auto knob = [&](unsigned n, int detents) { cc(uint8_t(knob_first_cc + n), uint8_t(detents > 0 ? detents : 128 + detents)); };
+    auto step = [&](unsigned n) { melodee.surface(make_event(0x90, step_note(n), 127)); melodee.surface(make_event(0x80, step_note(n), 0)); };
+    auto pad = [&](unsigned n, bool down) { melodee.surface(make_event(down ? 0x90 : 0x80, pad_note(n), down ? 100 : 0)); };
+    // A keygroup on track 3, the SFZ on it.
+    {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        CHECK(studio.new_track(2, app::TrackKind::Keys));
+        studio.select(2);
+        studio.jobs.push_back({"build/test-instruments/piano.sfz", 2, 0});
+    }
+    melodee.service();
+    CHECK(has(melodee.status(), "page=keys-play") && has(melodee.status(), "keys_page=1"));
+    // Shift + the wheel: its pages. PLAY: knob 1 the tune.
+    shifted([&] { wheel(1); });
+    CHECK(has(melodee.status(), "keys_page=2"));
+    knob(0, 2);
+    {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        CHECK(studio.project().tracks[2].pads[0].pitch == 2);
+    }
+    // To CHORD, the last page: knob 1 turns chords on.
+    shifted([&] { wheel(1); wheel(1); wheel(1); wheel(1); wheel(1); });
+    CHECK(has(melodee.status(), "keys_page=6"));
+    knob(0, 1);
+    CHECK(has(melodee.status(), "chord=1"));
+    knob(0, -1);
+    // The wheel's push on the instrument: the instrument browser, one place (--samples): straight in.
+    button(Button::MainPush);
+    CHECK(has(melodee.status(), "page=load-instruments") && !has(melodee.status(), "browse=0"));
+    button(Button::Back);
+    CHECK(has(melodee.status(), "page=keys-play"));
+    // Shift + Step 9: Keys & Scale. MODE pushed, turned to Chromatic, pushed; Back out.
+    shifted([&] { step(8); });
+    CHECK(has(melodee.status(), "page=keys-scale") && has(melodee.status(), "keys_row=0"));
+    button(Button::MainPush);
+    CHECK(has(melodee.status(), "keys_editing=1"));
+    wheel(1);
+    button(Button::MainPush);
+    CHECK(has(melodee.status(), "keys=CHROMATIC") && has(melodee.status(), "keys_editing=0"));
+    // KEY: D; SCALE: the next of the Move's (Minor).
+    wheel(1); // KEY (Chromatic has no ROWS)
+    button(Button::MainPush); wheel(2); button(Button::MainPush);
+    wheel(1); // SCALE
+    button(Button::MainPush); wheel(1); button(Button::MainPush);
+    CHECK(has(melodee.status(), "key=2/1"));
+    // STORE CHORD with two pads held: the store sheet, a pad takes it, saved as Mine 1.
+    wheel(1); wheel(1); // TRANSPOSE, STORE CHORD
+    pad(0, true); pad(4, true);
+    button(Button::MainPush);
+    pad(0, false); pad(4, false);
+    CHECK(has(melodee.status(), "page=store-chord"));
+    pad(3, true); pad(3, false);
+    CHECK(fs::exists(home + "/Progressions/Mine 1.progression"));
+    CHECK(has(melodee.status(), "keys=PROG"));
+    {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        CHECK(studio.project().tracks[2].prog.chords[3].count == 2);
+    }
+    button(Button::Back); // out of Keys & Scale
+    CHECK(has(melodee.status(), "page=keys-play"));
+    // A module track: MACRO first; knob 1 the FILTER macro. Then its menu's AUTO SAMPLE, the check, sampling, the new track.
+    {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        studio.select(1);
+    }
+    CHECK(melodee.load_module_now("fake").empty());
+    knob(0, -10);
+    {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        CHECK(studio.project().tracks[1].params[melodee::plugin_track::Macro1] == -10);
+    }
+    shifted([&] { button(Button::MainPush); }); // the module's menu
+    wheel(40);                                   // its last row: AUTO SAMPLE
+    button(Button::MainPush);
+    CHECK(has(melodee.status(), "page=auto-sample"));
+    for (int n = 0; n < 2000 && !has(melodee.status(), "auto_sheet=CHECKED"); ++n) std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    CHECK(has(melodee.status(), "auto_sheet=CHECKED"));
+    knob(0, 36 - 36); // LOW stays C1 (36)
+    knob(1, -55);      // HIGH down to 41
+    knob(2, -2);       // STEP 1
+    button(Button::MainPush);
+    for (int n = 0; n < 3000 && studio.auto_sampled < 0; ++n) { melodee.service(); std::this_thread::sleep_for(std::chrono::milliseconds(10)); }
+    CHECK(studio.auto_sampled == 2 + 1); // track 4: the first empty one
+    button(Button::MainPush); // go to it
+    CHECK(has(melodee.status(), "track=4 kind=keys"));
+}
+
 } // namespace
 
 int main() {
@@ -594,6 +698,7 @@ int main() {
     test_keys();
     test_instrument_keys();
     test_auto_sampler();
+    test_screens();
     test_keygroup_track();
     std::cout << "instruments-tests: " << checks - failures << " of " << checks << " checks passed\n";
     return failures ? 1 : 0;

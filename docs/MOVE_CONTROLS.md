@@ -222,6 +222,7 @@ while Shift is held.
 | Wheel turn (list) | Moves through a menu; turns a value | The same | done |
 | Shift + Wheel turn (list) | Fine (tempo, groove) | Fine | done |
 | Wheel push (list) | Opens an entry, switches it, confirms | The same | done |
+| Pad held + Wheel push (list) | No job | As the push alone; on Keys & Scale's STORE CHORD the pads held are the chord stored | done |
 | Wheel long push | Confirms a factory reset | Melodee never resets the Move | none |
 | Wheel turn (Chop) | Slicing Mode: the number of slices | The chop's amount: slices, beat division, threshold | done |
 | Wheel push (Chop) | Confirms the slices onto a new Drum Rack | To Pads: Poly, Mono, Thru, Kit | done |

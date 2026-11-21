@@ -142,6 +142,7 @@ std::vector<Binding> make_table() {
         {"Wheel turn (list)", S::List, T::Any, H::none, C::WheelTurn, G::Turn, J::ListTurn, St::Done},
         {"Shift + Wheel turn (list)", S::List, T::Any, H::shift, C::WheelTurn, G::Turn, J::ListTurnFine, St::Done},
         {"Wheel push (list)", S::List, T::Any, H::none, C::WheelPush, G::Press, J::ListPush, St::Done},
+        {"Pad held + Wheel push (list)", S::List, T::Any, H::pad, C::WheelPush, G::Press, J::ListPush, St::Done},
         {"Wheel turn (Chop)", S::Chop, T::Any, H::none, C::WheelTurn, G::Turn, J::ChopAmount, St::Done},
         {"Wheel push (Chop)", S::Chop, T::Any, H::none, C::WheelPush, G::Press, J::ToPads, St::Done},
         {"Wheel turn (To Pads)", S::ToPads, T::Any, H::none, C::WheelTurn, G::Turn, J::ToPadsChoose, St::Done},
