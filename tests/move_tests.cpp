@@ -1485,13 +1485,16 @@ void test_sample_files() {
     settle();
     CHECK(std::filesystem::exists(home + "/Samples/Edits/SPARE-Trimmed.wav"));
     CHECK(has(melodee.status(), "samples=3"));
-    // Save Sample: the name typed (the sample's own given), push: done.
+    // Save Sample (kit depth's row): the name typed, the sample's own given
+    // in capitals, then the strip's OK (the Move's own typing): done.
     options(4);
     CHECK(has(melodee.status(), "typing=1"));
     tap_pad(melodee, 7); // the keyboard's backspace, bottom right
+    turn_wheel(melodee, 63); // the strip's end: OK
     press_button(melodee, Button::MainPush);
     settle();
-    CHECK(std::filesystem::exists(home + "/Samples/SPARE-Trimme.wav"));
+    CHECK(has(melodee.status(), "typing=0"));
+    CHECK(std::filesystem::exists(home + "/Samples/SPARE-TRIMME.wav"));
     // A kit's sources: EMPTY makes a kit with nothing on it.
     melodee.surface(make_event(0xb0, button_cc(Button::Row1), 127));
     tap_step(melodee, 2);
