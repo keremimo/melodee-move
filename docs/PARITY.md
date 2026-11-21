@@ -226,7 +226,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Cloud**: a pad as a grain cloud; position, size, density, scan, spread (MELODEE.md › Playing, A kit) | done | CLOUD page: on, position, size, density, scan, spread | [ ] |
 | **Kit filter**: one filter after every pad (MELODEE.md › Sampler) | done | KIT FILT page: type, cutoff, resonance | [ ] |
 | **COLOUR**: a pad's light colour, the track's, one of sixteen, or the kit's own (MELODEE.md › Playing, A kit) | done | MIX page, knob 4: the track's, one of the sixteen track colours, or the pad's own; pad lights | [ ] |
-| **Full Level**: every hit at 127 (MELODEE.md › Shift + pads) | kit depth | not here: Shift + Step 10 is the Move's Full Velocity, built by move-instruments (its branch); the kit's sends here (pads and 16 Pitches) already read its flag, `Studio::full_level`, so it covers kits once merged | [ ] |
+| **Full Level**: every hit at 127 (MELODEE.md › Shift + pads) | done | Shift + Step 10, the Move's Full Velocity (move-instruments): `Studio::full_level`, read by the kit's sends (pads and 16 Pitches) and a note track's pads alike | [ ] |
 | **Pad sends** into buses A-D, and the kit's send (MELODEE.md › Playing, A kit) | done | a kit's track item, Shift + turn: the last pad's own sends on knobs 1-4; the kit's (the track's) on its first page | [ ] |
 | **A pad's own chain** of four effects (MELODEE.md › Effects) | done | the Device View: after the pad, its own effects and their `+` (a dotted underline) | [ ] |
 | **Chop**: Auto, Beats, Regions, Threshold; a slice's start and end (MELODEE.md › Sampler, Chop) | done | Loop; knobs 1-4; jogwheel or Left / Right the slice | [ ] |
@@ -489,10 +489,10 @@ sections, each on Shift + Step n.
 
 | Status | Rows |
 | --- | --- |
-| `done` | 267 |
+| `done` | 268 |
 | `sequencer` | 4 |
 | `sampling` | 0 |
-| `kit depth` | 2 |
+| `kit depth` | 1 |
 | `instruments` | 1 |
 | `mixer & effects` | 2 |
 | `song & export` | 1 |
