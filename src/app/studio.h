@@ -2,6 +2,7 @@
 #pragma once
 #include "app/canvas_page.h"
 #include "app/module_host.h"
+#include "app/pad_layout.h"
 #include "app/project_store.h"
 #include "move/app.h"
 #include "move/queues.h"
@@ -149,7 +150,9 @@ public:
     ModuleTrack* module_track() { return module_track(selected); }
     int octave(unsigned track) const; // the bottom-left pad's octave on a note track (0: C2)
     void set_octave(unsigned track, int octave);
-    int note_for(unsigned pad, int octave) const; // rows of fourths, C2 at the bottom left at octave 0
+    // The physical pad's note: rows of fourths (Rows) or 1-32 up the
+    // semitones (Banks), C2 at the bottom left at octave 0.
+    int note_for(unsigned pad, int octave) const;
 
     // A kit track's pads.
     unsigned pad() const { return song->tracks[selected].last_pad % pad_count; }

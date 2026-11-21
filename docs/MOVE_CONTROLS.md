@@ -77,6 +77,7 @@ after Schwung) differ for some buttons:
 | Kit pads | **32 kit pads** (two banks of 16) as today; **Plus and Minus move 16 pads** through the kit's 8 banks (as Control Live's Drum mode). **Shift + Step 8** turns the right 16 into **16 Pitches** of the last pad (Melodee's 16 Levels, Tune), the left 16 staying the kit; Plus and Minus are then the pitches' octave. |
 | Shift + Steps 4, 12, 13 | No Move job (no icon): **4 the Mixer** (16 tracks, their effects), **12 the Looper**, **13 Song**. |
 | Shift held | **Nothing on the screen**, as on the stock Move: the steps with a Shift job light, Melodee's 4, 12 and 13 too (Kerem dropped the on-screen Shift card from the mockups). |
+| Pads | **Two layouts, the user's choice**: **Rows**, the Move's eight a row (1-8 the bottom row, up to 25-32), or **Banks**, two MPC 4x4 banks side by side (1-16 the left bank from its bottom left, 17-32 the right). Every pad job follows it: kit pads and banks, Chop's slices, 16 Pitches, notes, typing, the lights. Notes in Banks run **up the scale in pad order** (reading (a): 1-16 the left bank, 17-32 on up the right). The setting is **global, in Setup > PADS > LAYOUT**, kept in `Move.settings`; **no shortcut**; typing follows the banks. 16 Pitches is the left 4x4 kit, right 4x4 pitches in both layouts (docs/UI.md, "Pads"; docs/ui/pads.png). |
 | Undo, quit | **Undo held 0.4 s opens the undo list** (as Melodee's Shift + − hold on the MPC). **Shift + Back goes back to Ableton's Move app**, as today, and Setup (Shift + Step 2) lists it too. |
 
 Followed from the rule without a choice: Left and Right become the
@@ -87,6 +88,16 @@ the amount, as the Move's wheel sets the number of slices.
 ## The map
 
 ### Pads
+
+A pad's job comes from its number in the layout chosen in Setup > PADS >
+LAYOUT (Rows or Banks, the decision above; `src/app/pad_layout.h`): "pad
+n", "the right 16" and "slice n" below are in that layout's numbering. The
+bindings table matches pads by where they lie (16 Pitches' right 4x4), the
+screens and the audio thread turn the pad into its number; `audio_event()`
+does it once for every note a pad plays or writes (Seq Record, Capture,
+Repeat, the arp go through the track and key it works out). The Move's
+grids stay where they lie in both layouts until Kerem says otherwise:
+Session (a row a track of the bank, a column a pattern) and the Overview.
 
 | Control | On the Move | In Melodee | Status |
 | --- | --- | --- | --- |
