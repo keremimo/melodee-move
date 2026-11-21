@@ -6,13 +6,24 @@ Melodee for Ableton Move as Schwung's module catalog installs it
 
 ## Unreleased
 
-- A Schwung module's pages and menus now look and work as under Schwung,
-  drawn by Schwung's own code: its knob grid and widgets, its presets page
-  and Sections list, its pages shown or hidden as the module asks
-  (Schimera's Vowel pages in Vowel mode), and a module's drawn pages in
-  place with their knobs (Schimera's mouth). A text parameter opens the
-  keyboard: touch its knob and push the wheel (Schimera's Lyrics). Auto
-  Sample is on the last page, Melodee.
+- A module's pages now behave exactly as under Schwung, in Melodee's own
+  look. On a synth track the push on the module goes into its pages; there
+  the wheel turns pages, Shift + the wheel jumps a section, the push with no
+  knob held opens the Sections list, Back steps out one layer at a time and
+  finally back to the Device View. A page the module draws (Schimera's mouth,
+  Webstream's Browse) shows in place. Schwung's effects work the same way.
+- ARP and CHORD are now items before the module in the Device View, like
+  Schwung's MIDI effects; push shows the page, Mute + push turns it on or off.
+- Shift + push on a module swaps it, Delete + push removes it, Mute + push
+  bypasses it. Shift + the wheel moves a Schwung effect along the chain.
+- My Presets on a module's pages saves and loads its whole state, shared with
+  Schwung's own presets. The Module page has the module's help, Swap, Remove
+  and Auto Sample.
+- With Shift locked (a double press), Back works again.
+- A Schwung module's pages follow what the module declares, as under
+  Schwung: its pages shown or hidden as it asks (Schimera's Vowel pages in
+  Vowel mode), its presets page and lists, and a text parameter opens the
+  keyboard: touch its knob and push the wheel (Schimera's Lyrics).
 - Pad lights fade. A pad going to a new colour (a press, a sound, a page
   changing) now gets there smoothly through the Move's true RGB instead of
   jumping between the palette's few shades: up in a quarter of Setup's PAD

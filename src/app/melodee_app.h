@@ -64,7 +64,6 @@ public:
     std::string load_module_now(const std::string& id) { return own->load_module_now(own->track(), id); }
     unsigned slice_count() const;                          // Chop's slices, as the status line says
     std::string synth_value(const std::string& key) const; // as the screen has it
-    bool canvas_pixel(int x, int y) const;                 // the module's own page as last drawn, for tests
     std::string ask_module(const std::string& key);       // the module's answer now, for tests
     const std::string& project_path() const { return own->project_path(); }
 

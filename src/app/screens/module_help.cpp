@@ -104,7 +104,7 @@ public:
         ui::rail(g, module ? upper(module->info().abbrev).substr(0, 4) : "SYN", std::to_string(studio.pages_target.track + 1), "HELP");
         if (path.empty() || (root.children.empty() && root.lines.empty())) {
             move::draw_text_centred(g, ui::content_x, 24, ui::content_width, "NO HELP");
-            ui::detail(g, "BACK OUT");
+            ui::hints(g, {{"BACK", "OUT"}});
             return;
         }
         const HelpNode& at = current();
@@ -118,13 +118,13 @@ public:
             std::vector<std::string> rows;
             for (const auto& child : at.children) rows.push_back(upper(child.title).substr(0, 14) + (child.children.empty() ? "" : " >"));
             ui::list(g, area, rows, path.back().cursor, 1);
-            ui::detail(g, "JOG SEL CLK OPEN");
+            ui::hints(g, {{"JOG", "SEL"}, {"CLK", "OPEN"}, {"BACK", "OUT"}});
             return;
         }
         int first = path.back().cursor, y = area.getY();
         for (int n = first; n < int(at.lines.size()) && n < first + visible_lines(); ++n, y += move::glyph_height + 2)
             move::draw_text(g, area.getX() + 2, y, upper(at.lines[size_t(n)]));
-        ui::detail(g, "JOG SCRL BACK OUT");
+        ui::hints(g, {{"JOG", "SCRL"}, {"BACK", "OUT"}});
     }
 
 private:

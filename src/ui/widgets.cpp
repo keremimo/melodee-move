@@ -32,6 +32,22 @@ void detail(juce::Graphics& g, std::string_view left, std::string_view right) {
     if (!right.empty()) move::draw_text(g, width - move::text_width(right), detail_y, right);
 }
 
+void hints(juce::Graphics& g, const std::vector<std::pair<std::string, std::string>>& pairs) {
+    int x = content_x + 1;
+    for (const auto& [key, verb] : pairs) {
+        int key_width = move::text_width(key) + 2, verb_width = move::text_width(verb);
+        if (x + key_width + 1 + verb_width > width) break;
+        g.setColour(on);
+        g.fillRect(x, detail_y - 1, key_width, move::glyph_height + 2);
+        g.setColour(off);
+        move::draw_text(g, x + 1, detail_y, key);
+        g.setColour(on);
+        move::draw_text(g, x + key_width + 1, detail_y, verb);
+        x += key_width + 1 + verb_width + 4;
+    }
+    g.setColour(on);
+}
+
 void playhead(juce::Graphics& g, juce::Rectangle<int> area, int column) {
     int x = area.getX() + column;
     g.setColour(off);

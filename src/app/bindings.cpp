@@ -462,7 +462,10 @@ Mapped map(const move::Input& input) {
 
 uint16_t Gestures::held(Control for_control) const {
     uint16_t bits = 0;
-    if (shift_down || (locked && for_control != Control::Play)) bits |= held::shift;
+    // Shift locked (a double press) is Shift held for every control but Play
+    // and Back: Back stays a way up, as Schwung's Back is (Shift + Back, quit,
+    // still takes the Shift held by hand).
+    if (shift_down || (locked && for_control != Control::Play && for_control != Control::Back)) bits |= held::shift;
     for (const auto& down : downs) {
         switch (down.control) {
         case Control::TrackButton: bits |= held::track; break;

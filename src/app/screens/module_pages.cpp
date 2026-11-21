@@ -20,7 +20,7 @@ class ModulePages final : public Screen {
 public:
     using Screen::Screen;
 
-    void enter() override { held.fill(false); }
+    void enter() override { held.fill(false); shifted = false; }
 
     bindings::Screen screen_kind() const override { return bindings::Screen::Canvas; }
 
@@ -30,8 +30,7 @@ public:
         SchwungPages* pages = studio.pages_of(studio.pages_target);
         if (!pages || studio.top() != this) return;
         if (input.kind == Kind::Touch && input.index < 8) pages->midi(input.pressed ? 0x90 : 0x80, input.index, input.pressed ? 127 : 0);
-        if (input.kind == Kind::Button && input.index == uint8_t(move::Button::Shift))
-            pages->midi(0xb0, move::button_cc(move::Button::Shift), input.pressed ? 127 : 0);
+        if (input.kind == Kind::Button && input.index == uint8_t(move::Button::Shift)) shift_to(*pages, input.pressed);
         if (input.kind == Kind::Pad && input.pressed && input.value > 0 && pages->view().live_press) // a finger on a pad, for a module that asks
             pages->midi(0x90, move::pad_note(input.index), input.value);
     }
@@ -44,6 +43,10 @@ public:
             return job == Job::CanvasTurn || job == Job::CanvasPush;
         }
         auto cc = [&](uint8_t number, uint8_t value) { pages->midi(0xb0, number, value); };
+        // Shift as the bindings see it (held, or locked by a double press):
+        // what Schwung reads for its section jump, Shift + click, fine knobs.
+        if (job == Job::TurnKnob || job == Job::TurnKnobFine || job == Job::CanvasTurn || job == Job::CanvasPush)
+            shift_to(*pages, (use.held & bindings::held::shift) != 0);
         auto detents = [&](uint8_t number, int delta) { // one message a detent, as the Move sends them
             for (int n = 0; n < std::min(std::abs(delta), 16); ++n) cc(number, delta > 0 ? 1 : 127);
         };
@@ -124,11 +127,19 @@ public:
         else if (v.kind == "items") items(g, body, v.items);
         else if (v.kind == "knobs") cells(g, body, v.cells);
         if (!v.hint.empty()) hint(g, body, v);
-        ui::detail(g, v.notice.empty() ? footer(v) : upper(v.notice).substr(0, 17));
+        if (v.notice.empty()) ui::hints(g, v.footer);
+        else ui::detail(g, upper(v.notice).substr(0, 17));
     }
 
 private:
     std::array<bool, pad_count> held {};
+    bool shifted = false; // what Schwung's pages last heard of Shift
+
+    void shift_to(SchwungPages& pages, bool down) {
+        if (down == shifted) return;
+        shifted = down;
+        pages.midi(0xb0, move::button_cc(move::Button::Shift), down ? 127 : 0);
+    }
 
     const LoadedModule* target_module() const {
         const auto& target = studio.pages_target;
@@ -164,19 +175,6 @@ private:
         move::draw_text(g, ui::content_x + 2, 1, left.substr(0, room - (r.empty() ? 0 : r.size() + 1)));
         if (!r.empty()) move::draw_text(g, ui::width - 1 - move::text_width(r), 1, r);
         g.setColour(juce::Colours::white);
-    }
-
-    // Schwung's footer pairs ("JOG PAGE", "CLK MENU", "BACK OUT"), as many as
-    // fit, most important first (Schwung drops the tail too).
-    static std::string footer(const ModuleView& v) {
-        const size_t room = size_t(ui::content_width / move::glyph_advance);
-        std::string line;
-        for (const auto& [key, verb] : v.footer) {
-            std::string pair = key + " " + verb;
-            if (line.size() + (line.empty() ? 0 : 1) + pair.size() > room) break;
-            line += (line.empty() ? "" : " ") + pair;
-        }
-        return line;
     }
 
     static std::string fit(std::string label, std::string value, size_t width) {

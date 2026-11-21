@@ -90,7 +90,8 @@ jogwheel picks, a push confirms, Back leaves.
 | Capture | `CAP` / seconds / `SEC` | the last phrase | target pad, push to keep |
 | Load samples | `LOAD` / target pad / `SMP` | folders and files | |
 | Load modules | `LOAD` / track / `SYN` or `FX` | Schwung's modules | |
-| A module's page | module / track / page | page title, 8 knob cells | |
+| A module's box (Device View) | module / track / `SND` | its name, its box's 8 knob cells | preset |
+| A module's pages | module / track / page n/N | strip, the page (cells, list, preset, its drawing) | Schwung's footer verbs |
 
 The pad pages are a first sort of Melodee's Stage pages onto eight knobs,
 to settle while building: **PLAY** (tune, level, pan, start, end, attack,
@@ -99,48 +100,60 @@ link, offset), **FILTER** (cutoff, resonance, type, envelope attack, decay,
 depth, kit filter), **TIME** (warp, beats, follow, loop, loop point,
 reverse), **CLOUD** (position, size, density, scan, spread, on).
 
-Where the Move has Schwung (always, as Melodee is its tool), a module's
-pages and menus are drawn by **Schwung's own knob-page code** (Kerem,
-2026-11-21; `src/app/schwung_pages.h`): the same grid, widgets, drawn pages
-(Schimera's mouth, in place, its knobs working), presets page, Sections
-list and `visible_if` as under Schwung, on the whole screen. Melodee adds
-one page after the module's, **Melodee**, with **Auto Sample** (not for a
-source). The controls: knobs and their touches as under Schwung; the
-wheel's push is Schwung's click (a knob touched: that parameter, so a text
-one such as Schimera's Lyrics opens the keyboard; none: its Sections; with
-Shift, its Shift + click); Shift + the wheel its pages, then ARP and CHORD
-after its last; while Schwung has the wheel (its Sections, a list, an
-entered page) the wheel and Back are its. The wheel alone still walks the
-Device View, to the track's mix and the effects. The rest of this section
-is Melodee's own drawing, used where Schwung's code is not there (the tests,
-a Mac).
+### A module's pages (Kerem, 2026-11-21)
 
-A Schwung module's pages come from its `module.json`: `ui_hierarchy` where it
-has one, else its `chain_params` eight at a time. Names are cut to the cell
-(3 to 5 characters); the touched knob shows the full name. A chooser (a preset
-list, an items list) is never a knob; a `null` in `knobs` is an empty knob,
-and knobs past eight go to the level's next page.
+Melodee's look, Schwung's behaviour, in every quirk. A synth track's Device
+View is Schwung's chain editor: along the top the track's mix, **ARP and
+CHORD** (Melodee's MIDI effects, before the module as Schwung's MIDI FX boxes
+are; struck through while off), the module, its effects and the plus. On the
+module the knobs are its box's knobs as in Schwung's chain editor (its root's
+declared knobs, else its first child level's, else `chain_params` in order).
 
-A page the module draws itself (a `canvas` parameter: Radio Garden's
-browser, Webstream's search) is a door until pushed (Kerem, 2026-11-20):
-outside it the Device View stays, the page's title over its knobs (they
-work) and `PUSH: IN` under them, and the wheel walks the items as on any
-page, to the track's mix, the effects and the `+`. Pushed, the page takes
-the whole screen, its own script drawing it as under Schwung, with a footer
-line for the module and `BACK: OUT`, and has the jogwheel until Back brings
-you out of its top level, to its door. The menu's row for the page goes
-straight in. `docs/ui/synth.png` is the sheet (`src/ui/mockups_synth.cpp`),
-on Webstream.
+- **Push** on the module: **into its pages**. Shift + push: swap it (the
+  modules, the REPLACE question first). Delete + push: remove it (the track
+  stays, empty). Mute + push: bypass it (it still takes its notes).
+- Push on a Schwung effect: into its pages too; Shift + push swaps it,
+  Shift + the wheel moves it along the chain. Melodee's own effects keep the
+  effect browser and their options.
+- Push on ARP or CHORD: the page whole, Back out; Mute + push turns it off
+  and on.
+
+Inside, **Schwung's own page controller decides everything**
+(`src/app/schwung_pages.h`: the module's pages, visible_if, doors, the
+Sections picker, its presets, Back one layer at a time, the enum peek,
+Schwung's footer verbs) and `screens/module_pages.cpp` draws it as Melodee
+draws: the rail (module, track, page n/N), a strip with the page's name (a
+held knob's name and value, as Schwung's header), Melodee's knob cells (a bar
+where a value has a place, its text where it has none, a door's corner where
+it opens something), lists for menus and pickers, Melodee's preset view, and
+Schwung's footer on the detail line (`JOG PAGE CLK MENU`, `CLK ENTER`,
+`JOG SEL CLK OPEN BACK OUT` ...).
+
+- The wheel: the next page; inside an entered door (its presets, a menu, a
+  list, a drawn page) its cursor. **Shift + the wheel: the next section.**
+- The push: Schwung's click. A knob held: that parameter (a trigger fires, a
+  two-option enum flips, a longer one opens a list, a text one opens the
+  keyboard: Schimera's Lyrics); none held: **the Sections picker**; on a door,
+  in, then its row. Shift + push: the Sections picker from anywhere.
+- Back: the peek, the picker, an entered door, one at a time, then out to
+  the Device View on the module. A locked Shift is a held Shift here, and
+  Back stays Back.
+- A page the module draws (Webstream's Browse, Schimera's mouth and lyrics)
+  is one of its pages, drawn in place in the band under the strip; an
+  enterable one is a door like any other.
+
+After the module's own pages, as Schwung appends its own: **My Presets**
+(Preset: the list to load from, `* name` once edited; Save; Save As; Delete,
+asked first), sharing Schwung's files (`/data/UserData/schwung/presets/<id>/`,
+the module's `state`: a preset saved here is in Schwung and the other way
+round; a synth's module only, an effect's state is not asked for on the audio
+thread), and **Module** (Module Help where it ships `help.json`, Swap Module,
+Remove Module, Auto Sample for an instrument). `docs/ui/synth.png` is the
+sheet (`src/ui/mockups_synth.cpp`), on Webstream.
 
 ![A synth track on Webstream](ui/synth.png) A page asking for text gets the keyboard screen: its title,
 the text so far, and the pads lit as keys (letters grey, space blue,
 backspace red), the steps as digits.
-
-The jogwheel's push opens the module's menu (`MENU` on the rail), its
-levels as lists: the preset first where the level has one, then values
-(`CUTOFF      57`), levels (`ENVELOPE >`) and lists to choose from (the
-current one marked `*`). Push a value to edit it (`[57]`), push a level to
-open it; Back goes up, then closes the menu.
 
 ## Tracks
 

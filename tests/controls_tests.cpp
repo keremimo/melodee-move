@@ -370,7 +370,7 @@ void test_gestures() {
         // The step was a modifier: no step tap when it is let go.
         CHECK(g.feed(step_input(1, false), t0 + 1700ms).empty());
     }
-    {   // Shift: a double press locks it; held for all but Play; a press unlocks.
+    {   // Shift: a double press locks it; held for all but Play and Back; a press unlocks.
         Gestures g;
         g.feed(button(Button::Shift, true), t0);
         g.feed(button(Button::Shift, false), t0 + 50ms);
@@ -387,6 +387,9 @@ void test_gestures() {
         auto five = g.feed(step_input(4, true), t0 + 1200ms);
         CHECK(five.size() == 1 && resolve(kit, five[0]) == Job::Tempo);
         g.feed(step_input(4, false), t0 + 1250ms);
+        auto back = g.feed(button(Button::Back, true), t0 + 1300ms); // Back stays a way up, not Shift + Back (quit)
+        CHECK(!back.empty() && back[0].held == held::none && resolve(kit, back[0]) == Job::Back);
+        g.feed(button(Button::Back, false), t0 + 1350ms);
         g.feed(button(Button::Shift, true), t0 + 2s);
         CHECK(!g.shift_locked());
         g.feed(button(Button::Shift, false), t0 + 2100ms);

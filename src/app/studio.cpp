@@ -589,7 +589,6 @@ void Studio::apply_track(unsigned t) {
 
 ModuleTrack& Studio::make_module_track(unsigned t) {
     modules[t] = std::make_unique<ModuleTrack>();
-    modules[t]->page = 0;
     return *modules[t];
 }
 
@@ -994,7 +993,6 @@ CanvasPage::Host Studio::canvas_host(unsigned t) {
         }
     };
     host.text_entry = [this, t](const std::string& title, const std::string& initial) {
-        auto* module = module_track(t);
         typing = true;
         typing_done = nullptr; // the page's: Studio::finish_typing() hands it the text
         typing_room = 120;
@@ -1002,11 +1000,7 @@ CanvasPage::Host Studio::canvas_host(unsigned t) {
         typed = initial;
         typing_title = title;
         typing_track = int(t);
-        typing_canvas = -1;
-        if (module && module->module) {
-            if (module->canvas_open >= 0) typing_canvas = module->canvas_open;
-            else if (module->page < module->module->pages.size()) typing_canvas = module->module->pages[module->page].canvas;
-        }
+        typing_canvas = -1; // Studio::start_pages() marks it as its pages'
         pads_typing.store(true);
     };
     host.changed = [this] { changed(); }; // saved three seconds on, with the module (module_state())
@@ -1197,12 +1191,7 @@ void Studio::remove_module(PagesTarget target) {
     std::string name = upper(track->module->info().name);
     track->leaving.push_back(std::move(track->module));
     track->schwung_pages.reset();
-    track->canvas_pages.clear();
     track->saved = {};
-    track->page = 0;
-    track->menu_open = false;
-    track->canvas_open = -1;
-    track->canvas_entered = false;
     say(("REMOVED " + name).substr(0, 17));
     changed();
     name_step("REMOVE " + name, int(target.track));
@@ -1264,15 +1253,10 @@ void Studio::finish_typing(bool cancelled) {
         if (!cancelled) done(typed);
         return;
     }
-    auto* module = typing_track >= 0 ? module_track(unsigned(typing_track)) : nullptr;
     int index = typing_canvas;
     typing_canvas = typing_track = -1;
-    if (index == typing_schwung_pages) {
+    if (index == typing_schwung_pages) // a module's pages' keyboard: a text parameter, a drawn page's
         if (SchwungPages* pages = pages_of(typing_pages)) pages->text_entered(typed, cancelled);
-        return;
-    }
-    if (module && index >= 0 && index < int(module->canvas_pages.size()) && module->canvas_pages[size_t(index)])
-        module->canvas_pages[size_t(index)]->text_entered(typed, cancelled);
 }
 
 // ---------------------------------------------------------------- undo (history.h)
@@ -1570,9 +1554,6 @@ SynthFile Studio::module_state(unsigned t) const {
                     file.pages.emplace_back(property.name.toString().toStdString(), text);
         return file;
     }
-    for (size_t n = 0; n < track->canvas_pages.size() && n < module.canvases.size(); ++n)
-        if (track->canvas_pages[n])
-            if (auto state = track->canvas_pages[n]->saved_state(); !state.empty()) file.pages.emplace_back(module.canvases[n].key, state);
     return file;
 }
 
@@ -1847,26 +1828,6 @@ void Studio::take_answers() {
             }
         }
         track->player.send_asks(); // what waited for room, now the answers are taken
-        // An items list, read whole: [{"index": 0, "label": "GM"}, ...] or names.
-        std::string text;
-        if (track->pick_reading && track->player.long_answer(text)) {
-            track->pick_reading = false;
-            track->pick_items.clear();
-            juce::var list;
-            if (juce::JSON::parse(juce::String::fromUTF8(text.c_str()), list).wasOk())
-                if (auto* entries = list.getArray())
-                    for (int n = 0; n < entries->size(); ++n) {
-                        const auto& entry = entries->getReference(n);
-                        if (entry.isString()) { track->pick_items.emplace_back(n, entry.toString().toStdString()); continue; }
-                        auto* object = entry.getDynamicObject();
-                        if (!object) continue;
-                        int index = object->hasProperty("index") ? int(object->getProperty("index")) : n;
-                        auto label = object->hasProperty("label") ? object->getProperty("label") : object->getProperty("name");
-                        track->pick_items.emplace_back(index, label.toString().toStdString());
-                    }
-            track->pick_key.clear();
-        }
-        if (!track->pick_key.empty() && !track->pick_reading) track->pick_reading = track->player.ask_long(track->pick_key);
     }
 }
 
@@ -2260,18 +2221,6 @@ std::string Studio::load_module_now(unsigned t, const std::string& id, const Syn
             }
         if (!loaded->preset_name_param.empty()) loaded->preset_name = loaded->get_now(loaded->preset_name_param);
     }
-    // Its own pages' scripts, started before it plays (never under the lock:
-    // a script's first run may take its time).
-    std::vector<std::unique_ptr<CanvasPage>> started;
-    if (loaded)
-        for (const auto& canvas : loaded->canvases) {
-            std::string failed;
-            started.push_back(CanvasPage::load(canvas.script, canvas_host(t), failed));
-            if (!started.back()) std::fprintf(stderr, "melodee-move: %s's page %s would not start: %s\n", id.c_str(), canvas.key.c_str(), failed.c_str());
-            else if (saved && saved->module == id) // the page as it was left: its provider, where its menus were
-                for (const auto& [key, state] : saved->pages)
-                    if (key == canvas.key) started.back()->restore_state(state);
-        }
     // Its pages and menus as Schwung's own code has them, where the Move has
     // it (schwung_pages.h, screens/module_pages.cpp).
     std::unique_ptr<SchwungPages> schwung_pages;
@@ -2301,17 +2250,12 @@ std::string Studio::load_module_now(unsigned t, const std::string& id, const Syn
     copy_text(ref.name, info.name);
     if (track->module) track->leaving.push_back(std::move(track->module));
     track->module = std::move(loaded);
-    track->canvas_pages.swap(started); // the module before's pages end with this function, outside the lock
-    track->schwung_pages.swap(schwung_pages);
-    track->canvas_open = -1;
-    track->canvas_entered = false;
+    track->schwung_pages.swap(schwung_pages); // the module before's pages end with this function, outside the lock
     if (typing && typing_track == int(t)) { typing = false; pads_typing.store(false); typing_canvas = typing_track = -1; }
     track->set_at.clear();
     track->player.drop_asks(); // the module before's keys
-    track->page = 0;
-    track->menu_open = false;
-    track->pick_items.clear();
-    track->pick_key.clear();
+    track->user_preset.clear();
+    track->user_preset_dirty = false;
     track->saved = {};
     if (!saved) {
         if (t == selected && stack.size() > 1) home(); // to play it

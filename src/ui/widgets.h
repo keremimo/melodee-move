@@ -5,6 +5,7 @@
 #include <array>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 // The pieces Melodee's Move screens are made of (docs/UI.md): drawn in whole
@@ -25,6 +26,10 @@ void rail(juce::Graphics& g, std::string_view top, std::string_view big, std::st
 inline juce::Rectangle<int> content(int y = 0, int h = height) { return {content_x, y, content_width, h}; }
 // The line under the subject: the left text, and the right one flush right.
 void detail(juce::Graphics& g, std::string_view left, std::string_view right = {});
+// The line under the subject as a module's pages give it, Schwung's footer:
+// each control inverted, what it does beside it ("JOG" PAGE, "CLK" MENU),
+// as many as fit, the first first (Schwung drops the tail too).
+void hints(juce::Graphics& g, const std::vector<std::pair<std::string, std::string>>& pairs);
 // A vertical line through a waveform: where playback is.
 void playhead(juce::Graphics& g, juce::Rectangle<int> area, int column);
 // A filled circle, for the record light.

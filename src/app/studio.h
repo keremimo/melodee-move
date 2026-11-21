@@ -116,7 +116,6 @@ struct ModuleTrack {
     uint8_t entry = melodee::no_plugin; // its entry of Project::plugins
     std::unique_ptr<LoadedModule> module;
     std::vector<std::unique_ptr<LoadedModule>> leaving;
-    std::vector<std::unique_ptr<CanvasPage>> canvas_pages; // one a module->canvases, null where its script failed
     std::unique_ptr<SchwungPages> schwung_pages;           // its pages by Schwung's own code (schwung_pages.h)
     std::string user_preset;        // the user preset loaded or saved last (user_presets.h); empty: none
     bool user_preset_dirty = false; // a value set since
@@ -126,16 +125,6 @@ struct ModuleTrack {
     bool loading = false;
     std::map<std::string, uint64_t> set_at; // each key's last set (SynthPlayer's serial)
     std::vector<std::string> edited;        // the keys set since the last undo step closed (history.h)
-    // The screen's: the page, the menu, the module's own pages.
-    unsigned page = 0;
-    bool menu_open = false, menu_editing = false;
-    std::vector<std::string> menu_path; // level ids, root first
-    int menu_cursor = 0;
-    std::vector<std::pair<int, std::string>> pick_items; // an items list, as the module gave it
-    std::string pick_key;                                // the list being read, until it is
-    bool pick_reading = false;
-    int canvas_open = -1;        // a page opened from the menu, over it
-    bool canvas_entered = false; // the page has the jogwheel
     ~ModuleTrack() { player.stop(); } // a source's thread ends before the modules it plays go
 };
 

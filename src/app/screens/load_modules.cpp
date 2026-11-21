@@ -13,7 +13,6 @@ public:
     using Screen::Screen;
 
     void enter() override {
-        if (auto* track = studio.module_track()) track->menu_open = false;
         studio.rescan_modules();
         cursor = std::clamp(cursor, 0, std::max(0, int(studio.catalog.size()) - 1));
     }

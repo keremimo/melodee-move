@@ -814,10 +814,5 @@ std::string MelodeeApp::ask_module(const std::string& key) {
     return track ? own->module_get(*track, key) : std::string();
 }
 
-bool MelodeeApp::canvas_pixel(int x, int y) const {
-    std::lock_guard<std::mutex> guard(own->lock);
-    auto* track = own->module_track();
-    return track && !track->canvas_pages.empty() && track->canvas_pages.front() && track->canvas_pages.front()->pixel(x, y);
-}
 
 } // namespace app

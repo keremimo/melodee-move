@@ -233,20 +233,32 @@ int write_previews(const std::string& directory, const std::string& modules) {
     send(0x9f, 1, 127); // touch knob 2
     ok = save(melodee, folder, "synth-touch") && ok;
     send(0x9f, 1, 0);
-    // Its menu (Shift + the wheel's push), a value being edited, a list to choose from.
-    std::this_thread::sleep_for(std::chrono::milliseconds(700));
-    shifted(move::Button::MainPush);
-    send(0xbf, move::main_knob_cc, 2);
-    ok = save(melodee, folder, "synth-menu") && ok;
-    press(move::Button::MainPush);
-    ok = save(melodee, folder, "synth-edit") && ok;
-    press(move::Button::MainPush);
-    send(0xbf, move::main_knob_cc, 2);
-    press(move::Button::MainPush);
+    // Its pages (the push; Schwung's page code, Melodee's look), drawn a
+    // while as the screen thread draws them, which is when they tick: a page,
+    // Schwung's Sections (the push, no knob held), its presets (a page back).
     move::AudioBlock in {}, out {};
-    melodee.render(in, out); // a list is read on the audio thread
-    melodee.service();
-    ok = save(melodee, folder, "synth-items") && ok;
+    auto frames = [&](int n) {
+        juce::Image screen(juce::Image::ARGB, move::screen_width, move::screen_height, true);
+        for (int k = 0; k < n; ++k) {
+            melodee.render(in, out);
+            melodee.service();
+            std::this_thread::sleep_for(std::chrono::milliseconds(55));
+            juce::Graphics g(screen);
+            melodee.draw(g);
+        }
+    };
+    std::this_thread::sleep_for(std::chrono::milliseconds(700));
+    press(move::Button::MainPush);
+    frames(10);
+    ok = save(melodee, folder, "synth-pages") && ok;
+    press(move::Button::MainPush);
+    frames(2);
+    ok = save(melodee, folder, "synth-sections") && ok;
+    press(move::Button::Back);
+    send(0xbf, move::main_knob_cc, 127);
+    frames(3);
+    ok = save(melodee, folder, "synth-presets") && ok;
+    press(move::Button::Back); // out to the Device View
 
     // Instruments (docs/UI.md, "Instruments"): an SFZ on a keygroup track,
     // its pages (Shift + the wheel), its browser, Keys & Scale (Shift + Step
@@ -284,9 +296,14 @@ int write_previews(const std::string& directory, const std::string& modules) {
     press(move::Button::Row2); // the synth: the module's first page, where a track opens
     std::this_thread::sleep_for(std::chrono::milliseconds(1600));
     ok = save(melodee, folder, "synth-page") && ok;
-    std::this_thread::sleep_for(std::chrono::milliseconds(320));
-    shifted(move::Button::MainPush); // its menu, the last row: AUTO SAMPLE
-    send(0xbf, move::main_knob_cc, 40);
+    press(move::Button::MainPush); // its pages, the last: Module; in, its last row: Auto Sample
+    frames(8);
+    send(0xbf, move::main_knob_cc, 16);
+    frames(2);
+    press(move::Button::MainPush);
+    frames(1);
+    send(0xbf, move::main_knob_cc, 8);
+    frames(1);
     press(move::Button::MainPush);
     ok = save(melodee, folder, "auto-check") && ok;
     for (int n = 0; n < 1000 && melodee.status().find("auto_sheet=CHECKED") == std::string::npos; ++n)

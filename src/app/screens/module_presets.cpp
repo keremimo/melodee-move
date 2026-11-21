@@ -59,14 +59,14 @@ public:
         g.setColour(juce::Colours::white);
         if (presets.empty()) {
             move::draw_text_centred(g, ui::content_x, 24, ui::content_width, "NO PRESETS SAVED");
-            ui::detail(g, "BACK EXIT");
+            ui::hints(g, {{"BACK", "EXIT"}});
             return;
         }
         std::vector<std::string> rows;
         for (const auto& preset : presets)
             rows.push_back((track && preset.name == track->user_preset ? "* " : "  ") + upper(preset.name).substr(0, 15));
         ui::list(g, juce::Rectangle<int>(ui::content_x, ui::header_height + 2, ui::content_width, ui::subject_height - ui::header_height - 2), rows, cursor, 1);
-        ui::detail(g, "JOG SEL CLK LOAD");
+        ui::hints(g, {{"JOG", "SEL"}, {"CLK", "LOAD"}, {"BACK", "EXIT"}});
     }
 
     std::string status() const override { return " presets=" + std::to_string(presets.size()) + " preset_cursor=" + std::to_string(cursor); }
