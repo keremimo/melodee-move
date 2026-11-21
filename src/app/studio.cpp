@@ -1532,13 +1532,20 @@ void Studio::take_back() {
     while (engine->take_retired_pattern(pattern)) delete pattern;
     const melodee::SampleData* sample = nullptr;
     std::vector<std::unique_ptr<Sample>> let_go;
+    // The print host reads the samples of the project it was started in (Printer::start), so none goes while it runs.
+    const bool printing = arranger && arranger->printer().busy();
     while (engine->take_retired(sample)) { // the samples are the studio's, kept for the run; another project's go now
         sampler_shell->retired(sample); // a preview's goes
         std::lock_guard<std::mutex> guard(lock);
         auto at = std::find_if(samples_leaving.begin(), samples_leaving.end(), [sample](const auto& s) { return s && s->data.get() == sample; });
         if (at == samples_leaving.end()) continue;
-        let_go.push_back(std::move(*at));
+        (printing ? samples_printing : let_go).push_back(std::move(*at));
         samples_leaving.erase(at);
+    }
+    if (!printing && !samples_printing.empty()) {
+        std::lock_guard<std::mutex> guard(lock);
+        for (auto& kept : samples_printing) let_go.push_back(std::move(kept));
+        samples_printing.clear();
     }
     let_go.clear(); // freed outside the lock
     melodee::AudioPack* audio_pack = nullptr;
@@ -2195,6 +2202,7 @@ std::string Studio::open_project(const std::string& file, bool fresh) {
         bank.swap(next_bank);
         move_extras = next_extras;
         engine->reload(*pack, false); // parked: this thread's to do (the last one's prints let go)
+        arranger->printer().closing();             // a print under way is the last project's: called off, dropped
         arranger->printer().table() = next_prints; // its frozen tracks' prints read and sent after restore()
         setup_modules_from(states, next_prints);
         setup_fx(states); // its Schwung effects, loaded by the service thread
@@ -2458,7 +2466,8 @@ std::string Studio::status() const {
             " step_us=" + std::to_string(step_us) + "/" + std::to_string(step_us_peak);
     std::string name = project_name();
     std::replace(name.begin(), name.end(), ' ', '_');
-    line += " project=" + name + " opening=" + std::to_string(int(opening)) + " listings=" + std::to_string(listings);
+    line += " project=" + name + " opening=" + std::to_string(int(opening)) + " listings=" + std::to_string(listings) +
+            " samples_printing=" + std::to_string(samples_printing.size());
     if (!last_step.empty()) {
         std::string step = last_step;
         std::replace(step.begin(), step.end(), ' ', '_');

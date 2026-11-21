@@ -75,7 +75,15 @@ public:
     };
     std::string start(Job job); // empty: started; else why not
     void cancel();              // the prints under way called off: nothing changes
-    bool busy() const { return running.load(std::memory_order_acquire) || job_waiting; }
+    // Another project opens: the job called off, and what it made (records, a freeze) dropped, since it is the last
+    // project's. Under the lock.
+    void closing();
+    // From start() until the print thread is done with the job, the live samples it reads included: one flag, set
+    // by start() and cleared by the print thread at the job's end (or by cancel() for a job not taken yet), so it is
+    // never false in between.
+    bool busy() const { return active.load(std::memory_order_acquire); }
+    // Tests: while held, the print thread waits before each block it renders, as a long print would.
+    void hold(bool on) { held.store(on, std::memory_order_release); }
     // Plays live again at once (a deep-frozen one thaws first: its module loads again, the prints playing meanwhile).
     std::string unfreeze(unsigned track);
     // A control would change what a frozen track's prints are made of: true when `track` is frozen, so the caller
@@ -115,6 +123,7 @@ private:
         bool made = false;
         std::string error;
         double seconds = 0, times_real = 0;
+        uint32_t epoch = 0; // the project's it was made for (closing() moves on)
     };
     struct Ready {
         unsigned track = 0;
@@ -132,7 +141,7 @@ private:
     melodee::PrintTable prints;
     uint32_t thaw_mask = 0, deep_pending = 0;
     std::array<std::chrono::steady_clock::time_point, melodee::track_count> deep_since {}, thaw_since {};
-    uint32_t serial = 0;
+    uint32_t serial = 0, epoch = 0;
     unsigned printed = 0, skipped = 0, froze = 0;
     std::vector<melodee::FreezePack*> sent; // packs the engine holds or held (freed as it hands them back)
     mutable std::mutex lock;
@@ -142,8 +151,8 @@ private:
     std::deque<Ready> ready;           // under lock
     Progress shown;                    // under lock
     std::deque<std::string> lines;     // under lock: the latest results, for status
-    bool stopping = false, job_waiting = false; // under lock (job_waiting read without it as a hint)
-    std::atomic<bool> running {false}, cancelled {false};
+    bool stopping = false, job_waiting = false; // under lock
+    std::atomic<bool> active {false}, cancelled {false}, held {false};
     std::thread thread;
 };
 

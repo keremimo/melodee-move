@@ -90,7 +90,7 @@ bool changes_print(bindings::Job job) {
 // The job as the print thread takes it: copies of what the prints are made of, as it was when it started.
 struct Printer::Work {
     Job job;
-    uint32_t serial = 0;
+    uint32_t serial = 0, epoch = 0;
     std::string project_path;
     std::unique_ptr<melodee::Project> project;
     std::unique_ptr<melodee::PatternBank> bank;
@@ -154,6 +154,7 @@ std::string Printer::start(Job job) {
     job.track = t;
     auto work = std::make_unique<Work>();
     work->serial = ++serial;
+    work->epoch = epoch;
     work->project_path = studio.project_path();
     work->project = std::make_unique<melodee::Project>(studio.project());
     work->bank = std::make_unique<melodee::PatternBank>(studio.patterns());
@@ -179,6 +180,7 @@ std::string Printer::start(Job job) {
         shown.count = uint16_t(work->job.patterns.size());
         waiting = std::move(work);
         job_waiting = true;
+        active.store(true, std::memory_order_release); // busy from here until the print thread is done with it
     }
     cancelled.store(false);
     wake.notify_all();
@@ -188,8 +190,18 @@ std::string Printer::start(Job job) {
 void Printer::cancel() {
     cancelled.store(true);
     std::lock_guard<std::mutex> guard(lock);
-    waiting.reset();
+    if (!waiting) return; // taken: the print thread calls it off and clears `active` at its end
+    waiting.reset();      // not taken yet: nothing of it runs
     job_waiting = false;
+    shown.busy = false;
+    shown.error = "called off";
+    active.store(false, std::memory_order_release);
+}
+
+void Printer::closing() {
+    cancel();
+    ++epoch;  // its records are dropped as they come in
+    ++serial; // and its freeze pack
 }
 
 std::string Printer::unfreeze(unsigned t) {
@@ -271,7 +283,7 @@ void Printer::tick() {
         packs.swap(ready);
     }
     for (auto& r : got) {
-        if (!r.error.empty()) continue;
+        if (!r.error.empty() || r.epoch != epoch) continue; // failed, or the last project's
         prints.put(r.record);
         if (r.made) ++printed; else ++skipped;
         studio.changed();
@@ -372,7 +384,6 @@ void Printer::run() {
             job_waiting = false;
         }
         if (!work) continue;
-        running.store(true, std::memory_order_release);
         melodee::PrintTable known = work->known;
         bool failed = false;
         for (uint8_t p : work->job.patterns) {
@@ -383,6 +394,7 @@ void Printer::run() {
                 shown.fraction = 0;
             }
             Result r = print_one(*work, p);
+            r.epoch = work->epoch;
             std::lock_guard<std::mutex> guard(lock);
             if (r.error.empty()) {
                 known.put(r.record);
@@ -415,7 +427,8 @@ void Printer::run() {
             shown.pattern = -1;
             if (cancelled.load()) shown.error = "called off";
         }
-        running.store(false, std::memory_order_release);
+        work.reset(); // the job's copies go before it says it is done
+        active.store(false, std::memory_order_release); // done with the studio's samples (Studio::take_back keeps them till here)
     }
 }
 
@@ -499,6 +512,7 @@ Printer::Result Printer::print_one(const Work& work, unsigned pattern) {
             shown.seconds_left = speed > 0 ? float((std::max(0.0, double(total) - rendered) + double(left) * double(total)) / rate / speed) : 0;
         }
         ++blocks;
+        while (held.load(std::memory_order_acquire)) std::this_thread::sleep_for(std::chrono::milliseconds(1));
         return !cancelled.load();
     }, r.record.sends);
     double rendering = since(r0);

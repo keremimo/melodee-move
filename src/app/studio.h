@@ -628,6 +628,7 @@ private:
     void free_unused_slots();                    // under `lock`
     std::vector<ProjectJob> project_jobs;
     std::vector<std::unique_ptr<Sample>> samples_leaving; // another project's, until the audio thread lets them go
+    std::vector<std::unique_ptr<Sample>> samples_printing; // let go by the audio thread, kept while a print reads them
     uint8_t free_plugin_entry() const;
 
     std::unique_ptr<melodee::Project> song;
