@@ -343,7 +343,9 @@ private:
     move::TripleBuffer<PadMap> pad_maps; // the MIDI thread's to write, the audio thread's to read
     std::atomic<bool> full_level {false};
     std::array<int8_t, melodee::track_count> shifts {};
-    void note_pad(const move::Input& input, Went& went, int track); // audio thread
+    // Audio thread: a note track's pad. `quiet`: another job has the pads
+    // (bindings::pad_sounds()): its notes are worked out, not sent.
+    void note_pad(const move::Input& input, Went& went, int track, bool quiet);
     Went chord_held;                     // CHORD's hold: the chord sounding on (audio thread)
     std::array<Went, pad_count> pad_went {};
     // Last, so it goes first: it holds the samples and runners above.

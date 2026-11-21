@@ -235,10 +235,13 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
         if (input.pressed) {
             went = {};
             if (pads_typing.load(std::memory_order_relaxed)) return; // a letter, not a note
-            if (pads_quiet.load(std::memory_order_relaxed)) return;  // another job (docs/MOVE_CONTROLS.md)
             int track = audio_track.load(std::memory_order_relaxed);
             auto kind = TrackKind(audio_kind.load(std::memory_order_relaxed));
-            if (kind != TrackKind::Kit && kind != TrackKind::Audio && kind != TrackKind::Empty) { note_pad(input, went, track); return; } // app/keys.h
+            if (kind != TrackKind::Kit && kind != TrackKind::Audio && kind != TrackKind::Empty) { // app/keys.h: its notes worked out, quiet or not
+                note_pad(input, went, track, pads_quiet.load(std::memory_order_relaxed));
+                return;
+            }
+            if (pads_quiet.load(std::memory_order_relaxed)) return;  // another job (docs/MOVE_CONTROLS.md)
             int key = kind == TrackKind::Kit ? int(melodee::sampler_first_note + logical_pad(input.index, pad_layout()))
                     : kind == TrackKind::Synth || kind == TrackKind::Keys || kind == TrackKind::Midi || kind == TrackKind::Plugin
                         ? note_for(input.index, audio_octave.load(std::memory_order_relaxed)) : -1;
@@ -247,7 +250,7 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
             went.key = key;
             engine->send({Type::NoteOn, uint8_t(track), 0, uint16_t(key), int16_t(full_level.load(std::memory_order_relaxed) ? 127 : std::max<int>(1, input.value))});
         } else if (went.track >= 0 && went.route != PadMap::Route::None) {
-            note_pad(input, went, went.track);
+            note_pad(input, went, went.track, false);
         } else if (went.track >= 0) {
             engine->send({Type::NoteOff, uint8_t(went.track), 0, uint16_t(went.key), 0});
             went = {};

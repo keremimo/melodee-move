@@ -293,6 +293,13 @@ void test_keygroup_track() {
         pad(melodee, 9, true); // a note in the instrument's range
         CHECK(loudest(melodee, 20) > to_s32(0.02f));
         pad(melodee, 9, false);
+        for (int block = 0, quiet = 0; block < 8000 && quiet < 100; ++block) quiet = loudest(melodee, 1) ? 0 : quiet + 1; // rung out
+        // A pad with another job (a step held, Shift on a kit...): worked out, not sounded.
+        melodee.studio().quiet_pads(true);
+        melodee.audio_event(make_event(0x90, pad_note(9), 110));
+        CHECK(loudest(melodee, 20) == 0);
+        melodee.audio_event(make_event(0x80, pad_note(9), 0));
+        melodee.studio().quiet_pads(false);
         CHECK(melodee.save_now().empty());
     }
     {   // Opened again: the instrument read back and landed, and it plays.

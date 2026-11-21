@@ -114,7 +114,7 @@ void Studio::send_arp(unsigned t) {
 // A note track's pad, on the audio thread in the cycle it was read: its
 // notes as Keys & Scale lays them (app/keys.h), straight to the engine, to
 // the arp, or to Note Repeat; let go, the same keys go.
-void Studio::note_pad(const move::Input& input, Went& went, int track) {
+void Studio::note_pad(const move::Input& input, Went& went, int track, bool quiet) {
     pad_maps.take();
     const PadMap& map = pad_maps.front();
     auto all = [&](const Went& w, Type type, int16_t value) {
@@ -137,6 +137,10 @@ void Studio::note_pad(const move::Input& input, Went& went, int track) {
         }
         went.track = track;
         const auto velocity = int16_t(map.full_velocity ? 127 : std::max<int>(1, input.value));
+        // Here move-seq's PadStamp is written for the MIDI thread (Seq Record, a step held + the pad, step entry,
+        // Capture), quiet or not: track, key = went.keys[0], keys[0..count) = went.keys, velocity, position =
+        // engine->position_of(track), ticks = engine->ticks(); `sounded` (release) once the keys below are sent.
+        if (quiet) { went = {}; return; }
         switch (went.route) {
         case PadMap::Route::Arp:
             if (map.latch) { // a fresh latch: the keys it held go
