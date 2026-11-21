@@ -215,7 +215,9 @@ doors (docs/MOVE_CONTROLS.md, Decisions). `docs/ui/song.png` is the sheet
   clip's pad then another copies it there; Delete held deletes it; Mute held
   mutes it. **The steps** are sixteen bars (as Loop Mode has them): the
   loop's bright, the lane's clips dim, the cursor white; a step moves the
-  cursor, a step held and another sets the loop brace.
+  cursor, a step held and another sets the loop brace. Song's pads are a
+  grid of where they lie, as Session's, in both pad layouts; PRINT's
+  patterns are numbered pads and follow Rows or Banks.
 - **The wheel** moves the cursor a bar; its push on a clip opens its jobs
   (`CLIP`: open notes, duplicate, split at the cursor, own pattern, repeat to
   the next marker, loop its bars, mute, delete), on empty time places the

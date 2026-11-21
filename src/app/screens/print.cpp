@@ -2,7 +2,8 @@
 // PRINT (a track button held + Sampling; docs/UI.md "Print and freeze",
 // Kerem's decision in docs/MOVE_CONTROLS.md): Melodee's PRINT sheet for that
 // track. The pads are its patterns of the bank in view (Plus / Minus: the
-// bank of 32), the ones with notes dim in the track's colour, the ones to
+// bank of 32), numbered as the pad layout numbers the pads (pad_layout.h:
+// the Move's rows or two MPC banks), the ones with notes dim in the track's colour, the ones to
 // print ice; a pad takes one out or back. Knob 1 TAP (Post FX: engine and
 // chain; Pre FX: the engine alone), knob 2 TAIL (Loop, Ring, Cut). The wheel
 // picks what its push does: FREEZE (the lit patterns printed, then the track
@@ -13,6 +14,7 @@
 // Back calls the prints off (nothing changes), or leaves. The work is
 // prints.h's.
 #include "app/screens/common.h"
+#include "app/pad_layout.h"
 #include "app/prints.h"
 #include "app/song_desk.h"
 #include "ui/song_view.h"
@@ -59,7 +61,7 @@ public:
             return true;
         case Job::PrintPattern: {
             if (printer.busy()) return true;
-            unsigned p = bank * bank_size + unsigned(use.index);
+            unsigned p = bank * bank_size + logical_pad(uint8_t(use.index), pad_layout()); // the pad's number in the layout
             chosen[p / 64] ^= uint64_t(1) << (p % 64);
             return true;
         }
@@ -91,8 +93,9 @@ public:
         auto progress = printer.progress();
         bool blink = std::chrono::steady_clock::now().time_since_epoch() / std::chrono::milliseconds(250) % 2;
         int playing = studio.playing() ? int(studio.host().pattern_of(track)) : -1;
-        for (unsigned pad = 0; pad < pad_count; ++pad) {
-            unsigned p = bank * bank_size + pad;
+        auto layout = pad_layout();
+        for (unsigned number = 0; number < pad_count; ++number) { // a pattern on the pad of its number in the layout
+            unsigned p = bank * bank_size + number, pad = physical_pad(uint8_t(number), layout);
             bool notes = with[p / 64] >> (p % 64) & 1, lit = chosen[p / 64] >> (p % 64) & 1;
             uint8_t colour = notes ? ui::track_colour(track).dim : colour::off;
             if (progress.busy) {
@@ -162,7 +165,9 @@ public:
     }
 
     std::string status() const override {
-        return studio.top() == this ? " print_sheet=" + std::to_string(track + 1) + " print_action=" + std::to_string(action) : std::string();
+        if (studio.top() != this) return {};
+        return " print_sheet=" + std::to_string(track + 1) + " print_action=" + std::to_string(action) + " print_chosen=" +
+               std::to_string(chosen_patterns().size());
     }
 
 private:

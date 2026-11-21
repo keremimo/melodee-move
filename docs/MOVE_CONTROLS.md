@@ -320,7 +320,7 @@ controls take Session's and Loop Mode's meanings where they have one.
 
 | Control | On the Move | In Melodee | Status |
 | --- | --- | --- | --- |
-| Pad (Song) | (Session: launches the clip, a row a track) | The cursor to that lane (the bank's four, a row each, Track 1 of the bank on top) and bar (the eight bars in view) | done |
+| Pad (Song) | (Session: launches the clip, a row a track) | The cursor to that lane (the bank's four, a row each, Track 1 of the bank on top) and bar (the eight bars in view), where the pad lies in both pad layouts, as Session's grid | done |
 | Copy held + Pad (Song) | (Session: copies the clip, then pastes it on the next pad pressed) | The clip there, then a copy of it where the next pad is pressed | done |
 | Delete held + Pad (Song) | (Session: deletes the clip at once) | Deletes the clip there | done |
 | Mute held + Pad (Song) | (Note Mode: mutes the drum pad) | Mutes or unmutes the clip there | done |
@@ -346,7 +346,7 @@ controls take Session's and Loop Mode's meanings where they have one.
 | Control | On the Move | In Melodee | Status |
 | --- | --- | --- | --- |
 | Track button held + Sampling | No job (the Move has no freeze) | PRINT for that track | done |
-| Pad (Print) | (No PRINT on the Move) | A pattern of the bank, printed or left out | done |
+| Pad (Print) | (No PRINT on the Move) | The pattern of the pad's number in the pad layout (Rows or Banks), printed or left out | done |
 | Plus or Minus (Print) | (As above) | The patterns' bank of 32 | done |
 | Wheel turn (Print) | (As above) | FREEZE, DEEP FREEZE, ALL, NONE, UNFREEZE | done |
 | Wheel push (Print) | (As above) | Does it; while printing, Back calls it off | done |

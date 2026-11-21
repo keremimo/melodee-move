@@ -8,6 +8,7 @@
 // and the service thread (service), as the runtime would.
 #include "app/exports.h"
 #include "app/melodee_app.h"
+#include "app/pad_layout.h"
 #include "app/prints.h"
 #include "app/project_store.h"
 #include "app/song_desk.h"
@@ -558,6 +559,52 @@ void test_synth_freeze() {
     CHECK(has(rig.app.status(), "print_skipped=1"));
 }
 
+// The pad layouts (pad_layout.h): PRINT's patterns are numbered pads, so
+// they follow Rows or Banks; Song's lanes and bars are where the pads lie,
+// as Session's grid, so they stay physical in both (Kerem, 2026-11-20).
+void test_pad_layouts() {
+    std::string folder = "build/test-samples", home = "build/test-home-song-pads", loop = folder + "/loop.wav";
+    write_project(home, loop);
+    Rig rig(folder, home);
+    auto& app = rig.app;
+    auto status = [&] { return app.status(); };
+    {   // A9 has notes too: pattern 8.
+        std::lock_guard<std::mutex> guard(rig.studio().lock);
+        auto& pattern = rig.studio().patterns().at[0][8];
+        pattern.length = rig.studio().project().bar_ticks();
+        melodee::Event e;
+        e.key = uint8_t(melodee::sampler_first_note);
+        e.length = 12;
+        pattern.events.push_back(e);
+        rig.desk().sync_pattern(0, 8);
+    }
+    app::set_pad_layout(app::PadLayout::Banks);
+    hold(app, Button::Row1, true);
+    press(app, Button::Sample);
+    hold(app, Button::Row1, false);
+    CHECK(has(status(), "page=print") && has(status(), "print_chosen=3")); // A1, A2, A9
+    // Banks: pad 9 (A9) is the left bank's third row, first column: physical 16.
+    tap_pad(app, 16);
+    CHECK(has(status(), "print_chosen=2"));
+    tap_pad(app, 16);
+    CHECK(has(status(), "print_chosen=3"));
+    // Rows: physical 16 is pad 17 (no notes); A9 is physical 8, the second row's first.
+    app::set_pad_layout(app::PadLayout::Rows);
+    tap_pad(app, 16);
+    CHECK(has(status(), "print_chosen=3"));
+    tap_pad(app, 8);
+    CHECK(has(status(), "print_chosen=2"));
+    press(app, Button::Back);
+    // Song in Banks: the top row is still the bank's first lane, the third pad its third bar.
+    app::set_pad_layout(app::PadLayout::Banks);
+    with(app, Button::Shift, [&] { tap_step(app, 12); });
+    tap_pad(app, song_pad(1, 2));
+    CHECK(has(status(), "page=song ") && has(status(), "track=2 ") && has(status(), "song_cursor=3"));
+    tap_pad(app, song_pad(0, 6));
+    CHECK(has(status(), "track=1 ") && has(status(), "song_cursor=7"));
+    app::set_pad_layout(app::PadLayout::Rows);
+}
+
 // Song, EXPORT and PRINT driven by the Move's own controls, through the
 // bindings table (docs/MOVE_CONTROLS.md, "Song", "Print and freeze").
 void test_song_screens() {
@@ -719,6 +766,8 @@ int main() {
     test_synth_freeze();
     std::cerr << "test_song_screens\n";
     test_song_screens();
+    std::cerr << "test_pad_layouts\n";
+    test_pad_layouts();
     std::cout << "song-tests: " << checks - failures << " of " << checks << " checks passed\n";
     return failures ? 1 : 0;
 }

@@ -8,7 +8,10 @@
 // the loop. The wheel moves the cursor a bar; its push opens the clip's jobs
 // (song_clip.cpp) or, on empty time, places a clip; Shift + push a marker.
 // Copy, Delete and Loop act on the clip under the cursor, Copy held, Delete
-// held and Mute held on the pad's clip. Knobs: 1 the pattern, 2 the length
+// held and Mute held on the pad's clip. The pads are a grid of where they
+// lie, a row a lane beside its track button, as Session's: they stay
+// physical in both pad layouts (Kerem, 2026-11-20, docs/MOVE_CONTROLS.md
+// "Pads": only numbered pad jobs follow Rows or Banks). Knobs: 1 the pattern, 2 the length
 // (of the clip under the cursor, or the next one placed), 3 the zoom, 5 the
 // cursor's bar's tempo (under 30 BPM: none), 6 its shape. Plus and Minus the
 // bank, Left and Right the pads' page, Shift + Left / Right the markers. Play
@@ -54,7 +57,7 @@ public:
         switch (job) {
         case Job::Song: case Job::Back: studio.close(); return true; // Shift + Step 13 again, or Back
         case Job::SongPick: case Job::SongCopyClip: case Job::SongDeleteClip: case Job::SongMuteClip: {
-            unsigned lane = 3 - unsigned(use.index) / 8, bar = pads_first() + unsigned(use.index) % 8;
+            unsigned lane = lane_of(unsigned(use.index)), bar = pads_first() + move::pad_column(unsigned(use.index));
             unsigned at_track = bank + lane;
             int clip = desk.clip_at(at_track, bar);
             if (job == Job::SongPick) {
@@ -147,8 +150,8 @@ public:
         int play_bar = desk.song_playing() ? int(studio.host().song_bar()) : -1;
         // The pads: four lanes over eight bars, top row the bank's first.
         unsigned first = pads_first();
-        for (unsigned pad = 0; pad < pad_count; ++pad) {
-            unsigned lane = 3 - pad / 8, bar = first + pad % 8, t = bank + lane;
+        for (unsigned pad = 0; pad < pad_count; ++pad) { // where it lies, in both pad layouts
+            unsigned lane = lane_of(pad), bar = first + move::pad_column(pad), t = bank + lane;
             int clip = desk.clip_at(t, bar);
             uint8_t colour = colour::off;
             if (clip >= 0) {
@@ -231,6 +234,8 @@ private:
     int copy_from = -1;   // Copy held: the clip pressed first
     int zoom_turned = 0;  // detents toward the next zoom
     unsigned pads_first() const { return studio.desk().cursor / 8 * 8; }
+    // The lane of a pad where it lies: the top row the bank's first track, beside its track button.
+    static unsigned lane_of(unsigned pad) { return move::pad_rows - 1 - move::pad_row(pad); }
     unsigned steps_first() const { return studio.desk().cursor / 16 * 16; }
     void move_cursor(int bar) { studio.desk().cursor = unsigned(std::clamp(bar, 0, int(melodee::song_bars) - 1)); }
     // Another lane: its track selected, Song still on top (a track button leaves for Play, as on the Move).
