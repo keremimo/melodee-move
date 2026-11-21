@@ -49,6 +49,9 @@ public:
     // Every input as it comes (after the audio thread had the pads): pads
     // played into Seq Record and Capture, what is held let go.
     void input(const move::SurfaceEvent& event);
+    // A key from MIDI in on track `t`, as it reaches the engine (app/midi.cpp, the MIDI thread, under the lock): as a
+    // pad's, Capture keeps it, Step Edit's ENTRY writes it at the caret, Seq Record at the tick it was heard.
+    void midi_key(unsigned t, int key, int velocity, bool down);
     // Every lights() call: Seq Record's free length growing, the engine's
     // repeats written, the click for Rec only, a launched pattern's loop.
     void tick(Clock::time_point now);
@@ -213,6 +216,9 @@ private:
     std::array<std::vector<int>, move::pad_count> pad_chords; // and all its keys (a chord pad's)
     std::array<int, move::pad_count> pad_tracks {};
     std::vector<uint8_t> keys_down; // a note track's keys held, for a step's chord
+    std::array<std::bitset<128>, melodee::track_count> midi_held {}; // MIDI in's keys held, a track each
+    bool midi_entry_written = false;                                // ENTRY: MIDI keys written; the caret moves once they go
+    void entry_write(const std::vector<int>& keys, int velocity);    // ENTRY: keys at the caret
     bool click_now = false;
     // Capture.
     std::unique_ptr<melodee::CaptureRing> ring;

@@ -9,6 +9,7 @@
 #include "app/midi.h"
 #include "app/pad_layout.h"
 #include "app/screen.h"
+#include "app/sequencer.h"
 #include "app/studio.h"
 #include "ui/mockups.h"
 #include "melodee/engine/midi_engine.h"
@@ -276,6 +277,57 @@ void test_in() {
     auto remote = rig.blocks(6);
     CHECK(count_of(remote, 0x92, 48) == 1);
     CHECK(rig.melodee->status().find("melodee_midi_panics=1") != std::string::npos);
+}
+
+// MIDI in recorded (guide/midi-and-sync.md): under Seq Record a key writes where it was heard, as long as it was held;
+// on Step Edit's ENTRY it writes at the caret, which moves on once the keys go.
+void test_recorded() {
+    Rig rig("recorded");
+    rig.midi_track(2);
+    rig.pump();
+    rig.blocks(2);
+    auto& seq = rig.studio().sequencer();
+    auto& studio = rig.studio();
+    auto locked = [&](auto&& what) { std::lock_guard<std::mutex> hold(studio.lock); what(); };
+    locked([&] {
+        seq.workflow.count_in = false;
+        seq.record(true); // from stopped: Play, at once
+    });
+    rig.blocks(8);
+    rig.pump();
+    locked([&] { CHECK(seq.recording() && studio.playing()); });
+    rig.in_message({0x90, 60, 90});
+    rig.blocks(40); // about 116 ms held
+    rig.in_message({0x80, 60, 0});
+    locked([&] {
+        const auto& p = seq.pattern(2, seq.number(2));
+        CHECK(p.events.size() == 1);
+        if (!p.events.empty()) CHECK(p.events[0].key == 60 && p.events[0].velocity == 90 && p.events[0].length > 12);
+        seq.record(false);
+        studio.stop();
+    });
+    rig.blocks(2);
+    // Not recording: played, not written.
+    rig.in_message({0x90, 62, 90});
+    rig.in_message({0x80, 62, 0});
+    locked([&] {
+        CHECK(seq.pattern(2, seq.number(2)).events.size() == 1);
+        seq.clear_pattern(2, seq.number(2));
+        seq.entry = true;
+        seq.caret = 0;
+    });
+    // ENTRY: a chord at the caret; the caret moves once both keys go.
+    rig.in_message({0x90, 64, 100});
+    rig.in_message({0x90, 67, 100});
+    rig.in_message({0x80, 64, 0});
+    locked([&] { CHECK(seq.caret == 0); });
+    rig.in_message({0x80, 67, 0});
+    locked([&] {
+        const auto& p = seq.pattern(2, seq.number(2));
+        CHECK(seq.caret == seq.entry_length && p.events.size() == 2);
+        for (const auto& e : p.events) CHECK(e.tick == 0);
+        seq.entry = false;
+    });
 }
 
 uint64_t now_ns() { return uint64_t(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count()); }
@@ -619,6 +671,7 @@ int main() {
     test_spi_cable();
     test_out();
     test_in();
+    test_recorded();
     test_sync_in();
     test_sysex();
     test_saved();
