@@ -469,7 +469,12 @@ globalThis.canvas_overlay = {
             refreshTrailingIfChanged();
             tick();
             const canvas = opened || (controller.page && controller.page.canvas) || null;
-            if (canvas && info && info.height > 0)
+            // Under something open over the page (Sections, the enum picker,
+            // the peek, a hint) the page is not drawn: Melodee draws that
+            // instead, on black, as Schwung's overlays cover the page.
+            const s = controller.state || {};
+            const covered = !!(enumPicker || controller.pickerOpen || (controller.enumPeek && controller.enumPeek()) || (s.hintLines && s.hintLines.lines));
+            if (canvas && !covered && info && info.height > 0)
                 drawCanvas(c, { x: info.x || 0, y: info.y || 0, w: info.width || 128, h: info.height }, canvas);
         }
         publish();

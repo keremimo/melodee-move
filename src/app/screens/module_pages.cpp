@@ -118,6 +118,11 @@ public:
         strip(g, upper(left), upper(right));
 
         const auto body = juce::Rectangle<int>(ui::content_x, ui::header_height + 2, ui::content_width, ui::subject_height - ui::header_height - 2);
+        if (v.enum_picker.shown || v.picker.shown || v.peek.shown || !v.hint.empty()) { // over the page: on black, never over its drawing
+            g.setColour(juce::Colours::black);
+            g.fillRect(ui::content_x, ui::header_height, ui::content_width, ui::detail_y - ui::header_height - 1);
+            g.setColour(juce::Colours::white);
+        }
         if (v.enum_picker.shown) list(g, body, v.enum_picker, v.enum_picker.cursor);
         else if (v.picker.shown) list(g, body, v.picker, v.picker.cursor);
         else if (v.peek.shown) list(g, body, v.peek, v.peek.cursor);
