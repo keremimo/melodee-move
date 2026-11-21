@@ -27,10 +27,16 @@ void item_row(juce::Graphics& g, const std::vector<Item>& items, int selected);
 // -1..1 (a pan, a bar out from the middle), `meter` 0..1 what it plays now
 // (a thin bar beside it). Muted: its bar hollow; soloed: an S over it;
 // unused: a dot and nothing else.
+//
+// Text mode (`text` not empty: the USB page's submix, "1".."8"): the text in
+// a chip at the top of the strip instead of a bar, cut out of it, the chip
+// hollow when muted; "-" (nothing chosen) alone, without a chip; the meter a
+// thin bar under it. `value` and `bipolar` are not used.
 struct Strip {
     std::string label;
     float value = 0, meter = 0;
     bool bipolar = false, muted = false, soloed = false, used = true;
+    std::string text;
 };
 // The strips side by side across `area`; the selected one's label inverted.
 void strips(juce::Graphics& g, juce::Rectangle<int> area, const std::vector<Strip>& strips, int selected);

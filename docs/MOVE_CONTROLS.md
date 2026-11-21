@@ -284,8 +284,8 @@ while Shift is held.
 | Delete held + Wheel push (Play) | No job | Removes the effect in focus; the rest close up | done |
 | Copy held + Wheel push (Play) | No job | Copies the effect in focus; Copy still held, a push on another slot pastes it | done |
 | Copy held + Wheel turn (Play) | No job | Walks the items as without Copy, to the slot to paste on | done |
-| Wheel turn (Mixer) | (No Mixer on the Move) | The page: levels, pans, sends A-D, MAIN | done |
-| Wheel push (Mixer) | (As above) | The page's chain: the selected track's, the bus's, the master's | done |
+| Wheel turn (Mixer) | (No Mixer on the Move) | The page: levels, pans, sends A-D, MAIN, USB (each track's and bus's USB submix, docs/USB_AUDIO.md) | done |
+| Wheel push (Mixer) | (As above) | The page's chain: the selected track's, the bus's, the master's; nothing on USB | done |
 | Wheel turn (Knob FX) | (No Knob FX on the Move) | Walks the MPC's 28 and Melodee's 15 | done |
 | Wheel push (Knob FX) | (As above) | Loads the one turned to | done |
 | Shift + Wheel push (Knob FX) | (As above) | Every track (or the bank's kit pads) on, or all off | done |
@@ -395,7 +395,7 @@ while Shift is held.
 | Shift + Left or Right | No job (Control Live: 16 bars) | 16 bars | done |
 | Left or Right (Session) | No job (Control Live: the session ring a track) | The patterns' page, eight at a time | done |
 | Left or Right (Chop) | No job | The slice before or after | done |
-| Left or Right (Mixer) | (No Mixer on the Move) | Tracks 1-8 or 9-16 | done |
+| Left or Right (Mixer) | (No Mixer on the Move) | Tracks 1-8 or 9-16; on USB, then the buses A-D | done |
 | Plus or Minus (Pad FX) | (No Pad FX on the Move) | The other bank of punches | done |
 | Plus or Minus (Overview) | No job | The folder's next or previous 32 pads | done |
 

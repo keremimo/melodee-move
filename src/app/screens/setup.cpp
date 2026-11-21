@@ -6,8 +6,8 @@
 // response and pressure. LIGHTS: pad lights, pad fade, brightness, the light
 // show and its style; LAYOUT (move-pad-layout's). MIDI and MIDI SYNC
 // (move-midi's MIDI Config) and WEB PAGE (move-web's) where those screens
-// are here. FEATURES Full or Basic, the usage log,
-// ABOUT, and BACK TO MOVE (Ableton's app again, as Shift + Back). Every
+// are here. FEATURES Full or Basic, USB AUDIO (read only) and USB VOLUME
+// (docs/USB_AUDIO.md), the usage log, ABOUT, and BACK TO MOVE (Ableton's app again, as Shift + Back). Every
 // setting is the same for every project, kept in Move.settings.
 #include "app/screens/common.h"
 #include "ui/system_draw.h"
@@ -70,6 +70,7 @@ public:
             drawn.name = row.name;
             drawn.door = row.values.empty() && (row.door[0] || std::string(row.name) == "PADS" || std::string(row.name) == "LIGHTS");
             if (!row.values.empty()) drawn.value = row.values[size_t(std::clamp(value(row.name), 0, int(row.values.size()) - 1))];
+            else if (std::string(row.name) == "USB AUDIO") drawn.value = usb_state();
             drawn.editing = editing && std::string(row.name) == rows()[size_t(cursor)].name;
             list.push_back(drawn);
         }
@@ -105,6 +106,10 @@ private:
         }
         if (studio.screen("web-page")) top.push_back({"WEB PAGE", {}, "web-page"});
         top.push_back({"FEATURES", {"BASIC", "FULL"}});
+        // USB audio to a computer (docs/USB_AUDIO.md): what it is doing, read
+        // only; whether the Volume knob turns the mix on 1-2 too.
+        top.push_back({"USB AUDIO", {}});
+        top.push_back({"USB VOLUME", {"FULL", "KNOB"}});
         top.push_back({"USAGE LOG", {"OFF", "ON"}});
         top.push_back({"ABOUT", {}, "about"});
         top.push_back({"BACK TO MOVE", {}});
@@ -121,7 +126,19 @@ private:
         if (name == "SHOW STYLE") return s.show_style;
         if (name == "FEATURES") return s.full;
         if (name == "USAGE LOG") return s.usage_log;
+        if (name == "USB VOLUME") return s.usb_full ? 0 : 1;
         return 0;
+    }
+    // USB AUDIO's state: OFF until usb-audio.sh has set the gadget up, NO
+    // COMPUTER until one records, then its channels.
+    std::string usb_state() const {
+        auto now = studio.usb_out().stats();
+        switch (now.state) {
+        case move::UsbState::Waiting: return "NO COMPUTER";
+        case move::UsbState::Running: return std::to_string(now.channels) + " CH";
+        case move::UsbState::Failed: return "FAILED";
+        default: return "OFF";
+        }
     }
     void set(const std::string& name, int v) {
         auto& s = studio.settings;
@@ -134,6 +151,7 @@ private:
         else if (name == "SHOW STYLE") s.show_style = uint8_t(v);
         else if (name == "FEATURES") s.full = v != 0;
         else if (name == "USAGE LOG") s.usage_log = v != 0;
+        else if (name == "USB VOLUME") s.usb_full = v == 0;
         studio.settings_changed();
     }
     void push(const std::vector<Row>& shown) {

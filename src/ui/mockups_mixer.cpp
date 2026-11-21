@@ -9,7 +9,9 @@
 // a track, four buses and six on the master before its compressor. Shift +
 // Step 4 (no Move job) opens the Mixer: Melodee's MIX hub, its pages along
 // the top the wheel walks: the sixteen tracks' levels, pans and sends, the
-// main out. Shift + Step 4 again: Knob FX, again Pad FX, again Flex Beat
+// main out, and USB: which of the eight stereo submixes on the USB port
+// (channels 3-18, the main mix on 1-2) each track and bus also goes to.
+// Shift + Step 4 again: Knob FX, again Pad FX, again Flex Beat
 // (Kerem, 2026-11-20).
 #include "ui/mockups.h"
 #include "move/controls.h"
@@ -67,8 +69,34 @@ std::vector<Strip> track_strips(unsigned first, int which) { // which: 0 level, 
     return out;
 }
 
+// The USB port's submixes: OFF (0, the main mix only) or 1-8, on channels
+// 3-4 to 17-18. The default puts tracks 1-8 on 1-8; here GRAND is taken
+// off, the TB-03 (MIDI) has no audio to send, BREAKS is on 3, track 8 is
+// empty, and FOLEY shares the drums' submix 1.
+constexpr int usb_sub[16] {1, 2, 0, 0, 3, 4, 5, 0, 1, 0, 0, 0, 0, 0, 0, 0};
+constexpr int bus_sub[4] {7, 8, 0, 0}; // the buses: room on 7, echo on 8
+
+std::string sub_text(int sub) { return sub ? std::to_string(sub) : "-"; }
+std::string channels(int sub) { return "CH " + std::to_string(2 * sub + 1) + "-" + std::to_string(2 * sub + 2); }
+
+std::vector<Strip> usb_strips(unsigned first) {
+    std::vector<Strip> out;
+    for (unsigned t = first; t < first + 8; ++t) {
+        const Example& e = example[t];
+        Strip s;
+        s.label = std::to_string(t + 1);
+        s.used = e.tag[0] != 0;
+        s.muted = e.muted;
+        s.soloed = e.soloed;
+        s.meter = e.meter;
+        s.text = sub_text(usb_sub[t]);
+        out.push_back(s);
+    }
+    return out;
+}
+
 // The hub's pages along the top: the wheel walks them.
-std::vector<Item> hub() { return {{"VOL"}, {"PAN"}, {"SNDA"}, {"SNDB"}, {"SNDC"}, {"SNDD"}, {"MAIN"}}; }
+std::vector<Item> hub() { return {{"VOL"}, {"PAN"}, {"SNDA"}, {"SNDB"}, {"SNDC"}, {"SNDD"}, {"MAIN"}, {"USB"}}; }
 
 // The kit's Device View: the kit, its pad A05, A05's own effect and the
 // plus that adds its next, the track's two and the plus that adds the next.
@@ -217,6 +245,34 @@ std::vector<Screen> mixer_screens() {
             mix::item_row(g, {{"DRIV"}, {"EQ"}, {"+"}, {"COMP"}}, 3);
             mix::reduction(g, content(11, 40), pump(content_width), 4, 70);
             detail(g, "KEY 1", "-4.5DB");
+        }},
+        // USB, the hub's last page: each track's and bus's submix on the
+        // USB port, OFF or 1-8, a step a detent (a copy stays in the mix).
+        {"mixer-usb", "USB: EACH TRACK'S SUBMIX, OFF OR 1-8", [](juce::Graphics& g) {
+            rail(g, "MIX", "5", "1-8");
+            mix::item_row(g, hub(), 7);
+            mix::strips(g, content(10, 44), usb_strips(0), int(selected));
+            detail(g, "SUB " + std::to_string(usb_sub[selected]), channels(usb_sub[selected]));
+        }},
+        {"mixer-usb-bus", "LEFT/RIGHT: 9-16, THEN BUSES A-D", [](juce::Graphics& g) {
+            rail(g, "MIX", "C", "A-D");
+            mix::item_row(g, hub(), 7);
+            std::vector<Strip> list;
+            const float heard[4] {0.35f, 0.2f, 0, 0};
+            for (int b = 0; b < 4; ++b) {
+                Strip s;
+                s.label = std::string(1, char('A' + b));
+                s.text = sub_text(bus_sub[b]);
+                s.meter = heard[b];
+                list.push_back(s);
+            }
+            mix::strips(g, {content_x, 10, 4 * (content_width / 8), 44}, list, 2); // under knobs 1-4, as tracks 1-4
+            detail(g, "OFF", "MIX ONLY");
+        }},
+        {"mixer-usb-touch", "A KNOB TOUCHED: THAT TRACK'S SUBMIX", [](juce::Graphics& g) {
+            rail(g, "KNOB", "5", "USB");
+            big_parameter(g, content(4, 44), "5 BREAKS USB", "SUB " + std::to_string(usb_sub[selected]), usb_sub[selected] / 8.0f);
+            move::draw_text_centred(g, content_x, detail_y, content_width, channels(usb_sub[selected]));
         }},
         // Melodee's performance effects: Shift + Step 4 again, and again, and again.
         {"knob-fx", "SHIFT + STEP 4 AGAIN: KNOB FX", [](juce::Graphics& g) {
@@ -430,7 +486,7 @@ juce::Image sheet(const std::vector<Screen>& screens, const std::vector<Lights>&
     g.setColour(juce::Colour(0xffd8f0ff));
     move::draw_text(g, gap, 20, "MELODEE ON MOVE: MIXER AND EFFECTS", 4);
     g.setColour(juce::Colour(0xff8a96a3));
-    move::draw_text(g, gap, 60, "EFFECTS IN THE DEVICE VIEW; SHIFT + STEP 4 THE MIXER. DOCS/UI.MD", 2);
+    move::draw_text(g, gap, 60, "EFFECTS IN THE DEVICE VIEW; SHIFT + STEP 4 THE MIXER, USB. DOCS/UI.MD", 2);
     auto place = [&](size_t n, int from) { return juce::Point<int>(gap + int(n % 2) * (screen_w + gap), from + int(n / 2) * (screen_h + caption + gap)); };
     for (size_t n = 0; n < screens.size(); ++n) {
         auto at = place(n, top);

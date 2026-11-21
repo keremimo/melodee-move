@@ -57,6 +57,30 @@ void strips(juce::Graphics& g, juce::Rectangle<int> area, const std::vector<Stri
         move::draw_text_centred(g, x, label_y, w - 1, s.label.substr(0, size_t(std::max(1, (w - 1) / move::glyph_advance))));
         g.setColour(on);
         if (!s.used) { g.fillRect(x + w / 2 - 1, floor, 1, 1); continue; }
+        if (!s.text.empty()) {
+            // Text mode: a chip at the top, the text cut out of it (hollow
+            // when muted), "-" alone; what it plays now a thin bar under it.
+            // A pixel in from the column's left: three between chips, so
+            // side by side they never read as one number.
+            int chip_x = x + 1, chip_w = std::max(move::glyph_width + 2, w - 3), chip_h = move::glyph_height + 4;
+            std::string text = s.text.substr(0, size_t(std::max(1, (chip_w - 2) / move::glyph_advance)));
+            if (s.soloed) move::draw_text_centred(g, chip_x, area.getY(), chip_w, "S");
+            if (s.text == "-") {
+                move::draw_text_centred(g, chip_x, top + 2, chip_w, text);
+            } else if (s.muted) {
+                g.drawRect(chip_x, top, chip_w, chip_h);
+                move::draw_text_centred(g, chip_x, top + 2, chip_w, text);
+            } else {
+                g.fillRect(chip_x, top, chip_w, chip_h);
+                g.setColour(off);
+                move::draw_text_centred(g, chip_x, top + 2, chip_w, text);
+                g.setColour(on);
+            }
+            int under = top + chip_h + 2;
+            int m = int(std::lround(std::clamp(s.meter, 0.0f, 1.0f) * float(std::max(0, floor - under))));
+            if (m > 0) g.fillRect(chip_x + chip_w / 2 - 1, floor - m + 1, 2, m);
+            continue;
+        }
         int meter_w = w >= 9 ? 2 : 1, bar_w = std::max(2, w - meter_w - 3);
         if (s.soloed) move::draw_text(g, x + (bar_w - move::glyph_width) / 2, area.getY(), "S");
         if (s.bipolar) {

@@ -354,7 +354,17 @@ void test_setup_and_tracks() {
         CHECK(again.studio().settings.response == 2 && !again.studio().settings.pressure && !again.studio().settings.full);
         CHECK(again.studio().settings_more.count("other_area") && again.studio().settings_more.at("other_word") == "other_word 7");
     }
-    turn_wheel(melodee, 2);           // ABOUT
+    // USB AUDIO after FEATURES: read only, a push changes nothing. USB
+    // VOLUME: FULL or KNOB, flipped at once (docs/USB_AUDIO.md).
+    turn_wheel(melodee, 1);           // USB AUDIO
+    press(melodee, Button::MainPush);
+    CHECK(has(status(), "page=setup") && has(status(), "setup_editing=0") && studio.settings.usb_full);
+    turn_wheel(melodee, 1);           // USB VOLUME
+    press(melodee, Button::MainPush);
+    CHECK(!studio.settings.usb_full);
+    press(melodee, Button::MainPush);
+    CHECK(studio.settings.usb_full);
+    turn_wheel(melodee, 2);           // ABOUT, past USAGE LOG
     press(melodee, Button::MainPush);
     CHECK(has(status(), "page=about"));
     press(melodee, Button::Back);

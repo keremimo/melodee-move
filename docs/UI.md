@@ -375,7 +375,9 @@ and a return, and six on the master before its compressor (docs/PARITY.md,
 mixer & effects). `docs/ui/mixer.png` is the sheet
 (`src/ui/mockups_mixer.cpp`, its pieces in `src/ui/mix_widgets.*`),
 approved by Kerem on 2026-11-20 with his choices in
-[MOVE_CONTROLS.md](MOVE_CONTROLS.md)'s Decisions; the screens are built to
+[MOVE_CONTROLS.md](MOVE_CONTROLS.md)'s Decisions, and its USB page
+(`mixer-usb`, `mixer-usb-bus`, `mixer-usb-touch`) by Kerem on 2026-11-20
+as drawn; the screens are built to
 it (`src/app/screens/device_fx.*`, `mixer.cpp`), the logic in
 `src/app/mixing.*`, Schwung's effects in `src/app/fx_host.*`.
 
@@ -406,7 +408,7 @@ it (`src/app/screens/device_fx.*`, `mixer.cpp`), the logic in
   pan, 3-6 its sends into buses A-D; its meter on the right; the detail
   line its level in dB and its share of the CPU.
 - **The Mixer** (Shift + Step 4): Melodee's MIX hub, its pages on the row
-  the wheel walks: VOL, PAN, SNDA-SNDD, MAIN. On VOL, PAN
+  the wheel walks: VOL, PAN, SNDA-SNDD, MAIN, USB. On VOL, PAN
   and the sends the knobs are eight tracks (Left and Right: 1-8 or 9-16),
   each a strip with its meter, the selected one's number inverted, a muted
   one hollow, a soloed one marked S; a send page shows the bus's return
@@ -417,6 +419,15 @@ it (`src/app/screens/device_fx.*`, `mixer.cpp`), the logic in
   8 its pad). The steps are the sixteen tracks: a step selects one, Mute +
   a step mutes it, Shift + Mute + a step solos it, as with the track
   buttons. A touched knob shows that track large, in dB.
+- **USB** (the hub's last page): the Move as an 18-channel USB audio
+  interface, the main mix on 1-2 and eight stereo submixes on 3-18. Each
+  track and bus goes to one submix or none (OFF), a copy staying in the
+  main mix; by default tracks 1-8 on submixes 1-8, the rest OFF. Left and
+  Right walk 1-8, 9-16 and the buses A-D (knobs 1-4); a knob steps OFF,
+  1-8, one a detent. Each strip shows its submix in a chip (`-` for OFF),
+  hollow when muted, a thin meter under it. The detail line says
+  `SUB 3  CH 7-8` or `OFF  MIX ONLY`; on A-D the rail and detail follow the
+  bus last turned. A touched knob shows `5 BREAKS USB`, `SUB 3` large.
 - **Shift + Step 4 again** (Kerem's choice): from the Mixer, Knob FX;
   again Pad FX; again Flex Beat; again the Mixer.
 - **Knob FX**: the mode turns on as it opens (the MPC's Knob FX lit) and
@@ -452,6 +463,7 @@ it (`src/app/screens/device_fx.*`, `mixer.cpp`), the logic in
 | Effect browser | `LOAD` / track / slot | families, then effects | `PUSH: OK` |
 | Effect options | `OPT` / track / effect | Bypass, Move, Copy, Paste, Remove | |
 | Mixer page | `MIX` / track / `1-8` or `9-16` | the hub row, eight strips | the selected track, its value |
+| Mixer USB | `MIX` / track or bus / `1-8`, `9-16`, `A-D` | the hub row, a submix chip a strip | `SUB 3  CH 7-8`, `OFF  MIX ONLY` |
 | Mixer MAIN | `MIX` / / `MAIN` | returns, reduction, out | reduction, `PUSH: FX` |
 | A bus's chain | `BUS` / `A`-`D` / item | the row, the return or the effect | the tracks sending |
 | The master's chain | `MAIN` / / item | the row, an effect or the compressor's bar | its key, the reduction |
@@ -778,10 +790,13 @@ sheet (`src/ui/mockups_projects.cpp`); the screens draw with the same code
   pressure), LIGHTS (pad lights colour, white, off; pad fade; brightness
   low to max, as the Move's; the light show and its style: Pulse, Sweep,
   Chase, Ripple, Levels, in time with the tempo), MIDI and SYNC (move-midi),
-  WEB PAGE (move-web), FEATURES (Full, or Basic: the Move's own pages,
-  tracks, modules, the mixer and Song), USAGE LOG, ABOUT (the audio cycle's
-  share and longest, late exchanges, room left, synths and their slow
-  calls, the build), BACK TO MOVE. A push opens a door or edits a value
+  WEB PAGE (move-web), USB AUDIO (read only: `OFF`, the gadget not set
+  up; `NO COMPUTER`, the row's name cut to `USB` to fit; `18 CH`), USB
+  VOLUME (`FULL`, or `KNOB`: the Move's volume knob turns the USB channels
+  too; approved by Kerem on 2026-11-20), USAGE LOG, ABOUT (the audio
+  cycle's share and longest, late exchanges, room left, synths and their
+  slow calls, the build), BACK TO MOVE. No FEATURES (Basic or Full): the
+  Move is always Full (Kerem, 2026-11-20). A push opens a door or edits a value
   (`[MED]`: the wheel turns it, a push keeps it, Back leaves it as it was);
   a value of two flips at once. Step 2 flashes while it is open.
 - **A track's options** (Shift + a track button): its COLOUR (the wheel

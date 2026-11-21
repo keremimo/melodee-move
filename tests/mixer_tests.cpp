@@ -10,6 +10,7 @@
 #include "app/mixing.h"
 #include "app/pad_layout.h"
 #include "app/project_store.h"
+#include "app/screen.h"
 #include "melodee/engine/engine_info.h"
 #include "move/audio.h"
 #include "move/controls.h"
@@ -430,12 +431,38 @@ void test_screens(Rig& rig) {
     CHECK(studio.project().buses[1].level == 90);
     press(rig, Button::Back);
     CHECK(page_of(rig) == "mixer");
-    wheel(rig, 10); // MAIN
+    wheel(rig, 3); // MAIN
+    CHECK(has(rig.melodee.status(), "mixer_page=6"));
     turn(rig, knob_first_cc + 7, -20); // the compressor's amount
     CHECK(studio.project().compressor.amount == 80);
     press(rig, Button::MainPush); // the master's chain: its compressor last
     CHECK(page_of(rig) == "chain" && has(rig.melodee.status(), "chain=MAIN"));
     press(rig, Button::Back);
+    // USB, the last page (docs/USB_AUDIO.md): knob 1 track 1's submix, a
+    // step a detent however fast, OFF the least; touched, its channels under
+    // it. Right, Right: the buses A-D on knobs 1-4. The push opens nothing.
+    wheel(rig, 1);
+    CHECK(has(rig.melodee.status(), "mixer_page=7") && studio.extras().usb_submix[0] == 1);
+    turn(rig, knob_first_cc, 1);
+    CHECK(studio.extras().usb_submix[0] == 2);
+    auto shown = studio.top()->knob(0);
+    CHECK(shown.value == "SUB 2" && has(shown.name, " USB") && studio.top()->knob_detail(0) == "CH 5-6" && studio.top()->knob_owner() == "USB");
+    turn(rig, knob_first_cc, -5);
+    CHECK(studio.extras().usb_submix[0] == 1);
+    turn(rig, knob_first_cc, -1);
+    turn(rig, knob_first_cc, -1);
+    CHECK(studio.extras().usb_submix[0] == 0 && studio.top()->knob(0).value == "OFF" && studio.top()->knob_detail(0) == "MIX ONLY");
+    press(rig, Button::Right);
+    press(rig, Button::Right);
+    CHECK(has(rig.melodee.status(), "mixer_half=2"));
+    turn(rig, knob_first_cc + 1, 1); // bus B
+    turn(rig, knob_first_cc + 5, 1); // past D: nothing
+    CHECK(studio.extras().usb_submix[melodee::track_count + 1] == 1 && studio.top()->knob(1).name == "BUS B USB" && studio.top()->knob(5).name.empty());
+    press(rig, Button::MainPush);
+    CHECK(page_of(rig) == "mixer");
+    wheel(rig, -1); // MAIN: the buses' bank is USB's alone
+    CHECK(has(rig.melodee.status(), "mixer_page=6") && has(rig.melodee.status(), "mixer_half=1"));
+    studio.extras().usb_submix = app::usb_defaults();
     press(rig, Button::Back);
     CHECK(page_of(rig) == "synth-play" || page_of(rig) == "kit-play");
     // A track button held + Mute + a step mutes that track.

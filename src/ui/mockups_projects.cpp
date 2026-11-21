@@ -173,8 +173,27 @@ std::vector<Screen> projects_screens() {
         {"setup", "SHIFT + STEP 2: SETUP", [](juce::Graphics& g) {
             sys::setup_list(g, "SETP", "",
                             {{"PADS", "", true}, {"LIGHTS", "", true}, {"MIDI", "", true}, {"SYNC", "", true}, {"WEB PAGE", "", true},
-                             {"FEATURES", "FULL"}, {"USAGE LOG", "OFF"}, {"ABOUT", "", true}, {"BACK TO MOVE", ""}},
+                             {"USB AUDIO", "18 CH"}, {"USB VOLUME", "FULL"},
+                             {"USAGE LOG", "OFF"}, {"ABOUT", "", true}, {"BACK TO MOVE", ""}},
                             0);
+        }},
+        // The USB port as an audio interface (18 channels out: the main mix
+        // on 1-2, eight submixes on 3-18, the Mixer's USB page): USB AUDIO
+        // says what it is doing and cannot be edited; USB VOLUME is whether
+        // the Move's volume knob turns the USB channels too.
+        {"setup-usb-none", "USB AUDIO: READ ONLY, NO COMPUTER YET", [](juce::Graphics& g) {
+            sys::setup_list(g, "SETP", "",
+                            {{"PADS", "", true}, {"LIGHTS", "", true}, {"MIDI", "", true}, {"SYNC", "", true}, {"WEB PAGE", "", true},
+                             {"USB AUDIO", "NO COMPUTER"}, {"USB VOLUME", "FULL"},
+                             {"USAGE LOG", "OFF"}, {"ABOUT", "", true}, {"BACK TO MOVE", ""}},
+                            5);
+        }},
+        {"setup-usb-volume", "OFF: NOT SET UP. USB VOLUME: FULL OR KNOB", [](juce::Graphics& g) {
+            sys::setup_list(g, "SETP", "",
+                            {{"PADS", "", true}, {"LIGHTS", "", true}, {"MIDI", "", true}, {"SYNC", "", true}, {"WEB PAGE", "", true},
+                             {"USB AUDIO", "OFF"}, {"USB VOLUME", "KNOB"},
+                             {"USAGE LOG", "OFF"}, {"ABOUT", "", true}, {"BACK TO MOVE", ""}},
+                            6);
         }},
         {"setup-pads", "SETUP > PADS: PUSH EDITS A VALUE", [](juce::Graphics& g) {
             sys::setup_list(g, "PADS", "SETP", {{"RESPONSE", "MED", false, true}, {"PRESSURE", "ON"}}, 0);

@@ -18,6 +18,15 @@ Unless a project says otherwise, tracks 1-8 are on submixes 1-8 and tracks
 its Move section (`usb T N`, `usb_bus B N`, only where not the default); a
 moved track takes its submix along; a change is an undo step of its own.
 
+On the Move: the Mixer (Shift + Step 4), its last page **USB**. Knobs 1-8
+are eight tracks' submixes, a step a detent from OFF to 8; Left and Right walk
+1-8, 9-16 and the buses A-D (knobs 1-4). Each strip shows its submix in a
+chip (`-` for none), the detail line `SUB 3  CH 7-8` or `OFF  MIX ONLY`; a
+touched knob shows the submix large and its channels under it (docs/UI.md,
+`docs/ui/mixer.png`). Setup (Shift + Step 2) has **USB AUDIO**, read only:
+`OFF` (the gadget not set up), `NO COMPUTER`, `18 CH` (or `FAILED`, a device
+it could not open); and **USB VOLUME**, `FULL` or `KNOB`.
+
 Not in any submix, only in 1-2: Knob FX's return, the Looper's strips, the
 master chain and compressor, a Sidechain's ducking (applied to the mix as a
 whole), and the monitored input. With a latent effect on a track (plug-in
