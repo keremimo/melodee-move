@@ -22,6 +22,9 @@ bool write_controls_mockups(const std::string& directory);
 // The pad layouts, Move rows and two MPC banks: pads.png and pads/
 // (mockups_pads.cpp).
 bool write_pads_mockups(const std::string& directory);
+// Kit depth: 128 pads, the pad pages, 16 Pitches, Sample Options: kit.png
+// and kit/ (mockups_kit.cpp).
+bool write_kit_mockups(const std::string& directory);
 
 namespace mockup {
 

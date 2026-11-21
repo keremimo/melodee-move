@@ -4,7 +4,8 @@
 // of places: the Move's own sample folders, Ableton's Core Library, all of
 // /data/UserData (or only --samples DIR). The jogwheel picks, its push opens
 // a place or folder or loads, Back goes up, then back to the places.
-#include "app/screens/common.h"
+#include "app/screens/kit_common.h"
+#include "melodee/shell/mpc_program.h"
 #include <filesystem>
 
 namespace app::screens {
@@ -25,6 +26,9 @@ bool is_sound_file(const fs::path& path) {
     auto extension = upper(path.extension().string());
     return extension == ".WAV" || extension == ".AIF" || extension == ".AIFF" || extension == ".FLAC" || extension == ".OGG" || extension == ".MP3";
 }
+// Kit depth: a bank file (.mldb) loads into the bank of the pad in view, an
+// MPC drum program (.xpm, .xty) opens the LOAD KIT sheet (load_kit.cpp).
+bool is_bank_file(const fs::path& path) { return upper(path.extension().string()) == ".MLDB"; }
 
 class LoadSamples final : public Screen {
 public:
@@ -58,16 +62,19 @@ public:
                 const auto& entry = entries[size_t(cursor)];
                 auto path = (fs::path(folder) / entry.name).string();
                 if (entry.folder) { folder = path; cursor = 0; list_folder(); }
+                else if (entry.tag == "BANK") { if (auto failed = studio.load_bank_file(path, studio.pad() / 16); !failed.empty()) studio.say(failed); }
+                else if (entry.tag == "KIT") { studio.program_path = path; studio.push("load-kit"); }
                 else { studio.jobs.push_back({path, studio.track(), studio.pad()}); studio.say("LOADING"); }
             }
             return true;
+        case Job::BrowserOptions: studio.push("browser-options"); return true; // Shift held: Save Sample, Save Bank
         default: return false; // a pad: the kit's Play screen picks it, the one a sample loads onto
         }
     }
 
     void lights(move::Lights& lights) override {
         using namespace move;
-        for (unsigned at = 0; at < pad_count; ++at) light_pad(lights, at, at == studio.pad() ? colour::white : studio.current().pads[at].used() ? ui::track_colour(studio.track()).dim : colour::off);
+        kit_pads(studio, lights, int(studio.pad())); // the pad a sample loads onto blinks
         steps_playhead(studio, lights);
         for (auto button : {Button::Left, Button::Right, Button::Up, Button::Down, Button::Loop}) lights.button(button, 0);
         lights.button(Button::Menu, 0);
@@ -82,13 +89,17 @@ public:
             return;
         }
         std::vector<std::string> rows;
-        for (const auto& entry : entries) rows.push_back(entry.folder ? entry.name + " >" : entry.name);
+        for (const auto& entry : entries) {
+            if (entry.tag.empty()) { rows.push_back(entry.folder ? entry.name + " >" : entry.name); continue; }
+            auto name = fs::path(entry.name).stem().string().substr(0, 11);
+            rows.push_back(name + std::string(12 - name.size(), ' ') + entry.tag);
+        }
         ui::list(g, ui::content(0, ui::height), rows, cursor, 1);
     }
 
 private:
     struct Place { std::string name, path, tag; };
-    struct Entry { std::string name; bool folder = false; };
+    struct Entry { std::string name; bool folder = false; std::string tag {}; };
 
     void open_place(int index) {
         if (index < 0 || index >= int(places.size())) return;
@@ -111,6 +122,8 @@ private:
             if (name.empty() || name[0] == '.') continue;
             if (item.is_directory(error)) entries.push_back({name, true});
             else if (is_sound_file(item.path())) entries.push_back({name, false});
+            else if (is_bank_file(item.path())) entries.push_back({name, false, "BANK"});
+            else if (melodee::is_drum_program(item.path().string())) entries.push_back({name, false, "KIT"});
         }
         std::sort(entries.begin(), entries.end(), [](const Entry& a, const Entry& b) {
             if (a.folder != b.folder) return a.folder;

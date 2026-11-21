@@ -60,6 +60,13 @@ TRANSPORT_EXPECTED='page=kit-play .*playing=1 tick=[1-9][0-9]* tempo=122.0 click
 # fifth pad at 300 is B01 in Banks (A05 in Rows). The next start keeps Banks.
 PADS_SCRIPT='100:0xb0,49,127;101:0x90,17,127;102:0x80,17,0;103:0xb0,49,0;120:0xb0,3,127;121:0xb0,3,0;140:0xb0,14,1;160:0xb0,3,127;161:0xb0,3,0;180:0xb0,51,127;181:0xb0,51,0;300:0x90,72,100;330:0x80,72,0'
 PADS_EXPECTED='page=kit-play .*pad=B01 .*layout=banks'
+# Kit depth, on that project (A01 the loop, A02-A17 its slices): Plus at 100
+# shows banks B-C and Minus at 160 back; Shift + Step 8 at 240 turns 16
+# Pitches on, a pitch pad at 300, off again at 480; Shift + turn at 700 opens
+# the pad pages (TRIM), knob 1 moves the start, Back at 780; Copy held with
+# A01 then B16 at 900 copies A01 onto the empty B16 (18 pads).
+KIT_SCRIPT='100:0xb0,55,127;101:0xb0,55,0;160:0xb0,54,127;161:0xb0,54,0;240:0xb0,49,127;241:0x90,23,127;242:0x80,23,0;243:0xb0,49,0;300:0x90,72,100;330:0x80,72,0;480:0xb0,49,127;481:0x90,23,127;482:0x80,23,0;483:0xb0,49,0;700:0xb0,49,127;701:0xb0,14,1;702:0xb0,49,0;720:0xb0,71,2;780:0xb0,51,127;781:0xb0,51,0;900:0xb0,60,127;901:0x90,68,100;902:0x80,68,0;903:0x90,99,100;904:0x80,99,0;905:0xb0,60,0'
+KIT_EXPECTED='page=kit-play .*pads=18 .* bank=0 pitches=0 copy_from=-1'
 # The synth track: Track 2 tapped at 50, the wheel's push at 60 lists the
 # modules (none loaded yet), its push at 80 loads the one in
 # build/test-modules (the tests' stand-in), a pad plays it, knob 1 turns its
@@ -94,6 +101,9 @@ docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE
     { build/melodee-move --backend simulated --samples build/simulated-samples --home build/simulated-home --seconds 3 --script '$TRANSPORT_SCRIPT' 2> build/simulated-transport.log || true; } &&
     tail -n 1 build/simulated-transport.log &&
     grep -qE '$TRANSPORT_EXPECTED' build/simulated-transport.log &&
+    { build/melodee-move --backend simulated --samples build/simulated-samples --home build/simulated-home --seconds 4 --script '$KIT_SCRIPT' 2> build/simulated-kit.log || true; } &&
+    tail -n 1 build/simulated-kit.log &&
+    grep -qE '$KIT_EXPECTED' build/simulated-kit.log &&
     { build/melodee-move --backend simulated --samples build/simulated-samples --home build/simulated-home --seconds 3 --script '$PADS_SCRIPT' 2> build/simulated-pads.log || true; } &&
     tail -n 1 build/simulated-pads.log &&
     grep -qE '$PADS_EXPECTED' build/simulated-pads.log &&

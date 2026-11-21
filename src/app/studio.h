@@ -11,9 +11,11 @@
 #include "melodee/engine/onsets.h"
 #include "melodee/engine/sample_data.h"
 #include "melodee/model/project.h"
+#include "melodee/shell/sample_cache.h"
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -40,7 +42,7 @@
 //   handed back to be freed off the audio thread.
 namespace app {
 
-constexpr unsigned pad_count = 32; // the Move's pads: kit pads 1-32 (A01-B16), notes 36-67
+constexpr unsigned pad_count = 32; // the Move's pads: on a kit, two of its eight banks (Studio::pad_bank())
 
 // What a track is, as the Move shows it: Melodee's engines, a PLUGIN track
 // split by what it plays (one of Schwung's modules, or another plug-in).
@@ -48,9 +50,13 @@ enum class TrackKind : uint8_t { Empty, Kit, Synth, Keys, Midi, Audio, Plugin, C
 const char* kind_name(TrackKind kind); // "empty", "kit", "synth", ...
 const char* kind_tag(TrackKind kind);  // the rail's: "----", "KIT", "SYN", "KEYS", "MIDI", "AUD", "PLUG"
 
-// A sample in memory, with what Chop needs found in it.
+// A sample in memory, with what Chop needs found in it. A long one (over
+// ten seconds, up to six hours), or one memory has no room for, is not read
+// into memory: it is read from storage as it plays (`streamed`, Melodee's
+// engine/stream_pager.h), its waveform read from the file once.
 struct Sample {
     std::string name, path;
+    bool streamed = false;
     std::unique_ptr<melodee::SampleData> data;
     melodee::Overview overview {};
     std::array<melodee::Hit, melodee::max_hits> hits {};
@@ -59,8 +65,12 @@ struct Sample {
     melodee::AutoRead autos;
 };
 // Reads a sound file and finds its hits, beats and what Auto reads. Slow
-// and allocating: never on the audio thread, never under the lock.
-std::unique_ptr<Sample> read_sample(const std::string& path, std::string& error);
+// and allocating: never on the audio thread, never under the lock. As
+// Melodee's SampleLibrary: refused ("Memory full") when what it would take
+// leaves less than 256 MB free (shell/sample_memory.h); a long WAV read in
+// place; a long MP3, FLAC, Ogg or AIFF decoded once into `cache` (Melodee/Cache,
+// shell/sample_cache.h) and read in place from there.
+std::unique_ptr<Sample> read_sample(const std::string& path, std::string& error, const melodee::SampleCache* cache = nullptr);
 
 // Melodee's PLUGIN track's plug-in, for one of Schwung's modules: the
 // engine host calls it on the audio thread (engine/plugin_engine.h).
@@ -154,18 +164,72 @@ public:
     // semitones (Banks), C2 at the bottom left at octave 0.
     int note_for(unsigned pad, int octave) const;
 
-    // A kit track's pads.
-    unsigned pad() const { return song->tracks[selected].last_pad % pad_count; }
-    void select_pad(unsigned pad);
+    // A kit track's pads: 128 in eight banks of 16 (A-H, melodee::sampler_pads),
+    // the Move's 32 two of them, Track::bank the lower (Plus and Minus move it
+    // 16 pads, docs/MOVE_CONTROLS.md). With 16 Pitches on (Melodee's 16 Levels,
+    // Track::levels) the left 16 are bank Track::bank laid out as the MPC's
+    // (bottom left first, rows of four) and the right 16 the last pad up the
+    // project's key. pad() is the kit pad edited (0-127).
+    unsigned pad() const { return song->tracks[selected].last_pad % melodee::sampler_pads; }
+    void select_pad(unsigned pad); // a kit pad, 0-127
+    int kit_pad_at(unsigned move_pad) const;   // the kit pad under Move pad 0-31; -1 a pitch of 16 Pitches
+    int move_pad_of(unsigned kit_pad) const;   // the Move pad showing a kit pad; -1 out of view
+    unsigned pad_bank() const { return song->tracks[selected].bank; }
+    void set_pad_bank(int bank);               // the lower bank in view, 0..6 (0..7 with 16 Pitches)
+    bool pitches() const;                      // 16 Pitches on the selected kit
+    void set_pitches(bool on);
+    void set_pitches_octave(int octave);       // melodee's kit Levels octave, kit_level_octave as it is
+    int pitch_semitones(unsigned pitch) const; // pitch 0-15 (bottom left first): its semitones from the pad's own
+    void refresh_pads();                       // the audio thread's copy of the above, after anything moved them
+    // While Chop is open the engine's kit pads 0-31 are its slices: the pads
+    // play them by their number in the pad layout, whatever bank is in view.
+    void pads_play_slices(bool on) { audio_slices.store(on, std::memory_order_relaxed); }
+    // Copy the sound of one pad onto another (its sample and values, chain,
+    // mute, zone trims). Clear: the pad's notes in the selected pattern, or
+    // with none its sound, or an empty pad's gap closed (the pads after it
+    // down one, notes too: melodee's shell/pad_gap.h).
+    bool copy_pad(unsigned track, unsigned from, unsigned to);
+    enum class Cleared { Nothing, Notes, Emptied, GapClosed };
+    Cleared clear_pad(unsigned track, unsigned pad);
+    bool delete_pad_notes(unsigned track, unsigned pad); // in the playing pattern; false: none there
+    // Which kit pads sound now, from the engine's taps of the selected track
+    // (the newest voices); for the pads' flare.
+    std::array<bool, melodee::sampler_pads> sounding() const;
     const Sample* sample_of(unsigned track, unsigned pad) const;
     const Sample* sample_of_pad() const { return sample_of(selected, pad()); }
     void set_pad(unsigned track, unsigned pad, const melodee::PadSound& sound); // the project's and the engine's
     void sound_pad(unsigned track, unsigned pad, const melodee::PadSound& sound); // the engine's only (Chop's slices)
     void sound_pads(unsigned track);                                             // the engine's back to the project's
     melodee::SampleChop* chop_of(unsigned slot);
-    std::string install(std::unique_ptr<Sample> sample, unsigned track, unsigned pad); // empty on success
-    struct Job { std::string path; unsigned track, pad; };
+    const Sample* sample_in(unsigned slot) const { return slot < samples.size() ? samples[slot].get() : nullptr; }
+    void set_kit_param(unsigned track, int param, int value); // a kit-wide value (melodee::sampler::Param)
+    // The layer the next sample loaded onto a pad goes on (LAYERS, kit_pages.cpp): 0 the pad's own.
+    struct LayerTarget { int track = -1, pad = -1, layer = 0; };
+    LayerTarget layer_target;
+    // `keep`: the pad keeps its values, only its sample and region new (Trim Sample).
+    std::string install(std::unique_ptr<Sample> sample, unsigned track, unsigned pad, bool keep = false); // empty on success
+    struct Job { std::string path; unsigned track, pad; bool keep = false; };
     std::vector<Job> jobs; // files to load (the service thread's)
+    // A pad's region (or a layer's) written as a WAV, on the service thread
+    // (Sample Options): Trim Sample (Samples/Edits/<NAME>-Trimmed.wav, then the
+    // pad onto all of it) and Save Sample (Samples/<name>.wav, the pad as it was).
+    struct FileJob { bool trim = false; unsigned track = 0, pad = 0; int layer = 0; std::string path; };
+    std::vector<FileJob> file_jobs;
+    std::string samples_folder() const; // Melodee's Samples, under its home
+    // Kits and banks from files, onto the selected kit (Melodee's
+    // shell/project_kits.h): an MPC drum program (.xpm, .xty) whole or a bank
+    // of it into a bank (`from_bank` -1: the whole kit), a bank file (.mldb)
+    // into a bank; Save Bank writes Samples/Banks/<name>.mldb. Their files
+    // are read by the service thread (`slots_wanted`). Empty on success.
+    std::string load_program(const melodee::Project& program, int from_bank, unsigned into_bank);
+    std::string load_bank_file(const std::string& path, unsigned bank);
+    std::string save_bank_file(unsigned bank, const std::string& name);
+    int slot_for(const melodee::SampleRef& ref); // this project's slot for a file, a new one queued to be read; -1 none free
+    std::vector<unsigned> slots_wanted;
+    std::string program_path; // the MPC drum program the LOAD KIT sheet loads (load_kit.cpp)
+    // Typing for Melodee's own use (Save Sample's name): `done` with the text unless cancelled.
+    void ask_text(std::string title, std::string initial, std::function<void(const std::string&)> done);
+    std::function<void(const std::string&)> typing_done;
     bool loading = false;
 
     // Transport and tempo.
@@ -242,6 +306,10 @@ private:
     ModuleTrack& make_module_track(unsigned track);
     void drop_module_track(unsigned track);
     void take_back();                      // what the audio thread handed back, freed
+    void run_file_jobs();                  // Trim Sample, Save Sample: regions written as WAVs
+    void hold_streams();                   // the long samples' chunks where pads start, held in memory (shell/stream_holds.h)
+    melodee::SampleCache cache;            // long MP3, FLAC, Ogg and AIFF as WAVs (home/Cache)
+    bool cache_tidied = false;
     void take_answers();
     void destroy_retired();
     std::string write(std::vector<uint8_t> bytes, std::string settings_text);
@@ -267,6 +335,10 @@ private:
     // pad's press went (its track and key), so its release and pressure
     // go there too.
     std::atomic<int> audio_track {0}, audio_kind {0}, audio_octave {0};
+    // A kit's: the lower bank in view, 16 Pitches on, its pad and each pitch's semitones.
+    std::atomic<int> audio_bank {0}, audio_levels_pad {0};
+    std::atomic<bool> audio_pitches {false}, audio_slices {false};
+    std::array<std::atomic<int>, 16> audio_semitones {};
     std::atomic<bool> pads_typing {false};
     // The MIDI thread's word to the audio thread: a pad pressed now has
     // another job than its sound (Shift, Copy, Delete, Mute or a step held;

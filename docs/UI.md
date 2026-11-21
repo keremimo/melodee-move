@@ -249,6 +249,98 @@ SETUP > PADS itself (`src/app/screens/setup_pads.cpp`, the row
 | --- | --- | --- | --- |
 | Setup > PADS | `PADS` / / `SETP` | the list: `LAYOUT  BANKS` | |
 | Editing LAYOUT | `PADS` / / `SETP` | the 32 pads, each run's first number inverted | `MOVE ROWS 8 A ROW`, `MPC BANKS 2 X 4X4` |
+## Kits
+
+Melodee's kits at full depth on the Move (wave 2, kit depth; Kerem's
+decisions of 2026-11-20 in [MOVE_CONTROLS.md](MOVE_CONTROLS.md)).
+`docs/ui/kit.png` is the sheet (`src/ui/mockups_kit.cpp`), approved before
+the screens were built; the screens are `src/app/screens/kit_play.cpp`,
+`kit_pages.cpp`, `sample_options.cpp`, `load_kit.cpp`, the lights
+`kit_common.h`.
+
+![The kit screens](ui/kit.png)
+
+- **128 pads in eight banks** (A-H), as Melodee's kits. The 32 pads are two
+  banks, the lower one bottom; **Plus and Minus move them 16 pads** (A-B,
+  B-C ... G-H), a message naming the pads in view (`PADS C01-D16`), Plus
+  and Minus lit where they can move. The rail's pad (`C05`) carries its
+  bank's letter.
+- **The pad pages** (Melodee's Stage, the Move's parameter banks): **Shift +
+  turn** from Play walks nine pages of the last pad, past either end back to
+  Play; Back too. Each page is eight knobs: TRIM (start, end, loop point,
+  Loop Lock, gain; a picture of the region with its flags), LAYERS (the
+  layer in hand, its velocities, tune, fine, level, pan, how a hit picks; a
+  row a layer; the wheel's push loads a sample onto the layer in hand),
+  TUNE (tune, fine, Warp, # Beats, and the kit's Follow, its mode Beats,
+  Tones or Tape (Tape is Warp's Pitch mode), Pitch), AMP ENV (attack, decay,
+  sustain, release, velocity sense, decay from), PLAY (One Shot or Note On,
+  Mono or Poly, mute group, offset, Pad Link, loop, reverse, the loop's
+  crossfade), CLOUD (on, position, size, density, scan, spread; the cloud
+  over the region), MIX (level, pan, kit volume, COLOUR: the track's, one
+  of the sixteen track colours, or the pad's own), FILTER (type, cutoff,
+  resonance, envelope amount and its four stages) and KIT FILT (the filter
+  after every pad: type, cutoff, resonance). A page draws its knobs as
+  cells under its title, three letters each; a knob touched shows its full
+  name and value large. On a pad holding an instrument TRIM becomes ZONES
+  (drawn, waiting for the instruments' loading).
+- **Shift + a knob touched** (the Move's second parameter): a kit knob's
+  fine view. TUNE shows its cents; START, END and LOOP POINT their place
+  close up, 32 times nearer (the Move's Sample Start zoom); Shift + turn
+  moves them finely.
+- **16 Pitches** (Shift + Step 8, as on the Move): the right 16 pads play the
+  last pad up the project's key from its own note (Melodee's 16 Levels
+  Scale), pad 1 bottom left; Plus and Minus their octave; the left 16 one
+  bank of the kit as the MPC lays it (bottom left first, rows of four), a pad
+  there making it the pad the pitches play. The rail says `PTCH`, the
+  detail line the key and the octave. The pitches leave from the audio
+  thread in the cycle they were read, as any pad.
+- **Copy held**, a pad then another: the first's sound (sample, values,
+  chain, mute) onto the second; the first blinks while it waits; onto a pad
+  that holds a sample it asks first (`COPY` / from / to, push yes, Back no).
+- **Delete held + a pad**, at once (Melodee's Erase + pad): its notes in the
+  pattern go first; a pad with none is emptied; an empty pad closes its gap,
+  the pads after it to the end of the next bank moving down one with their
+  notes (`A08-B16 DOWN ONE`).
+- **Sample Options** (Shift + push on the pad's sample): CHOP >, REVERSE
+  (on or off), TRIM SAMPLE (the region as `Samples/Edits/<NAME>-Trimmed.wav`,
+  the pad onto all of it, its values kept), NORMALIZE (the pad's gain, its
+  loudest frame to full scale), SAVE SAMPLE (a name typed, then
+  `Samples/<name>.wav`). On LAYERS with layer 2-4 in hand they are the
+  layer's, and REMOVE LAYER takes it off.
+- **The browser** lists bank files (`.mldb`, tagged `BANK`), which load into
+  the bank of the pad in view, and MPC drum programs (`.xpm`, `.xty`, tagged
+  `KIT`), whose push opens **LOAD KIT**: WHOLE KIT, a row a bank of the kit
+  (its push steps through the program's filled banks, then none) and LOAD
+  BANKS. **Shift held** in the browser opens its options: Save Sample, Save
+  Bank for the two banks in view.
+- **Long samples** (over ten seconds, up to six hours, or shorter ones memory
+  has no room for) play from storage as Melodee's do (`engine/stream_pager.h`):
+  half a second where each pad starts held in memory, the pager reading
+  ahead; a long MP3, FLAC, Ogg or AIFF is decoded once into
+  `Melodee/Cache` and read from there. The detail line gives a long
+  sample's length in minutes. **Memory full**: a load that would leave less
+  than 256 MB free is refused, and says so.
+
+| Screen | Rail | Subject | Detail |
+| --- | --- | --- | --- |
+| Play, banks moved | `KIT` / track / pad | the last pad's waveform | `PADS C01-D16`, for a moment |
+| A pad page | `PAD` / pad / page (`3/9`) | the page's title, eight cells; TRIM, LAYERS, CLOUD a picture | TRIM the region's length; LAYERS the layer's velocities and level |
+| A knob Shift + touched | `KNOB` / knob / `FINE`, `STRT`, `END` | the value large, or the place close up | the place, `X32` |
+| 16 Pitches | `PTCH` / track / pad | the last pad's waveform | key and scale, octave |
+| Copy held | `COPY` / pad / `PAD` | the pad, `ONTO A PAD` | the sample |
+| Copy onto a used pad | `COPY` / from / to | `REPLACE`, the pad | `PUSH YES`, `BACK NO` |
+| Sample Options | `OPT` / pad / `SMP` or `LYR2`-`LYR4` | the list | |
+| Load Kit | `KIT` / track / `LOAD` | WHOLE KIT, INTO A-H, LOAD BANKS | |
+| Browser options | `OPT` / pad / `LOAD` | Save Sample, Save Bank | |
+| Memory full | `KIT` / track / pad | `MEMORY FULL` | |
+
+**Kit lights** (Kerem's rule, 2026-11-20): a pad with a sample dim in its
+colour (COLOUR, an MPC kit's own, or the track's), bright while it sounds (the
+engine's voice taps); the last pad white; a muted pad dark grey (the Move's dim
+white); an empty pad off; a pad waiting (the copy's first, the pad a sample
+loads onto) blinks white. With 16 Pitches the right 16 light the key's roots
+in the track's colour and its other notes light grey. Copy is bright while
+held; Plus and Minus are lit where they move.
 
 ## Screens in code
 
@@ -273,7 +365,7 @@ hold the code to it. In short:
 
 | Control | Does |
 | --- | --- |
-| Pads | Play: a kit's 32 pads (two banks of 16), a module's notes; Chop: its slices; with a step held, notes on the step; Session: patterns |
+| Pads | Play: a kit's 32 pads (two of its eight banks of 16; with 16 Pitches, one bank and the last pad's pitches), a module's notes; Chop: its slices; with a step held, notes on the step; Session: patterns |
 | Steps | Step Edit (a pattern's sixteenths; in Loop Mode its bars); held with a pad, the volume knob, the wheel, Plus/Minus or Left/Right, that step's notes |
 | Shift + steps | 1 projects, 2 Setup, 3 Workflow, **4 Mixer**, 5 Tempo, 6 metronome, 7 swing, 8 16 Pitches, 9 Keys & Scales, 10 Full Level, 11 Repeat and Arp, **12 Looper**, **13 Song**, 14 a new pattern, 15 double, 16 Time Correct (Melodee's own in bold). Shift held lights them; the screen shows nothing |
 | Track buttons | the four tracks of the bank in view; held, the sixteen, and a step picks one (Tracks, above); Shift + one, its options |
@@ -318,7 +410,8 @@ hold the code to it. In short:
 
 ## Open questions
 
-- The pad pages' exact contents.
+- ~~The pad pages' exact contents.~~ Settled with kit depth: nine pages on
+  Shift + turn ("Kits", above).
 - A module track's note layout: rows of fourths for now, C2 at the bottom
   left (Ableton's names); a scale or chromatic later.
 - Realtime priority when Schwung launches melodee-move as `ableton`: a

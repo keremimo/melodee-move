@@ -6,6 +6,7 @@
 // jogwheel for To Pads (Poly, Mono, Thru), onto the first empty pads. Back
 // or Loop leaves Chop without changing the pads.
 #include "app/screens/common.h"
+#include "app/pad_layout.h"
 #include "melodee/shell/chop.h"
 
 namespace app::screens {
@@ -28,6 +29,7 @@ public:
         pad = studio.pad();
         selected = 0;
         sounding = true;
+        studio.pads_play_slices(true); // the pads its slices, whatever kit bank is in view
         // The sample's chop as it was left, where it was of this same region.
         const auto& sound = studio.current().pads[pad];
         uint32_t frames = sample->data->model_frames();
@@ -45,6 +47,7 @@ public:
     void leave() override {
         if (sounding) studio.sound_pads(track); // the pads back as the kit has them
         sounding = false;
+        studio.pads_play_slices(false);
     }
 
     bindings::Screen screen_kind() const override { return bindings::Screen::Chop; }
