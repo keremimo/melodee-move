@@ -6,6 +6,8 @@ TESTS := build/move-tests
 # The controls map (docs/MOVE_CONTROLS.md) against its table, alone: it
 # needs only src/app/bindings.*.
 CONTROLS_TESTS := build/controls-tests
+# The mix and its effects (src/app/mixing.*, fx_host.*), on a whole studio.
+MIXER_TESTS := build/mixer-tests
 # The pad layouts (src/app/pad_layout.*), alone.
 PAD_TESTS := build/pad-layout-tests
 # The pad layouts through the Move app: every pad job in both layouts.
@@ -73,7 +75,16 @@ SHARED_OBJECTS := $(patsubst src/%.cpp,build/obj/%.o,$(wildcard src/move/*.cpp s
 
 # A stand-in Schwung module for the tests, where Schwung keeps its synths.
 FAKE_MODULE := build/test-modules/sound_generators/fake
-all: $(TARGET) $(TESTS) $(CONTROLS_TESTS) $(PAD_TESTS) $(PADS_APP_TESTS) $(FAKE_MODULE)/dsp.so $(FAKE_MODULE)/module.json $(FAKE_MODULE)/page.js
+# And a stand-in audio effect, where Schwung keeps them (<id>/<id>.so).
+FAKE_FX := build/test-modules/audio_fx/fake-fx
+all: $(TARGET) $(TESTS) $(CONTROLS_TESTS) $(MIXER_TESTS) $(PAD_TESTS) $(PADS_APP_TESTS) $(FAKE_MODULE)/dsp.so $(FAKE_MODULE)/module.json $(FAKE_MODULE)/page.js \
+    $(FAKE_FX)/fake-fx.so $(FAKE_FX)/module.json
+$(FAKE_FX)/fake-fx.so: tests/fake_fx/fake-fx.c
+	@mkdir -p $(@D)
+	$(CC) -O2 -fPIC -shared -Wall -Wextra -Werror $< -o $@
+$(FAKE_FX)/module.json: tests/fake_fx/module.json
+	@mkdir -p $(@D)
+	cp $< $@
 $(FAKE_MODULE)/dsp.so: tests/fake_module/dsp.c
 	@mkdir -p $(@D)
 	$(CC) -O2 -fPIC -shared -Wall -Wextra -Werror $< -o $@
@@ -86,6 +97,8 @@ $(FAKE_MODULE)/page.js: tests/fake_module/page.js
 $(TARGET): build/obj/main.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS) $(MELODEE_LIBRARY)
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 $(TESTS): build/obj/tests/move_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS) $(MELODEE_LIBRARY)
+	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
+$(MIXER_TESTS): build/obj/tests/mixer_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS) $(MELODEE_LIBRARY)
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 $(CONTROLS_TESTS): build/obj/tests/controls_tests.o build/obj/app/bindings.o
 	$(CXX) -static-libstdc++ -static-libgcc $^ -pthread -o $@
@@ -120,5 +133,5 @@ $(foreach m,$(MODULE_C),$(eval $(call c_module_rule,$(m))))
 juce: $(JUCE_OBJECTS)
 .PHONY: all clean juce
 clean:
-	rm -rf build/obj $(TARGET) $(TESTS) $(CONTROLS_TESTS) $(PAD_TESTS) $(PADS_APP_TESTS)
+	rm -rf build/obj $(TARGET) $(TESTS) $(CONTROLS_TESTS) $(MIXER_TESTS) $(PAD_TESTS) $(PADS_APP_TESTS)
 -include $(shell find build/obj -name '*.d' 2>/dev/null)

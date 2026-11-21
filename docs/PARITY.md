@@ -81,7 +81,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Macro knobs FILTER, ECHO, SPACE** on every plug-in track, saved, recorded as motion (MELODEE.md › Playing, A synth) | instruments | a page of knobs on module tracks | [ ] |
 | **ARP**: Up, Down, Up-down, Random, Order; rate 1/4-1/32T; octaves; gate; hold (MELODEE.md › Playing) | instruments | ARP page, knobs 1-6 | [ ] |
 | **CHORD**: a pad a chord of the scale; type, voicing, inversion, hold (MELODEE.md › Playing) | instruments | CHORD page, knobs 1-5 | [ ] |
-| **MIX → SENDS → FX pages** of a track: level, pan, send A, meter; four sends and returns; the chain's slot in hand (MELODEE.md › Playing) | mixer & effects | the track's last pages; knobs 1-8 | [ ] |
+| **MIX → SENDS → FX pages** of a track: level, pan, send A, meter; four sends and returns; the chain's slot in hand (MELODEE.md › Playing) | done | the Device View's track item: knobs 1-6 level, pan, sends A-D, its meter and CPU share; its effects the next items; the returns on the Mixer | [ ] |
 | **Pads as notes** on a synth: rows of fourths, octave, pressure as poly aftertouch (MELODEE.md › Playing, Keys) | done | 32 pads; Up / Down the octave | [ ] |
 | **Keys**: root, scale, layout (Scale, Chromatic, Chords, Prog, Drums), transpose ±12, roots lit (MELODEE.md › Playing, Keys) | instruments | Keys page knobs; pad lights | [ ] |
 | **Project key and scale**, set from any track (MELODEE.md › Playing, Tempo) | instruments | tempo screen, knobs 4-5 | [ ] |
@@ -227,8 +227,8 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Kit filter**: one filter after every pad (MELODEE.md › Sampler) | done | KIT FILT page: type, cutoff, resonance | [ ] |
 | **COLOUR**: a pad's light colour, the track's, one of sixteen, or the kit's own (MELODEE.md › Playing, A kit) | done | MIX page, knob 4: the track's, one of the sixteen track colours, or the pad's own; pad lights | [ ] |
 | **Full Level**: every hit at 127 (MELODEE.md › Shift + pads) | kit depth | not here: Shift + Step 10 is the Move's Full Velocity, the `instruments` row in MOVE_CONTROLS.md; one flag in Studio::audio_event for every track, kits too | [ ] |
-| **Pad sends** into buses A-D, and the kit's send (MELODEE.md › Playing, A kit) | mixer & effects | SENDS page; pads lit by their send | [ ] |
-| **A pad's own chain** of four effects (MELODEE.md › Effects) | mixer & effects | Places > Effects on a pad | [ ] |
+| **Pad sends** into buses A-D, and the kit's send (MELODEE.md › Playing, A kit) | done | a kit's track item, Shift + turn: the last pad's own sends on knobs 1-4; the kit's (the track's) on its first page | [ ] |
+| **A pad's own chain** of four effects (MELODEE.md › Effects) | done | the Device View: after the pad, its own effects and their `+` (a dotted underline) | [ ] |
 | **Chop**: Auto, Beats, Regions, Threshold; a slice's start and end (MELODEE.md › Sampler, Chop) | done | Loop; knobs 1-4; jogwheel or Left / Right the slice | [ ] |
 | **Chop Manual**: pads tapped as it plays, cuts pulled onto hits (MELODEE.md › Sampler, Chop) | sampling | Chop: the type knob on Manual; pads | [ ] |
 | **Slices 33-64** on a second bank (MELODEE.md › Sampler, Chop) | sampling | Up / Down in Chop | [ ] |
@@ -256,20 +256,20 @@ Kerem has checked it there. `n/a` rows have no box.
 
 | Feature | Status | Move controls | ✓ |
 | --- | --- | --- | --- |
-| **Chains**: six slots on each track, four buses A-D with six slots and a return, the master's six before the compressor (MELODEE.md › Effects) | mixer & effects | Places > Effects; jogwheel the slot; knobs | [ ] |
-| **41 built-in effects**: reverbs, delays, modulation, dirt, filters and EQ, dynamics, Spring, Ensemble, Multi-chorus, Auto-wah, Formant, Width (MELODEE.md › Effects) | mixer & effects | the effect picker | [ ] |
-| **Schwung's audio FX modules** in chains (melodee-move README › Next) | mixer & effects | Menu (load): FX | [ ] |
-| **FX Select**: Track → Sends → Bus → Master; the slot strip; the effect sheet (change, presets, bypass, move, remove); copy an effect (MELODEE.md › Effects) | mixer & effects | Places > Effects; push sheet; Copy | [ ] |
-| **Mixer**: the 16 tracks' levels, pans, meters, CPU share, the strip in hand (MELODEE.md › Playing, Tracks) | mixer & effects | Places > Mixer; knobs 1-8 eight tracks | [ ] |
-| **Sends page**: every track's send into one bus, its return (MELODEE.md › Effects) | mixer & effects | Places > Sends | [ ] |
-| **Keyed Compressor and Gate**: KEY from a track or a bus (FXKY) (MELODEE.md › Effects) | mixer & effects | the effect's last page | [ ] |
-| **SYNC on the delays**: 1/32-1/1, triplets and dotted, following the tempo (MELODEE.md › Effects) | mixer & effects | the effect's knob | [ ] |
-| **Knob FX**: the MPC's 28 and Melodee's 15; settings A and B and the move between them; per kit pad or per track (MELODEE.md › Effects) | mixer & effects | Places > Knob FX; knobs 1-8; A to B on a knob (no fader) | [ ] |
-| **Pad FX**: 47 punches (the MPC's 16, Melodee 1 and 2), up to four held, pressure as depth, LATCH, master or track, QUANTIZE (MELODEE.md › Effects) | mixer & effects | Places > Pad FX; punches on the 32 pads | [ ] |
-| **Pad FX KEEP**: punches laid into the pattern and looping with it (KEPT); taken out again (MELODEE.md › Effects) | mixer & effects | Pad FX: push keeps; Delete + pad | [ ] |
-| **Flex Beat**: a time effect over the master for a bar, 15 effects, One Shot / Loop, mix, quantize (MELODEE.md › Effects) | mixer & effects | Places > Flex Beat | [ ] |
-| **Master Compressor**: attack, release, amount, In Boost, Color, Bypass (MELODEE.md › Effects) | mixer & effects | Shift + Step 5 | [ ] |
-| **Compressor Sidechain**: one track or one kit pad keys it (MELODEE.md › Effects) | mixer & effects | Compressor page: a pad picks | [ ] |
+| **Chains**: six slots on each track, four buses A-D with six slots and a return, the master's six before the compressor (MELODEE.md › Effects) | done | the Device View's effect items (the wheel the slot, knobs 1-6 its values); a bus's and the master's chain from the Mixer's push | [ ] |
+| **41 built-in effects**: reverbs, delays, modulation, dirt, filters and EQ, dynamics, Spring, Ensemble, Multi-chorus, Auto-wah, Formant, Width (MELODEE.md › Effects) | done | push on an effect: the browser by family, each loading as the wheel turns | [ ] |
+| **Schwung's audio FX modules** in chains (melodee-move README › Next) | done | the browser's SCHWUNG list (`modules/audio_fx`), push loads; its pages on the knobs, Shift + turn | [ ] |
+| **FX Select**: Track → Sends → Bus → Master; the slot strip; the effect sheet (change, presets, bypass, move, remove); copy an effect (MELODEE.md › Effects) | done | the Device View's row; push the browser, Shift + push the options; Mute / Delete / Copy held + push; Mixer push: a bus, the master (Melodee's effects have no presets of their own; a Schwung effect's are its own pages) | [ ] |
+| **Mixer**: the 16 tracks' levels, pans, meters, CPU share, the strip in hand (MELODEE.md › Playing, Tracks) | done | Shift + Step 4: knobs 1-8 eight tracks, Left / Right 1-8 or 9-16, the steps the tracks; a touched knob that strip large; CPU share on the track item | [ ] |
+| **Sends page**: every track's send into one bus, its return (MELODEE.md › Effects) | done | the Mixer's SNDA-SNDD: eight tracks' sends, the return last; its push the bus's chain, its return on knob 1 | [ ] |
+| **Keyed Compressor and Gate**: KEY from a track or a bus (FXKY) (MELODEE.md › Effects) | done | knob 7 on a Compressor or Gate: off, a track, a bus | [ ] |
+| **SYNC on the delays**: 1/32-1/1, triplets and dotted, following the tempo (MELODEE.md › Effects) | done | the delay's SYNC knob, shown as the note value | [ ] |
+| **Knob FX**: the MPC's 28 and Melodee's 15; settings A and B and the move between them; per kit pad or per track (MELODEE.md › Effects) | done | Shift + Step 4 twice: the wheel and push the effect, knobs 1-6, 7 A or B, 8 A to B (the fader's job); steps the tracks, pads the kit pads | [ ] |
+| **Pad FX**: 47 punches (the MPC's 16, Melodee 1 and 2), up to four held, pressure as depth, LATCH, master or track, QUANTIZE (MELODEE.md › Effects) | done | Shift + Step 4 three times: punches on the 32 pads (two banks), from the audio thread; Shift + push latch, target, quantize, tail | [ ] |
+| **Pad FX KEEP**: punches laid into the pattern and looping with it (KEPT); taken out again (MELODEE.md › Effects) | done | Pad FX: push keeps; Delete + pad takes that punch's out; the steps show where they fall | [ ] |
+| **Flex Beat**: a time effect over the master for a bar, 15 effects, One Shot / Loop, mix, quantize (MELODEE.md › Effects) | done | Shift + Step 4 four times: pads 1-16, knobs 1-3 mode, mix, quantize | [ ] |
+| **Master Compressor**: attack, release, amount, In Boost, Color, Bypass (MELODEE.md › Effects) | done | the Mixer's MAIN, push: the master's chain, COMP last, knobs 1-6; its amount also on MAIN's knob 8 (Shift + Step 5 is the Move's Tempo) | [ ] |
+| **Compressor Sidechain**: one track or one kit pad keys it (MELODEE.md › Effects) | done | COMP: knob 7 the key track (off, 1-16), knob 8 its kit pad (whole kit, A01-B16) | [ ] |
 
 ## Fader
 
@@ -345,8 +345,8 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Screen grammar and header**: a glyph and two words, back on B1, the verb on B3, sheets as cards, where you are always shown (MELODEE.md › Across every page) | done | the Rail (UI.md): rail, subject, detail line, sheets | [ ] |
 | **Questions before a loss**: one sheet, what goes, whether undo brings it back (MELODEE.md › Across every page) | MIDI & sync & undo & projects | push yes, Back no | [ ] |
 | **Place bar**: the bars of the pattern playing, how far it has played, coloured by state (MELODEE.md › Across every page) | sequencer | step lights (the playhead); a bar on the rail | [ ] |
-| **Mute mode**: pads mute kit pads or tracks, Shift + pad solos, Shift + Mute unmutes all; kit pad mutes saved (MELODEE.md › Across every page) | mixer & effects | Mute (a tap latches, a hold lasts) + pad; Shift + Mute | [ ] |
-| **Mute and solo tracks** from the overview (MELODEE.md › Pad lights, Tracks) | mixer & effects | track button held + Mute + step | [ ] |
+| **Mute mode**: pads mute kit pads or tracks, Shift + pad solos, Shift + Mute unmutes all; kit pad mutes saved (MELODEE.md › Across every page) | done | Mute held + pad (the Move's 16.5), Shift + Mute held + pad solos it, Shift + Mute alone unmutes all; a tap of Mute stays the Move's (the selected track), so no latch | [ ] |
+| **Mute and solo tracks** from the overview (MELODEE.md › Pad lights, Tracks) | done | track button held + Mute (+ Shift) + step; the same on the sixteen tracks latched and on the Mixer | [ ] |
 | **Erase a kit pad**, stopped (MELODEE.md › Across every page, Erase) | done | Delete + pad: its notes first, then its sound (Kerem, 2026-11-20: at once) | [ ] |
 | **Close a gap**: an empty pad erased moves the pads after it down, notes and lanes too (MELODEE.md › Across every page, Erase) | done | Delete + an empty pad: the pads after it to the end of the next bank down one, notes too (Melodee's shell/pad_gap.h) | [ ] |
 | **Erase + pot**: the value back to its start (MELODEE.md › Across every page, Erase) | MIDI & sync & undo & projects | Delete + knob touch | [ ] |
@@ -369,7 +369,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **PLUGIN engine on Schwung's modules**: menus, presets, own pages in QuickJS, sources on their own thread (MELODEE.md › Sound engines; melodee-move README) | done | Row button, Menu loads; jogwheel; knobs | [ ] |
 | **MIDI, keygroup and audio engines** (MELODEE.md › Sound engines) | done | new-track sheet | [ ] |
 | **EngineHost**: 16 tracks, the clock, buses and master, MIDI out timing; blocks of 128 frames (MELODEE.md › Threads and data) | done | automatic | [ ] |
-| **Render workers**: tracks in parallel on the spare cores (MELODEE.md › Threads and data) | mixer & effects | `EngineHost::set_render_threads()`; measure on the Move first (the audio thread renders alone now) | [ ] |
+| **Render workers**: tracks in parallel on the spare cores (MELODEE.md › Threads and data) | mixer & effects | built behind `MELODEE_RENDER_THREADS=N`, off: in the simulated Move two workers made the busy cycle slower (784-1516 µs against 579-849); to measure on the Move before turning on | [ ] |
 | **Overload guard**: the busiest track gives up its oldest voice before a block runs late (MELODEE.md › Threads and data) | done | automatic | [ ] |
 | **Pads at their frame**: a note played by hand sounds where it came in (MELODEE.md › Threads and data) | done | pads sound in the cycle they are read | [ ] |
 | **Melodee Poly, PD and Chip**: Open MPC synths with factory presets and pad pressure (MELODEE.md › Synths) | schwung | Schwung's synths take their place | — |
@@ -388,7 +388,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **A plug-in instrument**: its parameters on the knobs, a step at a time, back to default (MELODEE.md › Plug-ins, An instrument) | done | a Schwung module's pages on knobs 1-8, Left / Right | [ ] |
 | **Presets**: programs with names; CLAP preset files in folders (MELODEE.md › Plug-ins, Presets) | done | a Schwung module's presets on the jogwheel | [ ] |
 | **Drum machine plug-ins**: voices named, the pads to Drums (MELODEE.md › Plug-ins, Drum machines) | done | Schwung's drum modules (9w9) from note 36: Down an octave | [ ] |
-| **Plug-in effects** on track, bus, master and loop chains (MELODEE.md › Plug-ins, An effect) | mixer & effects | Schwung's audio effect modules on track, bus and master chains | [ ] |
+| **Plug-in effects** on track, bus, master and loop chains (MELODEE.md › Plug-ins, An effect) | done | Schwung's audio effect modules on track, bus, master (and the Looper's) chains, saved in their PLUG entries | [ ] |
 | **Transport to plug-ins**: playing, position, tempo, time signature; TRANSPORT off (MELODEE.md › Plug-ins, Transport) | sequencer | `schwung_move_info()` and `get_bpm()`: the tempo now; playing and the place to come | [ ] |
 | **Plugin Data** as the plug-ins' home folder (MELODEE.md › Plug-ins) | schwung | covered by Schwung's modules, the Move's plug-ins | — |
 | **Neural Amp Modeler and TONE3000**: models and IRs from Plugin Data; capture size kept (MELODEE.md › Plug-ins) | schwung | covered by Schwung's modules, the Move's plug-ins | — |
@@ -479,7 +479,7 @@ sections, each on Shift + Step n.
 | **Button lights**: bright in use, faint where they act, dark where they would do nothing (MELODEE.md › Lights) | done | the Move's button lights | [ ] |
 | **Track lights**: each track's colour, the selected one bright (MELODEE.md › Pad lights, Tracks) | done | Row1-4 | [ ] |
 | **Bank lights** A-H (MELODEE.md › Lights) | n/a | no bank lights; the rail names the bank | — |
-| **Level meters**: five lights a side, -24.1 to -0.1 dBFS; the input on Record (MELODEE.md › Lights) | mixer & effects | no meter lights: a meter on the screen | [ ] |
+| **Level meters**: five lights a side, -24.1 to -0.1 dBFS; the input on Record (MELODEE.md › Lights) | done | no meter lights: the Volume knob touched (the Move's VU meter), marks at -24, -12, -6, -3, 0; the Mixer's strips; the input's is Sampling's | [ ] |
 | **Kit pad lights**: the selected pad Full, a sample Dim, empty dark, muted Faint red, a flare as it sounds; five rungs that keep each colour's hue (MELODEE.md › Pad lights) | done | pad lights: dim in the pad's colour, bright while it sounds, the last pad white, muted dark grey (the Move's dim white), empty off (Kerem, 2026-11-20) | [ ] |
 | **Key lights**: the key's roots in the track's colour, its other notes Dim, out of the key Faint (MELODEE.md › Pad lights) | instruments | pad lights | [ ] |
 | **Pad lights and Pad fade settings**; the Tap Tempo flash (MELODEE.md › Project and system, LIGHTS) | MIDI & sync & undo & projects | Settings | [ ] |
@@ -489,12 +489,12 @@ sections, each on Shift + Step n.
 
 | Status | Rows |
 | --- | --- |
-| `done` | 80 |
+| `done` | 101 |
 | `sequencer` | 44 |
 | `sampling` | 22 |
 | `kit depth` | 2 |
 | `instruments` | 25 |
-| `mixer & effects` | 22 |
+| `mixer & effects` | 1 |
 | `song & export` | 21 |
 | `looper` | 13 |
 | `MIDI & sync & undo & projects` | 54 |

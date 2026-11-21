@@ -116,10 +116,10 @@ void set_module_tempo(float bpm_value) { tempo.store(bpm_value, std::memory_orde
 
 // ---------------------------------------------------------------- the catalog
 
-std::vector<ModuleInfo> scan_modules(const std::string& modules_root) {
+std::vector<ModuleInfo> scan_modules(const std::string& modules_root, const std::string& kind) {
     std::vector<ModuleInfo> found;
     std::error_code error;
-    for (const auto& folder : fs::directory_iterator(fs::path(modules_root) / "sound_generators", fs::directory_options::skip_permission_denied, error)) {
+    for (const auto& folder : fs::directory_iterator(fs::path(modules_root) / kind, fs::directory_options::skip_permission_denied, error)) {
         auto manifest_path = folder.path() / "module.json";
         std::ifstream in(manifest_path);
         if (!in) continue;
@@ -136,6 +136,10 @@ std::vector<ModuleInfo> scan_modules(const std::string& modules_root) {
         }
         info.api = has(manifest, "api_version") ? int(field(manifest, "api_version")) : 1;
         info.dsp = (folder.path() / (has(manifest, "dsp") ? text_of(field(manifest, "dsp")) : std::string("dsp.so"))).string();
+        if (kind == "audio_fx") { // Signal Chain ignores "dsp": <id>/<id>.so, where there is one
+            auto chain_library = folder.path() / (info.id + ".so");
+            if (fs::exists(chain_library, error)) info.dsp = chain_library.string();
+        }
         found.push_back(std::move(info));
     }
     std::sort(found.begin(), found.end(), [](const ModuleInfo& a, const ModuleInfo& b) { return lower(a.name) < lower(b.name); });
@@ -224,18 +228,43 @@ std::unique_ptr<LoadedModule> LoadedModule::load(const ModuleInfo& info, std::st
     return module;
 }
 
+std::unique_ptr<LoadedModule> LoadedModule::load_audio_fx(const ModuleInfo& info, std::string& error) {
+    if (info.api != 2) { error = "needs Schwung's v2 API"; return nullptr; }
+    void* library = dlopen(info.dsp.c_str(), RTLD_NOW | RTLD_LOCAL);
+    if (!library) { error = dlerror(); return nullptr; }
+    // Never closed, as a synth's library.
+    auto init = reinterpret_cast<move_audio_fx_init_v2_fn>(dlsym(library, schwung::audio_fx_init_v2_symbol));
+    if (!init) { error = "no move_audio_fx_init_v2"; return nullptr; }
+    audio_fx_api_v2_t* fx = init(&host_table());
+    if (!fx || fx->api_version != schwung::audio_fx_api_version_2 || !fx->create_instance || !fx->process_block) {
+        error = "not Schwung's audio_fx v2 API";
+        return nullptr;
+    }
+    void* instance = fx->create_instance(info.dir.c_str(), nullptr); // as Signal Chain: its folder, no config
+    if (!instance) { error = "the effect would not start"; return nullptr; }
+    std::unique_ptr<LoadedModule> module(new LoadedModule());
+    module->about = info;
+    module->fx_api = fx;
+    module->instance = instance;
+    module->read_parameters();
+    return module;
+}
+
 LoadedModule::~LoadedModule() {
     if (api && instance && api->destroy_instance) api->destroy_instance(instance);
+    if (fx_api && instance && fx_api->destroy_instance) fx_api->destroy_instance(instance);
 }
 
 void LoadedModule::set_now(const std::string& key, const std::string& value) {
-    if (api->set_param) api->set_param(instance, key.c_str(), value.c_str());
+    auto set = api ? api->set_param : fx_api ? fx_api->set_param : nullptr;
+    if (set) set(instance, key.c_str(), value.c_str());
 }
 
 std::string LoadedModule::get_now(const std::string& key) {
-    if (!api->get_param) return {};
+    auto get = api ? api->get_param : fx_api ? fx_api->get_param : nullptr;
+    if (!get) return {};
     std::vector<char> buffer(65536);
-    int n = api->get_param(instance, key.c_str(), buffer.data(), int(buffer.size()));
+    int n = get(instance, key.c_str(), buffer.data(), int(buffer.size()));
     if (n <= 0 || n >= int(buffer.size())) return {};
     return std::string(buffer.data(), size_t(n));
 }

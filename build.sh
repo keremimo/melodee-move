@@ -6,7 +6,7 @@
 # LATENCY, the meter timing clicks through a 300-frame cable, Shift + Back to
 # quit; Melodee: load, chop, To Pads, saved and restored, transport and
 # tempo, the pad layout set to MPC banks and kept, the synth track saved and
-# restored),
+# restored, the busy mix playing),
 # and the packages in dist/. When Melodee's own page previews are at hand
 # (MELODEE_PREVIEWS, by default ../melodee-sample/build/melodee-preview),
 # also crush them to the Move's 128 x 64 screen in build/crushed.
@@ -74,12 +74,18 @@ KIT_EXPECTED='page=kit-play .*pads=18 .* bank=0 pitches=0 copy_from=-1'
 SYNTH_SCRIPT='50:0xb0,42,127;51:0xb0,42,0;60:0xb0,3,127;61:0xb0,3,0;80:0xb0,3,127;81:0xb0,3,0;400:0x90,68,110;430:0x80,68,0;500:0xb0,71,3;520:0xb0,55,127;521:0xb0,55,0'
 SYNTH_EXPECTED='kind=synth .*synth=fake octave=1'
 SYNTH_FLAGS='--backend simulated --samples build/simulated-samples --home build/simulated-synth --modules build/test-modules'
+# The mix: build/mixer-tests writes a project of sixteen kit tracks with six
+# effects on every track, bus and the master (126 in all); Play at 200, five
+# seconds of it through the whole runtime, its process_us in the log.
+MIXER_SCRIPT='200:0xb0,85,127;201:0xb0,85,0'
+MIXER_EXPECTED='process_us=.* playing=1 .*effects=126 '
 # shellcheck disable=SC2086
 docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE" && pwd):/melodee:ro" -e MELODEE=/melodee \
     $MOUNT melodee-move-builder sh -c "
     make -j4 &&
     build/move-tests &&
     build/controls-tests &&
+    build/mixer-tests &&
     build/pad-layout-tests &&
     build/pads-app-tests &&
     build/melodee-move --self-test build/self-test.wav &&
@@ -118,6 +124,9 @@ docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE
     { build/melodee-move $SYNTH_FLAGS --seconds 3 2> build/simulated-synth-restore.log || true; } &&
     tail -n 1 build/simulated-synth-restore.log &&
     grep -qE '$SYNTH_EXPECTED' build/simulated-synth-restore.log &&
+    { build/melodee-move --backend simulated --samples build/test-samples-mixer --home build/bench-home-busy --seconds 5 --script '$MIXER_SCRIPT' 2> build/simulated-mixer.log || true; } &&
+    tail -n 1 build/simulated-mixer.log | grep -o 'process_us=[^ ]* of [0-9]*' &&
+    grep -qE '$MIXER_EXPECTED' build/simulated-mixer.log &&
     build/melodee-move --melodee-previews build/melodee-previews --modules build/test-modules > /dev/null &&
     build/melodee-move --probe-modules build/test-modules &&
     tools/bundle.sh &&

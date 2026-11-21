@@ -52,11 +52,28 @@ struct plugin_api_v2_t {
 };
 typedef plugin_api_v2_t* (*move_plugin_init_v2_fn)(const host_api_v1_t* host);
 
+// An audio effect (Schwung's src/host/audio_fx_api_v2.h, field for field):
+// what its Signal Chain loads from modules/audio_fx/<id>/<id>.so. It works
+// on a block in place, stereo interleaved 16-bit.
+struct audio_fx_api_v2_t {
+    uint32_t api_version;
+    void* (*create_instance)(const char* module_dir, const char* config_json);
+    void (*destroy_instance)(void* instance);
+    void (*process_block)(void* instance, int16_t* audio_inout, int frames);
+    void (*set_param)(void* instance, const char* key, const char* val);
+    int (*get_param)(void* instance, const char* key, char* buf, int buf_len);
+    void (*on_midi)(void* instance, const uint8_t* msg, int len, int source); // may be null
+};
+typedef audio_fx_api_v2_t* (*move_audio_fx_init_v2_fn)(const host_api_v1_t* host);
+static_assert(offsetof(audio_fx_api_v2_t, on_midi) == 48, "Schwung's audio effect table layout");
+
 } // extern "C"
 
 namespace schwung {
 constexpr uint32_t host_api_version = 1, plugin_api_version_2 = 2;
 constexpr const char* init_v2_symbol = "move_plugin_init_v2";
+constexpr uint32_t audio_fx_api_version_2 = 2;
+constexpr const char* audio_fx_init_v2_symbol = "move_audio_fx_init_v2";
 constexpr int midi_source_internal = 0, midi_source_external = 2;
 constexpr int clock_stopped = 1, clock_running = 2;
 } // namespace schwung

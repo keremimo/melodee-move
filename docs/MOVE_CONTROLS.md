@@ -43,8 +43,9 @@ after Schwung) differ for some buttons:
   *Overview* the projects (the Set Overview). *Browser* is a list opened by
   the wheel's push, *list* any menu or sheet the wheel walks (Setup, a
   module's menu, Sample Options), *Chop*, *To Pads*, *Sampling*, *Typing*
-  *Canvas* (a module's own page, entered) and *Tracks* (the sixteen
-  tracks, latched) are Melodee's. A row with no
+  *Canvas* (a module's own page, entered), *Tracks* (the sixteen
+  tracks, latched), *Mixer* (Shift + Step 4), *Knob FX*, *Pad FX* and
+  *Flex Beat* (Shift + Step 4 again) are Melodee's. A row with no
   screen holds wherever no row for that screen says otherwise; Typing
   takes every control but the Volume knob and Shift + Back.
 - **Tap and hold.** A button with a hold job (Note/Session, Undo, the
@@ -83,6 +84,10 @@ after Schwung) differ for some buttons:
 | 16 Pitches (kit depth) | **In key**: the right 16 play the last pad up the project's key and scale from its root (Melodee's 16 Levels Scale, the Move's In-Key), the sample counting as its own note; Plus and Minus its octave. |
 | Delete + pad (kit depth) | **At once, nothing asked**, as Melodee and the Move do: the pad's notes in the pattern go first; a pad with none is emptied; an empty pad closes the gap, the pads after it moving down one with their notes. Copy onto a pad that holds a sample asks first, as Copy a track does. |
 | Kit pad lights (kit depth) | **Dim, with a flare**: a pad with a sample dim in its colour, bright while it sounds; the last pad white; a muted pad dark grey (the Move's dim white); an empty pad off. |
+| Effects in the Device View | **The wheel walks the track's effects as devices** (the Move's two a Track Preset): the track, its sound, a kit pad's own four, the track's six, then `+`; the knobs follow the item in focus; the push opens the effect browser (Melodee's families and Schwung's audio effects), **Shift + push the effect's options** (bypass, move, copy, paste, remove), as Sample Options on a pad. |
+| Effect shortcuts | The manual gives none; Control Live deactivates a device with Mute + push. **Mute held + push bypasses the effect in focus, Delete held + push removes it, Copy held + push copies it** (and, Copy still held, a push on another slot pastes it). |
+| Knob FX, Pad FX, Flex Beat | **Shift + Step 4 again** (on the Mixer) opens Knob FX, again Pad FX, again Flex Beat, then the Mixer once more. |
+| Mixer | **Shift + Step 4**: knobs 1-8 are eight tracks of the page (the wheel: levels, pans, sends A-D, MAIN), **Left and Right 1-8 or 9-16**; the 16 steps are the tracks: a step selects, **Mute held + step mutes, Shift + Mute held + step solos** (as with the track buttons); the push opens the page's chain (the track's, a bus's, the master's with its compressor). **Touching the Volume knob shows the main meter**; **Shift + Mute alone lets every mute go** (Melodee's Unmute everything). |
 
 Followed from the rule without a choice: Left and Right become the
 pattern's bars, so pages move to Shift + turn; in Typing, Back deletes a
@@ -127,7 +132,12 @@ Session (a row a track of the bank, a column a pattern) and the Overview.
 | Delete held + Pad (Session) | Deletes the clip at once | Deletes the pattern | wave 2: sequencer |
 | Delete held + Pad (Overview) | Deletes the Set, the pad again to confirm | Deletes the project, asked first | wave 2: MIDI/sync/undo/projects |
 | Delete held + Pad (Chop) | No job (Control Live's Slicing mode: deletes the slice) | Takes the slice's cut out | wave 2: sampling |
-| Mute held + Pad (Play, kit) | Mutes or unmutes the drum pad (dim white) | Mutes or unmutes the kit pad | wave 2: mixer & effects |
+| Mute held + Pad (Play, kit) | Mutes or unmutes the drum pad (dim white) | Mutes or unmutes the kit pad, saved with the kit (dim white) | done |
+| Shift + Mute held + Pad (Play, kit) | No job (Shift + Mute + a track button solos a track) | Solos the kit pad: every other pad with a sound muted; the same pad again, the kit back | done |
+| Pad (Knob FX, kit) | (No Knob FX on the Move) | Knob FX on or off for that kit pad (lit white while on); quiet | done |
+| Pad (Pad FX) | (No Pad FX on the Move) | A punch while held, pressure its depth; up to four at once, a fifth takes the oldest's place | done |
+| Delete held + Pad (Pad FX) | (As above) | Takes that punch's kept punches out of the pattern | done |
+| Pad (Flex Beat) | (No Flex Beat on the Move) | Pads 1-16: pad 1 Empty, 2-16 the fifteen time effects over the master | done |
 | Step held + Pad | Adds or removes that note on the step | The same on the pattern | wave 2: sequencer |
 | Step held + Pad (Loop) | The note on every step of the bar | The same | wave 2: sequencer |
 | Shift + Step 16 held + Pad | Quantizes that drum pad's notes | Time Correct on that pad | wave 2: sequencer |
@@ -159,6 +169,12 @@ Session (a row a track of the bank, a column a pattern) and the Overview.
 | Step (Chop) | No job | Plays the sample from that sixteenth (the steps are the sample in 16 parts, lit where a cut falls) | wave 2: sampling |
 | Step (Typing) | (Text is typed with the wheel) | A digit, steps 1-10 | done |
 | Track button held + Step | No job | Picks track 1-16; an empty one opens the new-track sheet | done |
+| Track button held + Mute held + Step | No job | Mutes or unmutes track 1-16 | done |
+| Track button held + Shift + Mute held + Step | No job | Solos or unsolos track 1-16 | done |
+| Step (Mixer) | (No Mixer on the Move) | Selects that track | done |
+| Mute held + Step (Mixer) | (As above) | Mutes or unmutes that track | done |
+| Shift + Mute held + Step (Mixer) | (As above) | Solos or unsolos that track | done |
+| Step (Knob FX) | (No Knob FX on the Move) | Knob FX on or off for that track | done |
 
 ### Shift + steps
 
@@ -170,7 +186,7 @@ while Shift is held.
 | Shift + Step 1 | The Set Overview | Projects, 32 to a page | wave 2: MIDI/sync/undo/projects |
 | Shift + Step 2 | Setup: battery, Wi-Fi, update, Cloud, Control Live, Link, MIDI and MIDI Sync, USB-C audio, Move Manager, brightness | Setup: Melodee's settings, MIDI and sync, LED brightness, the web page's address and code, Back to Move | wave 2: MIDI/sync/undo/projects |
 | Shift + Step 3 | Workflow Settings: quantize amount, step grid, count-in, autoload, time signature, maximum recording length | The same for Melodee's patterns | wave 2: sequencer |
-| Shift + Step 4 | No job | The Mixer: 16 tracks, their effects | wave 2: mixer & effects |
+| Shift + Step 4 | No job | The Mixer: 16 tracks, their effects; on the Mixer, Knob FX, then Pad FX, then Flex Beat | done |
 | Shift + Step 5 | Tempo (the wheel; Shift for fine; push confirms) | The Tempo screen (today on Shift + Play) | done |
 | Shift + Step 6 | Metronome on or off | The same (today a push on the Tempo screen) | done |
 | Shift + Step 7 | Groove: triplet sixteenth swing, 0-100 % and beyond | Swing (today knob 2 on the Tempo screen) | done |
@@ -199,6 +215,8 @@ while Shift is held.
 | Step (Tracks) | (No Melodee screen of tracks on the Move) | In the sixteen tracks latched by Shift + Note/Session: picks that track | done |
 | Copy held + Step (Tracks) | (As above) | Copies that track onto the next step's | done |
 | Delete held + Step (Tracks) | (As above) | Deletes that track, asked first | done |
+| Mute held + Step (Tracks) | (As above) | Mutes or unmutes that track | done |
+| Shift + Mute held + Step (Tracks) | (As above) | Solos or unsolos that track | done |
 
 ### Knobs
 
@@ -218,7 +236,7 @@ while Shift is held.
 | Control | On the Move | In Melodee | Status |
 | --- | --- | --- | --- |
 | Volume knob | The main output, a meter on the screen | Main volume | done |
-| Volume touch | Shows the output level | The main meter | wave 2: mixer & effects |
+| Volume touch | Shows the output level | The main meter, left and right, in dB | done |
 
 ### The wheel
 
@@ -230,6 +248,19 @@ while Shift is held.
 | Shift + Wheel push (Play, synth) | No job (in the browser, Shift opens Options: Save Preset) | The module's menu: its levels, presets and own pages | done |
 | Shift + Wheel turn (Play) | The parameter banks of the instrument or sample in focus | The pad pages, a module's pages | done |
 | Wheel touch (Play) | Highlights the sample (audio track) | Names the item in focus | done |
+| Mute held + Wheel push (Play) | No job (Control Live: deactivates the device) | Bypasses the effect in focus, or brings it back | done |
+| Delete held + Wheel push (Play) | No job | Removes the effect in focus; the rest close up | done |
+| Copy held + Wheel push (Play) | No job | Copies the effect in focus; Copy still held, a push on another slot pastes it | done |
+| Copy held + Wheel turn (Play) | No job | Walks the items as without Copy, to the slot to paste on | done |
+| Wheel turn (Mixer) | (No Mixer on the Move) | The page: levels, pans, sends A-D, MAIN | done |
+| Wheel push (Mixer) | (As above) | The page's chain: the selected track's, the bus's, the master's | done |
+| Wheel turn (Knob FX) | (No Knob FX on the Move) | Walks the MPC's 28 and Melodee's 15 | done |
+| Wheel push (Knob FX) | (As above) | Loads the one turned to | done |
+| Shift + Wheel push (Knob FX) | (As above) | Every track (or the bank's kit pads) on, or all off | done |
+| Mute held + Wheel push (Knob FX) | (As above) | Bypasses Knob FX, or brings it back | done |
+| Wheel turn (Pad FX) | (No Pad FX on the Move) | The other bank of punches | done |
+| Wheel push (Pad FX) | (As above) | KEEP: the take laid into the pattern playing | done |
+| Shift + Wheel push (Pad FX) | (As above) | Its options: latch, master or track, quantize, snap, tail | done |
 | Wheel turn (Browser) | Moves through the list, loading each preset (Autoload) | Moves through the list; a module's presets load as it turns | done |
 | Wheel push (Browser) | Opens a folder; loads (Autoload off); leaves with the preset chosen | Opens a folder, loads onto the pad or the track | done |
 | Shift held (Browser) | Options: Save Preset (Shift held) | Options: Save Sample, Save Bank (the two banks in view, as `.mldb`); a module's preset waits for the instruments | done |
@@ -276,6 +307,7 @@ while Shift is held.
 | Loop | Loop Mode: the clip's bars on the steps | The pattern's Loop Mode | wave 2: sequencer |
 | Shift + Loop | No job | Left free (Chop is Shift + push) | free |
 | Mute | Mutes or unmutes the selected track | The same | done |
+| Shift + Mute | No job (Shift + Mute + a track button solos) | Let go alone: every mute and solo let go, the tracks' and the kit pads' | done |
 | Undo | Undoes (a preset just loaded too) | Melodee's undo | wave 2: MIDI/sync/undo/projects |
 | Shift + Undo | Redoes | The same | wave 2: MIDI/sync/undo/projects |
 | Undo held | No job | The undo list | wave 2: MIDI/sync/undo/projects |
@@ -317,6 +349,8 @@ while Shift is held.
 | Shift + Left or Right | No job (Control Live: 16 bars) | 16 bars | wave 2: sequencer |
 | Left or Right (Session) | No job (Control Live: the session ring a track) | The patterns' page, eight at a time | wave 2: sequencer |
 | Left or Right (Chop) | No job | The slice before or after | done |
+| Left or Right (Mixer) | (No Mixer on the Move) | Tracks 1-8 or 9-16 | done |
+| Plus or Minus (Pad FX) | (No Pad FX on the Move) | The other bank of punches | done |
 
 ### Outside the surface
 
@@ -348,6 +382,10 @@ Not checked by the tests: they follow from the screens.
 | Rec | Dim when it can record, flashing in the count-in, solid red recording, dark when it cannot | The same | core |
 | Sampling | Pulses red in Sampling Mode | The same | wave 2: sampling |
 | Capture | Lit while there is something to keep, dark once cleared | The same | wave 2: sequencer |
+| Steps, Mixer | No Mixer | The sixteen tracks: each its colour, the selected one white, a muted one grey, a soloed one blue, an empty one dark | done |
+| Pads, Knob FX | No Knob FX | A kit's pads with Knob FX white, the rest dim; the steps the tracks with it bright | done |
+| Pads, Pad FX | No Pad FX | The MPC's sixteen orange, Melodee's cyan, a sounding one white; the steps where the kept punches fall | done |
+| Pads, Flex Beat | No Flex Beat | Pads 1-16 violet, pad 1 (Empty) grey, the one playing white | done |
 | Knob LEDs | Red with automation; with Mute held, red active, white off, dark none; green for a macro; all pulse while browsing effects | Lit for the knobs the screen uses; motion's colours with the sequencer | done |
 | White buttons | Lit where they do something | The same | done |
 

@@ -1,0 +1,15 @@
+{
+  "id": "fake-fx",
+  "name": "Fake FX",
+  "abbrev": "FKFX",
+  "version": "1.0.0",
+  "description": "A stand-in audio effect for melodee-move's tests",
+  "api_version": 2,
+  "component_type": "audio_fx",
+  "capabilities": {
+    "chainable": true,
+    "chain_params": [
+      {"key": "gain", "name": "Gain", "type": "float", "min": 0, "max": 2, "step": 0.01, "default": 0.5}
+    ]
+  }
+}

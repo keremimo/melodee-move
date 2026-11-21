@@ -41,6 +41,10 @@ enum class Screen : uint8_t {
     Typing,
     Canvas,     // a module's own page, entered
     Tracks,     // the sixteen tracks, latched (Shift + Note/Session)
+    Mixer,      // Shift + Step 4: the sixteen tracks' levels, pans, sends, the main out
+    KnobFx,     // Shift + Step 4 again: Knob FX
+    PadFx,      // and again: Pad FX, the pads as punches
+    Flex,       // and again: Flex Beat
     Count
 };
 
@@ -98,7 +102,10 @@ constexpr uint16_t none = 0, shift = 1 << 0, track = 1 << 1, step = 1 << 2, pad 
     X(LoopMode) X(MuteSelected) X(Undo) X(Redo) X(UndoList) X(DuplicatePattern) X(DeleteCurrentPattern) X(TypeBackspace) \
     X(ToggleSession) X(PeekSession) X(TracksOverview) X(Back) X(BackToPlay) X(LeaveChop) X(CanvasBack) X(TypeCancel) \
     X(Quit) X(ShiftSteps) X(ShiftLock) X(Uppercase) \
-    X(Octave) X(PadBank) X(PitchesOctave) X(ScaleStep) X(TrackBank) X(SlicePage) X(Bar) X(Bar16) X(PatternPage) X(SliceStep)
+    X(Octave) X(PadBank) X(PitchesOctave) X(ScaleStep) X(TrackBank) X(SlicePage) X(Bar) X(Bar16) X(PatternPage) X(SliceStep) \
+    X(MuteStep) X(SoloStep) X(UnmuteAll) X(MixerPage) X(MixerHalf) X(OpenChain) X(BypassEffect) X(RemoveEffect) X(CopyEffect) \
+    X(KnobFxChoose) X(KnobFxLoad) X(KnobFxAll) X(KnobFxTrack) X(KnobFxPad) X(Punch) X(PunchBank) X(KeepPunches) X(PunchOptions) \
+    X(ClearKept) X(FlexPad) X(SoloPad)
 
 enum class Job : uint8_t {
 #define MELODEE_JOB_ENUM(name) name,

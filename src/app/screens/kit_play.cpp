@@ -10,7 +10,12 @@
 // and Minus moving them 16 pads; Shift + Step 8 turns the right 16 into the
 // last pad's 16 Pitches, Plus and Minus then their octave. Copy held, a pad
 // then another copies the first onto the second (asking when it holds a
-// sample); Delete held, a pad loses its notes, its sound, or its gap.
+// sample); Delete held, a pad loses its notes, its sound, or its gap; Mute
+// held, a pad mutes. A pad held + the Volume knob its level. Past the pad,
+// the wheel walks the kit's effects (device_fx.h).
+#include "app/pad_layout.h"
+#include "app/screens/common.h"
+#include "app/screens/device_fx.h"
 #include "app/screens/kit_common.h"
 #include "melodee/shell/pad_gap.h"
 
@@ -28,6 +33,7 @@ public:
 
     void input(const move::Input& input) override {
         using Kind = move::Input::Kind;
+        fx.input(input);
         if (input.kind == Kind::Button && move::Button(input.index) == move::Button::Copy) {
             copy_down = input.pressed;
             if (!input.pressed) copy_from = -1;
@@ -37,20 +43,32 @@ public:
 
     bool job(bindings::Job job, const bindings::Use& use) override {
         using bindings::Job;
+        // The track item's mix and the effects (device_fx.h): the knobs, the
+        // push and Shift + push are theirs there.
+        auto effects = fx.track_items();
+        focus = std::min(focus, 1 + int(effects.size()));
+        if (focus >= 2 && fx.job(effects[size_t(focus - 2)], job, use)) return true;
+        if (focus == 0 && fx.mix_job(studio.track(), job, use)) return true;
         switch (job) {
         case Job::PlayPad: case Job::SelectPadQuietly:
             if (int kit = studio.kit_pad_at(unsigned(use.index)); kit >= 0) studio.select_pad(unsigned(kit));
             return true;
         case Job::PlayPitch: return true; // the audio thread plays it
+        case Job::MutePad: // Mute held + pad (16.5)
+            if (int kit = studio.kit_pad_at(unsigned(use.index)); kit >= 0) mixing::toggle_pad_mute(studio, studio.track(), unsigned(kit));
+            return true;
+        case Job::SoloPad: // Shift + Mute held + pad
+            if (int kit = studio.kit_pad_at(unsigned(use.index)); kit >= 0) mixing::solo_pad(studio, studio.track(), unsigned(kit));
+            return true;
         case Job::TurnKnob: turn(unsigned(use.index), use.delta, false); return true;
         case Job::TurnKnobFine: turn(unsigned(use.index), use.delta, true); return true;
         case Job::SecondParameter: fine = use.index; return true;
         case Job::PadLevel: turn(1, use.delta, false); return true;
-        case Job::Focus: focus = std::clamp(focus + (use.delta > 0 ? 1 : -1), 0, 3); return true;
+        case Job::Focus: focus = std::clamp(focus + (use.delta > 0 ? 1 : -1), 0, 1 + int(effects.size())); return true;
         case Job::ShowFocus: studio.say(item(focus)); return true;
         case Job::OpenBrowser:
             if (focus == 1) studio.open("load-samples");
-            else studio.say(focus == 0 ? "KITS: NOT YET" : "EFFECTS: NOT YET");
+            else studio.say("KITS: NOT YET");
             return true;
         case Job::SampleOptions:
             if (studio.sample_of_pad()) studio.open("sample-options");
@@ -100,8 +118,14 @@ public:
         if (fine >= 0 && draw_fine(g)) return;
         bool pitches = studio.pitches();
         if (copy_down) { draw_copy(g); return; }
-        ui::rail(g, pitches ? "PTCH" : "KIT", track_number(studio), pad_label(studio.pad()));
-        items(g, {item(0), item(1), item(2), item(3)}, focus);
+        auto effects = fx.track_items();
+        if (studio.desk.show_effects) { focus = 2; studio.desk.show_effects = false; } // from the Mixer's push
+        focus = std::min(focus, 1 + int(effects.size()));
+        ui::rail(g, pitches ? "PTCH" : "KIT", track_number(studio),
+                 focus == 0 ? fx.mix_bottom() : focus >= 2 ? fx.rail_bottom(effects[size_t(focus - 2)]) : pad_label(studio.pad()));
+        fx.draw_row(g, item(0), item(1), effects, focus);
+        if (focus == 0) { fx.draw_mix(g, studio.track()); return; }
+        if (focus >= 2) { fx.draw(g, effects[size_t(focus - 2)]); return; }
         const Sample* sample = studio.sample_of_pad();
         std::string where = bar_beat(studio);
         if (!sample) {
@@ -122,6 +146,11 @@ public:
     }
 
     Knob knob(unsigned which) const override {
+        if (focus == 0) return fx.mix_knob(studio.track(), which);
+        if (focus >= 2) {
+            auto effects = fx.track_items();
+            return size_t(focus - 2) < effects.size() ? fx.knob(effects[size_t(focus - 2)], which) : Knob {};
+        }
         const Sample* sample = studio.sample_of_pad();
         uint32_t frames = sample ? std::max<uint32_t>(1, sample->data->model_frames()) : 1;
         const PadSound& sound = studio.current().pads[studio.pad()];
@@ -154,10 +183,11 @@ public:
     }
 
 private:
-    int focus = 1; // the Device View's item the wheel is on: 0 the kit, 1 the pad, 2-3 the effects
+    int focus = 1; // the Device View's item the wheel is on: 0 the kit (its mix), 1 the pad, 2 on its effects
     int fine = -1; // a knob Shift + touched: its fine view
     bool copy_down = false;
     int copy_from = -1; // Copy held: the kit pad picked to copy
+    DeviceFx fx {studio};
     std::string item(int which) const {
         switch (which) {
         case 0: return "KIT";

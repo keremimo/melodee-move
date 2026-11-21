@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "app/studio.h"
-#include "app/screen.h"
 #include "app/pad_layout.h"
+#include "app/screen.h"
 #include "melodee/engine/engine_info.h"
 #include "melodee/model/scales.h"
 #include "melodee/shell/pad_gap.h"
@@ -12,6 +12,7 @@
 #include <juce_core/juce_core.h>
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
@@ -176,6 +177,7 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
     settings_path = (fs::path(home_path) / "Move.settings").string();
     modules_root = modules_folder.empty() ? move_modules : std::move(modules_folder);
     catalog = scan_modules(modules_root);
+    fx_catalog = scan_modules(modules_root, "audio_fx");
     pad_went.fill({});
     melodee::dsp::device_rate.store(44100.0f); // the Move's; audio_opened() says if it is not
 
@@ -238,10 +240,18 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
             module.job_restores = true;
         }
     }
+    setup_fx(states); // Schwung's effects in the chains: loaded by the service thread
     engine = std::make_unique<melodee::EngineHost>();
     engine->set_overload_guard(true); // as Melodee runs on the MPC
     cache.set_folder((fs::path(home_path) / "Cache").string());
     engine->streams().start(); // long samples read from storage as they play
+    // Render workers (Melodee's, roadmap P2): MELODEE_RENDER_THREADS=N
+    // shares each block's tracks and chains among N threads beside the
+    // audio thread, at its priority, once a block takes more than 150 us.
+    // Off unless asked: the Move's numbers with and without are to be
+    // measured on the Move (docs/PARITY.md, mixer & effects).
+    if (const char* workers = std::getenv("MELODEE_RENDER_THREADS"))
+        engine->set_render_threads(unsigned(std::clamp(std::atoi(workers), 0, 3)));
     engine->load(*song, *bank);
     for (unsigned t = 0; t < melodee::track_count; ++t)
         if (modules[t] && modules[t]->entry != melodee::no_plugin) engine->offer_plugin(modules[t]->entry, &modules[t]->runner);
@@ -303,6 +313,14 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
     const auto& input = event.input;
     if (input.index >= pad_count) return;
     Went& went = pad_went[input.index];
+    // The pads as punches or Flex Beat's (mixing.h): the engine's command at
+    // once. A note held from before still lets go as a note.
+    if ((input.kind == Kind::Pad || input.kind == Kind::PadPressure) && !pads_typing.load(std::memory_order_relaxed)
+        && !(went.track >= 0 && !(input.kind == Kind::Pad && input.pressed))
+        && !(input.kind == Kind::Pad && input.pressed && pads_quiet.load(std::memory_order_relaxed))
+        && mixing::audio_pad(desk.perform, *engine, logical_pad(input.index, pad_layout()), input.kind == Kind::Pad && input.pressed,
+                             input.value, input.kind == Kind::PadPressure)) // the punch or Flex pad by its number in the layout
+        return;
     if (input.kind == Kind::Pad) {
         if (input.pressed) {
             went = {};
@@ -448,6 +466,7 @@ bool Studio::new_track(unsigned t, TrackKind made) {
 void Studio::delete_track(unsigned t) {
     t %= melodee::track_count;
     drop_module_track(t);
+    release_chain_fx(song->tracks[t].fx);
     auto mix = song->tracks[t].mix; // its mix strip stays, as Melodee's Delete leaves it
     song->tracks[t] = melodee::Track {};
     song->tracks[t].mix = mix;
@@ -475,6 +494,8 @@ bool Studio::copy_track(unsigned from, unsigned to) {
         return false; // another host's plug-in: its own copy is its host's to make
     }
     copy.mix = song->tracks[to].mix; // the target keeps its strip, as Melodee's Copy leaves it
+    release_chain_fx(song->tracks[to].fx);
+    copy_chain_fx(copy.fx); // a Schwung effect: its own instance, as a synth gets
     song->tracks[to] = copy;
     bank->at[to] = bank->at[from];
     apply_track(to);
@@ -912,6 +933,7 @@ std::vector<uint8_t> Studio::project_bytes() const {
         if (!module || module->entry == melodee::no_plugin) continue;
         states[module->entry] = synth_state(module_state(t));
     }
+    fx_states(states);
     return project_file_bytes(*song, *bank, states);
 }
 
@@ -997,10 +1019,12 @@ void Studio::take_back() {
     while (engine->take_midi(out)) {} // MIDI out: not yet on the Move
     // A Schwung track's runner, handed back: its track can go now.
     std::vector<std::unique_ptr<ModuleTrack>> gone;
+    std::vector<std::unique_ptr<FxModule>> gone_fx;
     {
         std::lock_guard<std::mutex> guard(lock);
         melodee::PluginRunner* runner = nullptr;
         while (engine->take_retired_plugin(runner)) {
+            if (auto effect = take_back_fx(runner)) { gone_fx.push_back(std::move(effect)); continue; }
             auto at = std::find_if(modules_leaving.begin(), modules_leaving.end(), [runner](const auto& m) { return &m->runner == runner; });
             if (at == modules_leaving.end()) continue;
             gone.push_back(std::move(*at));
@@ -1008,6 +1032,7 @@ void Studio::take_back() {
         }
     }
     gone.clear(); // its thread stopped and its modules destroyed, outside the lock
+    gone_fx.clear();
 }
 
 void Studio::take_answers() {
@@ -1100,6 +1125,7 @@ void Studio::service() {
         std::lock_guard<std::mutex> guard(lock);
         if (!failed.empty()) say(upper(failed).substr(0, 16));
     }
+    service_fx();
     std::vector<Job> todo;
     {
         std::lock_guard<std::mutex> guard(lock);
@@ -1340,6 +1366,8 @@ uint8_t Studio::free_plugin_entry() const {
         bool taken = false;
         for (const auto& module : modules) taken |= module && module->entry == entry;
         for (const auto& module : modules_leaving) taken |= module && module->entry == entry;
+        taken |= fx[entry] != nullptr;
+        for (const auto& effect : fx_leaving) taken |= effect && effect->entry == entry;
         if (!taken) return uint8_t(entry);
     }
     return melodee::no_plugin;
@@ -1454,6 +1482,15 @@ std::string Studio::status() const {
                   int(track.mix.solo), slow_calls, slowest_us / 1000.0,
                   module ? module->player.stream_late() : 0u, engine->dropped(), streamed, engine->streams().underruns());
     std::string line = text;
+    // The mix and its effects: slots in use on every chain, Schwung's
+    // effects loaded, and their calls that held the audio thread 1 ms or more.
+    unsigned effects = 0, schwung_fx = 0, fx_slow = 0;
+    for (unsigned n = 0; n < melodee::chain_count; ++n) effects += song->chain(n).count();
+    for (const auto& effect : fx)
+        if (effect) { schwung_fx += effect->module != nullptr; fx_slow += effect->runner.slow_calls(); }
+    std::snprintf(text, sizeof text, " effects=%u schwung_fx=%u fx_slow=%u render_threads=%u load=%.2f", effects, schwung_fx, fx_slow,
+                  engine->render_threads(), double(engine->render_load()));
+    line += text;
     for (const auto& screen : screens) line += screen->status();
     return line;
 }

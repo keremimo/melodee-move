@@ -341,6 +341,102 @@ white); an empty pad off; a pad waiting (the copy's first, the pad a sample
 loads onto) blinks white. With 16 Pitches the right 16 light the key's roots
 in the track's colour and its other notes light grey. Copy is bright while
 held; Plus and Minus are lit where they move.
+## Mixer and effects
+
+Melodee's mix and its 41 effects on the Move's own grammar. The Move has two
+audio effects in each Track Preset, after the instrument, and two main
+effects in each Set (its manual, chapters 7 and 17.2); the wheel walks the
+devices and its push opens the one in focus's browser. Melodee has six
+effects on each track, four on each kit pad, four buses A-D with six each
+and a return, and six on the master before its compressor (docs/PARITY.md,
+mixer & effects). `docs/ui/mixer.png` is the sheet
+(`src/ui/mockups_mixer.cpp`, its pieces in `src/ui/mix_widgets.*`),
+approved by Kerem on 2026-11-20 with his choices in
+[MOVE_CONTROLS.md](MOVE_CONTROLS.md)'s Decisions; the screens are built to
+it (`src/app/screens/device_fx.*`, `mixer.cpp`), the logic in
+`src/app/mixing.*`, Schwung's effects in `src/app/fx_host.*`.
+
+![The mixer and effects](ui/mixer.png)
+
+- **Effects in the Device View.** On Play the wheel walks the track's
+  items, three on the row at a time: the track, its sound (a kit's last
+  pad, a module's preset), on a kit the pad's own four effects (a dotted
+  underline) and their `+`, then the track's six and theirs: each chain
+  ends in a `+` while it has room. The knobs
+  follow the item in focus, as on the Move: on an effect its six values
+  (knob 7 a Compressor's or Gate's KEY: off, a track, a bus); the delays'
+  SYNC is one of them, shown as the note value. A bypassed effect is struck
+  through.
+- **The browser** (the wheel's push on an effect or the `+`): the families
+  (Space, Time, Motion, Dirt, Tone, Dynamics) and Schwung's audio effects
+  (`/data/UserData/schwung/modules/audio_fx`); in a family each effect loads
+  as the wheel turns (the Move's Autoload), push leaves with it; a Schwung
+  effect loads on the push. NONE takes the effect out.
+- **An effect's options** (Shift + push, as Sample Options on a pad):
+  Bypass (the sheet stays, to hear it), Move left, Move right, Copy, Paste,
+  Remove. Quicker, on free keys: **Mute held + push** bypasses (Control
+  Live's Mute + push deactivates a device), **Delete held + push** removes,
+  **Copy held + push** copies, and with Copy still held the wheel walks to
+  another slot (any chain's) and a push pastes it. A Schwung effect pasted
+  or on a copied track gets its own instance, set as the one copied.
+- **The track's mix** (the wheel on the track item): knob 1 its level, 2 its
+  pan, 3-6 its sends into buses A-D; its meter on the right; the detail
+  line its level in dB and its share of the CPU.
+- **The Mixer** (Shift + Step 4): Melodee's MIX hub, its pages on the row
+  the wheel walks: VOL, PAN, SNDA-SNDD, MAIN. On VOL, PAN
+  and the sends the knobs are eight tracks (Left and Right: 1-8 or 9-16),
+  each a strip with its meter, the selected one's number inverted, a muted
+  one hollow, a soloed one marked S; a send page shows the bus's return
+  last. MAIN: the returns A-D on knobs 1-4, the compressor's reduction and
+  the main out. The push opens the page's chain: the selected track's, the
+  bus's (its first item the return), the master's (its six, then COMP: the
+  compressor with its picture of a bar, knob 7 the sidechain's key track,
+  8 its pad). The steps are the sixteen tracks: a step selects one, Mute +
+  a step mutes it, Shift + Mute + a step solos it, as with the track
+  buttons. A touched knob shows that track large, in dB.
+- **Shift + Step 4 again** (Kerem's choice): from the Mixer, Knob FX;
+  again Pad FX; again Flex Beat; again the Mixer.
+- **Knob FX**: the mode turns on as it opens (the MPC's Knob FX lit) and
+  stays on after. The wheel walks the MPC's 28 and Melodee's 15 (`>` before
+  one not loaded yet), the push loads it. Knobs 1-6 its values (1-3 the
+  setting in hand), knob 7 which setting they edit (A or B), knob 8 slides
+  the effect from A to B (the MPC's fader). The steps switch it on for
+  tracks, a kit's pads for its pads; Shift + push every track on or off,
+  Mute + push bypasses it.
+- **Pad FX**: the 32 pads are punches (the MPC's sixteen orange, then
+  Melodee's cyan; the wheel, Plus or Minus the other bank), held up to four
+  at once (a fifth takes the oldest's place), pressure their depth, played
+  from the audio thread in the cycle the pad was read. Knobs 1-3 the last
+  MPC punch's own, 4 depth, 5 snap, 6 tail. The bar the pattern plays
+  drawn with the punches, kept ones dotted and on the steps; push keeps
+  the take in the pattern playing (KEPT), Delete + a pad takes that
+  punch's kept ones out; Shift + push its options: latch, master or track,
+  quantize, tail.
+- **Flex Beat**: pads 1-16, pad 1 Empty; knob 1 One Shot or Loop, knob 2
+  its mix, knob 3 quantize.
+- **Mute + a kit pad** mutes the pad (dim white), as on the Move;
+  **Shift + Mute** alone lets every mute go. **Touching the Volume knob**
+  shows the main meter, as the Move's VU meter.
+- **The MPC's fader**, which the Move has not: each of its targets is a
+  knob where its page is: a track's level on the Mixer and the track item,
+  Knob FX's A to B on knob 8, the compressor's amount, Flex Beat's mix.
+
+| Screen | Rail | Subject | Detail |
+| --- | --- | --- | --- |
+| An effect in the Device View | track kind / track / `FX1`-`FX6`, a pad's `A05` | the row, the effect's name, its knobs | |
+| `+` | the same / `FXn` | `ADD AN EFFECT` | slots used, `PUSH: BROWSE` |
+| The track item | kind / track / `MIX` | the track's name, its six knobs, its meter | level in dB, CPU share |
+| Effect browser | `LOAD` / track / slot | families, then effects | `PUSH: OK` |
+| Effect options | `OPT` / track / effect | Bypass, Move, Copy, Paste, Remove | |
+| Mixer page | `MIX` / track / `1-8` or `9-16` | the hub row, eight strips | the selected track, its value |
+| Mixer MAIN | `MIX` / / `MAIN` | returns, reduction, out | reduction, `PUSH: FX` |
+| A bus's chain | `BUS` / `A`-`D` / item | the row, the return or the effect | the tracks sending |
+| The master's chain | `MAIN` / / item | the row, an effect or the compressor's bar | its key, the reduction |
+| Knob FX | `KFX` / `A` or `B` / `ON`, `OFF`, `BYP` | the effect's name, its knobs | |
+| Pad FX | `PFX` / bank / `MST` or `TRK` | the punches held, the bar | quantize, `PUSH: KEEP` |
+| Pad FX options | `OPT` / / `PFX` | latch, master or track, quantize, tail | |
+| Flex Beat | `FLEX` / pad | the effect large, mode, mix | quantize |
+| Volume touched | `OUT` | the out in dB, left and right | the volume |
 
 ## Screens in code
 

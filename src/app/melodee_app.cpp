@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "app/melodee_app.h"
+#include <cmath>
 #include "app/screen.h"
 #include "move/display.h"
 #include "move/font.h"
@@ -127,13 +128,29 @@ bool MelodeeApp::global(bindings::Job job, const bindings::Use& use) {
         return true;
     }
     case Job::TracksOverview: studio.open("tracks"); return true;
+    // A track by its step (the Mixer, the sixteen tracks): Mute held mutes it, Shift + Mute solos it.
+    case Job::MuteStep: {
+        unsigned t = unsigned(use.index) % melodee::track_count;
+        studio.set_mute(t, !studio.project().tracks[t].mix.mute);
+        return true;
+    }
+    case Job::SoloStep: {
+        unsigned t = unsigned(use.index) % melodee::track_count;
+        studio.set_solo(t, !studio.project().tracks[t].mix.solo);
+        return true;
+    }
+    case Job::UnmuteAll: mixing::unmute_all(studio); studio.say("UNMUTED ALL"); return true;
+    case Job::ShowMeter: meter_until = Clock::time_point::max(); return true;
     // Transport and volume.
     case Job::PlayStop:
         if (studio.playing()) studio.stop();
         else studio.play();
         return true;
     case Job::Restart: studio.restart(); return true; // the Move's retrigger: every playing pattern from its top
-    case Job::MainVolume: studio.volume = std::clamp(studio.volume.load() + use.delta * 0.01f, 0.0f, 1.0f); return true;
+    case Job::MainVolume:
+        studio.volume = std::clamp(studio.volume.load() + use.delta * 0.01f, 0.0f, 1.0f);
+        if (meter_until != Clock::time_point::max()) meter_until = Clock::now() + turn_linger; // the Move's meter as it turns
+        return true;
     case Job::Metronome: studio.set_click(!studio.click(), studio.click_level()); return false; // and its screen opens
     // Knobs: a touch or a turn shows the knob large; the turn is the screen's.
     case Job::ShowKnob: touched = use.index; touched_until = Clock::time_point::max(); return true;
@@ -197,6 +214,8 @@ void MelodeeApp::surface(const move::SurfaceEvent& event) {
         }
     if (input.kind == Kind::Touch && !input.pressed && touched == int(input.index) && input.index < move::knob_count)
         touched_until = now + touch_linger;
+    if (input.kind == Kind::Touch && !input.pressed && input.index == move::touch_master && meter_until == Clock::time_point::max())
+        meter_until = now + touch_linger;
     for (auto* shown : std::vector<Screen*>(studio.stack)) shown->input(input);
     if (holding())
         if (auto* sixteen = tracks()) sixteen->input(input);
@@ -266,6 +285,7 @@ void MelodeeApp::draw(juce::Graphics& g) {
     Screen* top = studio.top();
     if (studio.typing) draw_typing(g);
     else if (holding() && now < volume_until) draw_volume(g);
+    else if (now < meter_until) draw_meter(g);
     else if (holding() && now - held_at >= hold_shown && tracks()) tracks()->draw(g);
     else if (top && touched >= 0 && now < touched_until && !top->knob(unsigned(touched)).name.empty()) draw_touched(g);
     else if (top) top->draw(g);
@@ -287,6 +307,30 @@ void MelodeeApp::draw_volume(juce::Graphics& g) {
     int level = studio.project().tracks[volume_track].mix.level;
     ui::rail(g, "VOL", std::to_string(volume_track + 1), "TRK");
     ui::big_parameter(g, ui::content(4, 44), "TRACK " + std::to_string(volume_track + 1) + " VOLUME", melodee::decibels(level) + " DB", level / 127.0f);
+}
+
+// The main meter: what goes out, left and right, in dB, as the Move's VU
+// meter shows it, with marks at -24, -12, -6, -3 and 0.
+void MelodeeApp::draw_meter(juce::Graphics& g) {
+    auto& studio = *own;
+    float volume = studio.volume.load();
+    float sides[2] {studio.host().out_level(0) * volume, studio.host().out_level(1) * volume};
+    float loudest = std::max(sides[0], sides[1]);
+    auto fraction = [](float peak) { return peak <= 0 ? 0.0f : std::clamp((20.0f * std::log10(peak) + 30.0f) / 30.0f, 0.0f, 1.0f); };
+    char text[16];
+    if (loudest <= 0.00001f) std::snprintf(text, sizeof text, "-INF");
+    else std::snprintf(text, sizeof text, "%.1fDB", double(20.0f * std::log10(loudest)));
+    ui::rail(g, "OUT", "", "");
+    move::draw_text_centred(g, ui::content_x, 2, ui::content_width, text, 2);
+    int w = ui::content_width - 4;
+    for (int side = 0; side < 2; ++side) {
+        int y = 22 + side * 9;
+        g.drawRect(ui::content_x + 2, y, w, 7);
+        g.fillRect(ui::content_x + 3, y + 1, int(std::lround(fraction(sides[side]) * float(w - 2))), 5);
+    }
+    for (int db : {-24, -12, -6, -3, 0}) g.fillRect(ui::content_x + 2 + (w - 1) * (db + 30) / 30, 40, 1, 2);
+    move::draw_text(g, ui::content_x + 1, 44, "-24  -12 -6 -3 0");
+    ui::detail(g, "VOLUME " + std::to_string(int(std::lround(volume * 100.0f))));
 }
 
 void MelodeeApp::draw_typing(juce::Graphics& g) {

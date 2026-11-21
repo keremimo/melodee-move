@@ -47,7 +47,12 @@ std::vector<Binding> make_table() {
         {"Delete held + Pad (Session)", S::Session, T::Any, H::del, C::Pad, G::Press, J::DeletePattern, St::Wave2, sequencer},
         {"Delete held + Pad (Overview)", S::Overview, T::Any, H::del, C::Pad, G::Press, J::DeleteProject, St::Wave2, projects},
         {"Delete held + Pad (Chop)", S::Chop, T::Any, H::del, C::Pad, G::Press, J::RemoveCut, St::Wave2, sampling},
-        {"Mute held + Pad (Play, kit)", S::Play, T::Kit, H::mute, C::Pad, G::Press, J::MutePad, St::Wave2, mixer},
+        {"Mute held + Pad (Play, kit)", S::Play, T::Kit, H::mute, C::Pad, G::Press, J::MutePad, St::Done},
+        {"Shift + Mute held + Pad (Play, kit)", S::Play, T::Kit, H::shift | H::mute, C::Pad, G::Press, J::SoloPad, St::Done},
+        {"Pad (Knob FX, kit)", S::KnobFx, T::Kit, H::none, C::Pad, G::Press, J::KnobFxPad, St::Done},
+        {"Pad (Pad FX)", S::PadFx, T::Any, H::none, C::Pad, G::Press, J::Punch, St::Done},
+        {"Delete held + Pad (Pad FX)", S::PadFx, T::Any, H::del, C::Pad, G::Press, J::ClearKept, St::Done},
+        {"Pad (Flex Beat)", S::Flex, T::Any, H::none, C::Pad, G::Press, J::FlexPad, St::Done},
         {"Step held + Pad", S::Play, T::Any, H::step, C::Pad, G::Press, J::NoteOnStep, St::Wave2, sequencer},
         {"Step held + Pad (Loop)", S::Loop, T::Any, H::step, C::Pad, G::Press, J::NoteOnBar, St::Wave2, sequencer},
         {"Shift + Step 16 held + Pad", S::Play, T::Any, H::shift | H::step, C::Pad, G::Press, J::QuantizePad, St::Wave2, sequencer, 0, 15},
@@ -83,12 +88,18 @@ std::vector<Binding> make_table() {
         {"Step (Chop)", S::Chop, T::Any, H::none, C::Step, G::Press, J::PlayFromPart, St::Wave2, sampling},
         {"Step (Typing)", S::Typing, T::Any, H::none, C::Step, G::Press, J::TypeDigit, St::Done},
         {"Track button held + Step", S::Any, T::Any, H::track, C::Step, G::Press, J::PickTrack, St::Done},
+        {"Track button held + Mute held + Step", S::Any, T::Any, H::track | H::mute, C::Step, G::Press, J::MuteStep, St::Done},
+        {"Track button held + Shift + Mute held + Step", S::Any, T::Any, H::track | H::shift | H::mute, C::Step, G::Press, J::SoloStep, St::Done},
+        {"Step (Mixer)", S::Mixer, T::Any, H::none, C::Step, G::Tap, J::PickTrack, St::Done},
+        {"Mute held + Step (Mixer)", S::Mixer, T::Any, H::mute, C::Step, G::Press, J::MuteStep, St::Done},
+        {"Shift + Mute held + Step (Mixer)", S::Mixer, T::Any, H::shift | H::mute, C::Step, G::Press, J::SoloStep, St::Done},
+        {"Step (Knob FX)", S::KnobFx, T::Any, H::none, C::Step, G::Tap, J::KnobFxTrack, St::Done},
 
         // Shift + steps
         {"Shift + Step 1", S::Any, T::Any, H::shift, C::Step, G::Press, J::Projects, St::Wave2, projects, step(1)},
         {"Shift + Step 2", S::Any, T::Any, H::shift, C::Step, G::Press, J::Setup, St::Wave2, projects, step(2)},
         {"Shift + Step 3", S::Any, T::Any, H::shift, C::Step, G::Press, J::Workflow, St::Wave2, sequencer, step(3)},
-        {"Shift + Step 4", S::Any, T::Any, H::shift, C::Step, G::Press, J::Mixer, St::Wave2, mixer, step(4)},
+        {"Shift + Step 4", S::Any, T::Any, H::shift, C::Step, G::Press, J::Mixer, St::Done, "", step(4)},
         {"Shift + Step 5", S::Any, T::Any, H::shift, C::Step, G::Press, J::Tempo, St::Done, "", step(5)},
         {"Shift + Step 6", S::Any, T::Any, H::shift, C::Step, G::Press, J::Metronome, St::Done, "", step(6)},
         {"Shift + Step 7", S::Any, T::Any, H::shift, C::Step, G::Press, J::Groove, St::Done, "", step(7)},
@@ -114,6 +125,8 @@ std::vector<Binding> make_table() {
         {"Step (Tracks)", S::Tracks, T::Any, H::none, C::Step, G::Press, J::PickTrack, St::Done},
         {"Copy held + Step (Tracks)", S::Tracks, T::Any, H::copy, C::Step, G::Press, J::CopyTrack, St::Done},
         {"Delete held + Step (Tracks)", S::Tracks, T::Any, H::del, C::Step, G::Press, J::ClearTrack, St::Done},
+        {"Mute held + Step (Tracks)", S::Tracks, T::Any, H::mute, C::Step, G::Press, J::MuteStep, St::Done},
+        {"Shift + Mute held + Step (Tracks)", S::Tracks, T::Any, H::shift | H::mute, C::Step, G::Press, J::SoloStep, St::Done},
 
         // Knobs
         {"Knob", S::Any, T::Any, H::none, C::Knob, G::Turn, J::TurnKnob, St::Done},
@@ -127,7 +140,7 @@ std::vector<Binding> make_table() {
 
         // Volume knob
         {"Volume knob", S::Everywhere, T::Any, H::none, C::Volume, G::Turn, J::MainVolume, St::Done},
-        {"Volume touch", S::Any, T::Any, H::none, C::VolumeTouch, G::Press, J::ShowMeter, St::Wave2, mixer},
+        {"Volume touch", S::Any, T::Any, H::none, C::VolumeTouch, G::Press, J::ShowMeter, St::Done},
 
         // The wheel
         {"Wheel turn (Play)", S::Play, T::Any, H::none, C::WheelTurn, G::Turn, J::Focus, St::Done},
@@ -136,6 +149,19 @@ std::vector<Binding> make_table() {
         {"Shift + Wheel push (Play, synth)", S::Play, T::Synth, H::shift, C::WheelPush, G::Press, J::ModuleMenu, St::Done},
         {"Shift + Wheel turn (Play)", S::Play, T::Any, H::shift, C::WheelTurn, G::Turn, J::Page, St::Done},
         {"Wheel touch (Play)", S::Play, T::Any, H::none, C::WheelTouch, G::Press, J::ShowFocus, St::Done},
+        {"Mute held + Wheel push (Play)", S::Play, T::Any, H::mute, C::WheelPush, G::Press, J::BypassEffect, St::Done},
+        {"Delete held + Wheel push (Play)", S::Play, T::Any, H::del, C::WheelPush, G::Press, J::RemoveEffect, St::Done},
+        {"Copy held + Wheel push (Play)", S::Play, T::Any, H::copy, C::WheelPush, G::Press, J::CopyEffect, St::Done},
+        {"Copy held + Wheel turn (Play)", S::Play, T::Any, H::copy, C::WheelTurn, G::Turn, J::Focus, St::Done},
+        {"Wheel turn (Mixer)", S::Mixer, T::Any, H::none, C::WheelTurn, G::Turn, J::MixerPage, St::Done},
+        {"Wheel push (Mixer)", S::Mixer, T::Any, H::none, C::WheelPush, G::Press, J::OpenChain, St::Done},
+        {"Wheel turn (Knob FX)", S::KnobFx, T::Any, H::none, C::WheelTurn, G::Turn, J::KnobFxChoose, St::Done},
+        {"Wheel push (Knob FX)", S::KnobFx, T::Any, H::none, C::WheelPush, G::Press, J::KnobFxLoad, St::Done},
+        {"Shift + Wheel push (Knob FX)", S::KnobFx, T::Any, H::shift, C::WheelPush, G::Press, J::KnobFxAll, St::Done},
+        {"Mute held + Wheel push (Knob FX)", S::KnobFx, T::Any, H::mute, C::WheelPush, G::Press, J::BypassEffect, St::Done},
+        {"Wheel turn (Pad FX)", S::PadFx, T::Any, H::none, C::WheelTurn, G::Turn, J::PunchBank, St::Done},
+        {"Wheel push (Pad FX)", S::PadFx, T::Any, H::none, C::WheelPush, G::Press, J::KeepPunches, St::Done},
+        {"Shift + Wheel push (Pad FX)", S::PadFx, T::Any, H::shift, C::WheelPush, G::Press, J::PunchOptions, St::Done},
         {"Wheel turn (Browser)", S::Browser, T::Any, H::none, C::WheelTurn, G::Turn, J::BrowseTurn, St::Done},
         {"Wheel push (Browser)", S::Browser, T::Any, H::none, C::WheelPush, G::Press, J::BrowsePush, St::Done},
         {"Shift held (Browser)", S::Browser, T::Any, H::none, C::Shift, G::Hold, J::BrowserOptions, St::Done},
@@ -172,6 +198,7 @@ std::vector<Binding> make_table() {
         {"Loop", S::Play, T::Any, H::none, C::Loop, G::Tap, J::LoopMode, St::Wave2, sequencer},
         {"Shift + Loop", S::Any, T::Any, H::shift, C::Loop, G::Press, J::Nothing, St::Free},
         {"Mute", S::Play, T::Any, H::none, C::Mute, G::Tap, J::MuteSelected, St::Done},
+        {"Shift + Mute", S::Any, T::Any, H::shift, C::Mute, G::Tap, J::UnmuteAll, St::Done},
         {"Undo", S::Any, T::Any, H::none, C::Undo, G::Tap, J::Undo, St::Wave2, projects},
         {"Shift + Undo", S::Any, T::Any, H::shift, C::Undo, G::Press, J::Redo, St::Wave2, projects},
         {"Undo held", S::Any, T::Any, H::none, C::Undo, G::Hold, J::UndoList, St::Wave2, projects},
@@ -217,6 +244,10 @@ std::vector<Binding> make_table() {
         {"Left or Right (Session)", S::Session, T::Any, H::none, C::Right, G::Press, J::PatternPage, St::Wave2, sequencer},
         {"Left or Right (Chop)", S::Chop, T::Any, H::none, C::Left, G::Press, J::SliceStep, St::Done},
         {"Left or Right (Chop)", S::Chop, T::Any, H::none, C::Right, G::Press, J::SliceStep, St::Done},
+        {"Left or Right (Mixer)", S::Mixer, T::Any, H::none, C::Left, G::Press, J::MixerHalf, St::Done},
+        {"Left or Right (Mixer)", S::Mixer, T::Any, H::none, C::Right, G::Press, J::MixerHalf, St::Done},
+        {"Plus or Minus (Pad FX)", S::PadFx, T::Any, H::none, C::Plus, G::Press, J::PunchBank, St::Done},
+        {"Plus or Minus (Pad FX)", S::PadFx, T::Any, H::none, C::Minus, G::Press, J::PunchBank, St::Done},
     };
 }
 
@@ -274,6 +305,7 @@ const std::vector<Binding>& table() {
 Screen under(Screen screen) {
     switch (screen) {
     case Screen::Loop: case Screen::Browser: case Screen::List: case Screen::Sampling: case Screen::Canvas: return Screen::Play;
+    case Screen::Mixer: case Screen::KnobFx: case Screen::PadFx: case Screen::Flex: return Screen::Play;
     case Screen::ToPads: return Screen::Chop;
     default: return screen;
     }
@@ -295,7 +327,8 @@ Job resolve(const Where& where, const Use& use) {
 }
 
 bool plays(Job job) {
-    return job == Job::PlayPad || job == Job::PlayNote || job == Job::PlayPitch || job == Job::PlaySlice;
+    // A punch and Flex Beat's pad sound too: the audio thread plays them (app/mixing.h).
+    return job == Job::PlayPad || job == Job::PlayNote || job == Job::PlayPitch || job == Job::PlaySlice || job == Job::Punch || job == Job::FlexPad;
 }
 
 bool pad_sounds(const Where& where, uint16_t held, unsigned pad) {
