@@ -108,7 +108,8 @@ constexpr uint16_t none = 0, shift = 1 << 0, track = 1 << 1, step = 1 << 2, pad 
     X(KnobFxChoose) X(KnobFxLoad) X(KnobFxAll) X(KnobFxTrack) X(KnobFxPad) X(Punch) X(PunchBank) X(KeepPunches) X(PunchOptions) \
     X(ClearKept) X(FlexPad) X(SoloPad) \
     X(StepTrig) X(Fill) X(LaunchScene) X(SeqPages) X(Playhead) X(ChainPattern) \
-    X(LoopPad) X(LoopPadNow) X(SelectLoop) X(LoopLevel) X(MuteLoop) X(SoloLoop) X(LoopRecord) X(PickLoop) X(LoopSheet)
+    X(LoopPad) X(LoopPadNow) X(SelectLoop) X(LoopLevel) X(MuteLoop) X(SoloLoop) X(LoopRecord) X(PickLoop) X(LoopSheet) \
+    X(PickProject) X(ProjectPage) X(DeleteSelection) X(MoveTrack) X(TypeTurn)
 
 enum class Job : uint8_t {
 #define MELODEE_JOB_ENUM(name) name,

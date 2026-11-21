@@ -129,6 +129,12 @@ $(SEQUENCER_TESTS): build/obj/tests/sequencer_tests.o $(SHARED_OBJECTS) $(JUCE_O
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 $(MIDI_TESTS): build/obj/tests/midi_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS) $(MELODEE_LIBRARY)
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
+# Undo, projects and the system (tests/projects_tests.cpp), a binary of
+# their own.
+PROJECTS_TESTS := build/projects-tests
+all: $(PROJECTS_TESTS)
+$(PROJECTS_TESTS): build/obj/tests/projects_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS) $(MELODEE_LIBRARY)
+	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 $(CONTROLS_TESTS): build/obj/tests/controls_tests.o build/obj/app/bindings.o
 	$(CXX) -static-libstdc++ -static-libgcc $^ -pthread -o $@
 $(PAD_TESTS): build/obj/tests/pad_layout_tests.o build/obj/app/pad_layout.o
@@ -162,5 +168,5 @@ $(foreach m,$(MODULE_C),$(eval $(call c_module_rule,$(m))))
 juce: $(JUCE_OBJECTS)
 .PHONY: all clean juce
 clean:
-	rm -rf build/obj $(TARGET) $(TESTS) $(WEB_TESTS) $(SEQUENCER_TESTS) $(CONTROLS_TESTS) $(MIDI_TESTS) $(MIXER_TESTS) $(PAD_TESTS) $(PADS_APP_TESTS)
+	rm -rf build/obj $(TARGET) $(TESTS) $(PROJECTS_TESTS) $(WEB_TESTS) $(SEQUENCER_TESTS) $(CONTROLS_TESTS) $(MIDI_TESTS) $(MIXER_TESTS) $(PAD_TESTS) $(PADS_APP_TESTS)
 -include $(shell find build/obj -name '*.d' 2>/dev/null)

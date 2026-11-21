@@ -58,6 +58,9 @@ public:
     virtual bool knob_lane(unsigned, unsigned& /*param*/, unsigned& /*pad*/) const { return false; }
     // The detail line under knob n shown large; empty: none.
     virtual std::string knob_detail(unsigned) const { return {}; }
+    // Knob n's value back to its start (Delete + its touch where it has no
+    // motion: Melodee's Erase + pot); false: nothing to reset.
+    virtual bool reset_knob(unsigned) { return false; }
     // Fields for the status line (" key=value ..."), whether shown or not.
     virtual std::string status() const { return {}; }
 

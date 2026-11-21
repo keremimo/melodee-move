@@ -181,6 +181,25 @@ public:
         return " bank=" + std::to_string(studio.pad_bank()) + " pitches=" + std::to_string(int(studio.pitches())) +
                " copy_from=" + std::to_string(copy_from);
     }
+    // Delete + a knob's touch with no motion: the value as a new pad has it (Melodee's Erase + pot).
+    bool reset_knob(unsigned which) override {
+        if (focus != 1 || !studio.sample_of_pad()) return false; // the pad's own knobs, not the mix's or an effect's
+        PadSound sound = studio.current().pads[studio.pad()];
+        const PadSound fresh {};
+        switch (which) {
+        case 0: sound.pitch = fresh.pitch; sound.fine = fresh.fine; break;
+        case 1: sound.level = fresh.level; break;
+        case 2: sound.pan = fresh.pan; break;
+        case 3: sound.start = fresh.start; break;
+        case 4: sound.end = fresh.end; break;
+        case 5: sound.attack = fresh.attack; break;
+        case 6: sound.decay = fresh.decay; break;
+        case 7: sound.cutoff = fresh.cutoff; sound.filter = fresh.filter; break;
+        default: return false;
+        }
+        studio.set_pad(studio.track(), studio.pad(), sound);
+        return true;
+    }
 
 private:
     int focus = 1; // the Device View's item the wheel is on: 0 the kit (its mix), 1 the pad, 2 on its effects

@@ -89,7 +89,7 @@ inline void steps_playhead(const Studio& studio, move::Lights& lights) {
 // A note track's pads: every C in the track's colour, the other naturals
 // dim, a held pad white.
 inline void note_pads(const Studio& studio, move::Lights& lights, const std::array<bool, pad_count>& held, bool sounding) {
-    auto colour = ui::track_colour(studio.track()).bright;
+    auto colour = studio.colour_of(studio.track()).bright;
     for (unsigned at = 0; at < pad_count; ++at) {
         int note = studio.note_for(at, studio.octave(studio.track()));
         lights.pad(at, held[at] ? move::colour::white : !sounding ? move::colour::off : note % 12 == 0 ? colour : natural(note) ? move::colour::dark_grey : move::colour::off);

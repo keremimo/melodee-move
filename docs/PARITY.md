@@ -74,7 +74,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **MIDI track ports** on the new-track sheet: Out jack, USB-C, All USB (guide/tracks.md) | n/a | one port on the Move: a device on USB-A and a computer on USB-C arrive together on cable 2, so there is nothing to pick (docs/MIDI.md) | — |
 | **Delete a track**: sound, kit, patterns; its mix strip stays; asks (its undo: MIDI & sync & undo & projects) (MELODEE.md › The panel, Pad Bank) | done | track button held + Delete + step | [ ] |
 | **Copy a track**: sound, kit, 128 patterns, motion; the target keeps its strip; a synth gets its own instance of the module (MELODEE.md › Across every page, Copy) | done | track button held + Copy + step, then a step | [ ] |
-| **Move a track**: trades places; song clips, keys, lanes and sources follow it (MELODEE.md › Across every page, Move) | MIDI & sync & undo & projects | track button held + Shift + Copy + step, then a step | [ ] |
+| **Move a track**: trades places; song clips, keys, lanes and sources follow it (MELODEE.md › Across every page, Move) | done | track button held + Shift + Copy + step, then a step (or Shift + Copy + steps on the 16 tracks); a track there trades places; one undo | [ ] |
 | **Stage**: each track's home pages, B1 source, B2 how it plays, B3 where it goes (MELODEE.md › Playing) | done | Shift + the jogwheel: a kit's nine pad pages (TRIM, LAYERS, TUNE, AMP ENV, PLAY, CLOUD, MIX, FILTER, KIT FILT, docs/UI.md "Kits"), a module's pages; the Play screen's knobs first | [ ] |
 | **Synth presets**: walked, loaded a moment after the last turn (MELODEE.md › Playing, A synth) | done | jogwheel (Schwung modules) | [ ] |
 | **Synth EDIT**: the instrument's own parameters and page map (MELODEE.md › Playing, Edit) | done | knobs 1-8, Left / Right; push: the module's menu | [ ] |
@@ -315,51 +315,51 @@ Kerem has checked it there. `n/a` rows have no box.
 | --- | --- | --- | --- |
 | **The whole project as a `.mldp`** (MELODEE.md › Files on the card) | done | automatic | [ ] |
 | **Autosave** a moment after the last change and on the way out (melodee-move README › Saving) | done | automatic | [ ] |
-| **Project page**: Save, Open, New (or KIT: a factory kit on track 1) (MELODEE.md › Project and system) | MIDI & sync & undo & projects | Shift + Step 16, or Places > Project | [ ] |
-| **Project list**: folders, each project's tracks and tempo, sorting, the open one marked (MELODEE.md › Project and system) | MIDI & sync & undo & projects | jogwheel; push; Back | [ ] |
-| **Project sheet**: Save, Save as new, Rename, Duplicate, Move to folder, New folder, Open at start, Delete (MELODEE.md › Project and system) | MIDI & sync & undo & projects | push sheet | [ ] |
-| **Load kit (no patterns)** from another project (MELODEE.md › Project and system) | MIDI & sync & undo & projects | project sheet | [ ] |
-| **A save frees unused sample slots** (MELODEE.md › Project and system) | MIDI & sync & undo & projects | automatic | [ ] |
-| **UNSAVED** shown while there are changes (MELODEE.md › Project and system) | MIDI & sync & undo & projects | the rail | [ ] |
-| **Loading**: the sound fades, the audio thread waits while the project builds; the Loading sheet counts files (MELODEE.md › Project and system) | MIDI & sync & undo & projects | screen | [ ] |
+| **Project page**: Save, Open, New (or KIT: a factory kit on track 1) (MELODEE.md › Project and system) | done | Shift + Step 1, the Move's Set Overview: projects on the pads; the wheel's push or Shift + pad: Save, Open, New (an empty pad, then Back) | [ ] |
+| **Project list**: folders, each project's tracks and tempo, sorting, the open one marked (MELODEE.md › Project and system) | done | the pads, 32 a page (Plus / Minus), each project keeping its pad as a Set; folders grey (push in, Back out); its tracks and tempo, OPEN on the open one; pads in place of sorting | [ ] |
+| **Project sheet**: Save, Save as new, Rename, Duplicate, Move to folder, New folder, Open at start, Delete (MELODEE.md › Project and system) | done | the wheel's push or Shift + pad: Save, Save as new, Rename, Colour, Duplicate, Move to folder, New folder, Open at start, Delete (asks); Copy + pad, then a pad (asks before replacing); Delete + pad, the pad again | [ ] |
+| **Load kit (no patterns)** from another project (MELODEE.md › Project and system) | done | the project sheet of another project: Load kit, onto the selected track, one undo | [ ] |
+| **A save frees unused sample slots** (MELODEE.md › Project and system) | done | the project sheet's Save (a slot no pad plays and no undo can bring back) | [ ] |
+| **UNSAVED** shown while there are changes (MELODEE.md › Project and system) | done | a mark in the rail's top right corner; OPEN UNSAVED on the projects | [ ] |
+| **Loading**: the sound fades, the audio thread waits while the project builds; the Loading sheet counts files (MELODEE.md › Project and system) | done | the engine parked (faded out, silent) while the project is built, then faded in; the Loading sheet counts samples and synths, presses wait | [ ] |
 | **Card folders read ahead** (the MPC's exFAT driver) (MELODEE.md › Project and system) | n/a | a fix for the MPC's card driver; the Move's storage is internal | — |
-| **MPC Sample projects** `.xpj` opened as a copy (MELODEE.md › Project and system) | MIDI & sync & undo & projects | the project list | [ ] |
-| **MPC 3 projects** opened, keygroup and audio tracks too (guide/projects-and-files.md) | MIDI & sync & undo & projects | the project list | [ ] |
+| **MPC Sample projects** `.xpj` opened as a copy (MELODEE.md › Project and system) | MIDI & sync & undo & projects | built: listed on the pads, opened as a copy (Melodee's importer, compiled unchanged), saved as a .mldp beside it; not tested yet: no .xpj at hand (Kerem to check on the Move) | [ ] |
+| **MPC 3 projects** opened, keygroup and audio tracks too (guide/projects-and-files.md) | MIDI & sync & undo & projects | built as the MPC Sample's (the same importer); keygroup and audio tracks open as tracks, their playing instruments' and sampling's; not tested yet: no MPC 3 project at hand | [ ] |
 | **SD card access**: the card lent to a computer (MELODEE.md › Project and system) | n/a | no card; the web page's Files tab reaches the Move's storage | — |
-| **Settings**: eight doors, a short list each; Reset Factory Settings (MELODEE.md › Project and system) | MIDI & sync & undo & projects | Shift + Step 8; jogwheel the row, a knob sets it | [ ] |
-| **PADS settings**: pad response (soft, medium, hard, full level), pad pressure on / off, Double Seq (MELODEE.md › Project and system) | MIDI & sync & undo & projects | Settings | [ ] |
+| **Settings**: eight doors, a short list each; Reset Factory Settings (MELODEE.md › Project and system) | done | Shift + Step 2, the Move's Setup: doors PADS, LIGHTS (and move-midi's MIDI, SYNC, move-web's WEB PAGE); the wheel the row, push edits; Reset Factory Settings left out: the Move's own is Ableton's, Melodee's settings are few | [ ] |
+| **PADS settings**: pad response (soft, medium, hard, full level), pad pressure on / off, Double Seq (MELODEE.md › Project and system) | done | Setup > PADS: response (soft, medium, hard, full level), pressure on / off; Double Seq's copy is the sequencer's | [ ] |
 | **KNOBS settings**: takeover (MELODEE.md › Project and system) | n/a | relative knobs have nothing to pick up | — |
 | **SCREEN settings**: palette, fonts, brightness, the place bar's place (MELODEE.md › Project and system; guide/settings.md) | n/a | a one-bit screen with one font (UI.md) | — |
 | **Screen Mirror**: the MPC as a USB webcam of its screen (MELODEE.md › Project and system) | n/a | no USB video gadget on the Move's kernel; a screen view on the web page could stand in | — |
 | **AUDIO settings**: sample rate 44.1, 48, 96 kHz; buffer 256-1024 frames (MELODEE.md › Project and system) | n/a | the Move runs 44.1 kHz in blocks of 128 frames, set by its XMOS link | — |
 | **USB volume** (MELODEE.md › Project and system) | n/a | no USB audio | — |
 | **SAMPLING settings**: Recall grab, gap, trim end; Take auto end, after, silence below (MELODEE.md › Project and system) | sampling | Settings | [ ] |
-| **ABOUT**: each core's load, dropouts, storage room and stream misses, plug-ins' cost; versions, licence (MELODEE.md › Project and system) | MIDI & sync & undo & projects | Settings > About | [ ] |
-| **Usage log**: what the hands do, no names, a file each start (MELODEE.md › Files on the card; guide/settings.md) | MIDI & sync & undo & projects | Settings | [ ] |
-| **Name sheet**: pads type like phone keys (MELODEE.md › Project and system) | MIDI & sync & undo & projects | the pad keyboard module pages use (letters on pads, digits on steps) | [ ] |
+| **ABOUT**: each core's load, dropouts, storage room and stream misses, plug-ins' cost; versions, licence (MELODEE.md › Project and system) | done | Setup > ABOUT: the audio cycle's share and longest, late exchanges, room left, synths and their slow calls, the build | [ ] |
+| **Usage log**: what the hands do, no names, a file each start (MELODEE.md › Files on the card; guide/settings.md) | done | Setup > USAGE LOG: Usage/usage-<start>.txt, a line a job (the time, the screen, the job), no names, written every 10 s | [ ] |
+| **Name sheet**: pads type like phone keys (MELODEE.md › Project and system) | done | the Move's own typing (Kerem): the wheel walks a strip, push types, OK ends; pads letters, steps digits; Back deletes, held cancels | [ ] |
 
 ## Across every page
 
 | Feature | Status | Move controls | ✓ |
 | --- | --- | --- | --- |
 | **Screen grammar and header**: a glyph and two words, back on B1, the verb on B3, sheets as cards, where you are always shown (MELODEE.md › Across every page) | done | the Rail (UI.md): rail, subject, detail line, sheets | [ ] |
-| **Questions before a loss**: one sheet, what goes, whether undo brings it back (MELODEE.md › Across every page) | MIDI & sync & undo & projects | push yes, Back no | [ ] |
+| **Questions before a loss**: one sheet, what goes, whether undo brings it back (MELODEE.md › Across every page) | done | one sheet (ui::system::question): what goes, the undo chip; push yes (or the pad again), Back no | [ ] |
 | **Place bar**: the bars of the pattern playing, how far it has played, coloured by state (MELODEE.md › Across every page) | done | the steps' playhead (green), Loop Mode's bars, Session's progress | [ ] |
 | **Mute mode**: pads mute kit pads or tracks, Shift + pad solos, Shift + Mute unmutes all; kit pad mutes saved (MELODEE.md › Across every page) | done | Mute held + pad (the Move's 16.5), Shift + Mute held + pad solos it, Shift + Mute alone unmutes all; a tap of Mute stays the Move's (the selected track), so no latch | [ ] |
 | **Mute and solo tracks** from the overview (MELODEE.md › Pad lights, Tracks) | done | track button held + Mute (+ Shift) + step; the same on the sixteen tracks latched and on the Mixer | [ ] |
 | **Erase a kit pad**, stopped (MELODEE.md › Across every page, Erase) | done | Delete + pad: its notes first, then its sound (Kerem, 2026-11-20: at once) | [ ] |
 | **Close a gap**: an empty pad erased moves the pads after it down, notes and lanes too (MELODEE.md › Across every page, Erase) | done | Delete + an empty pad: the pads after it to the end of the next bank down one, notes too (Melodee's shell/pad_gap.h) | [ ] |
-| **Erase + pot**: the value back to its start (MELODEE.md › Across every page, Erase) | MIDI & sync & undo & projects | Delete + knob touch | [ ] |
-| **Erase tapped alone**: the page's selection (a note, step, pattern, track, loop, effect, slice, layer, project) (MELODEE.md › Across every page, Erase) | MIDI & sync & undo & projects | Delete tapped | [ ] |
+| **Erase + pot**: the value back to its start (MELODEE.md › Across every page, Erase) | done | Delete + knob touch: the motion deleted where the knob has some (the Move's), else the value back to its start (a kit pad's; a module's values have no start known yet) | [ ] |
+| **Erase tapped alone**: the page's selection (a note, step, pattern, track, loop, effect, slice, layer, project) (MELODEE.md › Across every page, Erase) | done | Delete tapped: on the projects, the one picked (asks); on Play, the Move's (the pattern, the sequencer's); each area's page its own selection | [ ] |
 | **Copy kit pads**: the first pad, then the target (MELODEE.md › Across every page, Copy) | done | Copy held + pad, then a pad; onto a pad with a sample it asks | [ ] |
-| **Undo and redo**: the last 32 steps; a take, a control's turns, a press each one (MELODEE.md › Across every page, Undo) | MIDI & sync & undo & projects | Undo; Shift + Undo | [ ] |
-| **Undo list**: the steps with their glyphs and age, back to any one (MELODEE.md › Across every page, Undo) | MIDI & sync & undo & projects | Undo held | [ ] |
+| **Undo and redo**: the last 32 steps; a take, a control's turns, a press each one (MELODEE.md › Across every page, Undo) | done | Undo; Shift + Undo: 32 steps, a press each, a knob's turns one, a load one; history.h | [ ] |
+| **Undo list**: the steps with their glyphs and age, back to any one (MELODEE.md › Across every page, Undo) | done | Undo held: the steps with their track and age, struck through above the cursor; the wheel, push goes there | [ ] |
 | **Knob takeover**: Pickup, Scaled, Instant (MELODEE.md › Across every page) | n/a | relative knobs have nothing to pick up | — |
 | **Pad expression**: a pad's pressure as each note's poly aftertouch (MELODEE.md › Across every page) | done | pad pressure (Schwung modules) | [ ] |
 | **Text never under 11 px**, never cut (MELODEE.md › Across every page) | n/a | one 5 x 7 font at 128 x 64 (UI.md) | — |
-| **The Menu**: HERE, the page's jobs with their shortcuts; GO, the 16 places as the pads (guide/basics.md) | MIDI & sync & undo & projects | jogwheel push held; places on the pads | [ ] |
-| **Lessons**: First beat, Sequences, Mix a track, Shape a pad (guide/basics.md) | MIDI & sync & undo & projects | Places > Learn | [ ] |
-| **Basic and Full**: Basic shows the stock pages plus tracks, plug-ins, the mixer and Song (guide/settings.md) | MIDI & sync & undo & projects | Settings | [ ] |
+| **The Menu**: HERE, the page's jobs with their shortcuts; GO, the 16 places as the pads (guide/basics.md) | n/a | Kerem (2026-11-20): no Menu on the Move; Shift + the steps are the places | [ ] |
+| **Lessons**: First beat, Sequences, Mix a track, Shape a pad (guide/basics.md) | n/a | Kerem (2026-11-20): no Menu on the Move, so no Learn | [ ] |
+| **Basic and Full**: Basic shows the stock pages plus tracks, plug-ins, the mixer and Song (guide/settings.md) | done | Setup > FEATURES: Basic leaves out Melodee's Looper (Shift + Step 12); other areas ask `studio.settings.full` for their extras | [ ] |
 
 ## Sound engines and synths
 
@@ -398,7 +398,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Idle plug-ins sleep** when silent (MELODEE.md › Threads and data) | schwung | covered by Schwung's modules, the Move's plug-ins | — |
 | **Support in the binary**: GUI stubs, libsndfile, libsamplerate, FFTW, the armhf runtime (MELODEE.md › Plug-ins) | schwung | covered by Schwung's modules, the Move's plug-ins | — |
 | **Saved with the project**: each plug-in's path and state (PLUG) (MELODEE.md › Plug-ins, Saving) | done | a Schwung module's state in its PLUG entry | [ ] |
-| **Replace a plug-in**: asks; one undo brings the old one back with its state (MELODEE.md › Plug-ins) | MIDI & sync & undo & projects | asks; its undo | [ ] |
+| **Replace a plug-in**: asks; one undo brings the old one back with its state (MELODEE.md › Plug-ins) | done | loading another Schwung module over one asks (the question sheet); one undo brings the old one back with its values | [ ] |
 | **Plug-in probe**: a command-line host to try a plug-in first (MELODEE.md › Plug-ins) | done | `--probe-modules` | [ ] |
 
 ## Files
@@ -408,7 +408,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Projects** `.mldp` in tagged sections, written whole or not at all (MELODEE.md › Files on the card) | done | /data/UserData/Melodee/Projects | [ ] |
 | **Everything under one folder** (MELODEE.md › Files on the card) | done | /data/UserData/Melodee; `--home` moves it | [ ] |
 | **Folders named from outside** (`$MELODEE_*` on a host) (MELODEE.md › Files on the card) | done | `--home`, `--samples`, `--modules` | [ ] |
-| **Settings file**: settings, MIDI and Input Config, the project to open at start, the last one (MELODEE.md › Files on the card) | MIDI & sync & undo & projects | automatic | [ ] |
+| **Settings file**: settings, MIDI and Input Config, the project to open at start, the last one (MELODEE.md › Files on the card) | done | Move.settings: Setup's settings, the metronome, the track played last, start= and last= (MIDI and Input Config: move-midi's, sampling's) | [ ] |
 | **Samples folders**: Recorded, Edits, Banks, Looper, Expansions, Keygroups, Stems (MELODEE.md › Files on the card) | sampling | /data/UserData/Melodee/Samples | [ ] |
 | **Cache**: decoded long samples and instrument files, 4 GB, aged out after 30 days (MELODEE.md › Files on the card) | done | /data/UserData/Melodee/Cache (Melodee's shell/sample_cache.h: tidied at start, 4 GB, 30 days) | [ ] |
 | **Export folders**: Mixdowns, Stems, MIDI, MPC 3 (MELODEE.md › Files on the card; guide/song.md) | song & export | /data/UserData/Melodee | [ ] |
@@ -420,8 +420,8 @@ Kerem has checked it there. `n/a` rows have no box.
 | Feature | Status | Move controls | ✓ |
 | --- | --- | --- | --- |
 | **Status line** with Melodee's fields (MELODEE.md › Remote) | done | the Move's status line every 5 s; each area adds its fields | [ ] |
-| **Remote presses** `melodee-press`: buttons, pads, knobs (MELODEE.md › Remote) | MIDI & sync & undo & projects | a command over SSH | [ ] |
-| **`melodee-render`**: render workers off or on (MELODEE.md › Remote) | MIDI & sync & undo & projects | a command over SSH | [ ] |
+| **Remote presses** `melodee-press`: buttons, pads, knobs (MELODEE.md › Remote) | done | `melodee-move --ctl 'melodee-press shift+step1'` over SSH: the runtime's control socket plays them into the Move's input | [ ] |
+| **`melodee-render`**: render workers off or on (MELODEE.md › Remote) | done | `melodee-move --ctl 'melodee-render serial|parallel'` | [ ] |
 | **`melodee-looper`** (MELODEE.md › Remote) | looper | a command over SSH | [ ] |
 | **`melodee-midi`**: a message into the input; panic (MELODEE.md › Remote) | done | `melodee-midi HEX...` and `melodee-midi panic` in the package, over SSH | [ ] |
 | **`melodee-print`, `melodee-freeze`, `melodee-unfreeze`** (MELODEE.md › Print and freeze) | song & export | a command over SSH | [ ] |
@@ -475,21 +475,21 @@ sections, each on Shift + Step n.
 | **Play and Stop** (MELODEE.md › The panel) | done | Play, a toggle | [ ] |
 | **Sample Select**: the browser on a kit, the picker on a plug-in track (MELODEE.md › The panel) | done | Menu | [ ] |
 | **Exit** (Power): save and back to the stock app (MELODEE.md › Project and system) | done | Shift + Back | [ ] |
-| **Shift held**: the jobs lit white, toggles bright; toggles kept in the settings (MELODEE.md › Shift + pads) | MIDI & sync & undo & projects | Shift: the steps lit for their jobs | [ ] |
+| **Shift held**: the jobs lit white, toggles bright; toggles kept in the settings (MELODEE.md › Shift + pads) | done | Shift: the steps with a job lit, the metronome bright when on (move-controls); toggles kept in Move.settings | [ ] |
 | **Button lights**: bright in use, faint where they act, dark where they would do nothing (MELODEE.md › Lights) | done | the Move's button lights | [ ] |
 | **Track lights**: each track's colour, the selected one bright (MELODEE.md › Pad lights, Tracks) | done | Row1-4 | [ ] |
 | **Bank lights** A-H (MELODEE.md › Lights) | n/a | no bank lights; the rail names the bank | — |
 | **Level meters**: five lights a side, -24.1 to -0.1 dBFS; the input on Record (MELODEE.md › Lights) | done | no meter lights: the Volume knob touched (the Move's VU meter), marks at -24, -12, -6, -3, 0; the Mixer's strips; the input's is Sampling's | [ ] |
 | **Kit pad lights**: the selected pad Full, a sample Dim, empty dark, muted Faint red, a flare as it sounds; five rungs that keep each colour's hue (MELODEE.md › Pad lights) | done | pad lights: dim in the pad's colour, bright while it sounds, the last pad white, muted dark grey (the Move's dim white), empty off (Kerem, 2026-11-20) | [ ] |
 | **Key lights**: the key's roots in the track's colour, its other notes Dim, out of the key Faint (MELODEE.md › Pad lights) | instruments | pad lights | [ ] |
-| **Pad lights and Pad fade settings**; the Tap Tempo flash (MELODEE.md › Project and system, LIGHTS) | MIDI & sync & undo & projects | Settings | [ ] |
-| **Light show**: Pulse, Sweep, Chase, Ripple, Levels, in time with the tempo (MELODEE.md › Light show) | MIDI & sync & undo & projects | Sample + Mute; Up / Down the style | [ ] |
+| **Pad lights and Pad fade settings**; the Tap Tempo flash (MELODEE.md › Project and system, LIGHTS) | done | Setup > LIGHTS: pad lights (colour, white, off), pad fade (kept for kit depth's flares), brightness; the Tap Tempo flash is the sequencer's tap tempo | [ ] |
+| **Light show**: Pulse, Sweep, Chase, Ripple, Levels, in time with the tempo (MELODEE.md › Light show) | done | Setup > LIGHTS (Kerem: no key): Pulse, Sweep, Chase, Ripple, Levels in time with the tempo, on Play screens; a pad pressed flashes white | [ ] |
 
 ## Summary
 
 | Status | Rows |
 | --- | --- |
-| `done` | 175 |
+| `done` | 201 |
 | `sequencer` | 4 |
 | `sampling` | 22 |
 | `kit depth` | 2 |
@@ -497,10 +497,10 @@ sections, each on Shift + Step n.
 | `mixer & effects` | 2 |
 | `song & export` | 21 |
 | `looper` | 1 |
-| `MIDI & sync & undo & projects` | 30 |
+| `MIDI & sync & undo & projects` | 2 |
 | `web page` | 11 |
 | `schwung` | 16 |
-| `n/a` | 26 |
+| `n/a` | 28 |
 | All rows | 335 |
 
 # Ableton Move parity
@@ -537,6 +537,6 @@ tempo) touches, and where each stands now.
 | **Volume knob** | the main volume (16.1) | the same | done | [ ] |
 | **Wheel, its push, Shift + wheel** | choose, confirm, finer (20, 10.1) | the same on every screen | done | [ ] |
 | **Back** | leave a menu or view (20) | the same | done | [ ] |
-| **Undo, Shift + Undo** | undo, redo (20) | not yet | MIDI & sync & undo & projects | [ ] |
+| **Undo, Shift + Undo** | undo, redo (20) | the same, every step named; held, the undo list | done | [ ] |
 | **Capture** | the last notes played into a clip (14.3) | not yet | sampling | [ ] |
 | **Sample** ("Sampling") | Sampling mode (15.1) | not yet | sampling | [ ] |

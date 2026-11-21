@@ -5,6 +5,10 @@
 #include "app/mixing.h"
 #include "app/midi.h"
 #include "app/loop_desk.h"
+#include "app/history.h"
+#include "app/projects.h"
+#include "ui/track_style.h"
+#include <functional>
 #include "app/module_host.h"
 #include "app/pad_layout.h"
 #include "app/project_store.h"
@@ -105,6 +109,7 @@ struct ModuleTrack {
     bool job_restores = false;  // set as `saved` has it (a project opened, a track copied)
     bool loading = false;
     std::map<std::string, uint64_t> set_at; // each key's last set (SynthPlayer's serial)
+    std::vector<std::string> edited;        // the keys set since the last undo step closed (history.h)
     // The screen's: the page, the menu, the module's own pages.
     unsigned page = 0;
     bool menu_open = false, menu_editing = false;
@@ -120,6 +125,28 @@ struct ModuleTrack {
 
 class Screen;
 class Sequencer;
+
+// The Move's Setup (Shift + Step 2) as Melodee's Settings: the same for every
+// project, kept in Move.settings with the project to open at start.
+struct Settings {
+    uint8_t response = 1;    // pad response: 0 soft, 1 medium, 2 hard, 3 full level
+    bool pressure = true;    // pad pressure reaches the modules
+    uint8_t pad_lights = 0;  // 0 the tracks' colours, 1 white, 2 off
+    uint8_t pad_fade = 1;    // 60, 100, 150, 250 ms: how fast a pad's light fades
+    uint8_t brightness = 3;  // the lights: 0 low, 1 mid, 2 high, 3 max (the Move's four)
+    bool light_show = false;
+    uint8_t show_style = 0;  // Pulse, Sweep, Chase, Ripple, Levels
+    bool full = true;        // Full, or Basic: the Move's own pages, tracks, modules, the mixer and Song
+    bool usage_log = false;  // what the hands do, a file each start (Usage/)
+    std::string start;       // the project opened at start; empty: the one open last
+    bool operator==(const Settings& o) const {
+        return response == o.response && pressure == o.pressure && pad_lights == o.pad_lights && pad_fade == o.pad_fade &&
+               brightness == o.brightness && light_show == o.light_show && show_style == o.show_style && full == o.full &&
+               usage_log == o.usage_log && start == o.start;
+    }
+};
+constexpr unsigned pad_fade_ms[4] {60, 100, 150, 250};
+constexpr const char* show_styles[5] {"PULSE", "SWEEP", "CHASE", "RIPPLE", "LEVELS"};
 
 class Studio {
 public:
@@ -161,6 +188,12 @@ public:
     bool new_track(unsigned track, TrackKind kind);
     void delete_track(unsigned track);
     bool copy_track(unsigned from, unsigned to); // `to` replaced
+    // Melodee's Move: `from` goes to `to`, a track there trading places, mix
+    // strip, module, colour and patterns with it. Nothing is lost.
+    bool move_track(unsigned from, unsigned to);
+    // A track's colour on the lights: its own (track options) or the
+    // track's place's (ui/track_style.h).
+    ui::TrackColour colour_of(unsigned track) const;
     ModuleTrack* module_track(unsigned track);
     ModuleTrack* module_track() { return module_track(selected); }
     int octave(unsigned track) const; // the bottom-left pad's octave on a note track (0: C2)
@@ -265,6 +298,29 @@ public:
     std::string typed, typing_title;
     int typing_canvas = -1, typing_track = -1;
     void finish_typing(bool cancelled);
+    // The name sheet (the Move's typing): `done` gets the text unless it is
+    // cancelled (Back held). Under `lock`.
+    void ask_name(std::string title, std::string initial, size_t room, std::function<void(const std::string&)> done);
+    std::function<void(const std::string&)> typing_done;
+    size_t typing_room = 120;
+    int typing_strip = 0; // the strip's character in the box (ui::system::name_sheet)
+
+    // The question before a loss (Melodee's one sheet): what is asked, what
+    // goes, whether undo brings it back. `yes` runs on a push (or the pad
+    // asked about, pressed again); Back or anything else leaves it.
+    struct Question {
+        std::string rail_top, rail_big, rail_bottom, asked, line1, line2;
+        bool undoable = false;
+        std::string yes_key = "PUSH YES";
+        int pad = -1; // a pad that says yes too (the Move's Delete + pad, again)
+        std::function<void()> yes;
+    };
+    void ask(Question question);
+    Question asked;
+    bool quit = false; // Setup's Back to Move: the runtime ends, Ableton's app comes back
+    unsigned options_track = 0; // whose options Shift + a track button opened
+    // How the Move is doing, for Setup's About (MelodeeApp fills it from the runtime's session).
+    struct Machine { float cpu_percent = 0; unsigned peak_us = 0; unsigned late = 0; std::string version; } machine;
     unsigned slow_calls = 0; // calls into a module that held the audio thread 1 ms or more
     uint32_t slowest_us = 0;
 
@@ -279,6 +335,31 @@ public:
     void home(); // back to the track's Play screen
     std::vector<std::unique_ptr<Screen>> screens; // every registered screen, made once
     std::vector<Screen*> stack;
+
+    // Undo (history.h): every change to the project between two closes is
+    // one step. The app closes one after each press of a control, after a
+    // knob's or the wheel's turns (another control, or two seconds still),
+    // and the service thread after a load; nothing has to say what changed.
+    // A screen names the step it makes (shown on undo: "UNDO TUNE A05"); a
+    // change that is no undo step (the last pad played, a mute, the octave)
+    // says not_a_step(), and the next close takes it in without one. A take
+    // that lasts holds its step open from hold_step() to release_step().
+    void name_step(std::string what, int track = -1);
+    void not_a_step();
+    void hold_step(std::string what, int track = -1);
+    void release_step();
+    bool step_held() const { return holding_step; }
+    // What changed since the last close, kept as a step (or taken in, with
+    // `keep` false, or when not_a_step() was said); the app's and the
+    // service thread's. `fallback`: the step's name when no screen gave one.
+    bool close_step(const std::string& fallback = {}, bool keep = true);
+    bool undo(); // the newest step taken back, the engine and modules told; false: none
+    bool redo();
+    History history;
+    MoveExtras& extras() { return move_extras; }
+    const MoveExtras& extras() const { return move_extras; }
+    std::string last_step; // the step undone or redone last, for the status line
+    unsigned step_us = 0, step_us_peak = 0; // the last close's time and the longest (MIDI thread)
 
     // Messages, saving.
     void say(std::string text);
@@ -296,6 +377,45 @@ public:
     LoopDesk& loops() { return *loop_desk; }
     const LoopDesk& loops() const { return *loop_desk; }
     void loop_pads(bool shown, bool free); // free: no modifier but Shift held
+    // ---------------------------------------------------------- projects (projects.h)
+    // The Set Overview's jobs, done on the service thread in turn: under
+    // `lock` a screen asks (ask_projects()), the service thread does it and
+    // reads the folder again (`listing`).
+    struct ProjectJob {
+        enum class Kind : uint8_t { List, Open, New, SaveAs, Save, Rename, Duplicate, Delete, MoveTo, NewFolder, LoadKit, Copy, Colour } kind = Kind::List;
+        std::string path, name;  // the project or folder; a name, a folder (MoveTo), the target (Copy)
+        int pad = -1;            // where a new one lies
+        uint8_t colour = 0;
+        bool play = false;       // Open: and play it (the overview's Play, the Move's preview)
+        int track = -1;          // Open, New: then this track, on Play (a track button opened it)
+    };
+    void ask_projects(ProjectJob job);
+    std::string projects_root() const;           // <home>/Projects
+    std::string listing_folder;                  // the folder in view, under the root ("" the top)
+    projects::Folder listing;                    // as read last
+    unsigned listings = 0;                       // how many times read, for screens waiting on one
+    std::string project_message;                 // what the last job said ("" fine)
+    Settings settings;
+    void settings_changed();                     // Setup changed a setting: kept, and the audio thread told
+    // Move.settings' lines this file does not read (another area's: MIDI
+    // Config, the pad layout), by their first word (up to a space or '='),
+    // the whole line kept and written back unless settings_text() already
+    // wrote that word. An area may set its own here too.
+    std::map<std::string, std::string> settings_more;
+    // Called on the service thread, outside `lock`, before the open project
+    // is saved and another swapped in, the audio thread still running: what
+    // an area still has to write into the old one (the Looper's playing loops).
+    std::vector<std::function<void()>> closing;
+    // Called under `lock` before every save's bytes are made: what an area
+    // keeps in the project first (the Looper's values).
+    std::vector<std::function<void()>> saving;
+    // Called under `lock` once another project is in (opened or new), its path given: an area's reset (the Looper's loops).
+    std::vector<std::function<void(const std::string& path)>> opened;
+    // Opening a project: the Loading sheet's counts.
+    bool opening = false;
+    std::string opening_name, opening_file;
+    unsigned opening_samples = 0, opening_samples_done = 0, opening_synths = 0, opening_synths_done = 0;
+    std::string project_name() const;            // the open project's, from its file
 
     // ---------------------------------------------------------- service thread
     void service();
@@ -304,10 +424,26 @@ public:
     void stopping();
     std::string restore();  // the project's samples and modules read (the first service() does it)
     std::string save_now(); // empty on success
+    // A project opened (`fresh`: a new one at `file`), the one open saved
+    // first; the sound fades out, the audio thread waits while the project
+    // is built (park()), fades back in; then its samples and modules are read
+    // with the Loading sheet up. An MPC project (.xpj) opens as a copy, not
+    // saved until it is a .mldp beside it. Empty on success.
+    std::string open_project(const std::string& file, bool fresh = false);
+    // Saved now, the sample slots nothing can play again freed (Melodee's Save).
+    std::string save_project(const std::string& as = {});
+    // The first kit of the project at `file` onto the selected track, its
+    // patterns left (Melodee's Load kit): one undo step.
+    std::string load_kit(const std::string& file);
     std::string load_now(const std::string& path, unsigned pad); // onto the selected kit, waited for
     std::string load_module_now(unsigned track, const std::string& id, const SynthFile* saved = nullptr);
     const std::string& project_path() const { return path; }
     const std::string& home_folder() const { return home_path; }
+    // The engine made whole again from the project (an undo outside the
+    // tracks, a project opened): the audio thread parked, faded out and
+    // silent, while it is rebuilt, then faded back in. Never under `lock`.
+    std::string rebuild();
+    unsigned rebuilds = 0;
     std::string library;
     std::string status() const;
     // MIDI and sync (midi.h): MIDI Config, each track's MIDI OUT, the port.
@@ -359,6 +495,10 @@ public:
     }
 
 private:
+    struct Parked { enum Result { Yes, NoAudio, Failed } result = Failed; uint32_t serial = 0; };
+    Parked park_engine(); // service thread
+    Live live();                           // the project as the history compares it
+    void apply_step(const Step& step, bool forward); // what an undo or redo changed, told to the engine and the modules
     void forward();                        // audio thread: the ring into the host
     void apply_track(unsigned track);      // the engine's track made whole again from the project's (TrackLoad)
     void setup_modules();                  // a ModuleTrack for each Schwung track of the project, offered
@@ -381,7 +521,15 @@ private:
     std::string write(std::vector<uint8_t> bytes, std::string settings_text);
     SynthFile module_state(unsigned track) const; // a Schwung track's module as it is now: values, preset, its pages' state
     std::vector<uint8_t> project_bytes() const;
+    std::vector<uint8_t> bytes_to_save(); // the `saving` hooks, then project_bytes()
     std::string settings_text() const;
+    void read_settings();
+    void run_project_job(const ProjectJob& job); // service thread
+    unsigned read_missing_samples();             // service thread: the project's samples not in memory yet; how many are missing
+    void setup_modules_from(const PluginStates& states); // under `lock`: a ModuleTrack for each Schwung track of the project
+    void free_unused_slots();                    // under `lock`
+    std::vector<ProjectJob> project_jobs;
+    std::vector<std::unique_ptr<Sample>> samples_leaving; // another project's, until the audio thread lets them go
     uint8_t free_plugin_entry() const;
 
     std::unique_ptr<melodee::Project> song;
@@ -391,9 +539,16 @@ private:
     std::array<std::unique_ptr<ModuleTrack>, melodee::track_count> modules {};
     std::vector<std::unique_ptr<ModuleTrack>> modules_leaving; // their runners handed back first
     unsigned selected = 0;
+    MoveExtras move_extras;
+    std::string step_name;     // the open step's name (name_step())
+    int step_track = -1;
+    bool step_kept = true;     // false: the open step is no undo step (not_a_step())
+    bool holding_step = false; // hold_step(): closes wait for release_step()
     bool click_on = false;
     unsigned click_volume = 70;
     std::string home_path, path, settings_path;
+    std::string last_path;   // Move.settings' last= (read at start)
+    unsigned last_track = 0; // and its track=
     bool restored = false;
     Clock::time_point changed_at {}, retry_at {};
 
@@ -415,6 +570,13 @@ private:
     std::array<PadStamp, pad_count> stamps {};
     std::unique_ptr<Sequencer> seq;
     struct Went { int track = -1, key = -1, how = 0; };
+    std::atomic<uint8_t> pad_response {1}; // Settings::response, for the audio thread's velocity
+    std::atomic<bool> pad_pressure {true};
+    // Parking (rebuild()): the service thread asks, the audio thread parks
+    // the engine behind the commands before and says which park it was.
+    std::atomic<bool> park_asked {false};
+    std::atomic<uint32_t> park_serial {0};
+    bool rebuild_wanted = false; // under `lock`: the engine rebuilt from the project, parked
     std::array<Went, pad_count> pad_went {};
     // Schwung's effects by plug-in entry, and those handed back by the
     // audio thread waiting to be destroyed. Before `engine`, which holds
@@ -422,6 +584,7 @@ private:
     std::array<std::unique_ptr<FxModule>, melodee::max_plugins> fx {};
     std::vector<std::unique_ptr<FxModule>> fx_leaving;
     std::unique_ptr<LoopDesk> loop_desk; // made with the engine host, after the project is read
+    int loop_latency_setting = LoopDesk::default_latency; // Move.settings' loop_latency, for the Looper made after
     // Last, so it goes first: it holds the samples and runners above.
     std::unique_ptr<melodee::EngineHost> engine;
 };

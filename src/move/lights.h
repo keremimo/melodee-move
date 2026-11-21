@@ -57,18 +57,33 @@ public:
             auto& want = note ? note_want[number] : cc_want[number];
             auto& last = note ? note_sent[number] : cc_sent[number];
             if (want == unset || want == last) continue;
-            const uint8_t message[3] {uint8_t((note ? 0x90 : 0xb0) | surface_channel), number, want};
+            const uint8_t message[3] {uint8_t((note ? 0x90 : 0xb0) | surface_channel), number, shown(note, number, want)};
             if (!send(message)) break;
             last = want; ++sent;
         }
         return sent;
     }
     bool pending() const;
+    // What a pad or step was last asked to show (a palette index), for an
+    // app that changes the lights after its screens set them.
+    uint8_t pad_wanted(unsigned index) const;
+    uint8_t step_wanted(unsigned index) const;
+    // How bright the lights go out, as the Move's Setup: 0 low, 1 mid, 2
+    // high, 3 max (as asked). Everything is sent again at the new level.
+    void set_brightness(uint8_t level);
 
 private:
     static constexpr uint8_t unset = 0xff;
     std::array<uint8_t, 128> note_want {}, note_sent {}, cc_want {}, cc_sent {};
     unsigned cursor = 0;
+    uint8_t brightness = 3;
+    std::array<uint8_t, 128> dimmed {};  // each palette index at the brightness
+    std::array<bool, 128> cc_rgb {};     // a CC whose LED takes a palette index, not a brightness
+    uint8_t shown(bool note, uint8_t number, uint8_t want) const {
+        if (brightness >= 3 || !want) return want;
+        if (note || cc_rgb[number]) return dimmed[want & 127];
+        return uint8_t(want * (brightness + 1) / 4); // a white LED's brightness
+    }
 };
 
 } // namespace move

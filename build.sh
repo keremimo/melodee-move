@@ -7,7 +7,8 @@
 # quit; Melodee: load, chop, To Pads, saved and restored, transport and
 # tempo, MIDI in and out on the USB port, the sequencer's steps, Play and
 # Rec, the pad layout set to MPC banks and kept, the synth track saved and
-# restored, the busy mix playing, the web page),
+# restored, the busy mix playing, the web page, a new project from the
+# projects, Setup, and a press over the control channel),
 # and the packages in dist/. When Melodee's own page previews are at hand
 # (MELODEE_PREVIEWS, by default ../melodee-sample/build/melodee-preview),
 # also crush them to the Move's 128 x 64 screen in build/crushed.
@@ -107,6 +108,14 @@ LOOPER_FLAGS='--backend simulated --loopback 300 --samples build/simulated-sampl
 # as one at the machine's own address (as on Wi-Fi: refused until it types
 # the code it reads off the Move's mirrored screen).
 WEB_FLAGS='--backend simulated --samples build/simulated-samples --home build/simulated-web --web-port 8080 --seconds 12'
+# Projects and Setup, with the Move's keys (docs/MOVE_CONTROLS.md): Shift +
+# Step 1 at 100 opens the projects; an empty pad (the overview's second, pad
+# 26) at 300; Back at 400 makes a new project there and opens it, the engine
+# parked while it is built; Shift + Step 2 at 1000 opens Setup, its push at
+# 1100 the PADS settings. Then a run is driven over the control channel:
+# melodee-press shift+step1 opens the projects, and status says so.
+PROJECTS_SCRIPT='100:0xb0,49,127;101:0x90,16,127;102:0x80,16,0;103:0xb0,49,0;300:0x90,93,100;301:0x80,93,0;400:0xb0,51,127;401:0xb0,51,0;1000:0xb0,49,127;1001:0x90,17,127;1002:0x80,17,0;1003:0xb0,49,0;1100:0xb0,3,127;1101:0xb0,3,0'
+PROJECTS_EXPECTED='page=setup .*project=Project_1 opening=0'
 # shellcheck disable=SC2086
 docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE" && pwd):/melodee:ro" -e MELODEE=/melodee \
     $MOUNT melodee-move-builder sh -c "
@@ -116,6 +125,7 @@ docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE
     build/controls-tests &&
     build/mixer-tests &&
     build/midi-tests &&
+    build/projects-tests &&
     build/pad-layout-tests &&
     build/pads-app-tests &&
     build/web-tests &&
@@ -178,6 +188,15 @@ docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE
     rm -rf build/simulated-web &&
     { build/melodee-move $WEB_FLAGS 2> build/simulated-web.log & } &&
     python3 -I tests/web_check.py 8080 src/move/font.cpp &&
+    rm -rf build/simulated-projects build/simulated-remote &&
+    { build/melodee-move --backend simulated --samples build/simulated-samples --home build/simulated-projects --seconds 5 --script '$PROJECTS_SCRIPT' 2> build/simulated-projects.log || true; } &&
+    tail -n 1 build/simulated-projects.log &&
+    grep -qE '$PROJECTS_EXPECTED' build/simulated-projects.log &&
+    test -s 'build/simulated-projects/Projects/Project 1.mldp' &&
+    { build/melodee-move --backend simulated --samples build/simulated-samples --home build/simulated-remote --seconds 4 2> build/simulated-remote.log & } &&
+    sleep 2 &&
+    build/melodee-move --ctl 'melodee-press shift+step1' --home build/simulated-remote | grep -q ok &&
+    build/melodee-move --ctl status --home build/simulated-remote | grep -q 'page=projects' &&
     wait &&
     build/melodee-move --melodee-previews build/melodee-previews --modules build/test-modules > /dev/null &&
     build/melodee-move --probe-modules build/test-modules &&

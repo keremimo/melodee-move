@@ -103,6 +103,9 @@ namespace {
 // ("MVCH", the chops' text lines) after Melodee's. Melodee's reader skips a
 // section it does not know, so the file stays a Melodee project.
 constexpr char chops_tag[4] {'M', 'V', 'C', 'H'};
+// The Move's own part of the project (MoveExtras), the same way.
+constexpr char move_tag[4] {'M', 'V', 'P', 'J'};
+constexpr const char* move_header = "melodee-move project 1";
 constexpr char project_magic[8] {'M', 'E', 'L', 'O', 'D', 'E', 'E', '1'};
 
 KitFile chops_of(const melodee::Project& project) {
@@ -115,20 +118,38 @@ KitFile chops_of(const melodee::Project& project) {
 
 } // namespace
 
-std::vector<uint8_t> project_file_bytes(const melodee::Project& project, const melodee::PatternBank& patterns, const PluginStates& states) {
+std::vector<uint8_t> project_file_bytes(const melodee::Project& project, const melodee::PatternBank& patterns, const PluginStates& states,
+                                        const MoveExtras* extras) {
     auto bytes = melodee::save_project(project, patterns, &states);
-    auto text = chops_text(chops_of(project));
-    bytes.insert(bytes.end(), chops_tag, chops_tag + 4);
-    auto size = uint32_t(text.size());
-    for (int k = 0; k < 4; ++k) bytes.push_back(uint8_t(size >> (8 * k)));
-    bytes.insert(bytes.end(), text.begin(), text.end());
+    auto section = [&](const char (&tag)[4], const std::string& text) {
+        bytes.insert(bytes.end(), tag, tag + 4);
+        auto size = uint32_t(text.size());
+        for (int k = 0; k < 4; ++k) bytes.push_back(uint8_t(size >> (8 * k)));
+        bytes.insert(bytes.end(), text.begin(), text.end());
+    };
+    section(chops_tag, chops_text(chops_of(project)));
+    if (extras) {
+        std::ostringstream out;
+        out << move_header << '\n';
+        if (extras->colour) out << "colour " << unsigned(extras->colour) << '\n';
+        for (unsigned t = 0; t < melodee::track_count; ++t)
+            if (extras->track_colour[t]) out << "track_colour " << t << ' ' << unsigned(extras->track_colour[t]) << '\n';
+        section(move_tag, out.str());
+    }
     return bytes;
 }
 
-std::string read_project_file(const std::string& path, melodee::Project& project, melodee::PatternBank& patterns, PluginStates& states) {
+std::string read_project_file(const std::string& path, melodee::Project& project, melodee::PatternBank& patterns, PluginStates& states,
+                              MoveExtras* extras) {
     std::ifstream in(path, std::ios::binary);
     if (!in) return "missing";
     std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    return read_project_bytes(bytes, project, patterns, states, extras);
+}
+
+std::string read_project_bytes(const std::vector<uint8_t>& bytes, melodee::Project& project, melodee::PatternBank& patterns, PluginStates& states,
+                               MoveExtras* extras) {
+    if (extras) *extras = {};
     if (auto error = melodee::load_project(bytes, project, patterns, nullptr, &states); !error.empty()) return error;
     // The Move's chops, where the file has them.
     if (bytes.size() < 8 || std::memcmp(bytes.data(), project_magic, 8)) return {};
@@ -143,6 +164,19 @@ std::string read_project_file(const std::string& path, melodee::Project& project
             read_chops(std::string(bytes.begin() + long(at + 8), bytes.begin() + long(at + 8 + size)), kit);
             for (const auto& sample : kit.samples)
                 if (sample.chop.used()) project.chops.edit(sample.slot) = sample.chop;
+        }
+        if (extras && !std::memcmp(bytes.data() + at, move_tag, 4)) {
+            std::istringstream text(std::string(bytes.begin() + long(at + 8), bytes.begin() + long(at + 8 + size)));
+            std::string line;
+            if (std::getline(text, line) && line == move_header)
+                while (std::getline(text, line)) {
+                    std::istringstream fields(line);
+                    std::string word;
+                    unsigned a = 0, b = 0;
+                    fields >> word >> a;
+                    if (word == "colour") extras->colour = uint8_t(std::min(a, 127u));
+                    else if (word == "track_colour" && (fields >> b) && a < melodee::track_count) extras->track_colour[a] = uint8_t(std::min(b, 127u));
+                }
         }
         at += 8 + size;
     }

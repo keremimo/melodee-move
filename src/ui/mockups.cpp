@@ -252,6 +252,7 @@ int write_mockups(const std::string& directory) {
     ok = mockup::write_sequencer_mockups(directory) && ok;
     ok = write_midi_mockups(directory) && ok;
     ok = write_looper_mockups(directory) && ok;
+    ok = write_projects_mockups(directory) && ok;
     return ok ? 0 : 1;
 }
 
