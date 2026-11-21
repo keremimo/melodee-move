@@ -245,12 +245,13 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
             // Note Repeat or the arp takes the key and plays it on the clock (engine/note_repeat.h).
             int how = audio_repeat.load(std::memory_order_relaxed);
             went = {track, key, how};
-            engine->send({how == 1 ? Type::RepeatKey : how == 2 ? Type::ArpKey : Type::NoteOn, uint8_t(track), 0, uint16_t(key),
+            engine->send({how == 1 ? Type::RepeatKey : how >= 2 ? Type::ArpKey : Type::NoteOn, uint8_t(track), 0, uint16_t(key),
                           int16_t(std::max<int>(1, input.value))});
             stamp.sounded.store(true, std::memory_order_release);
         } else if (went.track >= 0) {
-            engine->send({went.how == 1 ? Type::RepeatKey : went.how == 2 ? Type::ArpKey : Type::NoteOff, uint8_t(went.track), 0,
-                          uint16_t(went.key), 0});
+            if (went.how != 3) // a latched arp keeps the key (Melodee's Context::key())
+                engine->send({went.how == 1 ? Type::RepeatKey : went.how == 2 ? Type::ArpKey : Type::NoteOff, uint8_t(went.track), 0,
+                              uint16_t(went.key), 0});
             went = {};
         }
     } else if (input.kind == Kind::PadPressure && went.track >= 0 && went.key < 128) {

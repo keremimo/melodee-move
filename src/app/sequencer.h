@@ -106,9 +106,12 @@ public:
     bool recording() const { return rec; }
     bool counting_in() const;
     void record(bool on);
-    // Note Repeat (11.6): the selected track's, its style (0 Repeat, 1-3
-    // the arp Up, Down, Random) and rate (engine/arp.h).
-    void set_repeat(unsigned track, bool on, unsigned style, unsigned rate);
+    // Note Repeat (11.6): the selected track's, its style (0 Repeat, 1-5
+    // the arp Up, Down, Up-down, Random, Order) and rate (engine/arp.h).
+    void set_repeat(unsigned track, bool on, unsigned style, unsigned rate); // style 0 Repeat, 1-5 the arp's modes
+    // The audio thread's routing of the pads (Studio::pads_repeat) from the
+    // selected track's repeat, arp and arp latch: call after changing them.
+    void route_pads();
     // Capture (14.3), Melodee's Recall.
     bool capture();                       // false: nothing played to keep
     void clear_capture();

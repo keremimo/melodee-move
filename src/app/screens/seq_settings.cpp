@@ -7,9 +7,9 @@
 //             BPM per pattern. The wheel walks the rows, a push edits one
 //             (the wheel turns it), a push again or Back is done.
 //   Repeat    Shift + Step 11 (the Move's, 11.6): Note Repeat on, and its
-//             screen: the style (Repeat; the arp Up, Down, Random on a note
-//             track), the rate, pressure as velocity; the wheel turns the
-//             row the push picks. Shift + Step 11 again: off.
+//             screen: the style (Off, Repeat; on a note track the arp's Up,
+//             Down, Up-down, Random, Order), the rate, pressure as velocity;
+//             the wheel turns the row the push picks. Shift + Step 11 again: off.
 //   Capture   a capture played stopped (14.3): three tempos it fits, the
 //             wheel picks (the pattern follows), push or Back done.
 #include "app/screens/common.h"
@@ -107,7 +107,7 @@ public:
     bindings::Screen screen_kind() const override { return bindings::Screen::List; }
     void enter() override {
         const auto& track = studio.current();
-        style = track.arp ? (track.arp_mode == 1 ? 2u : track.arp_mode == 3 ? 3u : 1u) : 0u;
+        style = track.arp ? 2u + std::min<unsigned>(track.arp_mode, 4u) : 1u; // the arp's mode, else Repeat
         rate = track.repeat_rate % melodee::arp_rates;
         row = 1;
         if (!track.repeat && !track.arp) apply(true); // Shift + Step 11 turns it on (11.6)
@@ -115,12 +115,12 @@ public:
     bool job(Job job, const bindings::Use& use) override {
         switch (job) {
         case Job::ListTurn: case Job::ListTurnFine:
-            if (row == 0 && !studio.sequencer().kit()) style = unsigned(std::clamp(int(style) + (use.delta > 0 ? 1 : -1), 0, 3));
+            if (row == 0) style = unsigned(std::clamp(int(style) + (use.delta > 0 ? 1 : -1), 0, studio.sequencer().kit() ? 1 : 6));
             else if (row == 1) rate = unsigned(std::clamp(int(rate) + (use.delta > 0 ? 1 : -1), 0, int(melodee::arp_rates) - 1));
             else if (row == 2) pressure = use.delta > 0;
             apply(true);
             return true;
-        case Job::ListPush: row = (row + 1) % 3; if (row == 0 && studio.sequencer().kit()) row = 1; return true;
+        case Job::ListPush: row = (row + 1) % 3; return true;
         case Job::Back: studio.close(); return true; // it stays on
         case Job::Repeat: apply(false); studio.close(); studio.say("REPEAT OFF"); return true; // Shift + Step 11 again
         default: return false;
@@ -135,7 +135,7 @@ public:
         bool on = track.repeat || track.arp;
         ui::rail(g, "RPT", on ? "ON" : "OFF", "");
         move::draw_text(g, ui::content_x + 4, 2, melodee::arp_rate_name(rate), 3);
-        static const char* styles[] {"REPEAT", "ARP UP", "ARP DOWN", "ARP RAND"};
+        static const char* styles[] {"OFF", "REPEAT", "ARP UP", "ARP DOWN", "ARP UP-DN", "ARP RAND", "ARP ORDER"};
         auto line = [](std::string name, std::string value) { return name + std::string(size_t(std::max(1, 16 - int(name.size()) - int(value.size()))), ' ') + value; };
         ui::list(g, ui::content(26, 30), {line("STYLE", styles[style]), line("RATE", melodee::arp_rate_name(rate)), line("PRESSURE", pressure ? "VEL" : "OFF")}, row, 1);
     }
@@ -146,7 +146,8 @@ private:
     int row = 1;
     bool pressure = false;
     void apply(bool on) {
-        studio.sequencer().set_repeat(studio.track(), on, style, rate);
+        // Style 0 off, 1 Repeat, 2-6 the arp's modes (instruments' ARP page sets its octaves, gate, latch).
+        studio.sequencer().set_repeat(studio.track(), on && style > 0, style > 0 ? style - 1 : 0, rate);
         studio.send({melodee::Command::Type::Repeat, uint8_t(studio.track()), 0, 5, int16_t(pressure)});
     }
 };

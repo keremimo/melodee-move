@@ -249,8 +249,9 @@ public:
     };
     const PadStamp& stamp(unsigned pad) const { return stamps[pad % pad_count]; }
     // MIDI thread: the track the pads play repeats its keys (1, Note Repeat)
-    // or plays them through its arp (2), 0 neither; the audio thread sends
-    // the pad's key there instead of a note.
+    // or plays them through its arp (2; 3 latched, the let-go not sent), 0
+    // neither; the audio thread sends the pad's key there instead of a note.
+    // Sequencer::route_pads() sets it from the track.
     void pads_repeat(int how) { audio_repeat.store(how, std::memory_order_relaxed); }
     // The time signature as the modules read it (set_module_transport()).
     void signature_to_modules(unsigned beats, unsigned unit) {

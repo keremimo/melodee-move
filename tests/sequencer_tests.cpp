@@ -11,6 +11,7 @@
 #include "move/controls.h"
 #include "move/tools.h"
 #include "ui/track_style.h"
+#include "melodee/engine/arp.h"
 #include "melodee/engine/engine_info.h"
 #include "melodee/model/generators.h"
 #include "melodee/model/pad_params.h"
@@ -421,6 +422,12 @@ void test_fill_and_repeat(app::MelodeeApp& melodee) {
     CHECK(melodee.studio().current().repeat);
     seqr.set_repeat(0, false, 0, 4);
     CHECK(!melodee.studio().current().repeat);
+    // The arp's styles (1-5: Melodee's ArpModes), on the same menu.
+    seqr.set_repeat(0, true, 4, 6);
+    const auto& t = melodee.studio().current();
+    CHECK(t.arp && !t.repeat && t.arp_mode == uint8_t(melodee::ArpMode::Random) && t.arp_rate == 6);
+    seqr.set_repeat(0, false, 4, 6);
+    CHECK(!t.arp);
 }
 
 void test_pages(app::MelodeeApp& melodee) {
@@ -650,8 +657,9 @@ void test_screens(app::MelodeeApp& melodee) {
     // Shift + Step 11: Repeat on, its rate on the wheel; again, off.
     h.with(Button::Shift, [&] { h.step(10); });
     CHECK(has(h.status(), "page=repeat") && melodee.studio().current().repeat && has(h.status(), "job=Repeat"));
+    unsigned rate = melodee.studio().current().repeat_rate;
     h.wheel(1);
-    CHECK(melodee.studio().current().repeat_rate == 5);
+    CHECK(melodee.studio().current().repeat_rate == rate + 1);
     h.with(Button::Shift, [&] { h.step(10); });
     CHECK(!melodee.studio().current().repeat && has(h.status(), "page=kit-play"));
     // Shift + Loop (a tap): Melodee's SEQ pages; Shift + the wheel the page.

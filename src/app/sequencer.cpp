@@ -301,7 +301,10 @@ bool Sequencer::job(Job job, const bindings::Use& use) {
         int key = studio.stamp(unsigned(use.index)).key.load(std::memory_order_acquire);
         if (key < 0) return true;
         if (seq::clear_lane(p, uint8_t(key))) { sync(t, n); studio.say("NOTES DELETED"); }
-        else { studio.set_pad(t, unsigned(use.index), melodee::PadSound {}); studio.say("PAD EMPTIED"); }
+        else if (key >= int(melodee::sampler_first_note)) { // the kit pad the key plays (whatever the pad layout)
+            studio.set_pad(t, unsigned(key) - melodee::sampler_first_note, melodee::PadSound {});
+            studio.say("PAD EMPTIED");
+        }
         return true;
     }
     case Job::CopyStep: {
@@ -628,20 +631,27 @@ void Sequencer::release_note(int key, uint32_t ticks) {
 }
 
 void Sequencer::set_repeat(unsigned t, bool on, unsigned style, unsigned rate) {
+    // Style 0 Repeat; 1-5 the arp, Melodee's ArpModes in order (Up, Down, Up-down, Random, Order).
     auto& track = studio.project().tracks[t % melodee::track_count];
     track.repeat = on && style == 0;
     track.arp = on && style > 0;
     track.repeat_rate = uint8_t(rate % melodee::arp_rates);
     track.arp_rate = track.repeat_rate;
-    static const uint8_t modes[] {0, 0, 1, 3}; // the arp's Up, Down, Random (engine/arp.h ArpMode)
-    if (style > 0) track.arp_mode = modes[std::min(style, 3u)];
+    if (style > 0) track.arp_mode = uint8_t(std::min(style - 1, unsigned(melodee::ArpMode::Count) - 1));
     studio.send({Type::Repeat, uint8_t(t), 0, 2, int16_t(track.repeat_rate)});
     studio.send({Type::Repeat, uint8_t(t), 0, 0, int16_t(track.repeat)});
     studio.send({Type::Arp, uint8_t(t), 0, 1, int16_t(track.arp_mode)});
     studio.send({Type::Arp, uint8_t(t), 0, 2, int16_t(track.arp_rate)});
     studio.send({Type::Arp, uint8_t(t), 0, 0, int16_t(track.arp)});
-    studio.pads_repeat(t == studio.track() ? (track.repeat ? 1 : track.arp ? 2 : 0) : 0);
+    route_pads();
     studio.changed();
+}
+
+void Sequencer::route_pads() {
+    const auto& track = studio.current();
+    // The audio thread sends the pads' keys to Note Repeat (1), the arp (2), the arp latched (3: no let-go sent,
+    // as Melodee's Context::key()), else as notes (0); Repeat before the arp.
+    studio.pads_repeat(track.repeat ? 1 : track.arp ? (track.arp_latch ? 3 : 2) : 0);
 }
 
 // ---------------------------------------------------------------- Capture (Melodee's Recall)
@@ -1054,8 +1064,7 @@ void Sequencer::tick(Clock::time_point now) {
         last_track = studio.track();
         if (rec || rec_waiting) record(false);
         clear_capture();
-        const auto& track = studio.current();
-        studio.pads_repeat(track.repeat ? 1 : track.arp ? 2 : 0);
+        route_pads();
         keys_down.clear();
     }
     grow_take();
