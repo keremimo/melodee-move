@@ -315,7 +315,7 @@ while Shift is held.
 | Wheel push (Typing) | Types the character, or Enter | Done | done |
 | Wheel turn (Session) | No job | Moves the playhead by the pattern's Q (Melodee's Shift + wheel on Patterns); stopped, Play continues from it | done |
 | Wheel push (Session) | No job (a scene launches by sliding down a column) | Launches the selected pattern's column on every track (Melodee's sequence), with its tempo | done |
-| Loop held + Wheel turn | The loop's length in bars | The pattern's length | done |
+| Loop held + Wheel turn | The loop's length in bars | The pattern's length, longer or shorter, on a Play screen and in Loop Mode alike | done |
 | Shift + Loop held + Wheel turn | The loop's length, fine | The same | done |
 | Wheel turn (Typing) | Moves through the characters | The same: the strip of characters, SPACE, DEL and OK at its end | done |
 | Wheel turn (Overview) | No job | Picks the next or previous pad's project | done |

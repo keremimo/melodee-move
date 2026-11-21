@@ -591,6 +591,11 @@ void test_screens(app::MelodeeApp& melodee) {
     CHECK(seq::notes_in(p, seq::bar_span(3, 384), 41).size() == 16 && has(h.status(), "job=CopyBar"));
     h.with(Button::Delete, [&] { h.step(3); });
     CHECK(seq::notes_in(p, seq::bar_span(3, 384)).empty() && has(h.status(), "job=ClearBar"));
+    // Loop held + the wheel: the length here too (shorter as on the Play screen), and Loop Mode stays.
+    h.with(Button::Loop, [&] { h.wheel(-1); });
+    CHECK(p.length == 3 * 384 && has(h.status(), "job=LoopLength") && has(h.status(), "page=loop"));
+    h.with(Button::Loop, [&] { h.wheel(1); });
+    CHECK(p.length == 4 * 384 && has(h.status(), "page=loop"));
     // Left / Right the bar; Loop again, out.
     h.button(Button::Right);
     CHECK(has(h.status(), "loop_bar=2") && has(h.status(), "job=Bar"));
