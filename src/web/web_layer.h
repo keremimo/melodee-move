@@ -34,9 +34,11 @@ public:
     void audio_event(const move::SurfaceEvent& event) override { inner.audio_event(event); }
     void surface(const move::SurfaceEvent& event) override;                 // MIDI thread
     void midi(const move::ExternalMidi& message) override { inner.midi(message); }
+    unsigned midi_out(move::ExternalMidi* messages, unsigned room) override { return inner.midi_out(messages, room); } // audio thread
     void lights(move::Lights& lights, Clock::time_point now) override;      // MIDI thread
     void draw(juce::Graphics& g) override;                                  // screen thread
     void service() override;                                                // service thread
+    void stopping() override { inner.stopping(); }                          // service thread, the run ending
     bool finished() const override { return inner.finished(); }
     std::string status() const override;
 
