@@ -100,7 +100,8 @@ Three parts so far:
   Minus, knobs 1 and 2 close in on the cut and a moved cut plays its slice,
   Shift + the wheel from hit to hit, Delete + a pad takes its cut out, a step
   plays from its sixteenth, Shift + push the slice options (Extract, Split,
-  Merge, Remove all cuts), and To Pads KIT (a pad a sound). Sample Options
+  Merge, Remove all cuts), To Pads KIT (a pad a sound) and To Pads PATTERN
+  (its last row: a note a slice into the next empty pattern). Sample Options
   also has TRIM (the region a file of its own) and SAVE SAMPLE (named on the
   pad keyboard).
 - **Sampling** (the Sampling button, on a kit; docs/UI.md "Sampling"):
@@ -288,7 +289,8 @@ Three parts so far:
   one MIDI port, USB-MIDI cable 2 of its device page, where a class-compliant
   device on USB-A and a computer on USB-C (the "Ableton Move Standalone
   Port") both arrive, in and out. MIDI in plays the selected track, or a
-  track by its own channel (Shift + a track button: MIDI IN, MIDI OUT); MIDI
+  track by its own channel (Shift + a track button: MIDI IN, MIDI OUT), and
+  Rec writes it as it writes the pads (the SEQ pages' ENTRY at the caret); MIDI
   Config (Setup, Shift + Step 2) has the channels, pad MIDI in and out, MIDI
   clock and MTC in and out, Thru, program change, the Remote CCs and Panic.
   A MIDI track plays outside gear: its pages (DEVICE, PROGRAM, three of CC

@@ -8,6 +8,7 @@
 #include "ui/track_style.h"
 #include "ui/widgets.h"
 #include "melodee/engine/arp.h"
+#include "melodee/engine/effect_info.h"
 #include "melodee/engine/engine_info.h"
 #include "melodee/model/lane_value.h"
 #include "melodee/model/generators.h"
@@ -496,11 +497,19 @@ bool Sequencer::knob_lane(unsigned knob, Lane& lane) const {
         lane.low = range.min;
         lane.high = range.max;
     } else if (param == melodee::motion_pan) {
-        lane.low = -64; lane.high = 63;
+        lane.low = -50; lane.high = 50; // Mix::pan
+    } else if (param >= melodee::motion_send(0) && param <= melodee::motion_send(3)) {
+        lane.low = 0; lane.high = 100;  // Mix::sends
+    } else if ((param >= melodee::motion_fx_base && param < melodee::motion_pad_base) ||
+               (param >= melodee::motion_master_fx_base && param < melodee::motion_return_base)) { // an effect's: its range
+        bool master = param >= melodee::motion_master_fx_base;
+        unsigned at = param - (master ? melodee::motion_master_fx_base : melodee::motion_fx_base);
+        const auto& chain = master ? studio.project().master : studio.project().tracks[t % melodee::track_count].fx;
+        const auto& info = melodee::effect_info(melodee::EffectKind(chain.slots[(at / 6) % chain.slots.size()].kind)).params[at % 6];
+        lane.low = info.min; lane.high = info.max;
     } else {
         lane.low = 0; lane.high = 127;
     }
-    (void)t;
     return true;
 }
 
@@ -937,20 +946,30 @@ void Sequencer::entry_erase() {
     sync(studio.track(), number(studio.track()));
 }
 
-void Sequencer::slices_to_pattern(unsigned first_pad, const std::vector<uint32_t>& starts, uint32_t frames) {
-    auto& p = pattern();
-    if (!frames || starts.empty()) return;
-    for (size_t k = 0; k < starts.size(); ++k) seq::clear_lane(p, uint8_t(melodee::sampler_first_note + first_pad + k));
-    for (size_t k = 0; k < starts.size(); ++k) {
-        uint32_t next = k + 1 < starts.size() ? starts[k + 1] : frames;
-        melodee::Event e;
-        e.tick = uint32_t(uint64_t(starts[k]) * p.length / frames);
-        e.length = uint16_t(std::clamp<uint64_t>(uint64_t(next - std::min(next, starts[k])) * p.length / frames, 1, 65535));
-        e.key = uint8_t(melodee::sampler_first_note + first_pad + k);
-        p.add(e);
-    }
+int Sequencer::slices_target() const {
+    const unsigned track = studio.track();
+    const auto& patterns = studio.patterns().at[track % melodee::track_count];
+    auto blank = [&](unsigned n) {
+        const auto& x = patterns[n];
+        return x.empty() && x.motion.empty() && x.punches.empty() && x.euclids.empty();
+    };
+    unsigned target = number(track) % melodee::pattern_count;
+    if (blank(target)) return int(target);
+    for (target = 0; target < melodee::pattern_count; ++target)
+        if (blank(target)) return int(target);
+    return -1;
+}
+
+void Sequencer::slices_to_pattern(unsigned target, const melodee::Pattern& made) {
+    record(false); // a take ends first (as Melodee's: Undo would otherwise take the slices' pattern with the take)
+    const unsigned track = studio.track();
+    target %= melodee::pattern_count;
+    auto& p = pattern(track, target);
+    p.length = made.length;
+    p.events = made.events;
     p.free = false;
-    sync(studio.track(), number(studio.track()));
+    sync(track, target);
+    if (target != number(track)) launch(track, target);
 }
 
 void Sequencer::move_playhead(int steps) {
@@ -1024,21 +1043,8 @@ void Sequencer::input(const move::SurfaceEvent& event) {
         }
         for (int k : chord) ring->press(unsigned(t), k, velocity, ms_now(), studio.playing() ? run : 0, ticks);
         if (entry && t == int(studio.track())) { // step entry (Melodee's Step Edit PLAY): written at the caret
-            auto& p = pattern();
-            for (int k : chord) {
-                melodee::Event e;
-                e.tick = seq::step_tick(p, caret);
-                e.length = uint16_t(std::min<uint32_t>(entry_length * p.q(), 65535));
-                e.key = uint8_t(k & 0xff);
-                e.pitch = int8_t(k >> 8);
-                e.velocity = uint8_t(entry_velocity ? entry_velocity : std::clamp(velocity, 1, 127));
-                e.chance = entry_chance;
-                if (e.tick >= p.length) seq::set_length(p, (e.tick / bar_ticks() + 1) * bar_ticks(), studio.project().max_length());
-                p.add(e);
-            }
-            p.free = false;
+            entry_write(chord, velocity);
             entry_written = true;
-            sync(studio.track(), number(studio.track()));
             return;
         }
         const auto& track = studio.project().tracks[unsigned(t) % melodee::track_count];
@@ -1064,6 +1070,54 @@ void Sequencer::input(const move::SurfaceEvent& event) {
     for (int k : chord) {
         ring->release(unsigned(t), k, ms_now(), studio.host().ticks());
         if (rec) release_note(k, studio.host().ticks());
+    }
+}
+
+void Sequencer::entry_write(const std::vector<int>& keys, int velocity) {
+    auto& p = pattern();
+    for (int k : keys) {
+        melodee::Event e;
+        e.tick = seq::step_tick(p, caret);
+        e.length = uint16_t(std::min<uint32_t>(entry_length * p.q(), 65535));
+        e.key = uint8_t(k & 0xff);
+        e.pitch = int8_t(k >> 8);
+        e.velocity = uint8_t(entry_velocity ? entry_velocity : std::clamp(velocity, 1, 127));
+        e.chance = entry_chance;
+        if (e.tick >= p.length) seq::set_length(p, (e.tick / bar_ticks() + 1) * bar_ticks(), studio.project().max_length());
+        p.add(e);
+    }
+    p.free = false;
+    sync(studio.track(), number(studio.track()));
+}
+
+void Sequencer::midi_key(unsigned t, int key, int velocity, bool down) {
+    t %= melodee::track_count;
+    if (key < 0 || key > 127) return;
+    auto& held = midi_held[t];
+    const uint32_t ticks = studio.host().ticks();
+    if (!down) {
+        if (!held[size_t(key)]) return;
+        held[size_t(key)] = false;
+        ring->release(t, key, ms_now(), ticks);
+        if (rec) release_note(key, ticks);
+        if (entry && midi_entry_written && held.none()) { // the chord let go: the caret moves on
+            midi_entry_written = false;
+            caret += entry_length;
+        }
+        return;
+    }
+    held[size_t(key)] = true;
+    ring->press(t, key, velocity, ms_now(), studio.playing() ? run : 0, ticks);
+    if (entry && t == studio.track()) {
+        entry_write({key}, velocity);
+        midi_entry_written = true;
+        return;
+    }
+    const auto& track = studio.project().tracks[t];
+    if (rec && !(track.repeat || track.arp) && t == take_track && studio.playing()) { // the engine writes what it repeats
+        bool early = studio.host().count_in() != 0;
+        if (early && studio.host().count_in_ticks() > melodee::sixteenth_ticks) return; // counting in: not yet
+        write_note(key, velocity, studio.host().position_of(t), ticks, early); // heard within the block it came in
     }
 }
 

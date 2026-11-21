@@ -35,12 +35,19 @@ public:
     void input(const move::Input& input); // Copy let go: a pending paste forgotten
     void draw(juce::Graphics& g, const Item& item) const; // the subject under the row
     Knob knob(const Item& item, unsigned which) const;
+    // Knob n as a Motion lane (Melodee's mix in Motion: Seq Record writes it, a held step locks it): an effect's
+    // parameter on the track's own chain or the master's (melodee/model/limits.h motion_fx_param, motion_master_fx).
+    // A bus's chain, a kit pad's own and a Schwung effect's have none.
+    bool lane(const Item& item, unsigned which, unsigned& param) const;
 
     // The track item: its mix on the knobs (1 level, 2 pan, 3-6 sends A-D);
     // on a kit, Shift + turn to its last pad's own sends A-D (knobs 1-4).
     bool mix_job(unsigned track, bindings::Job job, const bindings::Use& use);
     void draw_mix(juce::Graphics& g, unsigned track) const;
     Knob mix_knob(unsigned track, unsigned which) const;
+    // The track item's knob n as a Motion lane: level, pan, sends A-D of the selected track (motion_level ..
+    // motion_send); on a kit's pad sends, that pad's own (`pad`).
+    bool mix_lane(unsigned track, unsigned which, unsigned& param, unsigned& pad) const;
     std::string mix_bottom() const { return pad_sends ? "SND" : "MIX"; } // the rail's
 
 private:

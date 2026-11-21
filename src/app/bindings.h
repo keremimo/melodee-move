@@ -80,7 +80,8 @@ enum class Gesture : uint8_t { Press, Tap, Hold, Double, Turn, Release, Count };
 // What is held down while the control is used.
 namespace held {
 constexpr uint16_t none = 0, shift = 1 << 0, track = 1 << 1, step = 1 << 2, pad = 1 << 3,
-                   copy = 1 << 4, del = 1 << 5, mute = 1 << 6, loop = 1 << 7;
+                   copy = 1 << 4, del = 1 << 5, mute = 1 << 6, loop = 1 << 7,
+                   note = 1 << 8; // Note/Session held: counted for Sampling only (a peek's pads launch as in Session)
 }
 
 #define MELODEE_JOBS(X) \

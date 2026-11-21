@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "app/screens/device_fx.h"
+#include "melodee/model/limits.h"
+#include "melodee/model/pad_params.h"
 #include <cmath>
 
 namespace app::screens {
@@ -197,6 +199,15 @@ Knob DeviceFx::knob(const Item& item, unsigned which) const {
     return {};
 }
 
+bool DeviceFx::lane(const Item& item, unsigned which, unsigned& param) const {
+    if (item.plus || item.pad || which >= melodee::effect_params || schwung(item)) return false;
+    const auto& slot = mixing::slot(studio, item.chain, item.slot);
+    if (!melodee::effect_info(EffectKind(slot.kind)).params[which].label) return false;
+    if (item.chain == mixing::master) { param = melodee::motion_master_fx(item.slot, which); return true; }
+    if (item.chain < melodee::track_count) { param = melodee::motion_fx_param(item.slot, which); return true; }
+    return false; // a bus's chain: its return is the Mixer's
+}
+
 // ---------------------------------------------------------------- the track item: its mix
 
 bool DeviceFx::mix_job(unsigned t, Job job, const bindings::Use& use) {
@@ -249,6 +260,21 @@ void DeviceFx::draw_mix(juce::Graphics& g, unsigned t) const {
     std::snprintf(cpu, sizeof cpu, "CPU %d%%", int(std::lround(studio.host().track_load(t) * 100.0f)));
     std::string where = bar_beat(studio);
     ui::detail(g, mix.mute ? "MUTED" : mixing::level_text(mix.level), where.empty() ? cpu : where);
+}
+
+bool DeviceFx::mix_lane(unsigned t, unsigned which, unsigned& param, unsigned& pad) const {
+    if (pad_sends && studio.kind(t) == TrackKind::Kit) {
+        if (which >= 4) return false;
+        param = melodee::motion_pad_param(melodee::PadParam(unsigned(melodee::PadParam::SendA) + which));
+        pad = studio.pad();
+        return true;
+    }
+    pad = 0;
+    if (which == 0) param = melodee::motion_level;
+    else if (which == 1) param = melodee::motion_pan;
+    else if (which < 6) param = melodee::motion_send(which - 2);
+    else return false;
+    return true;
 }
 
 Knob DeviceFx::mix_knob(unsigned t, unsigned which) const {

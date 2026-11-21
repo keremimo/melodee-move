@@ -3,6 +3,7 @@
 // after melodee-sample's shell/midi_io.cpp, which does the same for the
 // MPC's jacks and USB.
 #include "app/midi.h"
+#include "app/sequencer.h"
 #include "app/studio.h"
 #include "melodee/engine/engine_host.h"
 #include "melodee/engine/midi_engine.h"
@@ -327,6 +328,7 @@ void Midi::note_in(Studio& studio, unsigned t, int key, int velocity, bool down,
     if (down) played[t][size_t(key)] = int16_t(key);
     int plays = played[t][size_t(key)] >= 0 ? played[t][size_t(key)] : key;
     const auto& track = studio.project().tracks[t];
+    studio.sequencer().midi_key(t, plays, velocity, down); // Seq Record, Step Edit's ENTRY and Capture take it as a pad's
     Command c {down ? Type::NoteOn : Type::NoteOff, uint8_t(t), uint8_t(echo ? 0 : 1), uint16_t(plays), int16_t(down ? std::max(velocity, 1) : 0)};
     if (track.repeat) { c.type = Type::RepeatKey; c.pattern = 0; c.value = int16_t(down ? velocity : 0); }
     else if (track.arp) { c.type = Type::ArpKey; c.pattern = 0; c.value = int16_t(down ? velocity : 0); if (!down && track.arp_latch) return; }

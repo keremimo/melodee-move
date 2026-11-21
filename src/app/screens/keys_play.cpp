@@ -11,6 +11,7 @@
 // and CHORD. Plus and Minus move the octave (Drums: 16 pads).
 #include "app/instruments.h"
 #include "app/screens/note_pages.h"
+#include "app/screens/zones.h"
 #include "melodee/engine/command.h"
 #include "melodee/engine/sample_data.h"
 #include "melodee/model/scales.h"
@@ -78,9 +79,9 @@ public:
             return;
         }
         const auto& sound = studio.current().pads[0];
-        const bool instrument = sample->instrument != nullptr;
+        const bool instrument = zones_of(sample) != nullptr;
         switch (page) {
-        case Page::Zones: instrument ? draw_zones(g, *sample) : draw_trim(g, *sample, sound); return;
+        case Page::Zones: instrument ? draw_zones(g, studio, *sample, 0, zone) : draw_trim(g, *sample, sound); return;
         case Page::Amp: {
             move::draw_text(g, ui::content_x + 1, 11, "AMP ENV");
             move::draw_text(g, ui::width - move::text_width("A D S R"), 11, "A D S R");
@@ -124,16 +125,7 @@ public:
         auto percent = [](int v) { return v / 100.0f; };
         switch (Page(page_of[t])) {
         case Page::Zones:
-            if (sample->instrument) {
-                const auto& multi = *sample->data->multi;
-                if (multi.zones.empty()) return {};
-                unsigned z = std::min<unsigned>(zone, unsigned(multi.zones.size()) - 1);
-                const auto* trim = melodee::find_trim(studio.current().zone_trims, 0, z, sound.sample);
-                if (n == 0) return {"ZONE", std::to_string(z + 1) + "/" + std::to_string(multi.zones.size()), float(z) / float(std::max<size_t>(1, multi.zones.size() - 1))};
-                if (n == 1) { int c = trim ? trim->tune : 0; return {"TUNE", std::to_string(c) + " CT", (c + 100) / 200.0f}; }
-                if (n == 2) { int l = trim ? trim->level : 0; char text[16]; std::snprintf(text, sizeof text, "%+.1f DB", l / 10.0); return {"LEVEL", text, (l + 240) / 300.0f}; }
-                return {};
-            }
+            if (zones_of(sample)) return zone_knob(studio, *sample, 0, zone, n);
             switch (n) { // one sample: its region and loop
             case 0: return {"START", seconds(sound.start), fraction_of(*sample, sound.start)};
             case 1: return {"END", seconds(end_of(*sample, sound)), fraction_of(*sample, end_of(*sample, sound))};
@@ -231,47 +223,6 @@ private:
         return upper(sample.name).substr(0, 12);
     }
 
-    void draw_zones(juce::Graphics& g, const Sample& sample) {
-        const auto& multi = *sample.data->multi;
-        const auto& ins = *sample.instrument;
-        const bool loading = !ins.done();
-        unsigned z = multi.zones.empty() ? 0 : std::min<unsigned>(zone, unsigned(multi.zones.size()) - 1);
-        std::string right = loading ? std::to_string(ins.landed.load()) + "/" + std::to_string(ins.parts.size())
-                                    : "Z" + std::to_string(z + 1) + "/" + std::to_string(multi.zones.size());
-        move::draw_text(g, ui::content_x + 1, 11, "ZONES");
-        move::draw_text(g, ui::width - move::text_width(right), 11, right);
-        // The zones over the piano's keys (21-108), a tick a zone's lowest key, the one picked filled.
-        auto area = ui::content(21, 13).reduced(1, 0);
-        auto x_of = [&](int key) { return area.getX() + (std::clamp(key, 21, 109) - 21) * area.getWidth() / 88; };
-        g.setColour(juce::Colours::white);
-        g.drawRect(area);
-        for (size_t n = 0; n < multi.zones.size(); ++n) {
-            const auto& each = multi.zones[n];
-            if (each.on_release) continue;
-            int from = x_of(each.low_key), to = x_of(each.high_key + 1);
-            if (n == z && !loading) g.fillRect(from, area.getY(), std::max(1, to - from), area.getHeight());
-            else g.fillRect(from, area.getY() + area.getHeight() / 2, 1, area.getHeight() / 2);
-        }
-        for (int c = 24; c <= 108; c += 12) g.fillRect(x_of(c), area.getBottom() + 1, 1, 2);
-        if (loading) {
-            g.drawRect(ui::content_x + 1, 41, ui::content_width - 4, 5);
-            g.fillRect(ui::content_x + 2, 42, int((ui::content_width - 6) * ins.landed.load() / std::max<size_t>(1, ins.parts.size())), 3);
-            ui::detail(g, "LOADING", ins.format);
-            return;
-        }
-        if (multi.zones.empty()) return;
-        const auto& picked = multi.zones[z];
-        const auto* trim = melodee::find_trim(studio.current().zone_trims, 0, z, studio.current().pads[0].sample);
-        char text[32];
-        std::snprintf(text, sizeof text, "%s-%s %+d %+.0fDB", note_name(picked.low_key).c_str(), note_name(picked.high_key).c_str(), trim ? trim->tune : 0,
-                      trim ? trim->level / 10.0 : 0.0);
-        move::draw_text(g, ui::content_x + 1, 41, text);
-        std::string file = picked.part < ins.parts.size() ? ins.parts[picked.part] : "";
-        auto slash = file.find_last_of('/');
-        if (slash != std::string::npos) file = file.substr(slash + 1);
-        ui::detail(g, upper(file).substr(0, 12), note_name(picked.root));
-    }
-
     void draw_trim(juce::Graphics& g, const Sample& sample, const melodee::PadSound& sound) {
         move::draw_text(g, ui::content_x + 1, 11, "TRIM");
         if (sound.loop) move::draw_text(g, ui::width - move::text_width("LOOP"), 11, "LOOP");
@@ -310,24 +261,7 @@ private:
         auto sound = studio.current().pads[0];
         auto step = [&](auto& field, int low, int high) { field = std::decay_t<decltype(field)>(std::clamp(int(field) + delta, low, high)); };
         auto flip = [&](bool& field) { field = delta > 0; };
-        if (page == Page::Zones && sample->instrument) {
-            const auto& multi = *sample->data->multi;
-            if (multi.zones.empty()) return;
-            if (n == 0) { zone = unsigned(std::clamp(int(zone) + delta, 0, int(multi.zones.size()) - 1)); return; }
-            if (n > 2) return;
-            auto& trims = studio.current().zone_trims;
-            unsigned z = std::min<unsigned>(zone, unsigned(multi.zones.size()) - 1);
-            const auto* had = melodee::find_trim(trims, 0, z, sound.sample);
-            int tune = had ? had->tune : 0, level = had ? had->level : 0;
-            if (n == 1) tune = std::clamp(tune + delta, -100, 100);
-            else level = std::clamp(level + delta * (fine ? 1 : 5), -240, 60);
-            if (!melodee::set_trim(trims, 0, z, sound.sample, tune, level)) { studio.say("TRIMS FULL"); return; }
-            melodee::ZoneTrim trim;
-            trim.pad = 0; trim.slot = sound.sample; trim.zone = uint16_t(z); trim.tune = int8_t(tune); trim.level = int16_t(level);
-            studio.send(melodee::zone_trim_command(t, trim));
-            studio.changed();
-            return;
-        }
+        if (page == Page::Zones && zones_of(sample)) { zone_turn(studio, *sample, 0, zone, n, delta, fine); return; }
         if (page == Page::Zones) { // one sample: its region and loop, a 256th of it a detent (Shift: a 4096th)
             const uint32_t frames = sample->data->model_frames(), unit = std::max<uint32_t>(1, frames / (fine ? 4096 : 256));
             auto move_frame = [&](uint32_t at) { return uint32_t(std::clamp<int64_t>(int64_t(at) + int64_t(delta) * unit, 0, frames)); };

@@ -466,6 +466,7 @@ controls take Session's and Loop Mode's meanings where they have one.
 | Control | On the Move | In Melodee | Status |
 | --- | --- | --- | --- |
 | Track button held + Sampling | No job (the Move has no freeze) | PRINT for that track | done |
+| Note/Session held + Sampling | No job (held, Session peeks) | PRINT for the selected track from the patterns grid (Melodee's Seq held + Sample Record): its pads are the track's patterns to freeze | done |
 | Pad (Print) | (No PRINT on the Move) | The pattern of the pad's number in the pad layout (Rows or Banks), printed or left out | done |
 | Plus or Minus (Print) | (As above) | The patterns' bank of 32 | done |
 | Wheel turn (Print) | (As above) | FREEZE, DEEP FREEZE, ALL, NONE, UNFREEZE | done |

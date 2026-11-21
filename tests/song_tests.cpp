@@ -440,6 +440,24 @@ void test_print_and_freeze() {
         CHECK(rig.until([&] { return !printer.busy(); }, 10));
         rig.app.service();
         CHECK(has(rig.app.status(), "printed=2 print_skipped=2"));
+        // busy() holds from start() until the job's results are in, never false while the print thread takes the job:
+        // watched as closely as a core can, each time.
+        for (int round = 0; round < 40; ++round) {
+            {
+                std::lock_guard<std::mutex> guard(rig.studio().lock);
+                app::Printer::Job job;
+                job.track = 0;
+                job.patterns = {0, 1};
+                job.freeze = false;
+                CHECK(printer.start(job).empty());
+            }
+            auto give_up = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+            while (printer.busy() && std::chrono::steady_clock::now() < give_up) {}
+            auto p = printer.progress();
+            CHECK(!printer.busy() && !p.busy && p.through == 2 && p.error.empty());
+        }
+        rig.app.service();
+        CHECK(has(rig.app.status(), "printed=2 print_skipped=82"));
         CHECK(rig.app.save_now().empty());
     }
     {   // Opened again: frozen as it was, its prints read and playing.
@@ -464,6 +482,36 @@ void test_print_and_freeze() {
         CHECK(printer.table().freeze[0].plays(0) && !printer.table().freeze[0].plays(1) && printer.table().freeze[0].tail == melodee::PrintTail::Cut);
         CHECK(fs::exists(prints_folder + "/" + melodee::print_file_name(0, 1))); // kept from before
     }
+}
+
+// Another project opened while a print runs: the print is called off, what it made is dropped (it is the last
+// project's), and the samples it reads stay in memory until it is done with them.
+void test_open_while_printing() {
+    std::string folder = "build/test-samples", home = "build/test-home-song-print-open", loop = folder + "/loop.wav";
+    write_project(home, loop);
+    Rig rig(folder, home);
+    auto& printer = rig.desk().printer();
+    printer.hold(true); // a long print: it waits before its first block
+    {
+        std::lock_guard<std::mutex> guard(rig.studio().lock);
+        app::Printer::Job job;
+        job.track = 0;
+        job.patterns = {0, 1};
+        job.freeze = true;
+        CHECK(printer.start(job).empty());
+    }
+    CHECK(rig.until([&] { return printer.progress().pattern == 0; }, 10));
+    CHECK(rig.studio().open_project(home + "/Projects/Other.mldp", true).empty());
+    CHECK(rig.until([&] { return has(rig.app.status(), "samples_printing=1"); }, 5)); // the engine let it go; kept
+    CHECK(printer.busy());
+    printer.hold(false);
+    CHECK(rig.until([&] { return !printer.busy(); }, 10));
+    rig.app.service();
+    auto status = rig.app.status();
+    CHECK(has(status, "samples_printing=0") && has(status, "project=Other"));
+    CHECK(has(status, "printed=0 print_skipped=0") && has(status, "frozen=0"));
+    std::lock_guard<std::mutex> guard(rig.studio().lock);
+    CHECK(printer.table().records.empty() && !printer.frozen(0) && printer.progress().error == "called off");
 }
 
 void test_wav_out() {
@@ -745,6 +793,14 @@ void test_song_screens() {
     snap(app, "unfreeze");
     press(app, Button::MainPush);
     CHECK(has(status(), "frozen=0") && has(status(), "page=kit-play"));
+    // Note/Session held + Sampling, from the patterns grid (Melodee's Seq held + Sample Record): PRINT for the selected
+    // track, its patterns on the pads; Note/Session let go leaves it open.
+    hold(app, Button::Menu, true);
+    press(app, Button::Sample);
+    hold(app, Button::Menu, false);
+    CHECK(has(status(), "page=print") && has(status(), "print_sheet=2") && has(status(), "track=2 "));
+    press(app, Button::Back);
+    CHECK(has(status(), "page=kit-play"));
 }
 
 } // namespace
@@ -762,6 +818,8 @@ int main() {
     test_exports();
     std::cerr << "test_print_and_freeze\n";
     test_print_and_freeze();
+    std::cerr << "test_open_while_printing\n";
+    test_open_while_printing();
     std::cerr << "test_synth_freeze\n";
     test_synth_freeze();
     std::cerr << "test_song_screens\n";

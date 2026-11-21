@@ -145,7 +145,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Accent, Slide, Tie**: about 4 dB louder; a glide of 60 ms; legato; CC 84 and CC 68 to synths (MELODEE.md › Sequencing, Roll) | done | a step held + push: TRIG, knobs 6-8 | [ ] |
 | **Step Edit, STEPS**: the 16 steps of a bar for one pad or note, lit by velocity, the playhead; Tie and Insert (MELODEE.md › Sequencing, Step Edit) | done | the Move's steps: a bar of the last pad's lane (a kit) or of the notes, the playhead green; Left / Right the bar; TIE on TRIG; Insert on Roll's push | [ ] |
 | **Step Edit, PLAY**: pads write at the caret; REST, ERASE; length, velocity, chance (MELODEE.md › Sequencing, Step Edit) | done | SEQ pages' ENTRY: pads write at the caret (the wheel), push a rest, Delete back; knobs length, velocity, chance | [ ] |
-| **Parameter locks**: hold a step, turn a knob (MELODEE.md › Sequencing, Step Edit) | sequencer | a step held + a knob (the Move's per-step automation): a kit pad's values and the mix's lanes. Not yet on a Schwung module's own parameters: they are not engine lanes, and need a module motion player | [ ] |
+| **Parameter locks**: hold a step, turn a knob (MELODEE.md › Sequencing, Step Edit) | done | a step held + a knob (the Move's per-step automation): a kit pad's values and the mix's lanes (level, pan, sends, the track's and the master's effects, the returns). A Schwung module's own parameters take none, as Melodee's plug-ins take none (MELODEE.md › Plug-ins, Not yet): the modules are the Move's plug-ins | [ ] |
 | **Lane length**: a kit pad's lane loops on its own, polymeter (LANE) (MELODEE.md › Sequencing, Step Edit) | done | SEQ pages' LANE: knob 1 | [ ] |
 | **Euclid**: hits, steps 1-64, rotation on a lane (EUCL) (MELODEE.md › Sequencing, Step Edit) | done | SEQ pages' LANE: knobs 2-4, push lays it | [ ] |
 | **Spare steps**: a step written past the end makes the pattern longer (MELODEE.md › Sequencing, Step Edit) | done | Right past the last bar, then a step | [ ] |
@@ -153,8 +153,8 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Roll marks and jobs**: mark notes; move by Q or a row, mute, ratchet, velocities and ramp, pull to the grid, octave; split, legato, reverse, the arp as notes, loop the bars in view (MELODEE.md › Sequencing, Roll) | done | SEQ pages' ROLL: push, the jobs (marks, mute, pull to grid, legato, split, reverse, arp as notes, loop the bar, ramps, insert); knobs move by Q (MOV) or a row (KEY), octave, ratchet | [ ] |
 | **Copy notes**: marked notes pasted at the cursor; a key's notes onto another; a step onto another (MELODEE.md › Across every page, Copy) | done | Roll: Copy the marked notes, Copy again pastes at the focus; MARK THE KEY then KEY moves a key's notes; Copy + a step, then a step | [ ] |
 | **Erase notes**: a pad's notes while playing, a key's notes, the note in focus (MELODEE.md › Across every page, Erase) | done | Delete + pad (a kit); Roll: MARK THE KEY, Delete; Delete on Roll the note in focus | [ ] |
-| **Motion**: knob moves recorded in each pattern, 8192 points, lanes reset at the pattern's start; a lane cleared (MELODEE.md › Sequencing, Motion) | sequencer | Rec + knob turns (14.2) on a kit's pages and the track's level; Delete + knob touch clears, Mute + touch off and on; SEQ pages' MOTION. Not yet a Schwung module's parameters (as Parameter locks) | [ ] |
-| **Mix in Motion**: level, pan, sends, master chain and returns recorded (MELODEE.md › Sequencing) | mixer & effects | the track's level done (track button + Volume knob while recording); pan, sends, master chain and returns come with the mixer's pages: their knobs name their lanes (Screen::knob_lane) and Rec writes them | [ ] |
+| **Motion**: knob moves recorded in each pattern, 8192 points, lanes reset at the pattern's start; a lane cleared (MELODEE.md › Sequencing, Motion) | done | Rec + knob turns (14.2) on a kit's pages, the mix (Mix in Motion) and the track's level; Delete + knob touch clears, Mute + touch off and on; SEQ pages' MOTION. A Schwung module's own parameters take none, as Melodee's plug-in parameters take none (MELODEE.md › Plug-ins, Not yet) | [ ] |
+| **Mix in Motion**: level, pan, sends, master chain and returns recorded (MELODEE.md › Sequencing) | done | Rec + the selected track's level, pan and sends A-D (track button + Volume knob, the Mixer's VOL, PAN, SNDA-SNDD, the Device View's track item), its chain's effects (the Device View), the master chain's (the Mixer's MAIN, push) and the returns (MAIN's knobs 1-4, a bus chain's RETURN): lanes of the selected track's pattern; another track's knob on the Mixer writes none | [ ] |
 | **MOD**: eight modulators, an LFO (seven shapes, free or synced) or a follower, up to four lanes each (MODS) (MELODEE.md › Sequencing) | done | SEQ pages' MOD: the wheel the modulator, knobs kind, shape, rate, sync, depth, target, low, high; push the target slot | [ ] |
 | **Macros**: eight, each one knob over up to eight lanes (MACR) (MELODEE.md › Sequencing, MOD) | done | SEQ pages' MACROS: a knob each; push: the lanes the last one moves | [ ] |
 | **A pattern's feel**: STRENGTH, SWING, HUMANIZE, HUMAN VEL, GROOVE from another pattern (FEEL) (MELODEE.md › Sequencing) | done | SEQ pages' FEEL: knobs 1-6 | [ ] |
@@ -180,7 +180,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Freeze**: each pattern printed; the track plays its prints; pads still live; level, pan, sends, mute live; a kit's bus sends printed too (MELODEE.md › Print and freeze) | done | a track button held + Sampling: PRINT (Kerem, 2026-11-20); kit and synth tracks | [ ] |
 | **PRINT sheet**: patterns on the pads, ALL, TAP Post / Pre FX, TAIL Loop / Ring / Cut, room needed, CPU saved (MELODEE.md › Print and freeze) | done | pads the patterns (Plus / Minus: 32 a bank); knob 1 TAP, knob 2 TAIL; the wheel FREEZE, DEEP FREEZE, ALL, NONE, UNFREEZE; push | [ ] |
 | **Printing**: progress a pattern, the switch on a bar line, called off (MELODEE.md › Print and freeze) | done | the PRINT sheet shows the pattern, how far, the speed; Back calls it off | [ ] |
-| **Freeze patterns from the pattern layer** (Seq held + Sample Record) (MELODEE.md › Print and freeze) | song & export | PRINT's pads are the patterns already; Session (the patterns grid) is the sequencer's: Note/Session held + Sampling once it is built | [ ] |
+| **Freeze patterns from the pattern layer** (Seq held + Sample Record) (MELODEE.md › Print and freeze) | done | Note/Session held + Sampling (Session peeking, the patterns grid): PRINT for the selected track, its patterns on the pads; push freezes them | [ ] |
 | **A frozen track shown**: a snowflake on the overview and pages; values a print holds dim (MELODEE.md › Print and freeze) | done | a snowflake in its Play screen's rail and on the sixteen tracks, its step ice; a knob or step asks first (one bit: no dim values) | [ ] |
 | **Deep freeze**: the track's plug-ins unloaded too; thawing restores their state (MELODEE.md › Print and freeze) | done | PRINT: DEEP FREEZE (the wheel); the module let go once the print plays, thawed as it was | [ ] |
 | **Unfreeze and edit**: at once, prints kept; an edit asks first; unchanged patterns keep their prints (MELODEE.md › Print and freeze) | done | PRINT: UNFREEZE; an edit on a frozen track asks UNFREEZE TRACK N?; unchanged patterns keep their prints | [ ] |
@@ -188,7 +188,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Auto sample a plug-in** into an MPC keygroup program (`.xpm`, `.xty`) on a new keygroup track (MELODEE.md › Print and freeze, Auto sample) | done | AUTO SAMPLE, the last row of a module track's menu (Shift + push): the .xpm and its WAVs in Melodee/Samples/Keygroups. The .xty (MPC 3's track file) is not written on the Move: Melodee's writer (shell/mpc3_export) needs its sample library | [ ] |
 | **Auto sample check**: drums, mono and glide, accent, velocity layers, takes, splits, sustain and loops, release fit (MELODEE.md › Print and freeze) | done | automatic: drums, mono and glide, accent and velocity layers, takes, sustain and loops, hold, release fit; a split (two sounds side by side) is not found yet: such a module samples as one sound | [ ] |
 | **AUTO SAMPLE sheet**: KEYS (low, high, step), NOTE (layers, hold, tail), SOUND (tap, loop, level) (MELODEE.md › Print and freeze) | done | knobs 1-8 LOW, HIGH, STEP, LAYERS, HOLD, TAIL, TAP, LOOP; Shift + turn: LEVEL; push samples, Back stops | [ ] |
-| **Auto sample an external instrument** on a MIDI track, heard at the input (MELODEE.md › Print and freeze, External instruments) | instruments | not yet: it needs MIDI out over USB (MIDI & sync) and the line in heard by the sampler; the check and the sampling take any note source (app/auto_sampler.h NoteSource) | [ ] |
+| **Auto sample an external instrument** on a MIDI track, heard at the input (MELODEE.md › Print and freeze, External instruments) | instruments | not yet: MIDI out on cable 2 and the engine's input ring (Audio Recall's) are there now, but Melodee's external path is its own note source (engine/external_notes.h: the input's silence and the note's delay measured, each note cut to where its sound starts, posted notes sent by the MIDI thread as the ring reaches them), which the Move's auto sampler (a module's instance rendered faster than real time, app/auto_sampler.h NoteSource) does not take yet; then a check with an instrument on the line in | [ ] |
 | **Keygroup glide**: Mono, portamento, Legato, Mono Retrig (MELODEE.md › Print and freeze, Keygroup glide) | done | automatic: an MPC program's Mono, Portamento, Legato and Mono Retrig reach Melodee's sampler | [ ] |
 | **Delete from storage**: a file, folder, program or plug-in; what the project plays is refused (MELODEE.md › Print and freeze, Deleting) | done | Delete on the Load page, asked first; in Melodee's folder and the Move's User Library (Kerem), never the Core Library; a program with its `_[TrackData]`; plug-ins are Schwung's | [ ] |
 
@@ -209,7 +209,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **EXS24 instruments** `.exs` (MELODEE.md › Sampler) | done | the instrument browser; streamed from storage | [ ] |
 | **SoundFonts** `.sf2`, presets listed as a folder (MELODEE.md › Sampler) | done | the instrument browser, an .sf2 a folder of its presets; its sounds laid out in Melodee/Cache and read in place | [ ] |
 | **DecentSampler presets** `.dspreset` (MELODEE.md › Sampler) | done | the instrument browser; streamed from storage | [ ] |
-| **An instrument on a kit pad**: its zones by key and velocity; ZONES page, zone tune and level trims (ZTRM) (MELODEE.md › Sampler, SFZ) | kit depth | not yet: an instrument reaches a pad by the instruments' loading of SFZ, programs and SoundFonts (`instruments` rows); ZONES (TRIM's place on such a pad, docs/ui/kit.png) is built once it can | [ ] |
+| **An instrument on a kit pad**: its zones by key and velocity; ZONES page, zone tune and level trims (ZTRM) (MELODEE.md › Sampler, SFZ) | done | Load on a kit: SFZ, EXS and DecentSampler presets listed with the samples, tagged; push loads one onto the pad, its files landing; TRIM's place is ZONES (docs/ui/kit.png): knob 1 the zone, 2 ZONE TUNE (cents), 3 ZONE LEVEL, on that pad only, kept with the project (ZTRM). A SoundFont's presets and MPC keygroup programs load on keygroup tracks | [ ] |
 | **MPC drum programs**: LOAD KIT sheet, the whole kit or banks, layers, pad colours (MELODEE.md › Sampler) | done | the browser lists them tagged KIT; push: LOAD KIT (whole kit, or a program bank into each kit bank, LOAD BANKS); pads of 2-4 layers take them as their own, more (an instrument) wait for the instruments' loading | [ ] |
 | **MPC expansions** `.xpn`: installed into Expansions; program previews (MELODEE.md › Sampler) | done | Load page: push installs into Samples/Expansions/<title>, then opens it; a program's `[Previews]` file plays as the wheel lands (its programs load with kit depth and instruments) | [ ] |
 | **Banks** `.mldb`: Save Bank, load into the bank in view (MELODEE.md › Sampler, Banks) | done | Shift held in the browser: Save Bank (the two banks in view); `.mldb` files listed tagged BANK, a push loads one into the bank of the pad in view | [ ] |
@@ -238,7 +238,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **CLEAN**: cut on the sample's drums stem (MELODEE.md › Sampler, Chop) | schwung | Schwung's separator writes the stems as files: Load the drums stem and Chop it | — |
 | **To Pads**: Poly, Mono, Thru (MELODEE.md › Sampler, Chop) | done | Chop: push; jogwheel | [ ] |
 | **To Pads KIT**: a pad a sound (MELODEE.md › Sampler, Chop) | done | To Pads sheet, its fourth row | [ ] |
-| **To Pads PATTERN**: a note for each slice into the pattern (MELODEE.md › Sampler, Chop) | sequencer | Not yet on the sheet: To Pads is sampling's Chop (screens/chop.cpp); Sequencer::slices_to_pattern() lays the notes, tested, for its PATTERN choice | [ ] |
+| **To Pads PATTERN**: a note for each slice into the pattern (MELODEE.md › Sampler, Chop) | done | To Pads' last row PATTERN (push flips it, kept for next time): a note a slice where it falls (KIT: on its sound's pad) into the track's pattern when it is empty, else the first empty one, which then plays; one undo with the pads | [ ] |
 | **Slices kept with the sample** (in its WAV on the MPC; here in the project, its own `MVCH` section, so the Move's library is never written) (MELODEE.md › Sampler, Chop) | done | automatic | [ ] |
 | **Zero Snap and 2 ms edge fades** on every cut (MELODEE.md › Sampler, Chop) | done | automatic | [ ] |
 | **A sample's note** found as it loads: a pitch, or a chord's root (MELODEE.md › Sampler) | done | automatic, every sample read (kept in the project) | [ ] |
@@ -291,7 +291,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **MIDI jacks** (the External port) (MELODEE.md › MIDI and sync) | n/a | the Move has no MIDI jacks; USB-C only | — |
 | **USB MIDI**: a computer or USB devices on USB-C (MELODEE.md › MIDI and sync) | done | USB-A devices and a computer on USB-C (the Standalone Port), both on cable 2 (docs/MIDI.md); to check on the Move | [ ] |
 | **MIDI in**: notes on the in channel play the selected track; a kit hears 36 as A01; pressure, mod wheel, pitch wheel, sustain pedal, CCs, All Notes Off (MELODEE.md › MIDI and sync; guide/midi-and-sync.md) | done | automatic, every page and track kind; a MIDI track echoes it | [ ] |
-| **MIDI in recorded**: under Seq Record; keys write on Step Edit and Roll (guide/midi-and-sync.md) | sequencer | MIDI notes reach the engine as the pads' do (to the frame they came at); recording them is Seq Record's (move-seq) | [ ] |
+| **MIDI in recorded**: under Seq Record; keys write on Step Edit and Roll (guide/midi-and-sync.md) | done | MIDI notes on the tracks they reach: under Rec written where heard (within the block they came in), as long as they were held; on the SEQ pages' ENTRY at the caret, a chord a step; Capture keeps them | [ ] |
 | **Track channel, Track MIDI in, Pad MIDI in / out**: a controller a track (guide/midi-and-sync.md) | done | Shift + a track button: MIDI IN and MIDI OUT (Kerem); Pad MIDI in and out in MIDI Config; Track MIDI in's ports: one port | [ ] |
 | **Remote CCs**: select a track, launch a pattern or a sequence (CC 102-104) (guide/midi-and-sync.md) | done | MIDI Config: Remote channel and CCs | [ ] |
 | **Program change** launches that pattern (MELODEE.md › MIDI and sync) | done | MIDI Config: PROG CHANGE | [ ] |
@@ -324,8 +324,8 @@ Kerem has checked it there. `n/a` rows have no box.
 | **UNSAVED** shown while there are changes (MELODEE.md › Project and system) | done | a mark in the rail's top right corner; OPEN UNSAVED on the projects | [ ] |
 | **Loading**: the sound fades, the audio thread waits while the project builds; the Loading sheet counts files (MELODEE.md › Project and system) | done | the engine parked (faded out, silent) while the project is built, then faded in; the Loading sheet counts samples and synths, presses wait | [ ] |
 | **Card folders read ahead** (the MPC's exFAT driver) (MELODEE.md › Project and system) | n/a | a fix for the MPC's card driver; the Move's storage is internal | — |
-| **MPC Sample projects** `.xpj` opened as a copy (MELODEE.md › Project and system) | MIDI & sync & undo & projects | built: listed on the pads, opened as a copy (Melodee's importer, compiled unchanged), saved as a .mldp beside it; not tested yet: no .xpj at hand (Kerem to check on the Move) | [ ] |
-| **MPC 3 projects** opened, keygroup and audio tracks too (guide/projects-and-files.md) | MIDI & sync & undo & projects | built as the MPC Sample's (the same importer); keygroup and audio tracks open as tracks, their playing instruments' and sampling's; not tested yet: no MPC 3 project at hand | [ ] |
+| **MPC Sample projects** `.xpj` opened as a copy (MELODEE.md › Project and system) | done | listed on the pads, opened as a copy (Melodee's importer, compiled unchanged), saved as a .mldp beside it, the .xpj untouched; tested with an MPC Sample project as Melodee's own tests write one (projects-tests) | [ ] |
+| **MPC 3 projects** opened, keygroup and audio tracks too (guide/projects-and-files.md) | done | as the MPC Sample's (the same importer); a keygroup track opens as a keygroup track (projects-tests: an MPC 3 project with one), audio tracks as sampling's | [ ] |
 | **SD card access**: the card lent to a computer (MELODEE.md › Project and system) | n/a | no card; the web page's Files tab reaches the Move's storage | — |
 | **Settings**: eight doors, a short list each; Reset Factory Settings (MELODEE.md › Project and system) | done | Shift + Step 2, the Move's Setup: doors PADS, LIGHTS (and move-midi's MIDI, SYNC, move-web's WEB PAGE); the wheel the row, push edits; Reset Factory Settings left out: the Move's own is Ableton's, Melodee's settings are few | [ ] |
 | **PADS settings**: pad response (soft, medium, hard, full level), pad pressure on / off, Double Seq (MELODEE.md › Project and system) | done | Setup > PADS: response (soft, medium, hard, full level), pressure on / off; Double Seq's copy is the sequencer's | [ ] |
@@ -371,7 +371,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **PLUGIN engine on Schwung's modules**: menus, presets, own pages in QuickJS, sources on their own thread (MELODEE.md › Sound engines; melodee-move README) | done | Row button, Menu loads; jogwheel; knobs | [ ] |
 | **MIDI, keygroup and audio engines** (MELODEE.md › Sound engines) | done | new-track sheet | [ ] |
 | **EngineHost**: 16 tracks, the clock, buses and master, MIDI out timing; blocks of 128 frames (MELODEE.md › Threads and data) | done | automatic | [ ] |
-| **Render workers**: tracks in parallel on the spare cores (MELODEE.md › Threads and data) | mixer & effects | built behind `MELODEE_RENDER_THREADS=N`, off: in the simulated Move two workers made the busy cycle slower (784-1516 µs against 579-849); to measure on the Move before turning on | [ ] |
+| **Render workers**: tracks in parallel on the spare cores (MELODEE.md › Threads and data) | mixer & effects | built behind `MELODEE_RENDER_THREADS=N` (and `melodee-render parallel|serial`), off: in the simulated Move two workers made the busy cycle slower (784-1516 µs against 579-849). Not on yet: it has to be measured on a Move first, which needs a deploy (Kerem's say-so) | [ ] |
 | **Overload guard**: the busiest track gives up its oldest voice before a block runs late (MELODEE.md › Threads and data) | done | automatic | [ ] |
 | **Pads at their frame**: a note played by hand sounds where it came in (MELODEE.md › Threads and data) | done | pads sound in the cycle they are read | [ ] |
 | **Melodee Poly, PD and Chip**: Open MPC synths with factory presets and pad pressure (MELODEE.md › Synths) | schwung | Schwung's synths take their place | — |
@@ -424,7 +424,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Status line** with Melodee's fields (MELODEE.md › Remote) | done | the Move's status line every 5 s; each area adds its fields | [ ] |
 | **Remote presses** `melodee-press`: buttons, pads, knobs (MELODEE.md › Remote) | done | `melodee-move --ctl 'melodee-press shift+step1'` over SSH: the runtime's control socket plays them into the Move's input | [ ] |
 | **`melodee-render`**: render workers off or on (MELODEE.md › Remote) | done | `melodee-move --ctl 'melodee-render serial|parallel'` | [ ] |
-| **`melodee-looper`** (MELODEE.md › Remote) | looper | a command over SSH | [ ] |
+| **`melodee-looper`** (MELODEE.md › Remote) | done | `melodee-move --ctl 'melodee-looper status|on|off|rec N|length N 1-16|...'` over SSH: the runtime's control socket, LoopDesk::remote() | [ ] |
 | **`melodee-midi`**: a message into the input; panic (MELODEE.md › Remote) | done | `melodee-move --ctl 'melodee-midi HEX...'` and `--ctl 'melodee-midi panic'`, the runtime's control socket, over SSH | [ ] |
 | **`melodee-print`, `melodee-freeze`, `melodee-unfreeze`** (MELODEE.md › Print and freeze) | done | `melodee-move --ctl 'melodee-print 2 A1,A2'` (and freeze, unfreeze) over SSH: the runtime's control socket, Printer::command() | [ ] |
 | **`melodee-autosample`** (MELODEE.md › Print and freeze) | done | `melodee-move --ctl 'melodee-autosample 2 36-84 step 3'` over SSH: the runtime's control socket, Studio::autosample_command (as Melodee takes its words) | [ ] |
@@ -438,15 +438,15 @@ Kerem has checked it there. `n/a` rows have no box.
 
 | Feature | Status | Move controls | ✓ |
 | --- | --- | --- | --- |
-| **The page at melodee.local**, named by Melodee's own mDNS (MELODEE.md › Web page) | web page | a computer on the Move's USB-C network | [ ] |
-| **Port 80**: the stock web server stopped while Melodee runs and started again after (MELODEE.md › Web page) | web page | automatic | [ ] |
-| **Device tab**: the version, free space, the plug-ins (MELODEE.md › Web page) | web page | browser | [ ] |
-| **Update** from a signed release zip (MELODEE.md › Web page) | web page | browser; install confirmed on the Move | [ ] |
-| **Plug-ins**: a zip uploaded and unzipped into Plugins; one removed (MELODEE.md › Web page) | web page | browser | [ ] |
-| **Files tab**: list, play, download, upload without overwriting, new folder, delete; protected folders (MELODEE.md › Web page) | web page | browser; /data/UserData/Melodee and the sample places | [ ] |
-| **Quickstart and Manual tabs**, carried in the binary (MELODEE.md › Web page) | web page | browser | [ ] |
-| **Safety**: only IP or localhost hosts, an `X-Melodee` header on every POST, one request at a time (MELODEE.md › Web page) | web page | automatic | [ ] |
-| **The browser and project list look again** after a change (MELODEE.md › Web page) | web page | automatic | [ ] |
+| **The page at melodee.local**, named by Melodee's own mDNS (MELODEE.md › Web page) | done | http://move.local:8080 from a computer on the USB-C cable (or Wi-Fi, with a code): the Move's own name (Ableton's mDNS); Melodee adds no second name. Shift + Capture shows the addresses | [ ] |
+| **Port 80**: the stock web server stopped while Melodee runs and started again after (MELODEE.md › Web page) | n/a | port 80 stays Ableton's MoveWebService, which runs on while Ableton's app is stopped (its own init script); Schwung has 7700 and 7681; Melodee takes 8080, or 8081-8089 if busy (Kerem, 2026-11-20) | — |
+| **Device tab**: the version, free space, the plug-ins (MELODEE.md › Web page) | done | the page's cards: Melodee's version, the storage free, the connection (USB, Wi-Fi paired); plug-ins are Schwung's modules, listed by Schwung's manager | [ ] |
+| **Update** from a signed release zip (MELODEE.md › Web page) | schwung | no update of its own: Schwung installs and updates melodee-move as one of its tools (Kerem, 2026-11-20) | [ ] |
+| **Plug-ins**: a zip uploaded and unzipped into Plugins; one removed (MELODEE.md › Web page) | schwung | Schwung's modules are the Move's plug-ins; its manager (port 7700) installs and removes them; there is no Melodee/Plugins folder (Kerem, 2026-11-20) | [ ] |
+| **Files tab**: list, play, download, upload without overwriting, new folder, delete; protected folders (MELODEE.md › Web page) | done | Files: Melodee's folder (/data/UserData/Melodee): list, play, download, upload (never over a file: "Kick 2.wav"), rename, delete, new folders; nothing outside it, the folder itself refused | [ ] |
+| **Quickstart and Manual tabs**, carried in the binary (MELODEE.md › Web page) | done | Guide: docs/GUIDE.md (the Move's controls), carried in the binary; one tab for both | [ ] |
+| **Safety**: only IP or localhost hosts, an `X-Melodee` header on every POST, one request at a time (MELODEE.md › Web page) | done | a Host that is an IP, localhost or a .local name (else 421), an `X-Melodee` header on every POST (else 403), a Wi-Fi browser paired by a code; at most 8 connections at once instead of one request at a time, since the screen's stream stays open | [ ] |
+| **The browser and project list look again** after a change (MELODEE.md › Web page) | done | automatic: an upload, rename, delete or new folder from the page and Load lists its folder again, Projects the projects (`melodee-files-changed`) | [ ] |
 
 ## Installing and updates
 
@@ -458,8 +458,8 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Recovery**: the stock app back after a crash (MELODEE.md › Threads and data) | done | `run-stock.sh`; a reboot is always stock | [ ] |
 | **Power off** from the Exit sheet (MELODEE.md › Project and system, Exit) | n/a | the Move's own power button; Melodee saves on the way out | — |
 | **Updates from the card**: a signed zip at the card's top (MELODEE.md › Updates from the card) | n/a | no card; updates come through the web page | — |
-| **Update sheet**: Update to vX?, LATER / INSTALL, its steps, the previous version kept to fall back to (MELODEE.md › Updates from the card) | web page | push installs, Back for later | [ ] |
-| **Release signing**: Ed25519 over `RELEASE.sha256` (MELODEE.md › Updates from the card) | web page | build tool | [ ] |
+| **Update sheet**: Update to vX?, LATER / INSTALL, its steps, the previous version kept to fall back to (MELODEE.md › Updates from the card) | schwung | no update of its own: Schwung updates melodee-move (Kerem, 2026-11-20) | [ ] |
+| **Release signing**: Ed25519 over `RELEASE.sha256` (MELODEE.md › Updates from the card) | schwung | no update of its own to sign: Schwung's installs carry melodee-move (Kerem, 2026-11-20) | [ ] |
 | **Release package** (the MPC: the card's zip) (README › Install) | done | `dist/melodee-move`, the Schwung tool package | [ ] |
 
 ## Panel and lights
@@ -491,18 +491,18 @@ sections, each on Shift + Step n.
 
 | Status | Rows |
 | --- | --- |
-| `done` | 266 |
-| `sequencer` | 4 |
+| `done` | 282 |
+| `sequencer` | 0 |
 | `sampling` | 0 |
-| `kit depth` | 1 |
+| `kit depth` | 0 |
 | `instruments` | 1 |
-| `mixer & effects` | 2 |
-| `song & export` | 1 |
-| `looper` | 1 |
-| `MIDI & sync & undo & projects` | 2 |
-| `web page` | 11 |
-| `schwung` | 16 |
-| `n/a` | 31 |
+| `mixer & effects` | 1 |
+| `song & export` | 0 |
+| `looper` | 0 |
+| `MIDI & sync & undo & projects` | 0 |
+| `web page` | 0 |
+| `schwung` | 20 |
+| `n/a` | 32 |
 | All rows | 336 |
 
 # Ableton Move parity
@@ -519,10 +519,10 @@ tempo) touches, and where each stands now.
 | Move key | Ableton's meaning | Melodee on the Move | Status | ✓ |
 | --- | --- | --- | --- | --- |
 | **Play** | start / stop (20) | plays and stops the patterns | done | [ ] |
-| **Shift + Play** | retrigger the playing clips from their start (17.1.5) | nothing yet: the bindings table | MIDI & sync & undo & projects | [ ] |
+| **Shift + Play** | retrigger the playing clips from their start (17.1.5) | every playing pattern from its top (the Move's retrigger) | done | [ ] |
 | **Rec** | record into the selected track's clip, after a count-in (14.1) | Seq Record, its count-in from stopped | done | [ ] |
 | **Track button** | select the track (20) | selects one of the bank's four of sixteen | done | [ ] |
-| **Track button held** (an unselected one) | look at that track without selecting it (20) | selects it on the press; held, the sixteen, the steps pick (free on the Move) | MOVE_CONTROLS.md decides | [ ] |
+| **Track button held** (an unselected one) | look at that track without selecting it (20) | selects it on the press; held, the sixteen tracks on the screen, the steps picking (free on the Move) | done | [ ] |
 | **Track button + Volume knob** | that track's volume, in dB (16.2) | the same (`VOL`) | done | [ ] |
 | **Mute** | mute the selected track (16.4) | the same | done | [ ] |
 | **Mute + track button** | mute that track (16.4) | the same; its button grey | done | [ ] |
@@ -533,12 +533,12 @@ tempo) touches, and where each stands now.
 | **Shift + Step 6** | Metronome on / off (10.3) | the same; the wheel its level | done | [ ] |
 | **Shift + Step 7** | Groove, 0 % to 100 % triplet sixteenths and past (10.2) | the same, as Melodee's swing 50-75 % | done | [ ] |
 | **Shift + Step 3** | Workflow settings: count-in (13, 14.1.1) | Workflow: quantize, step grid, count-in, Rec Quantize, time signature, max length, metronome, BPM per pattern | done | [ ] |
-| **Shift + Steps 1, 2, 8-11, 15, 16** | Set overview, Setup, 16 Pitches, Keys & Scale, full velocity, Repeat / Arp, double loop, quantize (20) | not yet | MOVE_CONTROLS.md decides | [ ] |
-| **Note / Session toggle** ("Menu", CC 50) | switch Note and Session; held, a peek (5, 17) | Load (samples, modules) | MOVE_CONTROLS.md decides | [ ] |
-| **Loop** | Loop mode: the steps are bars (12.1) | Chop | MOVE_CONTROLS.md decides | [ ] |
+| **Shift + Steps 1, 2, 8-11, 15, 16** | Set overview, Setup, 16 Pitches, Keys & Scale, full velocity, Repeat / Arp, double loop, quantize (20) | the same: Projects (the Set overview), Setup, 16 Pitches, Keys & Scale, Full Velocity, Repeat / Arp, Double Seq, Time Correct | done | [ ] |
+| **Note / Session toggle** ("Menu", CC 50) | switch Note and Session; held, a peek (5, 17) | the same: Play and the patterns grid; held, Session peeks (Load is the wheel's push) | done | [ ] |
+| **Loop** | Loop mode: the steps are bars (12.1) | the same: the pattern's Loop Mode (Chop is in Sample Options, Shift + push) | done | [ ] |
 | **Volume knob** | the main volume (16.1) | the same | done | [ ] |
 | **Wheel, its push, Shift + wheel** | choose, confirm, finer (20, 10.1) | the same on every screen | done | [ ] |
 | **Back** | leave a menu or view (20) | the same | done | [ ] |
 | **Undo, Shift + Undo** | undo, redo (20) | the same, every step named; held, the undo list | done | [ ] |
-| **Capture** | the last notes played into a clip (14.3) | Melodee's Recall of notes (MOVE_CONTROLS.md, Decisions) | sequencer | [ ] |
+| **Capture** | the last notes played into a clip (14.3) | Melodee's Recall of notes; Shift + Capture clears it | done | [ ] |
 | **Sample** ("Sampling") | Sampling mode (15.1) | Melodee's Sample Record (a pad records onto itself), Audio Recall on Shift + Sampling; an audio track's INPUT | done | [ ] |

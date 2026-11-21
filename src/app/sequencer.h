@@ -49,6 +49,9 @@ public:
     // Every input as it comes (after the audio thread had the pads): pads
     // played into Seq Record and Capture, what is held let go.
     void input(const move::SurfaceEvent& event);
+    // A key from MIDI in on track `t`, as it reaches the engine (app/midi.cpp, the MIDI thread, under the lock): as a
+    // pad's, Capture keeps it, Step Edit's ENTRY writes it at the caret, Seq Record at the tick it was heard.
+    void midi_key(unsigned t, int key, int velocity, bool down);
     // Every lights() call: Seq Record's free length growing, the engine's
     // repeats written, the click for Rec only, a launched pattern's loop.
     void tick(Clock::time_point now);
@@ -159,10 +162,13 @@ public:
     uint8_t entry_chance = 100;
     void entry_rest();              // on without writing
     void entry_erase();             // back a step, taking it out
-    // To Pads PATTERN (Melodee's Chop): a note for each slice on `first_pad`
-    // on, where it falls in the sample (`starts`, frames of `frames`), over
-    // the pattern's length; the pattern's notes on those pads first go.
-    void slices_to_pattern(unsigned first_pad, const std::vector<uint32_t>& starts, uint32_t frames);
+    // To Pads PATTERN (Melodee's Chop, as Live's Slice to New MIDI Track):
+    // the pattern it goes into, the selected track's when it holds nothing,
+    // else the first that holds nothing (-1: none); then `made`
+    // (melodee::slice_pattern: a note a slice where it falls) written there,
+    // its own settings kept, and played. A Seq Record take ends first.
+    int slices_target() const;
+    void slices_to_pattern(unsigned target, const melodee::Pattern& made);
     // The playhead by Q (Session's wheel, Melodee's Shift + wheel): playing,
     // it jumps; stopped, Play continues from it.
     void move_playhead(int steps);
@@ -210,6 +216,9 @@ private:
     std::array<std::vector<int>, move::pad_count> pad_chords; // and all its keys (a chord pad's)
     std::array<int, move::pad_count> pad_tracks {};
     std::vector<uint8_t> keys_down; // a note track's keys held, for a step's chord
+    std::array<std::bitset<128>, melodee::track_count> midi_held {}; // MIDI in's keys held, a track each
+    bool midi_entry_written = false;                                // ENTRY: MIDI keys written; the caret moves once they go
+    void entry_write(const std::vector<int>& keys, int velocity);    // ENTRY: keys at the caret
     bool click_now = false;
     // Capture.
     std::unique_ptr<melodee::CaptureRing> ring;

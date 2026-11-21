@@ -13,6 +13,7 @@
 // .xty) opens the LOAD KIT sheet (load_kit.cpp), Shift held the browser's
 // options (Save Sample, Save Bank). A Standard MIDI File's notes load onto
 // the track's pattern playing (song_desk.h, as Melodee's browser loads one).
+#include "app/instruments.h"
 #include "app/sampling.h"
 #include "app/pad_layout.h"
 #include "app/screens/kit_common.h"
@@ -64,7 +65,13 @@ public:
         root = folder = places[size_t(std::max(place, 0))].path;
     }
 
-    void enter() override { seen_installs = sampling().installs; seen_deletes = sampling().deletes; list_folder(); landed(); }
+    void enter() override {
+        seen_installs = sampling().installs;
+        seen_deletes = sampling().deletes;
+        seen_changes = studio.file_changes;
+        list_folder();
+        landed();
+    }
     void leave() override { sampling().preview_file("", studio.track()); }
 
     bindings::Screen screen_kind() const override { return bindings::Screen::Browser; }
@@ -113,6 +120,13 @@ public:
             if (!s.installed.empty()) open_folder(s.installed);
         }
         if (s.deletes != seen_deletes) { seen_deletes = s.deletes; list_folder(); landed(); }
+        if (studio.file_changes != seen_changes) { // the web page put a file here, or took one away
+            seen_changes = studio.file_changes;
+            const auto* was = cursor < int(entries.size()) ? &entries[size_t(cursor)] : nullptr;
+            std::string name = was ? was->name : std::string();
+            list_folder();
+            if (!name.empty()) land_on(name);
+        }
         // The pad a file loads onto blinks (the Move's browser), the kit's in their colour, where the pad layout puts them.
         kit_pads(studio, lights, int(studio.pad()));
         steps_playhead(studio, lights);
@@ -203,7 +217,7 @@ private:
     // The cursor landed: a file plays (PREVIEW), anything else stops one.
     void landed() {
         const Entry* entry = at_cursor();
-        bool plays = entry && (entry->kind == Kind::File || entry->kind == Kind::Program);
+        bool plays = entry && ((entry->kind == Kind::File && entry->tag.empty()) || entry->kind == Kind::Program); // an instrument: no preview
         sampling().preview_file(plays ? entry->path : std::string(), studio.track());
     }
 
@@ -292,6 +306,8 @@ private:
                     found.push_back({name, item.path().string(), Kind::Program, List::None, -1, melodee::is_drum_program(item.path().string()) ? "KIT" : "PROG"});
                 else if (is_bank_file(item.path())) found.push_back({name, item.path().string(), Kind::Bank, List::None, -1, "BANK"});
                 else if (is_midi_file(item.path())) found.push_back({name, item.path().string(), Kind::Midi});
+                else if (instrument_file(item.path().string()) && !soundfont_file(item.path().string())) // an SFZ, EXS, DecentSampler
+                    found.push_back({name, item.path().string(), Kind::File, List::None, -1, instrument_format(item.path().string())});
             }
             std::sort(found.begin(), found.end(), [](const Entry& a, const Entry& b) {
                 auto rank = [](Kind k) { return k == Kind::Program ? 0 : k == Kind::Folder ? 1 : 2; }; // programs, folders, files
@@ -310,7 +326,7 @@ private:
     std::string root, folder;
     std::vector<Entry> entries;
     int cursor = 0;
-    unsigned seen_installs = 0, seen_deletes = 0;
+    unsigned seen_installs = 0, seen_deletes = 0, seen_changes = 0;
     std::string pending, refused;
 };
 

@@ -184,6 +184,9 @@ void test_decisions() {
     CHECK(resolve(kit, use_of(Control::Capture, Gesture::Press, held::shift)) == Job::ClearRecall);
     CHECK(resolve(kit, use_of(Control::Sampling)) == Job::SamplingMode);
     CHECK(resolve(kit, use_of(Control::Sampling, Gesture::Press, held::shift)) == Job::AudioRecall);
+    // Note/Session held + Sampling: PRINT, from the patterns grid (Melodee's Seq held + Sample Record).
+    CHECK(resolve(kit, use_of(Control::Sampling, Gesture::Press, held::note)) == Job::Print);
+    CHECK(resolve({Screen::Session, Track::Kit}, use_of(Control::Sampling, Gesture::Press, held::note)) == Job::Print);
     // Kit pads: 32, Plus and Minus 16 more; Shift + Step 8, the right 16 pitches.
     CHECK(resolve(kit, use_of(Control::Plus)) == Job::PadBank);
     CHECK(resolve(synth, use_of(Control::Plus)) == Job::Octave);
@@ -295,6 +298,17 @@ void test_gestures() {
         CHECK(due.size() == 1 && due[0].gesture == Gesture::Hold && resolve(kit, due[0]) == Job::UndoList);
         CHECK(g.tick(t0 + 900ms).empty());
         CHECK(g.feed(button(Button::Undo, false), t0 + 1s).empty());
+    }
+    {   // Note/Session held counts for Sampling only: its peek's pads launch as Session's do.
+        Gestures g;
+        g.feed(button(Button::Menu, true), t0);
+        auto due = g.tick(t0 + 450ms);
+        CHECK(due.size() == 1 && resolve(kit, due[0]) == Job::PeekSession);
+        auto sampling = g.feed(button(Button::Sample, true), t0 + 500ms);
+        CHECK(sampling.size() == 1 && sampling[0].held == held::note && resolve({Screen::Session, Track::Kit}, sampling[0]) == Job::Print);
+        g.feed(button(Button::Sample, false), t0 + 550ms);
+        auto step = g.feed(button(Button::Undo, true), t0 + 600ms);
+        CHECK(step.size() == 1 && step[0].held == held::none);
     }
     {   // A modifier: Track 1 held, step 9 picks track 9; Track 1 neither selects nor peeks.
         Gestures g;
