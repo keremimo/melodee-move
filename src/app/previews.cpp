@@ -121,6 +121,7 @@ bool mixer_previews(MelodeeApp& melodee, const juce::File& folder, Send& send, P
 int write_previews(const std::string& directory, const std::string& modules) {
     auto folder = juce::File::getCurrentWorkingDirectory().getChildFile(juce::String(directory.c_str()));
     folder.createDirectory();
+    if (!write_sequencer_previews(folder.getChildFile("sequencer"))) return 1; // the sequencer's, beside its mockups
     auto samples = folder.getChildFile("samples");
     samples.createDirectory();
     auto loop = samples.getChildFile("Break 120.wav").getFullPathName().toStdString();

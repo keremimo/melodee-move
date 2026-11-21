@@ -117,6 +117,7 @@ struct ModuleTrack {
 };
 
 class Screen;
+class Sequencer;
 
 class Studio {
 public:
@@ -317,6 +318,31 @@ public:
     void fx_released(uint8_t entry); // its slot let it go: handed back, then destroyed
     FxModule* fx_module(uint8_t entry);
     void fx_set(FxModule& fx, const std::string& key, const std::string& value);
+    // The sequencer (sequencer.h): the Move's step sequencing, Loop Mode,
+    // Session, Seq Record and Capture on Melodee's patterns. Under `lock`.
+    Sequencer& sequencer() { return *seq; }
+    const Sequencer& sequencer() const { return *seq; }
+    // What the audio thread did with a pad's last press (audio_event()),
+    // read by the MIDI thread when the same press reaches it: the track and
+    // key it went to (also when the press stayed quiet), how hard, where the
+    // track's pattern was, and whether it sounded. Seq Record writes the
+    // note at the tick it was heard; a step held + the pad adds that key.
+    struct PadStamp {
+        std::atomic<int> track {-1}, key {-1}, velocity {0}, position {-1};
+        std::atomic<uint32_t> ticks {0};
+        std::atomic<bool> sounded {false};
+    };
+    const PadStamp& stamp(unsigned pad) const { return stamps[pad % pad_count]; }
+    // MIDI thread: the track the pads play repeats its keys (1, Note Repeat)
+    // or plays them through its arp (2; 3 latched, the let-go not sent), 0
+    // neither; the audio thread sends the pad's key there instead of a note.
+    // Sequencer::route_pads() sets it from the track.
+    void pads_repeat(int how) { audio_repeat.store(how, std::memory_order_relaxed); }
+    // The time signature as the modules read it (set_module_transport()).
+    void signature_to_modules(unsigned beats, unsigned unit) {
+        audio_beats.store(beats, std::memory_order_relaxed);
+        audio_unit.store(unit, std::memory_order_relaxed);
+    }
 
 private:
     void forward();                        // audio thread: the ring into the host
@@ -370,7 +396,11 @@ private:
     // another job than its sound (Shift, Copy, Delete, Mute or a step held;
     // bindings::pad_sounds()), so it stays quiet.
     std::atomic<bool> pads_quiet {false};
-    struct Went { int track = -1, key = -1; };
+    std::atomic<int> audio_repeat {0};
+    std::atomic<unsigned> audio_beats {4}, audio_unit {4}; // the time signature, for the modules' transport
+    std::array<PadStamp, pad_count> stamps {};
+    std::unique_ptr<Sequencer> seq;
+    struct Went { int track = -1, key = -1, how = 0; };
     std::array<Went, pad_count> pad_went {};
     // Schwung's effects by plug-in entry, and those handed back by the
     // audio thread waiting to be destroyed. Before `engine`, which holds

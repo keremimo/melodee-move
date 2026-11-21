@@ -5,8 +5,8 @@
 # whole runtime against a simulated Move (the spike: a pad, the jogwheel to
 # LATENCY, the meter timing clicks through a 300-frame cable, Shift + Back to
 # quit; Melodee: load, chop, To Pads, saved and restored, transport and
-# tempo, the pad layout set to MPC banks and kept, the synth track saved and
-# restored, the busy mix playing),
+# tempo, the sequencer's steps, Play and Rec, the pad layout set to MPC banks
+# and kept, the synth track saved and restored, the busy mix playing),
 # and the packages in dist/. When Melodee's own page previews are at hand
 # (MELODEE_PREVIEWS, by default ../melodee-sample/build/melodee-preview),
 # also crush them to the Move's 128 x 64 screen in build/crushed.
@@ -54,6 +54,11 @@ RESTORE_EXPECTED='page=kit-play .*pad=A02 samples=1 pads=17 loading=0 saves=1 un
 # at 380. Still playing at the end.
 TRANSPORT_SCRIPT='100:0xb0,85,127;101:0xb0,85,0;300:0xb0,49,127;301:0x90,20,127;302:0x80,20,0;303:0xb0,49,0;320:0xb0,14,2;340:0xb0,3,127;341:0xb0,3,0;360:0xb0,49,127;361:0x90,21,127;362:0x80,21,0;363:0xb0,49,0;380:0xb0,51,127;381:0xb0,51,0'
 TRANSPORT_EXPECTED='page=kit-play .*playing=1 tick=[1-9][0-9]* tempo=122.0 click=1'
+# The sequencer (docs/UI.md, Sequencer), on that project: Steps 1, 5, 9, 13
+# tapped at 50-81 (A02's lane), Play at 100, Rec at 200 (recording at
+# once while playing), A02 hit four times from 300; still recording at the end.
+SEQUENCER_SCRIPT='50:0x90,16,127;51:0x80,16,0;60:0x90,20,127;61:0x80,20,0;70:0x90,24,127;71:0x80,24,0;80:0x90,28,127;81:0x80,28,0;100:0xb0,85,127;101:0xb0,85,0;200:0xb0,86,127;201:0xb0,86,0;300:0x90,69,100;330:0x80,69,0;500:0x90,69,100;530:0x80,69,0;700:0x90,69,100;730:0x80,69,0;900:0x90,69,100;930:0x80,69,0'
+SEQUENCER_EXPECTED='playing=1 .*seq_notes=[5-9] .*rec=1'
 # The pad layouts, on that project (A01 the loop, A02 to B01 its 16
 # slices): Shift + Step 2 at 100 opens Setup > PADS, push edits LAYOUT, the
 # wheel right turns it to Banks, push sets it, Back at 180; the bottom row's
@@ -84,6 +89,7 @@ docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE
     $MOUNT melodee-move-builder sh -c "
     make -j4 &&
     build/move-tests &&
+    build/sequencer-tests &&
     build/controls-tests &&
     build/mixer-tests &&
     build/pad-layout-tests &&
@@ -107,6 +113,9 @@ docker run --rm --platform linux/arm64 -v "$PWD:/work" -v "$(cd "$MELODEE_SAMPLE
     { build/melodee-move --backend simulated --samples build/simulated-samples --home build/simulated-home --seconds 3 --script '$TRANSPORT_SCRIPT' 2> build/simulated-transport.log || true; } &&
     tail -n 1 build/simulated-transport.log &&
     grep -qE '$TRANSPORT_EXPECTED' build/simulated-transport.log &&
+    { build/melodee-move --backend simulated --samples build/simulated-samples --home build/simulated-home --seconds 4 --script '$SEQUENCER_SCRIPT' 2> build/simulated-sequencer.log || true; } &&
+    tail -n 1 build/simulated-sequencer.log &&
+    grep -qE '$SEQUENCER_EXPECTED' build/simulated-sequencer.log &&
     { build/melodee-move --backend simulated --samples build/simulated-samples --home build/simulated-home --seconds 4 --script '$KIT_SCRIPT' 2> build/simulated-kit.log || true; } &&
     tail -n 1 build/simulated-kit.log &&
     grep -qE '$KIT_EXPECTED' build/simulated-kit.log &&

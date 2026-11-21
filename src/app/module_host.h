@@ -235,5 +235,9 @@ void module_input(const move::AudioBlock& input);
 
 // What a module reads of Melodee's clock (get_bpm(), schwung_move_info()).
 void set_module_tempo(float bpm);
+// And of its transport (get_clock_status(), get_beat_position(), the
+// move_info's playing, song beats and time signature): the audio thread's,
+// once a block, atomics only.
+void set_module_transport(bool playing, double beats, unsigned upper, unsigned lower);
 
 } // namespace app

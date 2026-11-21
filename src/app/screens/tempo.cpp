@@ -63,8 +63,8 @@ public:
         ui::rail(g, "TMPO", "", std::to_string(signature.beats) + "/" + std::to_string(signature.unit));
         char bpm[16];
         std::snprintf(bpm, sizeof bpm, "%u.%u", studio.tempo() / 10, studio.tempo() % 10);
-        big(g, bpm, "BPM");
-        move::draw_text(g, ui::content_x + 4, 40, "SHIFT: FINER");
+        big(g, bpm, "BPM  TAP STEPS"); // the steps tap it (sequencer.h, Kerem 2026-11-20)
+        move::draw_text(g, ui::content_x + 4, 40, "< HALF  DOUBLE >");
         ui::detail(g, "PUSH: OK", bar_beat(studio));
     }
     Knob knob(unsigned which) const override {

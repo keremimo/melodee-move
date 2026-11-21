@@ -2,6 +2,7 @@
 #include "app/studio.h"
 #include "app/pad_layout.h"
 #include "app/screen.h"
+#include "app/sequencer.h"
 #include "melodee/engine/engine_info.h"
 #include "melodee/model/scales.h"
 #include "melodee/shell/pad_gap.h"
@@ -170,6 +171,7 @@ std::unique_ptr<Sample> read_sample(const std::string& path, std::string& error,
 
 Studio::Studio(std::string library_folder, std::string home_folder, std::string modules_folder)
     : library(std::move(library_folder)), song(std::make_unique<melodee::Project>()), bank(std::make_unique<melodee::PatternBank>()) {
+    seq = std::make_unique<Sequencer>(*this);
     std::error_code error;
     home_path = std::move(home_folder);
     if (home_path.empty()) home_path = fs::is_directory(move_user_data, error) ? move_home : (fs::current_path(error) / "Melodee").string();
@@ -212,6 +214,7 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
         std::string line;
         if (std::getline(in, line) && line == settings_header)
             while (std::getline(in, line)) {
+                if (seq->setting_line(line)) continue; // the sequencer's (Workflow, Loop Mode's loops)
                 std::istringstream fields(line);
                 std::string word;
                 unsigned value = 0;
@@ -301,6 +304,9 @@ void Studio::render(const move::AudioBlock& input, move::AudioBlock& output) {
     forward();
     module_input(input);
     engine->render(output.data(), move::audio_frames, volume.load(std::memory_order_relaxed), input.data());
+    // Melodee's transport, for the modules that follow it (sequencer.h): stores only.
+    set_module_transport(engine->playing(), engine->ticks() / double(melodee::ticks_per_quarter), audio_beats.load(std::memory_order_relaxed),
+                         audio_unit.load(std::memory_order_relaxed));
 }
 
 void Studio::audio_opened(const move::AudioFormat& format) {
@@ -325,11 +331,11 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
         if (input.pressed) {
             went = {};
             if (pads_typing.load(std::memory_order_relaxed)) return; // a letter, not a note
-            if (pads_quiet.load(std::memory_order_relaxed)) return;  // another job (docs/MOVE_CONTROLS.md)
             int track = audio_track.load(std::memory_order_relaxed);
             auto kind = TrackKind(audio_kind.load(std::memory_order_relaxed));
             int16_t velocity = int16_t(std::max<int>(1, input.value));
             int key = -1;
+            int pitch_pad = -1, pitch_semitones = 0; // 16 Pitches: the last pad at a pitch
             if (kind == TrackKind::Kit) {
                 // The kit's pads: two banks of 16 from the lower in view; with
                 // 16 Pitches, the left 16 one bank as the MPC lays it and the
@@ -341,24 +347,43 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
                 } else if (audio_pitches.load(std::memory_order_relaxed)) {
                     unsigned n = logical_pad(input.index, PadLayout::Banks);
                     if (n >= 16) {
-                        int semitones = audio_semitones[n - 16].load(std::memory_order_relaxed);
-                        int pad = audio_levels_pad.load(std::memory_order_relaxed);
-                        went = {track, melodee::pad_note(int(melodee::sampler_first_note) + pad, semitones)};
-                        engine->send({Type::PadNote, uint8_t(track), uint8_t(semitones + 64), uint16_t(pad), velocity});
-                        return;
+                        pitch_semitones = audio_semitones[n - 16].load(std::memory_order_relaxed);
+                        pitch_pad = audio_levels_pad.load(std::memory_order_relaxed);
+                        key = melodee::pad_note(int(melodee::sampler_first_note) + pitch_pad, pitch_semitones);
+                    } else {
+                        key = int(melodee::sampler_first_note + (bank + n) % melodee::sampler_pads);
                     }
-                    key = int(melodee::sampler_first_note + (bank + n) % melodee::sampler_pads);
                 } else {
                     key = int(melodee::sampler_first_note + (bank + logical_pad(input.index, pad_layout())) % melodee::sampler_pads);
                 }
             } else if (kind == TrackKind::Synth || kind == TrackKind::Keys || kind == TrackKind::Midi || kind == TrackKind::Plugin) {
                 key = note_for(input.index, audio_octave.load(std::memory_order_relaxed));
             }
+            // Stamped for the MIDI thread (Seq Record, a step held + the pad), quiet or not.
+            auto& stamp = stamps[input.index];
+            stamp.sounded.store(false, std::memory_order_relaxed);
+            stamp.track.store(track, std::memory_order_relaxed);
+            stamp.key.store(key, std::memory_order_relaxed);
+            stamp.velocity.store(velocity, std::memory_order_relaxed);
+            stamp.position.store(engine->position_of(unsigned(track)), std::memory_order_relaxed);
+            stamp.ticks.store(engine->ticks(), std::memory_order_relaxed);
+            if (pads_quiet.load(std::memory_order_relaxed)) return;  // another job (docs/MOVE_CONTROLS.md)
             if (key < 0) return;
-            went = {track, key};
-            engine->send({Type::NoteOn, uint8_t(track), 0, uint16_t(key), velocity});
+            if (pitch_pad >= 0) { // the pad at a pitch: not repeated or arpeggiated
+                went = {track, key};
+                engine->send({Type::PadNote, uint8_t(track), uint8_t(pitch_semitones + 64), uint16_t(pitch_pad), velocity});
+                stamp.sounded.store(true, std::memory_order_release);
+                return;
+            }
+            // Note Repeat or the arp takes the key and plays it on the clock (engine/note_repeat.h).
+            int how = audio_repeat.load(std::memory_order_relaxed);
+            went = {track, key, how};
+            engine->send({how == 1 ? Type::RepeatKey : how >= 2 ? Type::ArpKey : Type::NoteOn, uint8_t(track), 0, uint16_t(key), velocity});
+            stamp.sounded.store(true, std::memory_order_release);
         } else if (went.track >= 0) {
-            engine->send({Type::NoteOff, uint8_t(went.track), 0, uint16_t(went.key), 0});
+            if (went.how != 3) // a latched arp keeps the key (Melodee's Context::key())
+                engine->send({went.how == 1 ? Type::RepeatKey : went.how == 2 ? Type::ArpKey : Type::NoteOff, uint8_t(went.track), 0,
+                              uint16_t(went.key), 0});
             went = {};
         }
     } else if (input.kind == Kind::PadPressure && went.track >= 0 && went.key < 128) {
@@ -721,7 +746,11 @@ std::string Studio::install(std::unique_ptr<Sample> sample, unsigned t, unsigned
 
 // ---------------------------------------------------------------- transport and tempo
 
-void Studio::play() { send({Type::Play}); }
+void Studio::play() {
+    Command command {Type::Play};
+    command.position = seq->take_play_from(); // Continue from the playhead moved by Q (Session's wheel); else the top
+    send(command);
+}
 void Studio::stop() { send({Type::Stop}); }
 void Studio::restart() {
     if (!engine->playing()) return;
@@ -895,6 +924,7 @@ std::string Studio::settings_text() const {
     std::ostringstream out;
     out << settings_header << '\n' << "track " << selected << '\n' << "click " << int(click_on) << '\n' << "click_level " << click_volume << '\n';
     out << "pads " << int(pad_layout() == PadLayout::Banks) << '\n';
+    out << seq->settings_text();
     return out.str();
 }
 
@@ -1492,6 +1522,7 @@ std::string Studio::status() const {
                   engine->render_threads(), double(engine->render_load()));
     line += text;
     for (const auto& screen : screens) line += screen->status();
+    line += seq->status();
     return line;
 }
 

@@ -151,6 +151,13 @@ void test_decisions() {
     CHECK(resolve(kit, use_of(Control::Loop, Gesture::Tap)) == Job::LoopMode);
     CHECK(resolve(kit, use_of(Control::Loop)) == Job::Nothing);
     CHECK(resolve(kit, use_of(Control::Loop, Gesture::Press, held::shift)) == Job::Nothing);
+    // The sequencer's (Kerem, 2026-11-20): Shift + Loop tapped Melodee's SEQ pages, Loop held Fill,
+    // a step held + push Melodee's TRIG on the knobs.
+    CHECK(resolve(kit, use_of(Control::Loop, Gesture::Tap, held::shift)) == Job::SeqPages);
+    CHECK(resolve(kit, use_of(Control::Loop, Gesture::Hold)) == Job::Fill);
+    CHECK(resolve(kit, use_of(Control::WheelTurn, Gesture::Turn, held::shift | held::loop)) == Job::LoopLengthFine);
+    CHECK(resolve(kit, use_of(Control::WheelPush, Gesture::Press, held::step, 0, 3)) == Job::StepTrig);
+    CHECK(resolve(kit, use_of(Control::Knob, Gesture::Turn, held::step, 0, 3)) == Job::StepMotion);
     CHECK(resolve(kit, use_of(Control::WheelPush, Gesture::Press, held::shift)) == Job::SampleOptions);
     CHECK(resolve(synth, use_of(Control::WheelPush, Gesture::Press, held::shift)) == Job::ModuleMenu);
     // Note/Session switches Play and Session; Load is the wheel's push; pages Shift + turn.
@@ -188,7 +195,8 @@ void test_decisions() {
     // Shift + steps: the Move's, and Melodee's 4, 12, 13; Tempo on Step 5, Shift + Play restarts.
     const Job jobs[16] {Job::Projects, Job::Setup, Job::Workflow, Job::Mixer, Job::Tempo, Job::Metronome, Job::Groove, Job::SixteenPitches,
                         Job::KeysAndScales, Job::FullVelocity, Job::Repeat, Job::Looper, Job::Song, Job::NewPattern, Job::DoubleLoop, Job::Quantize};
-    for (int n = 0; n < 16; ++n) CHECK(resolve(kit, use_of(Control::Step, Gesture::Press, held::shift, n)) == jobs[n]);
+    // Shift + Step 16 quantizes on a tap: held, a pad picks the one lane (the Move's 1.4.0).
+    for (int n = 0; n < 16; ++n) CHECK(resolve(kit, use_of(Control::Step, n == 15 ? Gesture::Tap : Gesture::Press, held::shift, n)) == jobs[n]);
     CHECK(resolve(kit, use_of(Control::Play, Gesture::Press, held::shift)) == Job::Restart);
     CHECK(resolve(kit, use_of(Control::Play)) == Job::PlayStop);
     // Shift held: nothing on the screen but the steps (the Shift card was dropped).

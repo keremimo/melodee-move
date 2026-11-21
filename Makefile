@@ -3,6 +3,9 @@
 # their tests, built for linux/arm64 in tools/Dockerfile (./build.sh).
 TARGET := build/melodee-move
 TESTS := build/move-tests
+# The sequencer (docs/UI.md, "Sequencer"): its pattern edits and its keys
+# through the app, apart from move-tests.
+SEQUENCER_TESTS := build/sequencer-tests
 # The controls map (docs/MOVE_CONTROLS.md) against its table, alone: it
 # needs only src/app/bindings.*.
 CONTROLS_TESTS := build/controls-tests
@@ -77,7 +80,7 @@ SHARED_OBJECTS := $(patsubst src/%.cpp,build/obj/%.o,$(wildcard src/move/*.cpp s
 FAKE_MODULE := build/test-modules/sound_generators/fake
 # And a stand-in audio effect, where Schwung keeps them (<id>/<id>.so).
 FAKE_FX := build/test-modules/audio_fx/fake-fx
-all: $(TARGET) $(TESTS) $(CONTROLS_TESTS) $(MIXER_TESTS) $(PAD_TESTS) $(PADS_APP_TESTS) $(FAKE_MODULE)/dsp.so $(FAKE_MODULE)/module.json $(FAKE_MODULE)/page.js \
+all: $(TARGET) $(TESTS) $(SEQUENCER_TESTS) $(CONTROLS_TESTS) $(MIXER_TESTS) $(PAD_TESTS) $(PADS_APP_TESTS) $(FAKE_MODULE)/dsp.so $(FAKE_MODULE)/module.json $(FAKE_MODULE)/page.js \
     $(FAKE_FX)/fake-fx.so $(FAKE_FX)/module.json
 $(FAKE_FX)/fake-fx.so: tests/fake_fx/fake-fx.c
 	@mkdir -p $(@D)
@@ -99,6 +102,8 @@ $(TARGET): build/obj/main.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS)
 $(TESTS): build/obj/tests/move_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS) $(MELODEE_LIBRARY)
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 $(MIXER_TESTS): build/obj/tests/mixer_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS) $(MELODEE_LIBRARY)
+	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
+$(SEQUENCER_TESTS): build/obj/tests/sequencer_tests.o $(SHARED_OBJECTS) $(JUCE_OBJECTS) $(QUICKJS_OBJECTS) $(MELODEE_LIBRARY)
 	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 $(CONTROLS_TESTS): build/obj/tests/controls_tests.o build/obj/app/bindings.o
 	$(CXX) -static-libstdc++ -static-libgcc $^ -pthread -o $@
@@ -133,5 +138,5 @@ $(foreach m,$(MODULE_C),$(eval $(call c_module_rule,$(m))))
 juce: $(JUCE_OBJECTS)
 .PHONY: all clean juce
 clean:
-	rm -rf build/obj $(TARGET) $(TESTS) $(CONTROLS_TESTS) $(MIXER_TESTS) $(PAD_TESTS) $(PADS_APP_TESTS)
+	rm -rf build/obj $(TARGET) $(TESTS) $(SEQUENCER_TESTS) $(CONTROLS_TESTS) $(MIXER_TESTS) $(PAD_TESTS) $(PADS_APP_TESTS)
 -include $(shell find build/obj -name '*.d' 2>/dev/null)
