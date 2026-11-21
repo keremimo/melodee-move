@@ -240,11 +240,11 @@ while Shift is held.
 | Shift + Track button | The track's options: colour, MIDI In and Out channel | Selects it and shows its options: its colour, MIDI IN and MIDI OUT (docs/UI.md, MIDI and sync) | done |
 | Mute held + Track button | Mutes or unmutes the track (its LED dims) | The same | done |
 | Shift + Mute held + Track button | Solos or unsolos the track (its LED blue) | The same | done |
-| Track button held + Copy held + Step | No job (Control Live: Copy + a track button duplicates the track) | Copies that track onto the next step's, asking before replacing | done |
-| Track button held + Delete held + Step | No job (Control Live: Delete + a track button deletes the track) | Deletes that track, asked first | done |
+| Track button held + Copy held + Step | No job (Control Live: Copy + a track button duplicates the track) | Copies that track onto the next step's, asking before replacing: that step again says yes (the wheel's push too), any other step no | done |
+| Track button held + Delete held + Step | No job (Control Live: Delete + a track button deletes the track) | Deletes that track, asked first: the step again says yes (as the Move's Delete + pad, the pad again; the wheel's push too), any other step no; the step asked about lit red | done |
 | Step (Tracks) | (No Melodee screen of tracks on the Move) | In the sixteen tracks latched by Shift + Note/Session: picks that track | done |
-| Copy held + Step (Tracks) | (As above) | Copies that track onto the next step's | done |
-| Delete held + Step (Tracks) | (As above) | Deletes that track, asked first | done |
+| Copy held + Step (Tracks) | (As above) | Copies that track onto the next step's; onto a used one it asks, that step again says yes | done |
+| Delete held + Step (Tracks) | (As above) | Deletes that track, asked first: the step again says yes | done |
 | Mute held + Step (Tracks) | (As above) | Mutes or unmutes that track | done |
 | Shift + Mute held + Step (Tracks) | (As above) | Solos or unsolos that track | done |
 | Track button held + Shift + Copy held + Step | No job | Moves that track: then a step, where it goes; a track there trades places (Melodee's Move) | done |
@@ -301,6 +301,7 @@ while Shift is held.
 | Shift + Wheel turn (list) | Fine (tempo, groove) | Fine | done |
 | Wheel push (list) | Opens an entry, switches it, confirms | The same | done |
 | Pad held + Wheel push (list) | No job | As the push alone; on Keys & Scale's STORE CHORD the pads held are the chord stored | done |
+| Wheel push (Tracks) | (No Melodee screen of tracks on the Move) | Says yes to a track's question (delete, copy onto a used one), as the step asked about pressed again; latched, no job | done |
 | Wheel long push | Confirms a factory reset | Melodee never resets the Move | none |
 | Wheel turn (Chop) | Slicing Mode: the number of slices | The chop's amount: slices, beat division, threshold | done |
 | Wheel push (Chop) | Confirms the slices onto a new Drum Rack | To Pads: Poly, Mono, Thru, Kit | done |

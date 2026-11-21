@@ -138,14 +138,14 @@ std::vector<Screen> tracks_screens() {
             move::draw_text(g, content_x + 2, 4, "TRACK 5 TO 9", 1);
             move::draw_text(g, content_x + 2, 18, "9 HAS FOLEY:", 1);
             move::draw_text(g, content_x + 2, 28, "REPLACE IT?", 1);
-            detail(g, "PUSH YES", "BACK NO");
+            detail(g, "STEP YES", "BACK NO");
         }},
         {"delete", "DELETE + STEP 5", [](juce::Graphics& g) {
             rail(g, "DEL", "5", "KIT");
             move::draw_text(g, content_x + 2, 4, "DELETE TRACK 5?", 1);
             move::draw_text(g, content_x + 2, 18, "BREAKS, 9 PADS", 1);
             move::draw_text(g, content_x + 2, 28, "IT ALL GOES", 1);
-            detail(g, "PUSH YES", "BACK NO");
+            detail(g, "STEP YES", "BACK NO");
         }},
         // Each kind of track, playing.
         {"play-kit", "KIT TRACK 5, PLAYING: BAR 3 BEAT 2", [=](juce::Graphics& g) {

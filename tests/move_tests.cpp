@@ -1360,12 +1360,48 @@ void test_tracks() {
     step(10);
     melodee.surface(make_event(0xb0, button_cc(Button::Copy), 0));
     CHECK(has(melodee.status(), "tracks=4"));
-    melodee.surface(make_event(0xb0, button_cc(Button::Delete), 127)); // Delete held: track 11, asked first
+    auto del = [&](bool down) { melodee.surface(make_event(0xb0, button_cc(Button::Delete), down ? 127 : 0)); };
+    auto copy_1_to_11 = [&] {
+        hold(true);
+        melodee.surface(make_event(0xb0, button_cc(Button::Copy), 127));
+        step(0);
+        step(10);
+        melodee.surface(make_event(0xb0, button_cc(Button::Copy), 0));
+        hold(false);
+    };
+    del(true); // Delete held: track 11, asked first
     step(10);
-    melodee.surface(make_event(0xb0, button_cc(Button::Delete), 0));
+    del(false);
     hold(false);
     CHECK(has(melodee.status(), "page=delete-track") && has(melodee.status(), "tracks=4"));
-    press(melodee, Button::MainPush);
+    step(4); // another step: no
+    CHECK(has(melodee.status(), "page=kit-play") && has(melodee.status(), "tracks=4"));
+    hold(true);
+    del(true);
+    step(10);
+    del(false);
+    hold(false);
+    press(melodee, Button::MainPush); // the wheel's push: yes
+    loudest(melodee, 2);
+    CHECK(has(melodee.status(), "page=kit-play") && has(melodee.status(), "tracks=3"));
+    copy_1_to_11();
+    CHECK(has(melodee.status(), "tracks=4"));
+    hold(true);
+    del(true);
+    step(10);
+    CHECK(has(melodee.status(), "page=delete-track") && has(melodee.status(), "tracks=4"));
+    step(10); // the step again, Delete and the track button still held: yes
+    del(false);
+    hold(false);
+    loudest(melodee, 2);
+    CHECK(has(melodee.status(), "page=kit-play") && has(melodee.status(), "tracks=3"));
+    copy_1_to_11();
+    hold(true);
+    del(true);
+    step(10);
+    del(false);
+    hold(false);
+    step(10); // both let go, the step alone again: yes (and its let-go toggles no step on track 1's pattern, checked below)
     loudest(melodee, 2);
     CHECK(has(melodee.status(), "page=kit-play") && has(melodee.status(), "tracks=3"));
     hold(true); // an empty step: its new-track sheet

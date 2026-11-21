@@ -195,6 +195,8 @@ public:
     int held_step() const;
     bool shift_locked() const { return locked; }
     void reset();
+    // A control still down whose press did its job: its let-go is no tap.
+    void spend(Control control, int index);
 
 private:
     struct Down {

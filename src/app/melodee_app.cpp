@@ -332,6 +332,7 @@ void MelodeeApp::act(const bindings::Use& use) {
     if (Screen* top = studio.top(); top && top == studio.screen(home_screen(studio.kind())) && changes_print(job) &&
                                     studio.song_desk().printer().asks(studio.track())) {
         studio.push("unfreeze");
+    Screen* shown = studio.top();
         return;
     }
     [&] {
@@ -348,6 +349,10 @@ void MelodeeApp::act(const bindings::Use& use) {
             if (top->reset_knob(unsigned(use.index))) studio.name_step("RESET " + top->knob(unsigned(use.index)).name);
             else if (auto* play = studio.screen(home_screen(studio.kind())); play && play != top && play->reset_knob(unsigned(use.index)))
                 studio.name_step("RESET " + play->knob(unsigned(use.index)).name);
+    // A step whose press changed the screen (a track's question answered, a sheet
+    // opened) is spent: its let-go taps nothing on the screen now on top, where
+    // Play's Step would toggle a step. A step has no hold, so nothing else is lost.
+    if (use.control == Control::Step && use.gesture == Gesture::Press && studio.top() != shown) gestures.spend(use.control, use.index);
         }
     }();
     studio.sequencer().after(job, use); // a knob moved while recording, written

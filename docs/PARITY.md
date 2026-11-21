@@ -43,7 +43,8 @@ bindings map decides, and overrides the cell here.
 - Row1-4 pick among the four tracks of the bank in view (the Move's track
   select). A track button held shows the 16 tracks and turns the steps into
   them (free on the Move): a step picks that track, Copy + step copies it,
-  Delete + step deletes it, an empty step opens the new-track sheet.
+  Delete + step asks to delete it (the step again says yes), an empty step
+  opens the new-track sheet.
 - Play plays and stops; Shift + Step 5 / 6 / 7 are tempo, metronome and
   groove, as on the Move; a track button held with the Volume knob is that
   track's volume; Mute (+ Shift) + a track button mutes (solos) it.
@@ -72,7 +73,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **New-track sheet**: the types as a carousel (its undo: MIDI & sync & undo & projects) (MELODEE.md › Playing, An empty track) | done | track button held + empty step; jogwheel, push | [ ] |
 | **Drum sources**: Card (opens the browser), Empty, Input (opens Record) (guide/tracks.md) | done | new-track sheet: KIT, then LIBRARY (Load), EMPTY, INPUT (Sampling) | [ ] |
 | **MIDI track ports** on the new-track sheet: Out jack, USB-C, All USB (guide/tracks.md) | n/a | one port on the Move: a device on USB-A and a computer on USB-C arrive together on cable 2, so there is nothing to pick (docs/MIDI.md) | — |
-| **Delete a track**: sound, kit, patterns; its mix strip stays; asks (its undo: MIDI & sync & undo & projects) (MELODEE.md › The panel, Pad Bank) | done | track button held + Delete + step | [ ] |
+| **Delete a track**: sound, kit, patterns; its mix strip stays; asks (its undo: MIDI & sync & undo & projects) (MELODEE.md › The panel, Pad Bank) | done | track button held + Delete + step, the step again | [ ] |
 | **Copy a track**: sound, kit, 128 patterns, motion; the target keeps its strip; a synth gets its own instance of the module (MELODEE.md › Across every page, Copy) | done | track button held + Copy + step, then a step | [ ] |
 | **Move a track**: trades places; song clips, keys, lanes and sources follow it (MELODEE.md › Across every page, Move) | done | track button held + Shift + Copy + step, then a step (or Shift + Copy + steps on the 16 tracks); a track there trades places; one undo | [ ] |
 | **Stage**: each track's home pages, B1 source, B2 how it plays, B3 where it goes (MELODEE.md › Playing) | done | Shift + the jogwheel: a kit's nine pad pages (TRIM, LAYERS, TUNE, AMP ENV, PLAY, CLOUD, MIX, FILTER, KIT FILT, docs/UI.md "Kits"), a module's pages; the Play screen's knobs first | [ ] |

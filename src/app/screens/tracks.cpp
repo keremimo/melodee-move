@@ -5,7 +5,9 @@
 // track's colour. A step picks its track; an empty one opens the new-track
 // sheet for it. Copy held, a step then another copies the first track onto
 // the second (asking when the second has something); Delete held, a step
-// asks to delete it. The app shows this screen while a track button is held
+// asks to delete it. The step asked about, pressed again, says yes (the
+// Move's Delete + pad, the pad again), as the wheel's push does; any other
+// step says no. The app shows this screen while a track button is held
 // (MelodeeApp), over whatever screen is on top.
 #include "app/screens/common.h"
 #include "app/prints.h"
@@ -34,9 +36,11 @@ public:
     bool job(bindings::Job job, const bindings::Use& use) override {
         using bindings::Job;
         if (job == Job::Back) { studio.close(); return true; }
+        if (job == Job::ListPush) return true; // the wheel's push answers a question; latched, there is none
         if (job != Job::PickTrack && job != Job::CopyTrack && job != Job::ClearTrack && job != Job::MoveTrack) return false;
         if (use.index < 0 || unsigned(use.index) >= melodee::track_count) return true;
         unsigned t = unsigned(use.index);
+        if (question()) { answer(int(t)); return true; } // a track button still held: the steps answer it
         bool used = studio.kind(t) != TrackKind::Empty;
         if (job == Job::ClearTrack) {
             if (!used) return true;
@@ -73,7 +77,8 @@ public:
 
     void lights(move::Lights& lights) override {
         using namespace move;
-        for (unsigned t = 0; t < melodee::track_count; ++t) {
+        if (question()) asked_steps(lights);
+        else for (unsigned t = 0; t < melodee::track_count; ++t) {
             uint8_t colour = studio.kind(t) == TrackKind::Empty ? colour::dark_grey : studio.colour_of(t).bright;
             if (studio.song_desk().printer().frozen(t)) colour = move::nearest_colour({150, 215, 255}); // frozen: ice
             if (int(t) == copy_from) colour = colour::white;
@@ -85,6 +90,7 @@ public:
     }
 
     void draw(juce::Graphics& g) override {
+        if (auto* asked = question()) { asked->draw(g); return; } // drawn over the sixteen while a track button is held
         ui::rail(g, "TRKS", track_number(studio), "/16");
         auto area = ui::content(0, 52);
         int cell_w = area.getWidth() / 4, cell_h = area.getHeight() / 4;
@@ -129,6 +135,26 @@ public:
         studio.name_step("DELETE TRACK " + std::to_string(pending_to + 1), pending_to);
         pending_from = pending_to = -1;
     }
+
+    // The question about a track (delete-track, copy-track), when it is on top.
+    Screen* question() {
+        Screen* top = studio.top();
+        return top && (top->id() == "delete-track" || top->id() == "copy-track") ? top : nullptr;
+    }
+    // A step's answer: the one asked about says yes, any other no.
+    void answer(int step) {
+        Screen* asked = question();
+        if (!asked) return;
+        bool deleting = asked->id() == "delete-track";
+        studio.close();
+        if (step != pending_to) { pending_from = pending_to = -1; return; }
+        if (deleting) erase();
+        else copy();
+    }
+    // The step asked about, red (press it again); the rest dark, as the Question lights its pad.
+    void asked_steps(move::Lights& lights) const {
+        for (unsigned t = 0; t < melodee::track_count; ++t) lights.step(t, int(t) == pending_to ? move::colour::red : move::colour::off);
+    }
     int pending_from = -1, pending_to = -1;
 
 private:
@@ -139,18 +165,23 @@ private:
 Tracks& tracks_of(Studio& studio) { return static_cast<Tracks&>(*studio.screen("tracks")); }
 
 // The question before copying onto a track that has something, or deleting one.
+// It keeps the sixteen's steps (Screen::Tracks): the step asked about, again,
+// says yes, with or without Delete or Copy still held; the wheel's push too.
 class Confirm : public Screen {
 public:
     Confirm(Studio& studio, bool deleting) : Screen(studio), deleting(deleting) {}
 
-    bindings::Screen screen_kind() const override { return bindings::Screen::List; }
-    bool job(bindings::Job job, const bindings::Use&) override {
+    bindings::Screen screen_kind() const override { return bindings::Screen::Tracks; }
+    bool job(bindings::Job job, const bindings::Use& use) override {
         using bindings::Job;
         switch (job) {
         case Job::ListPush:
             studio.close();
             if (deleting) tracks_of(studio).erase();
             else tracks_of(studio).copy();
+            return true;
+        case Job::PickTrack: case Job::CopyTrack: case Job::ClearTrack: case Job::MoveTrack:
+            tracks_of(studio).answer(use.index);
             return true;
         case Job::Back: studio.close(); return true;
         case Job::ListTurn: case Job::ListTurnFine: case Job::TurnKnob: case Job::TurnKnobFine:
@@ -161,7 +192,7 @@ public:
 
     void lights(move::Lights& lights) override {
         using namespace move;
-        steps_playhead(studio, lights);
+        tracks_of(studio).asked_steps(lights);
         for (auto button : {Button::Left, Button::Right, Button::Up, Button::Down, Button::Loop, Button::Menu}) lights.button(button, 0);
         lights.button(Button::Back, white_dim);
     }
@@ -173,6 +204,7 @@ public:
         const auto& target = studio.project().tracks[unsigned(to)];
         ui::system::Question q;
         q.undoable = true;
+        q.yes = "STEP YES"; // the step again (the push too)
         if (deleting) {
             q.rail_top = "DEL"; q.rail_big = std::to_string(to + 1); q.rail_bottom = kind_tag(studio.kind(unsigned(to)));
             q.asked = "DELETE TRACK " + std::to_string(to + 1) + "?";

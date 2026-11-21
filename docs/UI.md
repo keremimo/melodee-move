@@ -157,9 +157,13 @@ Chop), Kerem decides with that map. `docs/ui/tracks.png` is the sheet
 - **Copy held**, with a track button: a step, then another, copies the first
   track onto the second: its sound, kit and patterns; the second keeps its
   mix strip; a synth gets its own instance of the module. Onto a track that
-  has something it asks first (`COPY` / from / `> to`, push yes, Back no).
+  has something it asks first (`COPY` / from / `> to`): that step again says
+  yes, Back or any other step no.
 - **Delete held**, with a track button: a step asks to delete that track
-  (`DEL`), push yes, Back no. Its mix strip stays, as Melodee's Delete.
+  (`DEL`), the step lit red; **the step again says yes** (the Move's Delete +
+  pad, the pad again), with Delete and the track button still held or not;
+  Back or any other step no. The wheel's push says yes too. Its mix strip
+  stays, as Melodee's Delete.
 - **The new-track sheet** (`NEW` / track / `TRK`): kit, synth (a Schwung
   module), keygroup, MIDI, audio; the jogwheel picks, push makes it. A kit
   goes on to Load, a synth to its modules. Push on an empty track's screen
@@ -191,8 +195,8 @@ Chop), Kerem decides with that map. `docs/ui/tracks.png` is the sheet
 | --- | --- | --- | --- |
 | Track button held | `TRKS` / track / `/16` | the sixteen as a grid, a row a bank | track, kind, name; `COPY: A STEP`, `DELETE: A STEP` |
 | New track | `NEW` / track / `TRK` | kit, synth, keygroup, MIDI, audio | `PUSH: MAKE` |
-| Copy onto a used track | `COPY` / from / `> to` | the question | `PUSH YES`, `BACK NO` |
-| Delete | `DEL` / track / kind | the question | `PUSH YES`, `BACK NO` |
+| Copy onto a used track | `COPY` / from / `> to` | the question | `STEP YES`, `BACK NO` |
+| Delete | `DEL` / track / kind | the question | `STEP YES`, `BACK NO` |
 | Empty track | `----` / track | `EMPTY` | `PUSH: NEW TRACK` |
 | Keygroup, MIDI, audio, plug-in | `KEYS`, `MIDI`, `AUD`, `PLUG` / track / lowest note or channel | what it plays | kind; the bar and beat while playing |
 | Track volume (track button held, Volume knob) | `VOL` / track / `TRK` | the track's volume in dB, a bar | |
