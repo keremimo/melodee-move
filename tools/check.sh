@@ -94,6 +94,8 @@ lane web_tests build/web-tests
 lane instruments build/instruments-tests
 lane boot_entry sh tests/boot_entry_test.sh
 lane heal sh tests/heal_test.sh
+# ellic-core's own tests (core/tests/core_tests.cpp): the engine as this build has it.
+lane core make -C core -j"$JOBS" test
 lanes
 if [ "$MODE" = quick ]; then
     phase "quick: done"
