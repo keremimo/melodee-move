@@ -1355,6 +1355,19 @@ void test_kit_depth() {
         CHECK(studio.current().pads[48].used() && studio.current().pads[48 + 6].used());
     }
     melodee.service(); // its files: the same slots, nothing read again
+    // Shift held in the samples browser: its options (Save Sample, Save Bank).
+    press_button(melodee, Button::MainPush); // the wheel's push on the pad: the samples browser
+    CHECK(has(status(), "page=load-samples"));
+    melodee.surface(make_event(0xb0, button_cc(Button::Shift), 127));
+    {
+        Lights lights;
+        melodee.lights(lights, std::chrono::steady_clock::now() + std::chrono::milliseconds(500));
+    }
+    melodee.surface(make_event(0xb0, button_cc(Button::Shift), 0));
+    CHECK(has(status(), "page=browser-options"));
+    press_button(melodee, Button::Back);
+    CHECK(has(status(), "page=load-samples"));
+    press_button(melodee, Button::Back);
     press_button(melodee, Button::Up);
     press_button(melodee, Button::Up);
     CHECK(has(status(), " bank=2 "));

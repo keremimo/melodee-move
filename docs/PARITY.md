@@ -75,7 +75,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Delete a track**: sound, kit, patterns; its mix strip stays; asks (its undo: MIDI & sync & undo & projects) (MELODEE.md › The panel, Pad Bank) | done | track button held + Delete + step | [ ] |
 | **Copy a track**: sound, kit, 128 patterns, motion; the target keeps its strip; a synth gets its own instance of the module (MELODEE.md › Across every page, Copy) | done | track button held + Copy + step, then a step | [ ] |
 | **Move a track**: trades places; song clips, keys, lanes and sources follow it (MELODEE.md › Across every page, Move) | MIDI & sync & undo & projects | track button held + Shift + Copy + step, then a step | [ ] |
-| **Stage**: each track's home pages, B1 source, B2 how it plays, B3 where it goes (MELODEE.md › Playing) | kit depth | the track's Play screen (done: a kit's PLAY knobs, a module's pages); the rest as pad pages, Left / Right | [ ] |
+| **Stage**: each track's home pages, B1 source, B2 how it plays, B3 where it goes (MELODEE.md › Playing) | done | Shift + the jogwheel: a kit's nine pad pages (TRIM, LAYERS, TUNE, AMP ENV, PLAY, CLOUD, MIX, FILTER, KIT FILT, docs/UI.md "Kits"), a module's pages; the Play screen's knobs first | [ ] |
 | **Synth presets**: walked, loaded a moment after the last turn (MELODEE.md › Playing, A synth) | done | jogwheel (Schwung modules) | [ ] |
 | **Synth EDIT**: the instrument's own parameters and page map (MELODEE.md › Playing, Edit) | done | knobs 1-8, Left / Right; push: the module's menu | [ ] |
 | **Macro knobs FILTER, ECHO, SPACE** on every plug-in track, saved, recorded as motion (MELODEE.md › Playing, A synth) | instruments | a page of knobs on module tracks | [ ] |
@@ -90,7 +90,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Drums layout**: a drum plug-in's or MIDI drum machine's pads from note 36, voices named (MELODEE.md › Playing, Drums) | instruments | 32 pads are notes 36-67; Up / Down the bank | [ ] |
 | **Pads page**: the bank's pads each drawing its waveform (MELODEE.md › Playing, Pads) | n/a | 128 x 64 cannot show 32 waveforms; the pads light in their colours and the screen shows the last pad | — |
 | **Sounds**: a MIDI track's saved sounds (`.mlds`), favourites (MELODEE.md › Playing, Sounds) | MIDI & sync & undo & projects | Menu (load) on a MIDI track | [ ] |
-| **16 Levels**: the last pad or note on every pad as Velocity, Filter, Tune, Scale or Zones; ends, octave; a MIDI keyboard plays the pad on every key (MELODEE.md › Playing, 16 Levels) | kit depth | Places > 16 Levels; the levels over the pads; knobs type and ends | [ ] |
+| **16 Levels**: the last pad or note on every pad as Velocity, Filter, Tune, Scale or Zones; ends, octave; a MIDI keyboard plays the pad on every key (MELODEE.md › Playing, 16 Levels) | done | as the Move's 16 Pitches (Shift + Step 8): the last pad on the right 16 in the project's key (Melodee's Scale; Kerem, 2026-11-20), Plus / Minus the octave; the left 16 one bank. Velocity, Filter, Tune and Zones are not on the Move's Layout | [ ] |
 | **Note Repeat**: 1/4-1/64 and triplets, swung, pressure as velocity, written under Seq Record (MELODEE.md › Playing, Note Repeat) | sequencer | Shift + Step 9 (the MPC's Fader page); the rate to settle | [ ] |
 | **Tempo**: BPM, swing, metronome level, metronome on / off (MELODEE.md › Playing, Tempo) | done | Shift + Step 5 / 6 / 7: tempo, metronome, groove, as on the Move | [ ] |
 | **Tap tempo, halve, double; metronome Rec** (clicks only while recording) (MELODEE.md › The panel; Playing, Tempo) | sequencer | tempo screen: tap a step; Left / Right halve, double; push cycles Off / On / Rec | [ ] |
@@ -196,10 +196,10 @@ Kerem has checked it there. `n/a` rows have no box.
 | Feature | Status | Move controls | ✓ |
 | --- | --- | --- | --- |
 | **One kit of 32 pads** on Melodee's SamplerEngine, A01-B16 (MELODEE.md › Sampler) | done | pads | [ ] |
-| **Kits of 128 pads** in banks (the MPC's A-H of 16; here four of 32) (MELODEE.md › Sampler) | kit depth | Up / Down the bank; the rail names it | [ ] |
-| **No count of samples**: memory is the limit; a load that would leave too little is refused, "Memory full" (MELODEE.md › Sampler) | kit depth | automatic | [ ] |
+| **Kits of 128 pads** in banks (the MPC's A-H of 16; here four of 32) (MELODEE.md › Sampler) | done | the 32 pads two of eight banks of 16 (Kerem, 2026-11-20); Plus / Minus move 16; the rail's pad names its bank | [ ] |
+| **No count of samples**: memory is the limit; a load that would leave too little is refused, "Memory full" (MELODEE.md › Sampler) | done | automatic: Melodee's shell/sample_memory.h, 256 MB left free; `MEMORY FULL` | [ ] |
 | **Load samples**: WAV, AIFF, FLAC, Ogg, MP3, from places (My Samples, Recordings, Core Library, /data/UserData) (MELODEE.md › Sampler, Samples) | done | Menu; jogwheel, push; Back up | [ ] |
-| **Long samples streamed** from storage, up to 6 hours; long MP3, FLAC, Ogg, AIFF decoded once into Cache (MELODEE.md › Sampler) | kit depth | automatic (now 60 s at most) | [ ] |
+| **Long samples streamed** from storage, up to 6 hours; long MP3, FLAC, Ogg, AIFF decoded once into Cache (MELODEE.md › Sampler) | done | automatic: over 10 s (up to 6 hours), or what memory has no room for, read in place by Melodee's stream pager; long MP3, FLAC, Ogg, AIFF via Cache | [ ] |
 | **PREVIEW**: each file plays as the cursor lands on it, streamed (MELODEE.md › Sampler, Samples) | sampling | Load page: Shift + push toggles | [ ] |
 | **Load onto a chosen pad** (the MPC: Shift + pad onto the next empty one) (MELODEE.md › Sampler, Samples) | sampling | Load page: tap a pad | [ ] |
 | **STARRED and RECENT**: star a file; the last 16 loaded (MELODEE.md › Sampler, Samples) | sampling | Load page: HERE > Star | [ ] |
@@ -208,25 +208,25 @@ Kerem has checked it there. `n/a` rows have no box.
 | **EXS24 instruments** `.exs` (MELODEE.md › Sampler) | instruments | Menu (load) | [ ] |
 | **SoundFonts** `.sf2`, presets listed as a folder (MELODEE.md › Sampler) | instruments | Menu (load) | [ ] |
 | **DecentSampler presets** `.dspreset` (MELODEE.md › Sampler) | instruments | Menu (load) | [ ] |
-| **An instrument on a kit pad**: its zones by key and velocity; ZONES page, zone tune and level trims (ZTRM) (MELODEE.md › Sampler, SFZ) | kit depth | pad pages; knobs | [ ] |
-| **MPC drum programs**: LOAD KIT sheet, the whole kit or banks, layers, pad colours (MELODEE.md › Sampler) | kit depth | Menu (load); push sheet | [ ] |
+| **An instrument on a kit pad**: its zones by key and velocity; ZONES page, zone tune and level trims (ZTRM) (MELODEE.md › Sampler, SFZ) | kit depth | not yet: an instrument reaches a pad by the instruments' loading of SFZ, programs and SoundFonts (`instruments` rows); ZONES (TRIM's place on such a pad, docs/ui/kit.png) is built once it can | [ ] |
+| **MPC drum programs**: LOAD KIT sheet, the whole kit or banks, layers, pad colours (MELODEE.md › Sampler) | done | the browser lists them tagged KIT; push: LOAD KIT (whole kit, or a program bank into each kit bank, LOAD BANKS); pads of 2-4 layers take them as their own, more (an instrument) wait for the instruments' loading | [ ] |
 | **MPC expansions** `.xpn`: installed into Expansions; program previews (MELODEE.md › Sampler) | sampling | Menu (load); push | [ ] |
-| **Banks** `.mldb`: Save Bank, load into the bank in view (MELODEE.md › Sampler, Banks) | kit depth | Load page: HERE > Save bank | [ ] |
+| **Banks** `.mldb`: Save Bank, load into the bank in view (MELODEE.md › Sampler, Banks) | done | Shift held in the browser: Save Bank (the two banks in view); `.mldb` files listed tagged BANK, a push loads one into the bank of the pad in view | [ ] |
 | **Pad sound knobs**: tune, level, pan, start, end, attack, decay, cutoff (MELODEE.md › Sampler, sample pages) | done | PLAY page, knobs 1-8; Shift finer | [ ] |
-| **TRIM**: loop point, zoom at each handle, Loop Lock, Normalize (MELODEE.md › Sampler, Trim) | kit depth | TIME page; Shift + knob zooms | [ ] |
-| **LAYERS**: four samples a pad, Velocity, Cycle or Random; each layer's tune, level, velocities (MELODEE.md › Sampler, Layers) | kit depth | LAYERS page; knobs | [ ] |
-| **Kit volume** (MELODEE.md › Sampler, Mix) | kit depth | a knob on a pad page | [ ] |
-| **Fine tune and Warp**: cents; Warp Off, 50-200 %, Seq from # Beats (MELODEE.md › Sampler, Tune) | kit depth | TIME page | [ ] |
-| **Warp mode**: Time stretch or Pitch for the kit (MELODEE.md › Shift + pads) | kit depth | Shift + Step 15 | [ ] |
-| **Amp envelope**: release on Note On, velocity sensitivity, decay from start or end (MELODEE.md › Sampler, Amp Env) | kit depth | SHAPE page | [ ] |
-| **Play modes**: Mono / Poly, mute group 1-16, offset, Note On, reverse, loop, Pad Link chains (MELODEE.md › Sampler, Play) | kit depth | SHAPE and TIME pages | [ ] |
-| **Loop seam crossfade** XFADE, 0-250 ms (MELODEE.md › Sampler, Play) | kit depth | TIME page knob | [ ] |
-| **Filter type, resonance and envelope**: Classic, LPF2/4, HPF2/4, BPF2/4; up to seven octaves (MELODEE.md › Sampler, Filter) | kit depth | FILTER page | [ ] |
-| **Follow**: the kit keeps the project's tempo, Beats, Tones or Tape; # Beats (MELODEE.md › Sampler) | kit depth | TIME page | [ ] |
-| **Cloud**: a pad as a grain cloud; position, size, density, scan, spread (MELODEE.md › Playing, A kit) | kit depth | CLOUD page | [ ] |
-| **Kit filter**: one filter after every pad (MELODEE.md › Sampler) | kit depth | FILTER page | [ ] |
-| **COLOUR**: a pad's light colour, the track's, one of sixteen, or the kit's own (MELODEE.md › Playing, A kit) | kit depth | a knob; pad lights | [ ] |
-| **Full Level**: every hit at 127 (MELODEE.md › Shift + pads) | kit depth | Shift + Step 1 | [ ] |
+| **TRIM**: loop point, zoom at each handle, Loop Lock, Normalize (MELODEE.md › Sampler, Trim) | done | TRIM page: start, end, loop point, Loop Lock, gain; Shift + a touch: the handle close up; Normalize in Sample Options | [ ] |
+| **LAYERS**: four samples a pad, Velocity, Cycle or Random; each layer's tune, level, velocities (MELODEE.md › Sampler, Layers) | done | LAYERS page: knob 1 the layer, its velocities, tune, fine, level, pan, how a hit picks; push loads the layer's sample; Sample Options removes it | [ ] |
+| **Kit volume** (MELODEE.md › Sampler, Mix) | done | MIX page, knob 3 | [ ] |
+| **Fine tune and Warp**: cents; Warp Off, 50-200 %, Seq from # Beats (MELODEE.md › Sampler, Tune) | done | TUNE page: tune, fine, Warp (Off, Seq, 50-200 %), # Beats; Shift + touch TUNE on Play: cents | [ ] |
+| **Warp mode**: Time stretch or Pitch for the kit (MELODEE.md › Shift + pads) | done | TUNE page, Follow's mode (Tape is Pitch, Beats and Tones Time stretch): Shift + Step 15 is the Move's double loop | [ ] |
+| **Amp envelope**: release on Note On, velocity sensitivity, decay from start or end (MELODEE.md › Sampler, Amp Env) | done | AMP ENV page: attack, decay, sustain, release, velocity sense, decay from | [ ] |
+| **Play modes**: Mono / Poly, mute group 1-16, offset, Note On, reverse, loop, Pad Link chains (MELODEE.md › Sampler, Play) | done | PLAY page: One Shot / Note On, Mono / Poly, mute group, offset, Pad Link, loop, reverse | [ ] |
+| **Loop seam crossfade** XFADE, 0-250 ms (MELODEE.md › Sampler, Play) | done | PLAY page, knob 8 | [ ] |
+| **Filter type, resonance and envelope**: Classic, LPF2/4, HPF2/4, BPF2/4; up to seven octaves (MELODEE.md › Sampler, Filter) | done | FILTER page: type, cutoff, resonance, envelope amount, attack, decay, sustain, release | [ ] |
+| **Follow**: the kit keeps the project's tempo, Beats, Tones or Tape; # Beats (MELODEE.md › Sampler) | done | TUNE page: Follow, its mode (Beats, Tones, Tape), Pitch; # Beats | [ ] |
+| **Cloud**: a pad as a grain cloud; position, size, density, scan, spread (MELODEE.md › Playing, A kit) | done | CLOUD page: on, position, size, density, scan, spread | [ ] |
+| **Kit filter**: one filter after every pad (MELODEE.md › Sampler) | done | KIT FILT page: type, cutoff, resonance | [ ] |
+| **COLOUR**: a pad's light colour, the track's, one of sixteen, or the kit's own (MELODEE.md › Playing, A kit) | done | MIX page, knob 4: the track's, one of the sixteen track colours, or the pad's own; pad lights | [ ] |
+| **Full Level**: every hit at 127 (MELODEE.md › Shift + pads) | kit depth | not here: Shift + Step 10 is the Move's Full Velocity, the `instruments` row in MOVE_CONTROLS.md; one flag in Studio::audio_event for every track, kits too | [ ] |
 | **Pad sends** into buses A-D, and the kit's send (MELODEE.md › Playing, A kit) | mixer & effects | SENDS page; pads lit by their send | [ ] |
 | **A pad's own chain** of four effects (MELODEE.md › Effects) | mixer & effects | Places > Effects on a pad | [ ] |
 | **Chop**: Auto, Beats, Regions, Threshold; a slice's start and end (MELODEE.md › Sampler, Chop) | done | Loop; knobs 1-4; jogwheel or Left / Right the slice | [ ] |
@@ -347,11 +347,11 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Place bar**: the bars of the pattern playing, how far it has played, coloured by state (MELODEE.md › Across every page) | sequencer | step lights (the playhead); a bar on the rail | [ ] |
 | **Mute mode**: pads mute kit pads or tracks, Shift + pad solos, Shift + Mute unmutes all; kit pad mutes saved (MELODEE.md › Across every page) | mixer & effects | Mute (a tap latches, a hold lasts) + pad; Shift + Mute | [ ] |
 | **Mute and solo tracks** from the overview (MELODEE.md › Pad lights, Tracks) | mixer & effects | track button held + Mute + step | [ ] |
-| **Erase a kit pad**, stopped (MELODEE.md › Across every page, Erase) | kit depth | Delete + pad | [ ] |
-| **Close a gap**: an empty pad erased moves the pads after it down, notes and lanes too (MELODEE.md › Across every page, Erase) | kit depth | Delete + an empty pad | [ ] |
+| **Erase a kit pad**, stopped (MELODEE.md › Across every page, Erase) | done | Delete + pad: its notes first, then its sound (Kerem, 2026-11-20: at once) | [ ] |
+| **Close a gap**: an empty pad erased moves the pads after it down, notes and lanes too (MELODEE.md › Across every page, Erase) | done | Delete + an empty pad: the pads after it to the end of the next bank down one, notes too (Melodee's shell/pad_gap.h) | [ ] |
 | **Erase + pot**: the value back to its start (MELODEE.md › Across every page, Erase) | MIDI & sync & undo & projects | Delete + knob touch | [ ] |
 | **Erase tapped alone**: the page's selection (a note, step, pattern, track, loop, effect, slice, layer, project) (MELODEE.md › Across every page, Erase) | MIDI & sync & undo & projects | Delete tapped | [ ] |
-| **Copy kit pads**: the first pad, then the target (MELODEE.md › Across every page, Copy) | kit depth | Copy + pad, then a pad | [ ] |
+| **Copy kit pads**: the first pad, then the target (MELODEE.md › Across every page, Copy) | done | Copy held + pad, then a pad; onto a pad with a sample it asks | [ ] |
 | **Undo and redo**: the last 32 steps; a take, a control's turns, a press each one (MELODEE.md › Across every page, Undo) | MIDI & sync & undo & projects | Undo; Shift + Undo | [ ] |
 | **Undo list**: the steps with their glyphs and age, back to any one (MELODEE.md › Across every page, Undo) | MIDI & sync & undo & projects | Undo held | [ ] |
 | **Knob takeover**: Pickup, Scaled, Instant (MELODEE.md › Across every page) | n/a | relative knobs have nothing to pick up | — |
@@ -410,7 +410,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Folders named from outside** (`$MELODEE_*` on a host) (MELODEE.md › Files on the card) | done | `--home`, `--samples`, `--modules` | [ ] |
 | **Settings file**: settings, MIDI and Input Config, the project to open at start, the last one (MELODEE.md › Files on the card) | MIDI & sync & undo & projects | automatic | [ ] |
 | **Samples folders**: Recorded, Edits, Banks, Looper, Expansions, Keygroups, Stems (MELODEE.md › Files on the card) | sampling | /data/UserData/Melodee/Samples | [ ] |
-| **Cache**: decoded long samples and instrument files, 4 GB, aged out after 30 days (MELODEE.md › Files on the card) | kit depth | /data/UserData/Melodee/Cache | [ ] |
+| **Cache**: decoded long samples and instrument files, 4 GB, aged out after 30 days (MELODEE.md › Files on the card) | done | /data/UserData/Melodee/Cache (Melodee's shell/sample_cache.h: tidied at start, 4 GB, 30 days) | [ ] |
 | **Export folders**: Mixdowns, Stems, MIDI, MPC 3 (MELODEE.md › Files on the card; guide/song.md) | song & export | /data/UserData/Melodee | [ ] |
 | **SysEx folder** (MELODEE.md › Files on the card) | MIDI & sync & undo & projects | /data/UserData/Melodee/SysEx | [ ] |
 | **Plugins folder**, read only (MELODEE.md › Files on the card) | schwung | covered by Schwung's modules, the Move's plug-ins | — |
@@ -480,7 +480,7 @@ sections, each on Shift + Step n.
 | **Track lights**: each track's colour, the selected one bright (MELODEE.md › Pad lights, Tracks) | done | Row1-4 | [ ] |
 | **Bank lights** A-H (MELODEE.md › Lights) | n/a | no bank lights; the rail names the bank | — |
 | **Level meters**: five lights a side, -24.1 to -0.1 dBFS; the input on Record (MELODEE.md › Lights) | mixer & effects | no meter lights: a meter on the screen | [ ] |
-| **Kit pad lights**: the selected pad Full, a sample Dim, empty dark, muted Faint red, a flare as it sounds; five rungs that keep each colour's hue (MELODEE.md › Pad lights) | kit depth | pad lights | [ ] |
+| **Kit pad lights**: the selected pad Full, a sample Dim, empty dark, muted Faint red, a flare as it sounds; five rungs that keep each colour's hue (MELODEE.md › Pad lights) | done | pad lights: dim in the pad's colour, bright while it sounds, the last pad white, muted dark grey (the Move's dim white), empty off (Kerem, 2026-11-20) | [ ] |
 | **Key lights**: the key's roots in the track's colour, its other notes Dim, out of the key Faint (MELODEE.md › Pad lights) | instruments | pad lights | [ ] |
 | **Pad lights and Pad fade settings**; the Tap Tempo flash (MELODEE.md › Project and system, LIGHTS) | MIDI & sync & undo & projects | Settings | [ ] |
 | **Light show**: Pulse, Sweep, Chase, Ripple, Levels, in time with the tempo (MELODEE.md › Light show) | MIDI & sync & undo & projects | Sample + Mute; Up / Down the style | [ ] |
@@ -489,10 +489,10 @@ sections, each on Shift + Step n.
 
 | Status | Rows |
 | --- | --- |
-| `done` | 55 |
+| `done` | 80 |
 | `sequencer` | 44 |
 | `sampling` | 22 |
-| `kit depth` | 27 |
+| `kit depth` | 2 |
 | `instruments` | 25 |
 | `mixer & effects` | 22 |
 | `song & export` | 21 |

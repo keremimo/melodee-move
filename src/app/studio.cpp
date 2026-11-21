@@ -246,6 +246,8 @@ Studio::Studio(std::string library_folder, std::string home_folder, std::string 
     audio_track.store(int(selected));
     audio_kind.store(int(kind(selected)));
     audio_octave.store(octave(selected));
+    refresh_pads();
+    engine->watch_taps(kind(selected) == TrackKind::Kit ? int(selected) : -1); // the pads' flare
 
     // The screens, one of each, and the track's Play screen shown.
     for (const auto& entry : registered_screens()) {

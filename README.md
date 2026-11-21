@@ -39,6 +39,17 @@ Three parts so far:
   (docs/PARITY.md, sequencer); a project from the MPC plays its patterns.
 - **Play** (a kit track): the last pad's sample. Knobs 1-8: tune, level, pan, start, end,
   attack, decay, cutoff (Shift: finer). Touch a knob to see it large.
+- **Kits at Melodee's depth** (docs/UI.md, "Kits"): 128 pads in eight banks,
+  the 32 pads two of them, Plus and Minus moving 16; Shift + the jogwheel
+  the nine pad pages (TRIM, LAYERS, TUNE with Warp and Follow, AMP ENV,
+  PLAY, CLOUD, MIX with kit volume and COLOUR, FILTER, KIT FILT); Shift +
+  Step 8 16 Pitches of the last pad in the project's key; Copy + a pad and
+  another copies it, Delete + a pad clears its notes, its sound or its gap;
+  Sample Options: Chop, Reverse, Trim Sample, Normalize, Save Sample; bank
+  files and MPC drum programs from the browser; samples over ten seconds
+  (up to six hours) played from storage, long MP3, FLAC, Ogg and AIFF
+  decoded once into `Melodee/Cache`; a load memory has no room for refused
+  (`MEMORY FULL`).
 - **Load** (the wheel's push on the pad, the Move's Device View): WAV,
   AIFF, FLAC, Ogg and MP3 files onto the last pad,
   read by Melodee's own `read_audio`. It opens on a list of places: My

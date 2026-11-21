@@ -248,32 +248,10 @@ private:
         uint32_t frames = std::max<uint32_t>(1, sample->data->model_frames());
         uint32_t at = fine == 3 ? sound.start : sound.end ? sound.end : frames;
         ui::rail(g, "KNOB", std::to_string(fine + 1), fine == 3 ? "STRT" : "END");
-        draw_close_up(g, *sample, at);
+        close_up(g, *sample, at);
         ui::detail(g, seconds(at), "X32");
         return true;
     }
-    // The frames round `at`, 32 times closer than the whole sample, the place a line.
-    void draw_close_up(juce::Graphics& g, const Sample& sample, uint32_t at) {
-        auto area = ui::content(0, ui::subject_height);
-        const auto& data = *sample.data;
-        uint32_t frames = std::max<uint32_t>(1, data.model_frames());
-        uint32_t span = std::max<uint32_t>(uint32_t(area.getWidth()), frames / 32);
-        int64_t from = int64_t(at) - span / 2;
-        std::vector<float> peaks(size_t(area.getWidth()), 0.0f);
-        for (int column = 0; column < area.getWidth(); ++column) {
-            int64_t a = from + int64_t(span) * column / area.getWidth(), b = from + int64_t(span) * (column + 1) / area.getWidth();
-            float peak = 0;
-            for (int64_t f = std::max<int64_t>(a, 0); f < b && f < int64_t(frames); f += std::max<int64_t>(1, (b - a) / 16)) {
-                size_t own = data.own(uint32_t(f));
-                if (own < data.left.size()) peak = std::max(peak, std::abs(data.left[own]));
-                if (own < data.right.size()) peak = std::max(peak, std::abs(data.right[own]));
-            }
-            peaks[size_t(column)] = peak;
-        }
-        ui::waveform(g, area, peaks);
-        g.fillRect(area.getX() + area.getWidth() / 2, area.getY(), 1, area.getHeight());
-    }
-
     void turn(unsigned which, int delta, bool fine_turn) {
         const Sample* sample = studio.sample_of_pad();
         if (!sample) return;

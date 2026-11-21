@@ -324,10 +324,18 @@ private:
         studio.set_pad(studio.track(), studio.pad(), sound);
     }
 
-    // Shift + a knob touched: its value in full, finer to turn.
+    // Shift + a knob touched: its value in full, finer to turn; on TRIM the
+    // start, end and loop point close up (the Move's Sample Start zoom).
     void draw_fine(juce::Graphics& g) {
         auto shown = knob(unsigned(fine));
         if (shown.name.empty()) return;
+        const Sample* sample = studio.sample_of_pad();
+        if (page == Trim && fine <= 2 && sample) {
+            const auto& sound = studio.current().pads[studio.pad()];
+            uint32_t frames = std::max<uint32_t>(1, sample->data->model_frames());
+            uint32_t at = fine == 0 ? sound.start : fine == 1 ? (sound.end ? sound.end : frames) : sound.loop_point();
+            if (close_up(g, *sample, at)) { ui::detail(g, shown.value, "X32"); return; }
+        }
         ui::big_parameter(g, ui::content(4, 44), shown.name, shown.value, shown.fraction);
         ui::detail(g, "SHIFT: FINE");
     }

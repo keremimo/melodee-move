@@ -3,6 +3,7 @@
 #include "app/screens/common.h"
 #include "melodee/model/scales.h"
 #include <chrono>
+#include <cmath>
 
 // What a kit's screens share (docs/UI.md, "Kits"): the pads' lights, the
 // pads in view, a pad's light colour.
@@ -56,6 +57,33 @@ inline void kit_pads(const Studio& studio, move::Lights& lights, int blinking = 
         else shown = pad_colour(studio, sound, sounding[unsigned(kit)]);
         lights.pad(at, shown);
     }
+}
+
+// The frames round `at` (the project's frames) across the subject, 32 times
+// closer than the whole sample, the place a line down the middle: the Move's
+// Sample Start zoom, for Shift + a touched START, END or LOOP POINT. Only a
+// sample in memory has the frames to draw.
+inline bool close_up(juce::Graphics& g, const Sample& sample, uint32_t at) {
+    const auto& data = *sample.data;
+    if (data.left.empty()) return false;
+    auto area = ui::content(0, ui::subject_height);
+    uint32_t frames = std::max<uint32_t>(1, data.model_frames());
+    uint32_t span = std::max<uint32_t>(uint32_t(area.getWidth()), frames / 32);
+    int64_t from = int64_t(at) - span / 2;
+    std::vector<float> peaks(size_t(area.getWidth()), 0.0f);
+    for (int column = 0; column < area.getWidth(); ++column) {
+        int64_t a = from + int64_t(span) * column / area.getWidth(), b = from + int64_t(span) * (column + 1) / area.getWidth();
+        float peak = 0;
+        for (int64_t f = std::max<int64_t>(a, 0); f < b && f < int64_t(frames); f += std::max<int64_t>(1, (b - a) / 16)) {
+            size_t own = data.own(uint32_t(f));
+            if (own < data.left.size()) peak = std::max(peak, std::abs(data.left[own]));
+            if (own < data.right.size()) peak = std::max(peak, std::abs(data.right[own]));
+        }
+        peaks[size_t(column)] = peak;
+    }
+    ui::waveform(g, area, peaks);
+    g.fillRect(area.getX() + area.getWidth() / 2, area.getY(), 1, area.getHeight());
+    return true;
 }
 
 // The pads in view as the rail and messages name them: "C01-D16".
