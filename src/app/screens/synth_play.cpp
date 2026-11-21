@@ -84,7 +84,13 @@ public:
         case Job::Octave: studio.say(octave_or_bank(studio, use.control == bindings::Control::Plus ? 1 : -1, lowest_octave, highest_octave)); return true;
         // The Device View.
         case Job::Focus: focus = std::clamp(focus + (use.delta > 0 ? 1 : -1), 0, 1 + int(effects.size())); return true;
-        case Job::ShowFocus: studio.say(item(*track, focus)); return true;
+        case Job::ShowFocus: // the item in focus, named in full: never the row's 4-letter tag or a bare preset number
+            if (focus == 0) studio.say("TRACK MIX");
+            else if (focus >= 2) studio.say(fx.focus_name(effects[size_t(focus - 2)]));
+            else if (track->module && !track->module->preset_param.empty() && !track->module->preset_name.empty())
+                studio.say(upper(track->module->preset_name).substr(0, 17));
+            else studio.say(track->module ? upper(track->module->info().name).substr(0, 17) : "SYNTH");
+            return true;
         case Job::OpenBrowser:
             if (focus == 1 && shown_canvas(*track) >= 0) track->canvas_entered = true; // in through the door: the page's own push from here
             else if (focus == 1 && track->module && !track->module->preset_param.empty()) browsing = true;

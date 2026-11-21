@@ -43,7 +43,11 @@ public:
         case Job::TurnKnobFine: turn(unsigned(use.index), use.delta, true); return true;
         case Job::Octave: studio.say(octave_or_bank(studio, use.control == bindings::Control::Plus ? 1 : -1, lowest_octave, highest_octave)); return true;
         case Job::Focus: focus = std::clamp(focus + (use.delta > 0 ? 1 : -1), 0, 3); return true;
-        case Job::ShowFocus: studio.say(item(focus)); return true;
+        case Job::ShowFocus: { // the item in focus, named in full
+            const Sample* sample = studio.keys_sample(studio.track());
+            studio.say(focus == 0 ? "TRACK MIX" : focus == 1 ? (sample ? upper(sample->name).substr(0, 17) : "NO SAMPLE") : "FX" + std::to_string(focus - 1));
+            return true;
+        }
         case Job::OpenBrowser:
             if (focus <= 1) studio.open("load-instruments");
             else studio.say("EFFECTS: NOT YET");

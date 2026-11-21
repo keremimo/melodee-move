@@ -68,6 +68,13 @@ std::string DeviceFx::rail_bottom(const Item& item) const {
     return "FX" + std::to_string(item.slot + 1);
 }
 
+std::string DeviceFx::focus_name(const Item& item) const {
+    if (item.plus) return "ADD EFFECT";
+    std::string name = mixing::long_name(EffectKind(mixing::slot(studio, item.chain, item.slot).kind));
+    if (FxModule* fx = schwung(item)) name = upper(fx->module ? fx->module->info().name : fx->saved.module);
+    return (rail_bottom(item) + ": " + name).substr(0, 17);
+}
+
 bool DeviceFx::job(const Item& item, Job job, const bindings::Use& use) {
     FxModule* fx = schwung(item);
     switch (job) {

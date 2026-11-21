@@ -24,6 +24,8 @@ public:
     std::vector<Item> chain_items(unsigned chain) const;
     ui::mix::Item row_item(const Item& item) const; // as the Device View's row draws it
     std::string rail_bottom(const Item& item) const; // FX1-FX6, a pad's own A05
+    // What a wheel touch says of an effect item: "FX2: DELAY", "+: ADD EFFECT".
+    std::string focus_name(const Item& item) const;
     // The row: the track item, the sound item, then `items`; `focus` 0 the
     // track, 1 the sound, 2 on the effects.
     void draw_row(juce::Graphics& g, const std::string& track_item, const std::string& sound_item, const std::vector<Item>& items, int focus) const;
