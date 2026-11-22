@@ -76,6 +76,21 @@ melodee::SfzRead found_only(melodee::SfzRead read, const fs::path& folder, std::
         if (known == there.end()) known = there.emplace(r.sample, !find_beside(folder, r.sample).empty()).first;
         return !known->second;
     }), read.regions.end());
+    // A root the program leaves to the file (an .xpm's RootNote 0, as MPC-V
+    // exports have): its smpl chunk's note, read once a file.
+    std::map<std::string, int> roots;
+    for (auto& r : read.regions) {
+        if (!r.root_from_file) continue;
+        auto known = roots.find(r.sample);
+        if (known == roots.end()) {
+            melodee::WavReader wav;
+            melodee::WavInfo info;
+            const auto file = find_beside(folder, r.sample);
+            const bool opened = !file.empty() && wav.open(file.string(), 1, &info).empty();
+            known = roots.emplace(r.sample, opened ? info.root : -1).first;
+        }
+        if (known->second >= 0) r.zone.root = uint8_t(known->second);
+    }
     if (read.regions.size() < had) {
         read.left += unsigned(had - read.regions.size());
         read.left_by.insert("missing files");

@@ -129,6 +129,28 @@ void test_readers() {
             // Keygroup glide: the program's Mono and Portamento reach the sampler.
             CHECK(multi.mono && multi.legato && multi.tied && std::fabs(multi.glide - 0.2f) < 0.05f);
         }
+        // RootNote 0 (MPC-V's own exports): the zone plays at its WAV's own root, the smpl chunk's note (76, E5).
+        {
+            std::fstream add(folder + "/e4.wav", std::ios::in | std::ios::out | std::ios::binary | std::ios::ate);
+            uint8_t smpl[68] = {'s', 'm', 'p', 'l', 60};
+            smpl[8 + 12] = 76;
+            add.write(reinterpret_cast<const char*>(smpl), sizeof smpl);
+            const uint32_t riff = uint32_t(add.tellp()) - 8;
+            add.seekp(4);
+            add.write(reinterpret_cast<const char*>(&riff), 4);
+        }
+        std::ifstream in(folder + "/Test.xpm");
+        std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        const auto at = text.find("<RootNote>65</RootNote>");
+        CHECK(at != std::string::npos);
+        if (at != std::string::npos) text.replace(at, 23, "<RootNote>0</RootNote>");
+        CHECK(write_text(folder + "/Own Root.xpm", text));
+        auto own = app::read_instrument_sample(folder + "/Own Root.xpm", error);
+        CHECK(own && error.empty());
+        if (own) {
+            const auto& multi = *own->data->multi;
+            CHECK(multi.zones.size() == 2 && multi.zones[0].root == 57 && multi.zones[1].root == 76);
+        }
     }
 
     // Not an instrument at all.
