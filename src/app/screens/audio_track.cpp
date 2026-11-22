@@ -34,6 +34,11 @@ std::string source_label(InputSource s, const Sampling& sampling) {
     default: return known ? "LINE" : "INPUT";
     }
 }
+// MONITOR: AUTO hears the input while the track is armed or recording, ON all
+// the time (also with another track selected), OFF never (src/app/sampling.cpp).
+std::string monitor_label(melodee::TrackMonitor m) {
+    return m == melodee::TrackMonitor::On ? "ON" : m == melodee::TrackMonitor::Auto ? "AUTO" : "OFF";
+}
 // The pattern's length in bars, as the take's frame numbers it.
 unsigned bars_of(Studio& studio, unsigned track) {
     const auto& pattern = studio.patterns().at[track][studio.project().tracks[track].pattern % melodee::pattern_count];
@@ -143,7 +148,7 @@ public:
         }
         ui::rail(g, "AUD", track_number(studio), "IN");
         ui::list(g, ui::content(0, 36),
-                 {row("SOURCE", source_label(setting.source, s)), row("MONITOR", setting.monitor == melodee::TrackMonitor::On ? "ON" : "OFF"),
+                 {row("SOURCE", source_label(setting.source, s)), row("MONITOR", monitor_label(setting.monitor)),
                   row("GAIN", s.gain_text())},
                  cursor, 1);
         level(g, 38);
@@ -155,7 +160,7 @@ public:
         auto& s = studio.sampling();
         switch (which) {
         case 0: return {"SOURCE", source_label(setting.source, s), 0};
-        case 1: return {"MONITOR", setting.monitor == melodee::TrackMonitor::On ? "ON" : "OFF", setting.monitor == melodee::TrackMonitor::On ? 1.0f : 0.0f};
+        case 1: return {"MONITOR", monitor_label(setting.monitor), float(setting.monitor) / 2.0f};
         case 2: return {"GAIN", s.gain_text(), (s.input.gain + 12) / 36.0f};
         default: return {};
         }
@@ -185,8 +190,12 @@ private:
         }
         case 1:
             if (!delta) return;
-            setting.monitor = wraps ? (setting.monitor == melodee::TrackMonitor::On ? melodee::TrackMonitor::Off : melodee::TrackMonitor::On)
-                                    : delta > 0 ? melodee::TrackMonitor::On : melodee::TrackMonitor::Off;
+            { // OFF, AUTO, ON: the push walks round, a turn stops at either end
+                const int count = int(melodee::TrackMonitor::Count), at = int(setting.monitor);
+                const int to = wraps ? (at + 1) % count : std::clamp(at + (delta > 0 ? 1 : -1), 0, count - 1);
+                if (to == at) return;
+                setting.monitor = melodee::TrackMonitor(to);
+            }
             studio.changed();
             break;
         case 2: s.step_gain(wraps ? 1 : delta); break;

@@ -3150,6 +3150,7 @@ void test_audio_track() {
         press_button(melodee, Button::Rec);
         CHECK(has(melodee.status(), "audio_armed=1"));
         blocks(melodee, 20, true);
+        CHECK(has(melodee.status(), "monitor=1")); // MONITOR AUTO, a new track's: heard while armed
         press_button(melodee, Button::Play); // one pass of the pattern (a bar, 2 s at 120 BPM) from its top
         blocks(melodee, 200, true);
         CHECK(has(melodee.status(), "audio_arm=-2")); // recording

@@ -352,10 +352,16 @@ bool Sampling::recall() {
 void Sampling::tick(bool in_view) {
     auto& host = studio.host();
     // An audio track selected, armed or recording takes its own source, its
-    // monitor heard while it is armed or recording (Melodee's record_tick);
-    // else Input Config's: Auto hears the input only while Sampling is in view.
+    // MONITOR saying when it is heard: AUTO while it is armed or recording, ON
+    // all the time, OFF never (Melodee's shell/audio_monitor.h). With another
+    // kind of track selected and Sampling not in view, the first audio track
+    // whose MONITOR is ON. Else Input Config's: Auto hears the input only while
+    // Sampling is in view.
     int recording = audio_recording();
     int audio_t = recording >= 0 ? recording : audio_arm >= 0 ? audio_arm : studio.kind() == TrackKind::Audio ? int(studio.track()) : -1;
+    if (audio_t < 0 && !in_view)
+        for (unsigned t = 0; t < melodee::track_count; ++t)
+            if (studio.project().tracks[t].is_audio() && studio.project().tracks[t].audio.monitor == melodee::TrackMonitor::On) { audio_t = int(t); break; }
     InputSource want = input.source;
     unsigned want_track = input.track % melodee::track_count;
     bool want_post = input.post;
@@ -365,7 +371,8 @@ void Sampling::tick(bool in_view) {
         want = setting.source;
         want_track = 0;
         want_post = true;
-        monitoring = setting.monitor == melodee::TrackMonitor::On && (audio_arm == audio_t || recording == audio_t);
+        monitoring = setting.monitor == melodee::TrackMonitor::On ||
+                     (setting.monitor == melodee::TrackMonitor::Auto && (audio_arm == audio_t || recording == audio_t));
         mic_heard = monitoring && want == InputSource::Mic;
     }
     if (!monitor_known || monitoring != monitor_sent) {

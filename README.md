@@ -119,8 +119,9 @@ Three parts so far:
   `RESAMPLE n`), then onto their pads. **Audio Recall** is Shift + Sampling:
   the input's last 25 s onto the next empty pad (`RECALL n`). A new track's
   KIT asks where its first sound comes from: LIBRARY, EMPTY, INPUT.
-- **Audio tracks**: Sampling opens the track's INPUT (source, monitor, gain);
-  Rec arms it, and Play records one pass of its pattern into
+- **Audio tracks**: Sampling opens the track's INPUT (source, monitor, gain;
+  MONITOR AUTO hears the input while the track is armed or recording, ON all
+  the time, also with another track selected, OFF never); Rec arms it, and Play records one pass of its pattern into
   `<project> Audio/Take NNN.wav`, which the pattern then plays. Its Play
   screen has the take's CLIP (knobs 1-6: level, start, end, fades, reverse)
   and, on Shift + the wheel, its WARP (warp, BPM, semitones, cents).
