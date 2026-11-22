@@ -263,6 +263,10 @@ public:
     melodee::SampleChop* chop_of(unsigned slot);
     const Sample* sample_in(unsigned slot) const { return slot < samples.size() ? samples[slot].get() : nullptr; }
     void set_kit_param(unsigned track, int param, int value); // a kit-wide value (melodee::sampler::Param)
+    // Each pad's own tempo (PadSound::own_tempo) for Follow and Seq warp: its sample's found tempo in the octave
+    // nearest the project's, exact at whole bars of its region; else its length as whole bars
+    // (melodee/shell/follow_tempo.h). Set when Follow turns on, and when a pad's Warp goes to Seq with neither.
+    void follow_tempos(unsigned track);
     // The layer the next sample loaded onto a pad goes on (LAYERS, kit_pages.cpp): 0 the pad's own.
     struct LayerTarget { int track = -1, pad = -1, layer = 0; };
     LayerTarget layer_target;

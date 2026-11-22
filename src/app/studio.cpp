@@ -16,6 +16,7 @@
 #include "melodee/engine/macros.h"
 #include "melodee/engine/render_pool.h"
 #include "melodee/model/scales.h"
+#include "melodee/shell/follow_tempo.h"
 #include "melodee/shell/pad_gap.h"
 #include "melodee/shell/project_kits.h"
 #include "melodee/shell/mpc_project.h"
@@ -828,7 +829,23 @@ void Studio::set_kit_param(unsigned t, int param, int value) {
     if (param < 0 || param >= int(melodee::max_params)) return;
     song->tracks[t].params[size_t(param)] = int16_t(value);
     send({Type::Param, uint8_t(t), 0, uint16_t(param), int16_t(value)});
+    if (param == melodee::sampler::Follow && value && song->tracks[t].engine == melodee::EngineKind::Sampler) follow_tempos(t);
     changed();
+}
+
+void Studio::follow_tempos(unsigned t) {
+    t %= melodee::track_count;
+    auto& track = song->tracks[t];
+    for (unsigned at = 0; at < melodee::sampler_pads; ++at) {
+        const Sample* sample = sample_of(t, at);
+        if (!sample) continue;
+        auto& pad = track.pads[at];
+        const uint32_t frames = sample->data->model_frames(), end = pad.end ? pad.end : frames;
+        const uint32_t length = end > pad.start ? end - pad.start : 0;
+        if (length < 4410) continue; // a hit, not a loop: it keeps its speed
+        pad.own_tempo = melodee::follow_tempo(length, sample->beats.found() ? sample->beats.tempo : 0, song->tempo);
+        sound_pad(t, at, pad);
+    }
 }
 
 void Studio::sync_chops() {

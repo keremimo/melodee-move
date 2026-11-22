@@ -350,6 +350,8 @@ private:
         int64_t v = std::clamp<int64_t>(int64_t(value.get(edit)) + int64_t(delta) * step, value.low, high);
         value.set(edit, int(v));
         studio.set_pad(studio.track(), studio.pad(), sound);
+        if (page == Tune && which == 2 && sound.warp == melodee::warp_seq && !sound.beats && !sound.own_tempo)
+            studio.follow_tempos(studio.track()); // Seq needs the pad's own tempo
         if (page == Trim && which <= 1) preview.moved(studio.track(), which == 1);
     }
     // TRIM's START or END turned and still now: the pad's sample heard there (edit_preview.h).

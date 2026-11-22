@@ -226,7 +226,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Play modes**: Mono / Poly, mute group 1-16, offset, Note On, reverse, loop, Pad Link chains (MELODEE.md › Sampler, Play) | done | PLAY page: One Shot / Note On, Mono / Poly, mute group, offset, Pad Link, loop, reverse | [ ] |
 | **Loop seam crossfade** XFADE, 0-250 ms (MELODEE.md › Sampler, Play) | done | PLAY page, knob 8 | [ ] |
 | **Filter type, resonance and envelope**: Classic, LPF2/4, HPF2/4, BPF2/4; up to seven octaves (MELODEE.md › Sampler, Filter) | done | FILTER page: type, cutoff, resonance, envelope amount, attack, decay, sustain, release | [ ] |
-| **Follow**: the kit keeps the project's tempo, Beats, Tones or Tape; # Beats (MELODEE.md › Sampler) | done | TUNE page: Follow, its mode (Beats, Tones, Tape), Pitch; # Beats | [ ] |
+| **Follow**: the kit keeps the project's tempo, Beats, Tones or Tape; # Beats (MELODEE.md › Sampler) | done | TUNE page: Follow, its mode (Beats, Tones, Tape), Pitch; # Beats; Follow on (or Warp to Seq with no # Beats) sets each pad's own tempo from its sample's found tempo, exact at whole bars (core follow_tempo.h) | [ ] |
 | **Cloud**: a pad as a grain cloud; position, size, density, scan, spread (MELODEE.md › Playing, A kit) | done | CLOUD page: on, position, size, density, scan, spread | [ ] |
 | **Kit filter**: one filter after every pad (MELODEE.md › Sampler) | done | KIT FILT page: type, cutoff, resonance | [ ] |
 | **COLOUR**: a pad's light colour, the track's, one of sixteen, or the kit's own (MELODEE.md › Playing, A kit) | done | MIX page, knob 4: the track's, one of the sixteen track colours, or the pad's own; pad lights | [ ] |
