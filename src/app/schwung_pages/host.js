@@ -18,27 +18,46 @@
 // (canvas_page.cpp). Imports name Schwung's folder on the Move;
 // MELODEE_SCHWUNG_ROOT moves it (the tests').
 //
+// The pages after the module's own, My Presets and Module, are Schwung's
+// too: its user presets (shadow/shadow_ui_presets.mjs), its help viewer
+// (shadow/shadow_ui_settings.mjs), its module lists and its module picker
+// (shared/module_lists.mjs, shared/chain_editor_chrome.mjs), with the glue
+// shadow_ui.js gives them written here again. What is Melodee's there: the
+// modules a swap may pick and the loading of one, Remove's removing, and its
+// own Auto Sample row.
+//
 // The seam with Melodee, through the page ctx each hook is lent:
 //   getParam("<key>")              the module's parameter (Schwung's "synth:"
 //                                  or "fxN:" taken off): text, "" or null
 //   getParam("melodee:entry")      once, after an entry: {slot, component,
-//                                  module, name, abbrev, dir, page, enter}
+//                                  module, name, abbrev, dir, presets,
+//                                  instrument, page, enter}
 //   getParam("melodee:shift")      "1" while Shift is held or locked
 //   getParam("melodee:reader")     "1" while Melodee's screen reader is on
 //   getParam("melodee:page_states") the drawn pages' kept state, at start
+//   getParam("melodee:preset_record") the user preset the module is on
+//                                  (Schwung's {name, hash}), at start
+//   getParam("melodee:modules")    the modules a swap may pick, Melodee's
+//                                  ([{id, name, abbrev, component_type,
+//                                  subcategory}])
 //   setParam("melodee:exit", "")   Back at the top: out to the Device View
 //   setParam("melodee:knob", "n c") knob n's ring (0-7), Schwung's colour c
 //                                  ("-1 0": all given back)
 //   setParam("melodee:status", json) what is shown, for status lines and tests
 //   setParam("melodee:page_states", json) the drawn pages' state changed
+//   setParam("melodee:preset_record", json) the user preset record changed
+//                                  ("": none), kept with Melodee's project
 //   setParam("melodee:say", text)  Schwung's screen reader's words
-//   getParam("melodee:trailing")   the pages after the module's (Schwung's
-//                                  trailingMenus shape), Melodee's
-//   setParam("melodee:action", id) one of their rows pushed
+//   setParam("melodee:action", what) "swap <id>", "remove" or "auto_sample"
 //   setParam("melodee:pad_block", "1" or "0") the pads the keyboard's
 //                                  (Schwung's pad typing): none to the module
 //   setParam("melodee:pad", "n c") pad note n (68-99) lit Schwung's colour c
 //                                  while the pads are the keyboard's
+//
+// Schwung's own files (its presets, module_lists.json, shadow_config.json)
+// are where its code looks for them, MELODEE_SCHWUNG_ROOT's folder in the
+// tests: the host_* calls here move the paths, and canvas_page.cpp gives
+// Schwung's modules an "os" that moves them too.
 import * as std from "std";
 import * as os from "os";
 
@@ -63,7 +82,8 @@ function log(source, message) { globalThis.unified_log(source, message); }
 globalThis.shadow_get_shift_held = () => (seam("shift") === "1" ? 1 : 0);
 globalThis.shadow_get_display_mode = () => 1; // the shadow UI is what is on the screen
 globalThis.tts_get_enabled = () => seam("reader") === "1";
-globalThis.host_send_screenreader = (text) => { tell("say", text); return true; };
+let lastSaid = ""; // the last words, for the status (the tests)
+globalThis.host_send_screenreader = (text) => { lastSaid = String(text); tell("say", text); return true; };
 globalThis.shadow_get_held_step = () => -1;
 globalThis.shadow_get_held_step_is_hold = () => 0;
 globalThis.shadow_get_delete_held = () => 0;
@@ -128,7 +148,8 @@ globalThis.param_view_get_mode = () => paramView;
 
 const SHARED = "/data/UserData/schwung/shared", SHADOW = "/data/UserData/schwung/shadow";
 const [ctxModule, spp, frames, childKeys, , menu, lists, keyboard, enumList, listKnob, browser, flatFiles,
-       reader, scrolling, inputFilter, knobEngine, paramFormat, loadGate] = await Promise.all([
+       reader, scrolling, inputFilter, knobEngine, paramFormat, loadGate, presetsUi, settingsUi, currentPreset,
+       ModuleLists, ModuleCategories, chrome, renderPage, nameSort] = await Promise.all([
     import(SHADOW + "/shadow_ui_ctx.mjs"),
     import(SHADOW + "/shadow_ui_param_pages.mjs"),
     import(SHARED + "/param_pages/frame_ctx.mjs"),
@@ -148,14 +169,24 @@ const [ctxModule, spp, frames, childKeys, , menu, lists, keyboard, enumList, lis
     import(SHARED + "/knob_engine.mjs"),
     import(SHARED + "/param_format.mjs"),
     import(SHARED + "/component_load_gate.mjs"),
+    // The trailing pages' screens: My Presets, Module Help, Add to List, Swap.
+    import(SHADOW + "/shadow_ui_presets.mjs"),
+    import(SHADOW + "/shadow_ui_settings.mjs"),
+    import(SHARED + "/param_pages/current_preset.mjs"),
+    import(SHARED + "/module_lists.mjs"),
+    import(SHARED + "/module_categories.mjs"),
+    import(SHARED + "/chain_editor_chrome.mjs"),
+    import(SHARED + "/param_pages/render_page.mjs"),
+    import(SHARED + "/name_sort.mjs"),
 ]);
 const ctx = ctxModule.ctx;
 const { enterParamPages, exitParamPages, tickParamPages, drawParamPages, handleParamPagesMidi, paramPagesActive,
         paramPagesCachedValue, paramPagesComponent, paramPagesSlot, paramPagesLevelNameOf, paramPagesChildIndex,
         paramPagesEntering, currentParamPage, paramPagesPageName, paramPagesPickerOpen, paramPagesFooterHints,
-        enumPickerFooterHints, commitParamPagesValue, clearParamPagesTouch } = spp;
+        enumPickerFooterHints, commitParamPagesValue, clearParamPagesTouch, paramPagesExitMenu,
+        paramPagesRefreshTrailing, CONTRACT_SETTLE_MS } = spp;
 const { drawMenuHeader: drawHeader, drawMenuFooter: drawFooter, drawMenuList, drawMessageOverlay,
-        showOverlay, hideOverlay, tickOverlay, drawOverlay } = menu;
+        showOverlay, hideOverlay, tickOverlay, drawOverlay, drawConfirmOverlay } = menu;
 const { SCREEN_WIDTH, SCREEN_HEIGHT, LIST_TOP_Y, FOOTER_RULE_Y, truncateText } = lists;
 const { openTextEntry, closeTextEntry, isTextEntryActive, handleTextEntryMidi, drawTextEntry, tickTextEntry,
         setPadSelectGlobal, setTextPreviewGlobal, getTextEntryBuffer } = keyboard;
@@ -165,15 +196,24 @@ const { buildFilepathBrowserState, refreshFilepathBrowser, moveFilepathBrowserSe
         activateFilepathBrowserItem } = browser;
 const { planFileFlatOpen, fileFlatPick, createRefusalLatch } = flatFiles;
 const { announce, announceMenuItem, announceParameter } = reader;
-const { wrapText } = scrolling;
+const { wrapText, createScrollableText, handleScrollableTextJog, isActionSelected, drawScrollableText,
+        visibleLinesFor } = scrolling;
 const { decodeDelta } = inputFilter;
 const { knobInit, knobStep } = knobEngine;
 const { formatParamValue: ufFormatParamValue, formatParamForSet: ufFormatParamForSet } = paramFormat;
 const { decideComponentEntry, holdProbeIntervalTicks, ENTRY_HOLD, ENTRY_ENTER } = loadGate;
+const { makeRecord, presetRowValue, isModified } = currentPreset;
+const { drawChainPicker, drawListScreen } = chrome;
+const { fitText } = renderPage;
+const { compareNames } = nameSort;
 
 // Schwung's Display settings, Pad Typing and Text Preview, from its file, as
-// shadow_ui.js reads them at start (on Kerem's Move both are on).
-for (const [name, set] of [["pad_typing", setPadSelectGlobal], ["text_preview", setTextPreviewGlobal]]) {
+// shadow_ui.js reads them at start (on Kerem's Move both are on); and its
+// Audition (browser_preview, default off): a preset list plays the preset
+// under the cursor (on Kerem's Move it is on).
+let previewEnabled = false;
+for (const [name, set] of [["pad_typing", setPadSelectGlobal], ["text_preview", setTextPreviewGlobal],
+                           ["browser_preview", (on) => { previewEnabled = on; }]]) {
     try {
         const content = host_read_file("/data/UserData/schwung/shadow_config.json");
         const config = content ? JSON.parse(content) : null;
@@ -188,7 +228,8 @@ const VIEWS = { // shadow_ui.js's names, the ones these screens use
     PRESETS: "modpresets", PRESET_DETAIL: "modpresetdetail", COMPONENT_SELECT: "compselect",
     CANVAS: "canvas", FILEPATH_BROWSER: "filepathbrowser", GLOBAL_SETTINGS: "globalsettings",
     ENUM_PICKER: "enumpick", FILE_FLAT: "fileflat", COMPONENT_LOADING: "comploading",
-    COMPONENT_EDIT: "compedit",
+    COMPONENT_EDIT: "compedit", MODULE_LISTS: "modulelists", MODULE_LISTS_EDIT: "modulelistsedit",
+    MODULE_LISTS_ACTIONS: "modulelistsact",
 };
 const NUM_KNOBS = 8, KNOB_CC_START = 71, KNOB_CC_END = 78;
 const CC_JOG = 14, CC_CLICK = 3, CC_BACK = 51;
@@ -197,17 +238,30 @@ const isShiftHeld = () => shadow_get_shift_held() !== 0;
 let view = VIEWS.CHAIN_EDIT;
 let needsRedraw = true;
 
-function setView(next) { // shadow_ui.js's: a change only, and a redraw
+// shadow_ui.js's: a change only, and a redraw. Its chain editor is Melodee's
+// Device View: reached and not taken back to a grid (drawView), the pages
+// are left.
+function setView(next) {
     if (view === next) return;
     view = next;
     needsRedraw = true;
-    if (next === VIEWS.CHAIN_EDIT) tell("exit", ""); // Schwung's chain editor is Melodee's Device View
 }
 
-// Which module, where (Melodee's track is Schwung's slot: "S2 > ...").
+// Which module, where (Melodee's track is Schwung's slot: "S2 > ..."), and
+// what Melodee offers on its trailing pages: My Presets where its state can
+// be read (a synth's module), Auto Sample on an instrument's.
 let slot = 0, component = "synth", moduleId = "", moduleDir = "", moduleName = "", moduleAbbrev = "";
+let presetsOffered = false, autoSampleOffered = false;
+// The module in the position as these screens know it: the one entered,
+// until a swap picks another or a removal empties it.
+let positionModule = "";
 function prefixOf(key) { return key === "midiFx" ? "midi_fx1" : key; } // shadow_ui.js's chainComponentId
 function moduleKeyOf(key) { const p = prefixOf(key); return p ? `${p}_module` : null; }
+// The position's label, as Schwung's chain model names it ("Synth", "FX 2").
+function componentLabel(key) {
+    const fx = /^fx(\d+)$/.exec(String(key));
+    return fx ? `FX ${fx[1]}` : key === "synth" ? "Synth" : String(key);
+}
 
 // ---------------------------------------------------------------- the slot's parameters
 
@@ -253,7 +307,13 @@ function getSlotParamCached(s, key, owner) {
     return value;
 }
 
-// Module names, from module.json, as shadow_ui.js caches them.
+// Module names, from module.json, as shadow_ui.js caches them (the one
+// entered, and those a swap's list names).
+const moduleAbbrevCache = Object.create(null), moduleNameCache = Object.create(null);
+function cacheModuleAbbrev(json) {
+    if (json && json.id && json.abbrev) moduleAbbrevCache[String(json.id).toLowerCase()] = json.abbrev;
+    if (json && json.id && json.name) moduleNameCache[String(json.id).toLowerCase()] = json.name;
+}
 function moduleIdOf(ref) {
     let id = String(ref);
     if (id.indexOf("/") >= 0) {
@@ -268,13 +328,13 @@ function getModuleAbbrev(ref) {
     if (!ref) return "--";
     const id = moduleIdOf(ref);
     if (!id) return "--";
-    return id.toLowerCase() === moduleId.toLowerCase() && moduleAbbrev ? moduleAbbrev : id.substring(0, 2).toUpperCase();
+    return moduleAbbrevCache[id.toLowerCase()] || id.substring(0, 2).toUpperCase();
 }
 function getModuleDisplayName(ref) {
     if (!ref) return "--";
     const id = moduleIdOf(ref);
     if (!id) return "--";
-    return id.toLowerCase() === moduleId.toLowerCase() && moduleName ? moduleName : getModuleAbbrev(id);
+    return moduleNameCache[id.toLowerCase()] || getModuleAbbrev(id);
 }
 
 // ---------------------------------------------------------------- visible_if
@@ -1483,13 +1543,14 @@ function openComponentEditor(s, comp, entry) {
     }
     enterComponentEditFallback(s, comp, entry);
 }
-function componentLoadHoldLabel() {
+function componentLoadHoldLabel() { // the module the position holds now (a swap's, while it loads)
     if (!componentLoadHold) return "";
-    return moduleId ? getModuleAbbrev(moduleId) : String(componentLoadHold.componentKey || "").toUpperCase();
+    return positionModule ? getModuleAbbrev(positionModule) : String(componentLoadHold.componentKey || "").toUpperCase();
 }
 function serviceComponentLoadHold() {
     if (!componentLoadHold || view !== VIEWS.COMPONENT_LOADING) return;
     const h = componentLoadHold;
+    if (h.handover) return; // a swap's: the new module's pages are Melodee's to start (maybeReturnToComponentGrid)
     if (++h.ticks < holdProbeIntervalTicks(h.attempts)) return;
     h.ticks = 0;
     h.attempts++;
@@ -1767,18 +1828,798 @@ function refreshPendingKnobOverlay() { // the slot's own knob mapping, which the
     pendingKnobIndex = -1;
 }
 
-// ---------------------------------------------------------------- the module's io
+// ---------------------------------------------------------------- the user preset it is on
 
-// The pages after the module's own (Schwung's My Presets and Module), and
-// what their rows do, are Melodee's (studio.cpp pages_trailing, pages_action).
-function trailingMenus() {
-    try { return JSON.parse(seam("trailing") || "[]") || []; } catch (e) { return []; }
+// shadow_ui.js's record of which user preset a component is on, {name,
+// hash}, and the live state blob the last plan read (the header's `*` rides
+// on it). Schwung keeps one per slot and component and saves it with the
+// slot; here the pages are one module's, so one record, saved with
+// Melodee's project (melodee:preset_record).
+let userPresetRecord = null, userPresetLiveBlob = null, userPresetRecordRead = false;
+function getUserPresetRecord(s, prefix) {
+    return s === slot && prefix === prefixOf(component) ? userPresetRecord : null;
 }
-function componentParamPagesIo(s) {
+function setUserPresetRecord(s, prefix, record) {
+    if (s !== slot || prefix !== prefixOf(component)) return;
+    userPresetRecord = record || null;
+    tell("preset_record", userPresetRecord ? JSON.stringify(userPresetRecord) : "");
+}
+function readUserPresetRecord() { // what the project kept, once
+    if (userPresetRecordRead) return;
+    userPresetRecordRead = true;
+    const kept = parseJson(seam("preset_record"));
+    userPresetRecord = kept && kept.name ? { name: String(kept.name), hash: kept.hash || null } : null;
+}
+
+// Record the preset as loaded or saved, hashing what the module now reports
+// (not the blob handed to it: a module may normalise it on the way in).
+function recordUserPresetFromDevice(s, prefix, name) {
+    const live = getSlotStateWithRetry(s, prefix + ":state");
+    userPresetLiveBlob = live;
+    setUserPresetRecord(s, prefix, makeRecord(name, live));
+    paramPagesRefreshTrailing();
+    needsRedraw = true;
+}
+// Should the return to My Presets land inside its menu? Back having chosen
+// nothing, and Delete, yes; a Load or a Save is done, no (shadow_ui.js's).
+let componentGridReturnEnter = true;
+function onUserPresetSaved(s, prefix, name) {
+    componentGridReturnEnter = false;
+    recordUserPresetFromDevice(s, prefix, name);
+}
+function onUserPresetLoaded(s, prefix, name) {
+    componentGridReturnEnter = false;
+    recordUserPresetFromDevice(s, prefix, name);
+}
+function onUserPresetDeleted(s, prefix, name) {
+    componentGridReturnEnter = true;
+    const rec = getUserPresetRecord(s, prefix);
+    if (rec && rec.name === name) setUserPresetRecord(s, prefix, null); // only the one it is on
+    paramPagesRefreshTrailing();
+    needsRedraw = true;
+}
+
+// The `*` after a write through the grid: once the hand settles, the
+// trailing pages planned again (one state read), only while the grid is still
+// up on the component that wrote.
+let userPresetWritePending = false, userPresetWriteAt = 0, userPresetWriteSlot = -1, userPresetWriteComponent = "";
+function markComponentParamWrite(s, componentKey) {
+    userPresetWritePending = true;
+    userPresetWriteAt = Date.now();
+    userPresetWriteSlot = s;
+    userPresetWriteComponent = componentKey;
+}
+function tickUserPresetStale() {
+    if (!userPresetWritePending) return;
+    if (Date.now() - userPresetWriteAt < CONTRACT_SETTLE_MS) return;
+    userPresetWritePending = false;
+    if (!paramPagesActive()) return;
+    if (paramPagesSlot() !== userPresetWriteSlot) return;
+    if (paramPagesComponent() !== userPresetWriteComponent) return;
+    paramPagesRefreshTrailing();
+}
+// The header's "S2 > <name>" for a loaded user preset, `*` when changed
+// since; null with none (the header shows the module's own then).
+function userPresetHeaderMark(s, componentKey) {
+    const record = getUserPresetRecord(s, prefixOf(componentKey));
+    if (!record || !record.name) return null;
+    return { name: record.name, dirty: isModified(record, userPresetLiveBlob) };
+}
+
+// ---------------------------------------------------------------- Module Help
+
+// A module's own help.json topics, or null without (cached, misses too).
+// Melodee's module folder first (on the Move it is one of Schwung's own),
+// then where Schwung's module manager lays modules out.
+const MODULE_HELP_BASES = [
+    "/data/UserData/schwung/modules",
+    "/data/UserData/schwung/modules/sound_generators",
+    "/data/UserData/schwung/modules/audio_fx",
+    "/data/UserData/schwung/modules/midi_fx",
+    "/data/UserData/schwung/modules/tools",
+];
+const moduleHelpCache = Object.create(null);
+function getModuleHelpChildren(id) {
+    if (!id) return null;
+    if (id.indexOf("/") >= 0 || id.indexOf("..") >= 0) return null;
+    if (id in moduleHelpCache) return moduleHelpCache[id];
+    const folders = (id.toLowerCase() === moduleId.toLowerCase() && moduleDir ? [moduleDir] : [])
+        .concat(MODULE_HELP_BASES.map((base) => onDisk(`${base}/${id}`)));
+    let children = null;
+    for (const folder of folders) {
+        let raw = null;
+        try { raw = std.loadFile(`${folder}/help.json`); } catch (e) { /* not here */ }
+        if (!raw) continue;
+        try { // found: its answer, whatever it says
+            const data = JSON.parse(raw);
+            if (data && Array.isArray(data.children) && data.children.length > 0) children = data.children;
+        } catch (e) { log("shadow", "Bad help.json for " + id + ": " + e); }
+        break;
+    }
+    moduleHelpCache[id] = children;
+    return children;
+}
+
+// shadow_ui.js's help viewer, hosted by its GLOBAL_SETTINGS view (drawn by
+// shadow_ui_settings.mjs): a stack of topic lists, a topic's text scrolled.
+// A Module Help session starts with one frame, the module's topics; Back off
+// it empties the stack, and the grid comes back on "Module", its menu open.
+let helpNavStack = [], helpDetailScrollState = null;
+let componentHelpReturnSlot = -1, componentHelpReturnKey = "";
+function helpBackTarget(inDetail) {
+    const depth = helpNavStack.length;
+    if (depth === 0) return "Settings";
+    const targetIdx = inDetail ? depth - 1 : depth - 2;
+    if (targetIdx < 0) return componentHelpReturnSlot >= 0 ? helpNavStack[0].title : "Settings";
+    if (targetIdx === 0 && componentHelpReturnSlot >= 0) return "List";
+    return helpNavStack[targetIdx].title;
+}
+function helpHeaderTitle(frame) {
+    if (helpNavStack.length === 1 && componentHelpReturnSlot >= 0) return "Help: " + frame.title;
+    return frame.title;
+}
+function drawHelpList() {
+    const frame = helpNavStack[helpNavStack.length - 1];
+    drawHeader(helpHeaderTitle(frame));
+    drawMenuList({
+        items: frame.items,
+        selectedIndex: frame.selectedIndex,
+        getLabel: (item) => item.title,
+        getValue: () => "",
+        listArea: { topY: LIST_TOP_Y, bottomY: FOOTER_RULE_Y },
+        valueAlignRight: true,
+    });
+    drawFooter("Back: " + helpBackTarget(false));
+}
+function drawHelpDetail() {
+    const frame = helpNavStack[helpNavStack.length - 1];
+    const item = frame.items[frame.selectedIndex];
+    drawHeader(item.title);
+    if (helpDetailScrollState) {
+        drawScrollableText({ state: helpDetailScrollState, topY: LIST_TOP_Y, bottomY: FOOTER_RULE_Y, actionY: -1 });
+    }
+    drawFooter("Back: " + helpBackTarget(true));
+}
+function maybeReturnToComponentHelp() {
+    if (componentHelpReturnSlot < 0) return false;
+    if (helpNavStack.length > 0 || helpDetailScrollState) return false;
+    if (isTextEntryActive()) return false;
+    const s = componentHelpReturnSlot, componentKey = componentHelpReturnKey;
+    componentHelpReturnSlot = -1;
+    componentHelpReturnKey = "";
+    if (!positionModule) return false;
+    enterParamPages(s, componentKey, prefixOf(componentKey), "Module", componentParamPagesIo(s, componentKey), null, { enter: true });
+    needsRedraw = true;
+    return true;
+}
+function helpJog(delta) {
+    if (helpDetailScrollState) {
+        handleScrollableTextJog(helpDetailScrollState, delta);
+    } else if (helpNavStack.length > 0) {
+        const frame = helpNavStack[helpNavStack.length - 1];
+        frame.selectedIndex = Math.max(0, Math.min(frame.items.length - 1, frame.selectedIndex + delta));
+        announce(frame.items[frame.selectedIndex].title);
+    }
+}
+function helpSelect() {
+    if (helpDetailScrollState) {
+        if (isActionSelected(helpDetailScrollState)) {
+            helpDetailScrollState = null;
+            needsRedraw = true;
+            const frame = helpNavStack[helpNavStack.length - 1];
+            announce(frame.title + ", " + frame.items[frame.selectedIndex].title);
+        }
+    } else if (helpNavStack.length > 0) {
+        const frame = helpNavStack[helpNavStack.length - 1];
+        const item = frame.items[frame.selectedIndex];
+        if (item.children && item.children.length > 0) {
+            helpNavStack.push({ items: item.children, selectedIndex: 0, title: item.title });
+            needsRedraw = true;
+            announce(item.title + ", " + item.children[0].title);
+        } else if (item.lines && item.lines.length > 0) {
+            helpDetailScrollState = createScrollableText({
+                lines: item.lines,
+                actionLabel: "Back",
+                visibleLines: visibleLinesFor(LIST_TOP_Y, FOOTER_RULE_Y),
+                onActionSelected: (label) => announce(label),
+            });
+            needsRedraw = true;
+            announce(item.title + ". " + item.lines.join(". "));
+        }
+    }
+}
+function helpBack() {
+    if (helpDetailScrollState) {
+        helpDetailScrollState = null;
+        needsRedraw = true;
+        const frame = helpNavStack[helpNavStack.length - 1];
+        announce(frame.title + ", " + frame.items[frame.selectedIndex].title);
+    } else if (helpNavStack.length > 0) {
+        helpNavStack.pop();
+        needsRedraw = true;
+        if (helpNavStack.length > 0) {
+            const frame = helpNavStack[helpNavStack.length - 1];
+            announce(frame.title + ", " + frame.items[frame.selectedIndex].title);
+        }
+    } else {
+        setView(VIEWS.CHAIN_EDIT); // nothing left to back out of (Schwung: out of Global Settings)
+    }
+}
+
+// ---------------------------------------------------------------- Add to List
+
+// shadow_ui.js's module lists (module_lists.mjs's model, Schwung's own file,
+// shared with Schwung): which lists hold the module, the lists themselves,
+// one list's actions. Held for the session and written on every change; a
+// file that would not parse is never written over.
+const moduleListsIo = {
+    readFile: (p) => host_read_file(p),
+    writeFile: (p, body) => host_write_file(p, body),
+};
+let moduleListsState = null, moduleListsCorrupt = false;
+let moduleListsSlot = -1, moduleListsKey = "", moduleListsModuleId = "";
+let moduleListsMemberIndex = 0, moduleListsEditIndex = 0, moduleListsActionIndex = 0;
+let moduleListsTarget = "", moduleListsConfirmDelete = false;
+let moduleListsPendingName = null; // a name the keyboard refused, offered again a tick on
+function moduleListsLoad() {
+    const r = ModuleLists.loadLists(moduleListsIo);
+    moduleListsState = r.state;
+    moduleListsCorrupt = r.corrupt;
+    if (r.corrupt) log("shadow", "module_lists.json unreadable, changes will not persist");
+}
+function moduleListsSave() {
+    if (!moduleListsState || moduleListsCorrupt) return false;
+    return ModuleLists.saveLists(moduleListsIo, moduleListsState);
+}
+function moduleListsEnsureLoaded() { if (!moduleListsState) moduleListsLoad(); }
+function moduleListsCountFor(id) { // the Module page row's value
+    moduleListsEnsureLoaded();
+    return ModuleLists.listsContaining(moduleListsState, id).length;
+}
+function moduleListsRows() { // never a read: drawn
+    if (!moduleListsState) return [];
+    const rows = moduleListsState.lists.map((l) => ({
+        name: l.name,
+        value: ModuleLists.isMember(moduleListsState, l.name, moduleListsModuleId) ? "*" : "",
+        kind: "toggle",
+    }));
+    rows.push({ name: "New List...", value: "", kind: "new" });
+    rows.push({ name: "Edit Lists...", value: "", kind: "edit" });
+    return rows;
+}
+function moduleListsClampMemberIndex() {
+    const n = moduleListsRows().length;
+    moduleListsMemberIndex = Math.max(0, Math.min(n > 0 ? n - 1 : 0, moduleListsMemberIndex));
+}
+function moduleListsRowLabel(i) {
+    const rows = moduleListsRows();
+    const r = rows[Math.max(0, Math.min(rows.length - 1, i))];
+    if (!r) return "";
+    return r.kind === "toggle" ? `${r.name}, ${r.value ? "on" : "off"}` : r.name;
+}
+function listScreenCtx() { return { fillRect: fill_rect, print, textWidth: text_width }; }
+function drawModuleLists() {
+    clear_screen();
+    drawListScreen(listScreenCtx(), {
+        headerLeft: getModuleDisplayName(moduleListsModuleId),
+        headerRight: "LISTS",
+        entries: moduleListsRows(),
+        index: moduleListsMemberIndex,
+        footer: [["CLK", "TOGGLE"], ["BACK", "MODULE"]],
+    });
+}
+// The keyboard for New List and Rename; a refused name comes back with what
+// was typed, a tick later (the keyboard closes itself after onConfirm).
+function moduleListsOpenNameEntry(existing, prefill) {
+    openTextEntry({
+        title: existing ? "Rename List" : "New List",
+        initialText: prefill === undefined ? (existing || "") : prefill,
+        onAnnounce: announce,
+        onConfirm: (text) => {
+            const r = existing ? ModuleLists.renameList(moduleListsState, existing, text)
+                               : ModuleLists.createList(moduleListsState, text);
+            if (!r.ok) {
+                announce(r.err);
+                moduleListsPendingName = { existing, text };
+                return;
+            }
+            const saved = moduleListsSave();
+            if (existing) moduleListsTarget = String(text).trim();
+            announce((existing ? `Renamed to ${text}` : `Created ${text}`) + (saved ? "" : ", save failed"));
+            needsRedraw = true;
+        },
+        onCancel: () => { needsRedraw = true; },
+    });
+}
+function moduleListsTickPendingName() {
+    if (!moduleListsPendingName) return;
+    const pending = moduleListsPendingName;
+    moduleListsPendingName = null;
+    moduleListsOpenNameEntry(pending.existing, pending.text);
+}
+function moduleListsResetSession() {
+    moduleListsSlot = -1;
+    moduleListsKey = "";
+    moduleListsModuleId = "";
+    moduleListsEditIndex = 0;
+    moduleListsActionIndex = 0;
+    moduleListsTarget = "";
+    moduleListsConfirmDelete = false;
+    moduleListsPendingName = null;
+}
+// Back out of the lists: the Module page, its menu open (the row clicked).
+function exitModuleLists() {
+    const s = moduleListsSlot, componentKey = moduleListsKey;
+    moduleListsResetSession();
+    if (s < 0 || !positionModule) { setView(VIEWS.CHAIN_EDIT); needsRedraw = true; return; }
+    enterParamPages(s, componentKey, prefixOf(componentKey), "Module", componentParamPagesIo(s, componentKey), null, { enter: true });
+    needsRedraw = true;
+}
+function moduleListsEditRows() {
+    if (!moduleListsState) return [];
+    return moduleListsState.lists.map((l) => ({ name: l.name, value: String(l.modules.length) }));
+}
+function moduleListsEditRowLabel() {
+    const r = moduleListsEditRows()[moduleListsEditIndex];
+    if (!r) return "";
+    return `${r.name}, ${r.value} module${r.value === "1" ? "" : "s"}`;
+}
+function moduleListsClampEditIndex() {
+    const n = moduleListsEditRows().length;
+    moduleListsEditIndex = Math.max(0, Math.min(n > 0 ? n - 1 : 0, moduleListsEditIndex));
+}
+function drawModuleListsEdit() {
+    clear_screen();
+    drawListScreen(listScreenCtx(), {
+        headerLeft: "Edit Lists",
+        entries: moduleListsEditRows(),
+        index: moduleListsEditIndex,
+        footer: [["JOG", "SEL"], ["CLK", "EDIT"], ["BACK", "LISTS"]],
+    });
+}
+function moduleListsActionRows() { // Favorites: Clear alone
+    const rows = [];
+    if (!ModuleLists.isProtected(moduleListsTarget)) {
+        rows.push({ name: "Rename", kind: "rename" });
+        rows.push({ name: "Delete", kind: "delete" });
+    }
+    rows.push({ name: "Clear", kind: "clear" });
+    return rows;
+}
+const CONFIRM_TEXT_W = 112; // a confirm card's line: its 120 less the border, a pixel of air
+function drawModuleListsActions() {
+    clear_screen();
+    const c = listScreenCtx();
+    drawListScreen(c, {
+        headerLeft: moduleListsTarget,
+        entries: moduleListsActionRows(),
+        index: moduleListsActionIndex,
+        footer: moduleListsConfirmDelete ? [["CLK", "YES"], ["BACK", "NO"]]
+            : (moduleListsActionRows().length > 1 ? [["JOG", "SEL"], ["CLK", "DO"], ["BACK", "EDIT"]]
+                                                  : [["CLK", "DO"], ["BACK", "EDIT"]]),
+    });
+    if (moduleListsConfirmDelete) // drawn last, so fed first
+        drawConfirmOverlay("Delete List", [fitText(c, moduleListsTarget + "?", CONFIRM_TEXT_W)], "CLK=Yes  BACK=No");
+}
+function moduleListsSelectAction() {
+    if (moduleListsConfirmDelete) {
+        moduleListsConfirmDelete = false;
+        const name = moduleListsTarget;
+        const r = ModuleLists.deleteList(moduleListsState, name);
+        const saved = r.ok ? moduleListsSave() : false;
+        moduleListsTarget = "";
+        moduleListsActionIndex = 0;
+        moduleListsClampEditIndex();
+        setView(VIEWS.MODULE_LISTS_EDIT);
+        announce((r.ok ? "Deleted " + name + (saved ? "" : ", save failed") : (r.err || "Delete failed"))
+                 + ". Edit Lists, " + moduleListsEditRowLabel());
+        needsRedraw = true;
+        return;
+    }
+    const row = moduleListsActionRows()[moduleListsActionIndex];
+    if (!row) return;
+    if (row.kind === "rename") {
+        moduleListsOpenNameEntry(moduleListsTarget);
+    } else if (row.kind === "delete") {
+        moduleListsConfirmDelete = true;
+        announce("Delete " + moduleListsTarget + "?");
+    } else {
+        const r = ModuleLists.clearList(moduleListsState, moduleListsTarget);
+        if (!r.ok) announce(r.err || "Clear failed");
+        else announce("Cleared " + moduleListsTarget + (moduleListsSave() ? "" : ", save failed"));
+    }
+    needsRedraw = true;
+}
+function moduleListsActionsBack() {
+    if (moduleListsConfirmDelete) {
+        moduleListsConfirmDelete = false;
+        const row = moduleListsActionRows()[moduleListsActionIndex];
+        announce("Cancelled, " + moduleListsTarget + (row ? ", " + row.name : ""));
+    } else {
+        moduleListsClampEditIndex();
+        setView(VIEWS.MODULE_LISTS_EDIT);
+        announce("Edit Lists, " + moduleListsEditRowLabel());
+    }
+    needsRedraw = true;
+}
+function moduleListsJog(delta) {
+    if (view === VIEWS.MODULE_LISTS) {
+        moduleListsEnsureLoaded();
+        const rows = moduleListsRows();
+        moduleListsMemberIndex = Math.max(0, Math.min(rows.length - 1, moduleListsMemberIndex + delta));
+        announceMenuItem("List", moduleListsRowLabel(moduleListsMemberIndex));
+    } else if (view === VIEWS.MODULE_LISTS_EDIT) {
+        moduleListsEnsureLoaded();
+        const rows = moduleListsEditRows();
+        moduleListsEditIndex = Math.max(0, Math.min(rows.length - 1, moduleListsEditIndex + delta));
+        if (rows[moduleListsEditIndex]) announceMenuItem("List", moduleListsEditRowLabel());
+    } else if (!moduleListsConfirmDelete) { // the actions: the confirm owns the jog while it is up
+        const rows = moduleListsActionRows();
+        moduleListsActionIndex = Math.max(0, Math.min(rows.length - 1, moduleListsActionIndex + delta));
+        const r = rows[moduleListsActionIndex];
+        if (r) announceMenuItem(moduleListsTarget, r.name);
+    }
+}
+function moduleListsSelect() {
+    moduleListsEnsureLoaded();
+    if (view === VIEWS.MODULE_LISTS) {
+        moduleListsClampMemberIndex();
+        const row = moduleListsRows()[moduleListsMemberIndex];
+        if (!row) return;
+        if (row.kind === "toggle") {
+            const on = ModuleLists.toggleMembership(moduleListsState, row.name, moduleListsModuleId);
+            if (on === null) announce("List unavailable");
+            else announce(`${row.name}, ${on ? "added" : "removed"}` + (moduleListsSave() ? "" : ", save failed"));
+        } else if (row.kind === "new") {
+            moduleListsOpenNameEntry(null);
+        } else {
+            moduleListsEditIndex = 0;
+            setView(VIEWS.MODULE_LISTS_EDIT);
+            announce("Edit Lists, " + ((moduleListsState.lists[0] || {}).name || ModuleLists.FAVORITES));
+        }
+        needsRedraw = true;
+    } else if (view === VIEWS.MODULE_LISTS_EDIT) {
+        moduleListsClampEditIndex();
+        const r = moduleListsEditRows()[moduleListsEditIndex];
+        if (!r) return;
+        moduleListsTarget = r.name;
+        moduleListsActionIndex = 0;
+        moduleListsConfirmDelete = false; // never a latch carried into another list
+        setView(VIEWS.MODULE_LISTS_ACTIONS);
+        announce(`${r.name}, ${(moduleListsActionRows()[0] || {}).name || "Clear"}`);
+        needsRedraw = true;
+    } else {
+        moduleListsSelectAction();
+    }
+}
+function moduleListsBack() {
+    if (view === VIEWS.MODULE_LISTS) { exitModuleLists(); return; }
+    if (view === VIEWS.MODULE_LISTS_EDIT) {
+        moduleListsClampMemberIndex();
+        setView(VIEWS.MODULE_LISTS);
+        announce("Add to List, " + moduleListsRowLabel(moduleListsMemberIndex));
+        needsRedraw = true;
+        return;
+    }
+    moduleListsActionsBack();
+}
+
+// ---------------------------------------------------------------- Swap Module
+
+// shadow_ui.js's module picker for a position (chain_editor_chrome.mjs's
+// drawChainPicker): List (a module list to filter by), Sort (A-Z or by
+// type), None, the modules of the position's kind, "*" on the one loaded.
+// The modules are Melodee's (its scan, those it can load); Schwung's
+// "[Get more...]" (its catalog) and its Move Left / Move Right (Melodee
+// moves an effect with Shift + the wheel on its Device View) are not here.
+const PICKER_FILTER_ID = "__list_filter__", PICKER_SORT_ID = "__sort__";
+let componentSelectFilter = null, componentSelectSort = "A-Z"; // for this module's pages
+let availableModules = [], selectedModuleIndex = 0, selectSlot = 0, selectComponentKey = "";
+function pickerIsControlRow(row) {
+    const id = row && row.id;
+    return id === PICKER_FILTER_ID || id === PICKER_SORT_ID;
+}
+function scanModulesForType(componentKey) { // None first, then the modules by name
+    const expected = componentKey === "synth" ? ["sound_generator"] : /^fx\d+$/.test(componentKey) ? ["audio_fx"] : [];
+    const result = [{ id: "", name: "None" }];
+    const found = parseJson(seam("modules"));
+    for (const json of Array.isArray(found) ? found : []) {
+        if (!json || !json.id) continue;
+        cacheModuleAbbrev(json);
+        if (!expected.includes(json.component_type)) continue;
+        if (!result.find((m) => m.id === json.id)) result.push({ id: json.id, name: json.name || json.id, subcategory: json.subcategory || "" });
+    }
+    const modules = result.slice(1);
+    modules.sort((a, b) => compareNames(a.name, b.name));
+    return [result[0], ...modules];
+}
+function pickerApplySort(entries, componentKey) {
+    if (componentSelectSort !== "Type") return entries;
+    const head = [], mods = [], tail = [];
+    for (const m of entries) {
+        if (!m) continue;
+        if (m.id === "") head.push(m);
+        else if (String(m.id).indexOf("__") === 0) tail.push(m);
+        else mods.push(m);
+    }
+    const catalog = ModuleCategories.loadCatalogCategories((path) => std.loadFile(onDisk(path)));
+    const grouped = ModuleCategories.groupRowsByCategory(mods, ModuleCategories.taxonomyTypeFor(componentKey), catalog);
+    return [...head, ...grouped, ...tail];
+}
+function pickerRealIds(entries) {
+    return (entries || []).filter((m) => m && m.id && String(m.id).indexOf("__") !== 0).map((m) => m.id);
+}
+function pickerEligibleLists(scanned) {
+    moduleListsEnsureLoaded();
+    return ModuleLists.listsWithAnyOf(moduleListsState, pickerRealIds(scanned));
+}
+function pickerApplyFilter(entries, filterName) {
+    if (!filterName) return entries;
+    moduleListsEnsureLoaded();
+    const kept = ModuleLists.filterIds(moduleListsState, pickerRealIds(entries), filterName);
+    if (kept === null) return entries;
+    const keep = Object.create(null);
+    for (const id of kept) keep[id] = true;
+    return entries.filter((m) => !m || !m.id || String(m.id).indexOf("__") === 0 || keep[m.id]);
+}
+function pickerFirstSelectableIndex(entries) {
+    for (let i = 0; i < entries.length; i++) {
+        const id = entries[i] && entries[i].id;
+        if (id === PICKER_FILTER_ID || id === PICKER_SORT_ID) continue;
+        if (entries[i] && entries[i].type === "divider") continue;
+        return i;
+    }
+    return 0;
+}
+function enterComponentSelect(s, componentKey) {
+    selectSlot = s;
+    selectComponentKey = componentKey;
+    availableModules = scanModulesForType(componentKey);
+    const eligible = pickerEligibleLists(availableModules);
+    let filterReset = false;
+    if (componentSelectFilter && eligible.indexOf(componentSelectFilter) < 0) {
+        componentSelectFilter = null;
+        filterReset = true;
+    }
+    availableModules = pickerApplyFilter(availableModules, componentSelectFilter);
+    availableModules = pickerApplySort(availableModules, componentKey);
+    availableModules.unshift({ id: PICKER_SORT_ID, name: "Sort", value: componentSelectSort, clickVerb: "SORT" });
+    availableModules.unshift({ id: PICKER_FILTER_ID, name: "List", value: componentSelectFilter || "All", clickVerb: "LIST" });
+    const shownIdx = positionModule ? availableModules.findIndex((m) => m.id === positionModule) : -1;
+    selectedModuleIndex = shownIdx >= 0 ? shownIdx : pickerFirstSelectableIndex(availableModules);
+    setView(VIEWS.COMPONENT_SELECT);
+    needsRedraw = true;
+    const name = (availableModules[selectedModuleIndex] && availableModules[selectedModuleIndex].name) || "None";
+    announce(`Select ${componentLabel(componentKey)}, ${name}`
+             + (filterReset ? ", list filter reset to All" : (componentSelectFilter ? `, list ${componentSelectFilter}` : "")));
+}
+function componentSelectJog(delta) { // over the category headings; a step that could only land on one stays
+    const dir = delta > 0 ? 1 : -1;
+    let next = Math.max(0, Math.min(availableModules.length - 1, selectedModuleIndex + delta));
+    while (next > 0 && next < availableModules.length - 1 && ModuleCategories.isCategoryHeader(availableModules[next])) next += dir;
+    if (!ModuleCategories.isCategoryHeader(availableModules[next])) selectedModuleIndex = next;
+    if (availableModules.length > 0) {
+        const mod = availableModules[selectedModuleIndex];
+        announceMenuItem("Module", mod.name || mod.id || "Unknown");
+    }
+}
+function applyComponentSelection() {
+    const selected = availableModules[selectedModuleIndex];
+    if (selected && selected.id === PICKER_FILTER_ID) { // cycles in place
+        componentSelectFilter = ModuleLists.nextFilter(componentSelectFilter, pickerEligibleLists(scanModulesForType(selectComponentKey)));
+        enterComponentSelect(selectSlot, selectComponentKey);
+        selectedModuleIndex = 0;
+        announce("List, " + (componentSelectFilter || "All"));
+        return;
+    }
+    if (selected && selected.id === PICKER_SORT_ID) { // and so does the sort
+        componentSelectSort = componentSelectSort === "Type" ? "A-Z" : "Type";
+        enterComponentSelect(selectSlot, selectComponentKey);
+        selectedModuleIndex = Math.max(0, availableModules.findIndex((m) => m && m.id === PICKER_SORT_ID));
+        announce("Sort, " + (componentSelectSort === "Type" ? "by type" : "A to Z"));
+        return;
+    }
+    if (ModuleCategories.isCategoryHeader(selected)) return;
+    applyChainComponentPick(selectSlot, selectComponentKey, selected && selected.id ? selected.id : "");
+}
+// A pick, None included (Remove Module is this too): the record is not the
+// new module's; None removes the module, Melodee's way (out to the Device
+// View, then gone); another module is loaded once the grid would come back
+// (maybeReturnToComponentGrid); the same one stays as it is (Schwung loads
+// it again).
+function applyChainComponentPick(s, componentKey, picked) {
+    if (!picked || picked.toLowerCase() !== String(positionModule).toLowerCase())
+        setUserPresetRecord(s, prefixOf(componentKey), null);
+    if (!picked) {
+        positionModule = "";
+        tell("action", "remove");
+    } else {
+        positionModule = picked;
+    }
+    setView(VIEWS.CHAIN_EDIT);
+    needsRedraw = true;
+}
+function drawComponentSelect() {
+    clear_screen();
+    drawChainPicker(listScreenCtx(), {
+        headerLeft: `S${selectSlot + 1} > ${componentLabel(selectComponentKey) || "Module"}`,
+        entries: availableModules,
+        index: selectedModuleIndex,
+        currentId: positionModule || null,
+        emptyMessage: "No modules available",
+    });
+}
+
+// ---------------------------------------------------------------- the trailing pages
+
+// shadow_ui.js's moduleMenuEntries: Module Help where the module ships
+// topics, Add to List (the count of lists holding it), Swap, Remove; its
+// Clear Automation is Schwung's clip lanes, not here; Melodee's Auto Sample
+// last, on an instrument's.
+function moduleMenuEntries(id) {
+    const entries = [];
+    if (getModuleHelpChildren(id)) entries.push({ label: "Module Help", action: "module_help" });
+    const inLists = moduleListsCountFor(id);
+    entries.push({ label: "Add to List", value: inLists > 0 ? String(inLists) : "", action: "module_lists" });
+    entries.push({ label: "Swap Module", action: "swap_module" });
+    entries.push({ label: "Remove Module", action: "remove_module" });
+    if (autoSampleOffered) entries.push({ label: "Auto Sample", action: "melodee:auto_sample" });
+    return entries;
+}
+// shadow_ui.js's componentTrailingMenus: "My Presets" (the Preset row the
+// door to the list, Save and Delete with one loaded, Save As) and "Module".
+// Planned on entry and after the screens' own writes, never drawn from: the
+// state read here is what the header's `*` rides on.
+function componentTrailingMenus(s, componentKey, prefix) {
+    const id = positionModule;
+    if (!id) return [];
+    const pages = [];
+    if (presetsOffered) {
+        const record = getUserPresetRecord(s, prefix);
+        const liveBlob = getSlotStateWithRetry(s, prefix + ":state");
+        userPresetLiveBlob = liveBlob;
+        const hasRecord = !!(record && record.name);
+        const presetEntries = [{ label: "Preset", value: presetRowValue(record, liveBlob), action: "up_load" }];
+        if (hasRecord) presetEntries.push({ label: "Save", action: "up_save" });
+        presetEntries.push({ label: "Save As", action: "up_save_as" });
+        if (hasRecord) presetEntries.push({ label: "Delete", action: "up_delete" });
+        pages.push({ name: "My Presets", entries: presetEntries });
+    }
+    pages.push({ name: "Module", entries: moduleMenuEntries(id) });
+    return pages;
+}
+function gridActionOpenedSomething(...conditions) { return conditions.some(Boolean); }
+// A hand-off the grid made, waiting for its way back (maybeReturnToComponentGrid).
+let componentModalFromGrid = false, componentGridReturnSlot = -1, componentGridReturnKey = "", componentGridReturnModule = "";
+// shadow_ui.js's runComponentActionFromGrid, for the rows above.
+function runComponentActionFromGrid(s, componentKey, action) {
+    const prefix = prefixOf(componentKey);
+    const id = positionModule;
+    const record = getUserPresetRecord(s, prefix);
+    const viewBefore = view;
+    let result;
+    switch (action) {
+    case "up_load": // the list, on the preset it is on
+        presetsUi.enterPresetBrowser(s, componentKey, id, prefix, { currentName: record ? record.name : "" });
+        result = true;
+        break;
+    case "up_save": {
+        if (!record || !record.name) { result = false; break; }
+        if (presetsUi.overwriteUserPreset(s, prefix, id, record.name)) {
+            onUserPresetSaved(s, prefix, record.name);
+            paramPagesExitMenu(); // in place: the menu closed behind it
+            announce(`Saved ${record.name}`);
+        } else {
+            announce("Save failed");
+            needsRedraw = true;
+        }
+        result = true;
+        break;
+    }
+    case "up_save_as":
+        presetsUi.enterPresetSaveAs(s, componentKey, id, prefix);
+        result = true;
+        break;
+    case "up_delete":
+        if (!record || !record.name) { result = false; break; }
+        presetsUi.enterPresetDeleteConfirm(s, componentKey, id, prefix, record.name);
+        result = true;
+        break;
+    case "module_help": { // the module's own topics; Back off the first frame comes back here
+        const children = getModuleHelpChildren(id);
+        if (!children) return false;
+        exitParamPages();
+        componentHelpReturnSlot = s;
+        componentHelpReturnKey = componentKey;
+        helpDetailScrollState = null;
+        helpNavStack = [{ items: children, selectedIndex: 0, title: getModuleDisplayName(id) }];
+        setView(VIEWS.GLOBAL_SETTINGS);
+        needsRedraw = true;
+        announce(helpNavStack[0].title + " Help, " + children[0].title);
+        return true;
+    }
+    case "module_lists": {
+        if (!id) return false;
+        exitParamPages();
+        moduleListsLoad();
+        moduleListsSlot = s;
+        moduleListsKey = componentKey;
+        moduleListsModuleId = id;
+        moduleListsMemberIndex = 0;
+        moduleListsEditIndex = 0;
+        moduleListsActionIndex = 0;
+        moduleListsTarget = "";
+        moduleListsConfirmDelete = false;
+        moduleListsPendingName = null;
+        setView(VIEWS.MODULE_LISTS);
+        needsRedraw = true;
+        announce("Add to List, " + moduleListsRowLabel(0) + (moduleListsCorrupt ? ", lists file unreadable, changes will not save" : ""));
+        return true;
+    }
+    case "swap_module":
+        enterComponentSelect(s, componentKey);
+        result = true;
+        break;
+    case "remove_module": // no question: the row is the door
+        applyChainComponentPick(s, componentKey, "");
+        result = true;
+        break;
+    case "melodee:auto_sample": // Melodee's sheet over the pages; they come back on Module, its menu open
+        tell("action", "auto_sample");
+        return true;
+    default:
+        result = false;
+    }
+    if (gridActionOpenedSomething(view !== viewBefore)) {
+        componentModalFromGrid = true;
+        componentGridReturnSlot = s;
+        componentGridReturnKey = componentKey;
+        componentGridReturnModule = id || "";
+    }
+    return result;
+}
+// ...and back to the grid when the screen handed off to is done with (every
+// way out of the preset list, the delete question and the picker arrives on
+// the chain editor): on "My Presets" while the module is still there; a
+// swapped-in module's own pages (Melodee starts them, a new instance; this
+// one holds on Schwung's loading screen meanwhile); nothing with none.
+function maybeReturnToComponentGrid() {
+    if (!componentModalFromGrid) return false;
+    if (isTextEntryActive()) return false;
+    componentModalFromGrid = false;
+    const moduleBefore = componentGridReturnModule, s = componentGridReturnSlot, componentKey = componentGridReturnKey;
+    componentGridReturnModule = "";
+    componentGridReturnSlot = -1;
+    componentGridReturnKey = "";
+    if (s !== slot || !positionModule) return false;
+    if (moduleBefore && positionModule !== moduleBefore) {
+        componentGridReturnEnter = true;
+        componentLoadHold = { slot: s, componentKey, attempts: 0, ticks: 0, entry: null, handover: true };
+        tell("action", "swap " + positionModule);
+        setView(VIEWS.COMPONENT_LOADING);
+        announce(`${componentLoadHoldLabel()}, loading`);
+        needsRedraw = true;
+        return true;
+    }
+    const enterOnArrival = componentGridReturnEnter;
+    componentGridReturnEnter = true;
+    enterParamPages(s, componentKey, prefixOf(componentKey), "My Presets", componentParamPagesIo(s, componentKey), null,
+                    { enter: enterOnArrival });
+    needsRedraw = true;
+    return true;
+}
+
+// The grid's io: its trailing pages and their rows, and every write it
+// makes marked for the `*`.
+function componentParamPagesIo(s, componentKey = component) {
     return {
-        trailingMenus,
-        runAction: (action) => tell("action", action),
-        setParam: (key, value) => setSlotParam(s, key, value),
+        trailingMenus: () => componentTrailingMenus(s, componentKey, prefixOf(componentKey)),
+        runAction: (action) => runComponentActionFromGrid(s, componentKey, action),
+        setParam: (key, value) => {
+            const ok = setSlotParam(s, key, value);
+            markComponentParamWrite(s, componentKey);
+            return ok;
+        },
         heldStepIsHold: () => false,
         deleteHeld: () => false,
         onValueWritten: () => {},
@@ -1791,6 +2632,8 @@ let muteHeld = false;
 Object.defineProperty(ctx, "view", { get() { return view; }, set(v) { view = v; }, enumerable: true });
 Object.defineProperty(ctx, "needsRedraw", { get() { return needsRedraw; }, set(v) { needsRedraw = v; }, enumerable: true });
 Object.defineProperty(ctx, "selectedSlot", { get() { return slot; }, set() { /* one slot here */ }, enumerable: true });
+Object.defineProperty(ctx, "helpNavStack", { get() { return helpNavStack; }, enumerable: true });
+Object.defineProperty(ctx, "helpDetailScrollState", { get() { return helpDetailScrollState; }, enumerable: true });
 Object.assign(ctx, {
     VIEWS,
     setView,
@@ -1809,7 +2652,15 @@ Object.assign(ctx, {
     canvasPageHook,
     getModuleDisplayName,
     getModuleAbbrev,
-    userPresetHeaderMark: () => null,
+    userPresetHeaderMark: (s, componentKey) => userPresetHeaderMark(s, componentKey),
+    // The user presets' screens (shadow_ui_presets.mjs) report what they did.
+    onPresetSaved: (s, prefix, name) => onUserPresetSaved(s, prefix, name),
+    onPresetLoaded: (s, prefix, name) => onUserPresetLoaded(s, prefix, name),
+    onPresetDeleted: (s, prefix, name) => onUserPresetDeleted(s, prefix, name),
+    auditionEnabled: () => previewEnabled,
+    // The help viewer's (shadow_ui_settings.mjs draws through these).
+    drawHelpList: () => drawHelpList(),
+    drawHelpDetail: () => drawHelpDetail(),
     isMuteHeld: () => muteHeld,
     runSlotAction: () => {},
     openEnumPicker: (o) => openEnumPicker(o),
@@ -1823,8 +2674,16 @@ Object.assign(ctx, {
 // ---------------------------------------------------------------- entering
 
 function enter(entry) {
-    // What a screen left behind when Melodee took the pages away.
+    // What a screen left behind when Melodee took the pages away: a preset
+    // list's audition put back, a hand-off's way back forgotten.
     if (isTextEntryActive()) closeTextEntry();
+    if (view === VIEWS.PRESETS) presetsUi.handlePresetsBack();
+    componentModalFromGrid = false;
+    componentGridReturnEnter = true;
+    componentHelpReturnSlot = -1;
+    helpNavStack = [];
+    helpDetailScrollState = null;
+    moduleListsResetSession();
     if (view === VIEWS.CANVAS) invokeCanvasOverlayHook("onExit", { cancelled: true });
     resetCanvasState();
     filepathBrowserState = null;
@@ -1849,6 +2708,11 @@ function enter(entry) {
     moduleDir = String(entry.dir || "");
     moduleName = String(entry.name || "");
     moduleAbbrev = String(entry.abbrev || "");
+    cacheModuleAbbrev({ id: moduleId, abbrev: moduleAbbrev, name: moduleName });
+    positionModule = moduleId;
+    presetsOffered = !!entry.presets;
+    autoSampleOffered = !!entry.instrument;
+    readUserPresetRecord();
     view = VIEWS.CHAIN_EDIT;
     openComponentEditor(slot, component, entry);
     needsRedraw = true;
@@ -1888,13 +2752,16 @@ function reconcilePadBlock() {
 function tick() {
     fileFlatTick();
     reconcilePadBlock();
+    presetsUi.tickPresetPreview(); // a preset list's audition, a moment after the cursor stops
     if (view === VIEWS.PARAM_PAGES) tickParamPages();
+    tickUserPresetStale();
     const fb = filepathBrowserState;
     if (fb && fb.livePreviewEnabled && fb.previewPendingPath && Date.now() - fb.previewPendingTime >= 150) {
         applyLivePreview(fb, { kind: "file", path: fb.previewPendingPath });
         fb.previewPendingPath = "";
         fb.previewPendingTime = 0;
     }
+    moduleListsTickPendingName();
     if (isTextEntryActive() && tickTextEntry()) needsRedraw = true;
     if (tickOverlay()) needsRedraw = true;
     refreshPendingKnobOverlay();
@@ -1911,7 +2778,12 @@ function tick() {
 }
 
 function drawView() {
+    // Back from a screen a trailing page's row handed off to, before the
+    // draw (shadow_ui.js's reconciles): the frame that notices is the grid's.
+    if (view === VIEWS.GLOBAL_SETTINGS) maybeReturnToComponentHelp();
+    if (view === VIEWS.CHAIN_EDIT) maybeReturnToComponentGrid();
     serviceComponentLoadHold(); // a probe that lands changes the view: drawn now
+    if (view === VIEWS.CHAIN_EDIT) { tell("exit", ""); return; } // Schwung's chain editor: Melodee's Device View
     try {
         switch (view) {
         case VIEWS.PARAM_PAGES:
@@ -1927,6 +2799,13 @@ function drawView() {
         case VIEWS.FILEPATH_BROWSER: drawFilepathBrowser(); break;
         case VIEWS.FILE_FLAT: drawFileFlat(); break;
         case VIEWS.ENUM_PICKER: drawEnumPicker(); break;
+        case VIEWS.PRESETS: presetsUi.drawPresets(); break;
+        case VIEWS.PRESET_DETAIL: presetsUi.drawPresetDetail(); break;
+        case VIEWS.GLOBAL_SETTINGS: settingsUi.drawGlobalSettings(); break;
+        case VIEWS.COMPONENT_SELECT: drawComponentSelect(); break;
+        case VIEWS.MODULE_LISTS: drawModuleLists(); break;
+        case VIEWS.MODULE_LISTS_EDIT: drawModuleListsEdit(); break;
+        case VIEWS.MODULE_LISTS_ACTIONS: drawModuleListsActions(); break;
         default: break;
         }
         // Over the view, in shadow_ui.js's order: the keyboard, the warning
@@ -1947,6 +2826,7 @@ function drawView() {
         print(10, 34, String(e).substring(0, 21), 1);
         if (paramPagesActive()) exitParamPages();
         setView(VIEWS.CHAIN_EDIT);
+        tell("exit", "");
     }
 }
 
@@ -1971,6 +2851,22 @@ function status() {
         title = fileFlatFolder;
         index = fileFlatIndex;
         rows = fileFlatRows.map((it, i) => [String(it.label || ""), i === fileFlatStored ? "*" : ""]);
+    } else if (view === VIEWS.COMPONENT_SELECT) {
+        title = `S${selectSlot + 1} > ${componentLabel(selectComponentKey)}`;
+        index = selectedModuleIndex;
+        rows = availableModules.map((m) => [String((m && (m.type === "divider" ? m.label : m.name || m.id)) || ""),
+                                            m && m.value !== undefined ? String(m.value) : m && positionModule && m.id === positionModule ? "*" : ""]);
+    } else if (view === VIEWS.MODULE_LISTS || view === VIEWS.MODULE_LISTS_EDIT || view === VIEWS.MODULE_LISTS_ACTIONS) {
+        const list = view === VIEWS.MODULE_LISTS ? moduleListsRows() : view === VIEWS.MODULE_LISTS_EDIT ? moduleListsEditRows()
+            : moduleListsActionRows();
+        title = view === VIEWS.MODULE_LISTS ? getModuleDisplayName(moduleListsModuleId) : view === VIEWS.MODULE_LISTS_EDIT ? "Edit Lists" : moduleListsTarget;
+        index = view === VIEWS.MODULE_LISTS ? moduleListsMemberIndex : view === VIEWS.MODULE_LISTS_EDIT ? moduleListsEditIndex : moduleListsActionIndex;
+        rows = list.map((r) => [String(r.name), String(r.value || "")]);
+    } else if (view === VIEWS.GLOBAL_SETTINGS && helpNavStack.length > 0) {
+        const frame = helpNavStack[helpNavStack.length - 1];
+        title = helpDetailScrollState ? String(frame.items[frame.selectedIndex].title) : helpHeaderTitle(frame);
+        index = helpDetailScrollState ? -1 : frame.selectedIndex;
+        rows = helpDetailScrollState ? [] : frame.items.map((item) => [String(item.title || ""), ""]);
     }
     return JSON.stringify({
         view,
@@ -1985,6 +2881,7 @@ function status() {
         index,
         footer,
         rows,
+        said: lastSaid,
     });
 }
 
@@ -1998,6 +2895,11 @@ function handleJog(delta) {
     case VIEWS.FILEPATH_BROWSER: filepathBrowserJog(delta); break;
     case VIEWS.FILE_FLAT: fileFlatMove(delta > 0 ? 1 : -1); break;
     case VIEWS.ENUM_PICKER: enumPickerJog(delta); break;
+    case VIEWS.PRESETS: presetsUi.handlePresetsJog(delta); break;
+    case VIEWS.PRESET_DETAIL: presetsUi.handlePresetDetailJog(delta); break;
+    case VIEWS.COMPONENT_SELECT: componentSelectJog(delta); break;
+    case VIEWS.MODULE_LISTS: case VIEWS.MODULE_LISTS_EDIT: case VIEWS.MODULE_LISTS_ACTIONS: moduleListsJog(delta); break;
+    case VIEWS.GLOBAL_SETTINGS: helpJog(delta); break;
     default: break; // a canvas has the turn through its onMidi
     }
     needsRedraw = true;
@@ -2013,6 +2915,17 @@ function handleSelect() {
     case VIEWS.FILEPATH_BROWSER: filepathBrowserSelect(); break;
     case VIEWS.FILE_FLAT: fileFlatCommit(); break;
     case VIEWS.ENUM_PICKER: closeEnumPicker(true); break;
+    case VIEWS.PRESETS: presetsUi.handlePresetsSelect(); break;
+    case VIEWS.PRESET_DETAIL: presetsUi.handlePresetDetailSelect(); break;
+    case VIEWS.COMPONENT_SELECT: {
+        const picked = availableModules[selectedModuleIndex];
+        if (picked && !pickerIsControlRow(picked) && !ModuleCategories.isCategoryHeader(picked))
+            announce(`Loading ${picked.name || picked.id || "module"}`);
+        applyComponentSelection();
+        break;
+    }
+    case VIEWS.MODULE_LISTS: case VIEWS.MODULE_LISTS_EDIT: case VIEWS.MODULE_LISTS_ACTIONS: moduleListsSelect(); break;
+    case VIEWS.GLOBAL_SETTINGS: helpSelect(); break;
     default: break;
     }
     needsRedraw = true;
@@ -2039,6 +2952,15 @@ function handleBack() {
         break;
     case VIEWS.HIERARCHY_EDITOR: leaveListEditor(); break; // opened from the grid: back to it
     case VIEWS.ENUM_PICKER: closeEnumPicker(false); break;
+    case VIEWS.PRESETS: presetsUi.handlePresetsBack(); break;
+    case VIEWS.PRESET_DETAIL: presetsUi.handlePresetDetailBack(); break;
+    case VIEWS.COMPONENT_SELECT: // to the chain editor, and from there the grid (maybeReturnToComponentGrid)
+        setView(VIEWS.CHAIN_EDIT);
+        announce("Chain Editor");
+        needsRedraw = true;
+        break;
+    case VIEWS.MODULE_LISTS: case VIEWS.MODULE_LISTS_EDIT: case VIEWS.MODULE_LISTS_ACTIONS: moduleListsBack(); break;
+    case VIEWS.GLOBAL_SETTINGS: helpBack(); break;
     default: break;
     }
 }

@@ -13,11 +13,15 @@
 // A Schwung module's pages, shown by Schwung's own screen code (Kerem,
 // 2026-11-21): from the push into a module until Back out, every screen is
 // what Schwung's shadow UI draws, its code run from the Schwung on the Move
-// (shadow/shadow_ui_param_pages.mjs, shared/...). Melodee gives that code
-// what Schwung's shadow UI gives it: its screen (schwung_display.h), the
-// glue shadow_ui.js provides (src/app/schwung_pages/host.js, carried in the
-// binary and run as a CanvasPage), and the Move's controls as the shim
-// forwards them. screens/module_pages.cpp shows the screen and nothing else.
+// (shadow/shadow_ui_param_pages.mjs, shadow_ui_presets.mjs, shared/...), the
+// pages after the module's own (My Presets, Module) and the screens their
+// rows open included. Melodee gives that code what Schwung's shadow UI gives
+// it: its screen (schwung_display.h), the glue shadow_ui.js provides
+// (src/app/schwung_pages/host.js, carried in the binary and run as a
+// CanvasPage), and the Move's controls as the shim forwards them; and what
+// is Melodee's there: the modules a swap may pick and their loading, a
+// module's removing, its Auto Sample, the user preset record kept with the
+// project. screens/module_pages.cpp shows the screen and nothing else.
 //
 // Called as a CanvasPage is: under the app's lock, from the screen or MIDI
 // thread, never the audio thread.
@@ -36,13 +40,21 @@ public:
         std::function<bool()> shift;     // Shift held or locked
         std::function<bool()> reader;    // the screen reader on (Schwung's list layout then)
         std::function<void(const std::string&)> say; // Schwung's screen reader's words
-        std::function<std::string()> trailing;          // the pages after the module's (JSON, Schwung's trailingMenus shape)
-        std::function<void(const std::string&)> action; // one of their rows pushed
+        // The modules a Swap may pick, of the position's kind (JSON: [{id,
+        // name, abbrev, component_type, subcategory}]).
+        std::function<std::string()> modules;
+        // What the trailing pages ask of Melodee: "swap <id>" (the module
+        // loaded in its place), "remove", "auto_sample".
+        std::function<void(const std::string&)> action;
+        std::function<void()> changed;   // the user preset record changed: the project to save
         // Schwung's keyboard took the pads (its pad typing) or gave them
         // back: while they are its keys none reaches the module (Melodee's
         // audio thread plays none).
         std::function<void(bool)> pad_block;
+        bool presets = false;            // My Presets offered (the module's state can be read: a synth's)
+        bool instrument = false;         // Melodee's Auto Sample on its Module page
         std::string page_states;         // the drawn pages' kept state (JSON), from the project
+        std::string preset_record;       // the user preset it is on (Schwung's {name, hash}), from the project
     };
     // `host` reaches the module (CanvasPage's). Null with `error` set when
     // it cannot start.
@@ -67,12 +79,15 @@ public:
         bool typing = false;          // Schwung's keyboard up (over the view)
         bool warning = false;         // its warning card up
         std::string text;             // what the keyboard holds
-        std::string title;            // a list screen's (option list, file browser, file list)
+        // A list screen's (option list, file browser, file list, module
+        // picker, module lists, help topics)
+        std::string title;
         int index = -1;               // and the row it is on
         std::vector<std::pair<std::string, std::string>> footer; // ("JOG", "PAGE"), ("CLK", "MENU") ...
         // A menu page's rows: label, value; a list screen's: label, "*" on
         // the one set (the browser: the row's kind).
         std::vector<std::pair<std::string, std::string>> rows;
+        std::string said;             // Schwung's screen reader's last words
     };
     const Status& status() const { return shown; }
     // The knob rings Schwung's pages lit: its colour each, -1 where it left
@@ -87,7 +102,13 @@ public:
     void release_pads();
     // The drawn pages' state, to keep with the project (JSON; empty: none).
     const std::string& page_states() const { return states; }
+    // The user preset the module is on, to keep with the project (Schwung's
+    // {name, hash} as JSON; empty: none).
+    const std::string& preset_record() const { return record; }
     const SchwungDisplay& screen() const { return page->screen(); }
+    // Which pages these are: each load a new number (a screen tells a
+    // swapped-in module's pages from the ones it entered).
+    uint64_t serial() const { return number; }
 
 private:
     SchwungPages() = default;
@@ -95,7 +116,8 @@ private:
     std::unique_ptr<CanvasPage> page;
     Hooks hooks;
     std::string entry; // host.js reads it once as "melodee:entry"
-    std::string states;
+    std::string states, record;
+    uint64_t number = 0;
     Status shown;
     std::array<int, 8> rings {-1, -1, -1, -1, -1, -1, -1, -1};
     std::array<int, 32> pads {};

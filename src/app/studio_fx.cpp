@@ -226,7 +226,7 @@ void Studio::service_fx() {
         std::unique_ptr<SchwungPages> pages;
         if (loaded)
             pages = start_pages(fx_host(uint8_t(entry)), *loaded, info.dir, saved.module == info.id ? saved.pages : std::vector<std::pair<std::string, std::string>> {},
-                                PagesTarget {selected, uint8_t(entry)});
+                                std::string(), PagesTarget {selected, uint8_t(entry)}); // no My Presets: an effect's state is not read
         std::lock_guard<std::mutex> guard(lock);
         FxModule* effect = fx[entry].get();
         if (!effect) continue; // let go meanwhile: `loaded` destroyed here, never played

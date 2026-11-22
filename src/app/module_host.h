@@ -178,6 +178,10 @@ public:
 
     // Any thread but the audio thread, one at a time (the app's lock).
     bool set_module(LoadedModule* module); // null: none
+    // A value too long for a command (a module's whole state, a user preset
+    // loaded) goes through a buffer of its own, one at a time, in its place
+    // among the commands: a second waits for the first to be applied, 100 ms
+    // at most (false then).
     bool set(const std::string& key, const std::string& value);
     // Answered on a later block, never dropped: what the queues have no room
     // for yet waits here (a preset change asks Surge for some 300 values),
@@ -227,7 +231,7 @@ public:
 
 private:
     struct Command {
-        enum class Kind : uint8_t { Module, Set, Ask } kind = Kind::Set;
+        enum class Kind : uint8_t { Module, Set, SetLong, Ask } kind = Kind::Set;
         LoadedModule* module = nullptr;
         char key[key_size] {};
         char value[value_size] {};
@@ -253,6 +257,9 @@ private:
     char long_key[key_size] {};
     int long_length = 0;
     std::vector<char> long_buffer = std::vector<char>(65536);
+    // The long set: 0 free, 1 sent (the playing thread's until applied).
+    std::atomic<int> long_set_state {0};
+    std::vector<char> long_set_buffer = std::vector<char>(65536);
     // The read answered now: as the long read, one caller at a time.
     std::mutex sync_lock;
     std::atomic<int> sync_state {0};

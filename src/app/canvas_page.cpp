@@ -18,11 +18,37 @@ namespace {
 
 // ---------------------------------------------------------------- modules
 
+// Schwung's code reaches its own folder through "os" too (its user presets
+// are listed and removed with os.readdir and os.remove): where
+// MELODEE_SCHWUNG_ROOT moves the folder (the tests), Schwung's modules get
+// an "os" that moves those paths with it, the real one under it. On the Move
+// nothing moves, and they get the real one.
+constexpr const char* schwung_os_name = "melodee:schwung-os";
+constexpr const char* schwung_os_source = R"(import * as os from "os";
+import * as std from "std";
+export * from "os";
+const device = "/data/UserData/schwung", root = std.getenv("MELODEE_SCHWUNG_ROOT") || device;
+const moved = (path) => { const p = String(path); return p === device || p.startsWith(device + "/") ? root + p.slice(device.length) : p; };
+export function readdir(path) { return os.readdir(moved(path)); }
+export function stat(path) { return os.stat(moved(path)); }
+export function lstat(path) { return os.lstat(moved(path)); }
+export function remove(path) { return os.remove(moved(path)); }
+export function rename(from, to) { return os.rename(moved(from), moved(to)); }
+export function mkdir(path, mode) { return mode === undefined ? os.mkdir(moved(path)) : os.mkdir(moved(path), mode); }
+export function realpath(path) { return os.realpath(moved(path)); }
+)";
+
+bool schwung_moved() { return SchwungDisplay::schwung_path("/data/UserData/schwung") != "/data/UserData/schwung"; }
+
 // A module's name, as QuickJS's own default makes it (a relative one from
 // the importing module's folder), then Schwung's folder moved where
 // MELODEE_SCHWUNG_ROOT says (schwung_display.h): Schwung's code imports its
 // own by absolute paths under /data/UserData/schwung.
 char* module_name(JSContext* context, const char* base, const char* name, void*) {
+    if (std::strcmp(name, "os") == 0 && schwung_moved()) {
+        std::string root = SchwungDisplay::root() + "/";
+        if (std::strncmp(base, root.c_str(), root.size()) == 0) return js_strdup(context, schwung_os_name);
+    }
     std::string out;
     if (name[0] != '.') out = name;
     else {
@@ -42,6 +68,16 @@ char* module_name(JSContext* context, const char* base, const char* name, void*)
     }
     out = SchwungDisplay::schwung_path(out);
     return js_strdup(context, out.c_str());
+}
+
+// quickjs-libc's loader, and the moved "os" from its source above.
+JSModuleDef* module_loader(JSContext* context, const char* name, void* opaque) {
+    if (std::strcmp(name, schwung_os_name) != 0) return js_module_loader(context, name, opaque);
+    JSValue compiled = JS_Eval(context, schwung_os_source, std::strlen(schwung_os_source), name, JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY);
+    if (JS_IsException(compiled)) return nullptr;
+    auto* module = static_cast<JSModuleDef*>(JS_VALUE_GET_PTR(compiled));
+    JS_FreeValue(context, compiled);
+    return module;
 }
 
 std::string exception_text(JSContext* context) {
@@ -240,7 +276,7 @@ std::unique_ptr<CanvasPage> CanvasPage::load_source(const std::string& source, c
     JS_SetMemoryLimit(engine.runtime, 64u << 20);
     JS_SetMaxStackSize(engine.runtime, 1u << 20);
     js_std_init_handlers(engine.runtime);
-    JS_SetModuleLoaderFunc(engine.runtime, module_name, js_module_loader, nullptr);
+    JS_SetModuleLoaderFunc(engine.runtime, module_name, module_loader, nullptr);
     JS_SetInterruptHandler(engine.runtime, CanvasBindings::interrupt, &engine);
     engine.context = JS_NewContext(engine.runtime);
     if (!engine.context) { error = "no memory for a script"; return nullptr; }

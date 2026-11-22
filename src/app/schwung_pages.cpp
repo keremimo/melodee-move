@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "app/schwung_pages.h"
 #include <juce_core/juce_core.h>
+#include <atomic>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -29,6 +30,8 @@ namespace {
 
 std::string text(const juce::var& value) { return value.isVoid() || value.isUndefined() ? std::string() : value.toString().toStdString(); }
 
+std::atomic<uint64_t> loads {0}; // each SchwungPages its number
+
 } // namespace
 
 std::string SchwungPages::shared_folder() {
@@ -43,6 +46,8 @@ std::unique_ptr<SchwungPages> SchwungPages::load(CanvasPage::Host host, Hooks ho
     auto* self = pages.get();
     self->hooks = std::move(hooks);
     self->states = self->hooks.page_states;
+    self->record = self->hooks.preset_record;
+    self->number = ++loads;
     self->pads.fill(-1);
     auto read = host.read ? std::move(host.read) : [get = host.get](const std::string& key) { return std::optional<std::string>(get(key)); };
     auto set = std::move(host.set);
@@ -52,7 +57,8 @@ std::unique_ptr<SchwungPages> SchwungPages::load(CanvasPage::Host host, Hooks ho
         if (key == "melodee:shift") return std::string(self->hooks.shift && self->hooks.shift() ? "1" : "0");
         if (key == "melodee:reader") return std::string(self->hooks.reader && self->hooks.reader() ? "1" : "0");
         if (key == "melodee:page_states") return self->states;
-        if (key == "melodee:trailing") return self->hooks.trailing ? self->hooks.trailing() : std::string("[]");
+        if (key == "melodee:preset_record") return self->record;
+        if (key == "melodee:modules") return self->hooks.modules ? self->hooks.modules() : std::string("[]");
         return std::nullopt;
     };
     host.set = [set, self](const std::string& key, const std::string& value) {
@@ -75,7 +81,11 @@ std::unique_ptr<SchwungPages> SchwungPages::load(CanvasPage::Host host, Hooks ho
             std::istringstream(value) >> note >> colour;
             if (note >= 68 && note < 68 + 32) self->pads[size_t(note - 68)] = colour;
         } else if (key == "melodee:page_states") self->states = value;
-        else if (key == "melodee:say") { if (self->hooks.say) self->hooks.say(value); }
+        else if (key == "melodee:preset_record") {
+            if (value == self->record) return;
+            self->record = value;
+            if (self->hooks.changed) self->hooks.changed();
+        } else if (key == "melodee:say") { if (self->hooks.say) self->hooks.say(value); }
         else if (key == "melodee:action") { if (self->hooks.action) self->hooks.action(value); }
     };
     std::string source(melodee_schwung_pages_start, size_t(melodee_schwung_pages_end - melodee_schwung_pages_start));
@@ -92,6 +102,8 @@ void SchwungPages::enter(const std::string& page_name, bool open) {
     what->setProperty("name", juce::String(hooks.module_name));
     what->setProperty("abbrev", juce::String(hooks.module_abbrev));
     what->setProperty("dir", juce::String(hooks.module_dir));
+    what->setProperty("presets", hooks.presets);
+    what->setProperty("instrument", hooks.instrument);
     if (!page_name.empty()) {
         what->setProperty("page", juce::String(page_name));
         what->setProperty("enter", open);
@@ -129,6 +141,7 @@ void SchwungPages::take_status(const std::string& json) {
     next.warning = bool(parsed["warning"]);
     next.text = text(parsed["text"]);
     next.title = text(parsed["title"]);
+    next.said = text(parsed["said"]);
     next.index = parsed["index"].isVoid() ? -1 : int(parsed["index"]);
     if (auto* pairs = parsed["footer"].getArray())
         for (const auto& pair : *pairs)

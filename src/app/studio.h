@@ -12,7 +12,6 @@
 #include "app/keys.h"
 #include "app/module_host.h"
 #include "app/schwung_pages.h"
-#include "app/user_presets.h"
 #include "app/pad_layout.h"
 #include "app/project_store.h"
 #include "move/app.h"
@@ -117,8 +116,6 @@ struct ModuleTrack {
     std::unique_ptr<LoadedModule> module;
     std::vector<std::unique_ptr<LoadedModule>> leaving;
     std::unique_ptr<SchwungPages> schwung_pages;           // its pages by Schwung's own code (schwung_pages.h)
-    std::string user_preset;        // the user preset loaded or saved last (user_presets.h); empty: none
-    bool user_preset_dirty = false; // a value set since
     SynthFile saved;            // as the project file has it: kept while the module is missing
     std::string job;            // a module to load (the service thread's)
     bool job_restores = false;  // set as `saved` has it (a project opened, a track copied)
@@ -322,22 +319,25 @@ public:
         uint8_t fx_entry = melodee::no_plugin;
         bool operator==(const PagesTarget& o) const { return track == o.track && fx_entry == o.fx_entry; }
     };
+    struct PagesSwap { PagesTarget target; std::string id; };
     PagesTarget pages_target;                   // whose pages screens/module_pages.cpp shows
-    std::optional<PagesTarget> swap_from_pages;   // a Swap Module asked from its pages
-    std::optional<PagesTarget> remove_from_pages; // a Remove Module asked from its pages
+    // Asked from a module's pages (Schwung's Swap Module and Remove Module),
+    // done by the pages screen once Schwung's code has returned.
+    std::optional<PagesSwap> swap_from_pages;
+    std::optional<PagesTarget> remove_from_pages;
     SchwungPages* pages_of(PagesTarget target);
     // A Schwung effect's place in its chain (0 the first): Schwung's "fx1" ...
     unsigned fx_position(PagesTarget target) const;
+    // `record`: the user preset it is on, as the project kept it.
     std::unique_ptr<SchwungPages> start_pages(CanvasPage::Host host, const LoadedModule& module, const std::string& dir,
-                                              const std::vector<std::pair<std::string, std::string>>& kept, PagesTarget target);
-    std::string pages_trailing(PagesTarget target, bool instrument);
+                                              const std::vector<std::pair<std::string, std::string>>& kept, const std::string& record,
+                                              PagesTarget target);
+    std::string pages_modules(PagesTarget target); // the modules a Swap may pick (schwung_pages.h)
     void pages_action(PagesTarget target, const std::string& action);
+    // Swap Module: `id` loaded in the module's place (a synth's on its
+    // track, an effect in its chain slot); where its pages will be.
+    PagesTarget swap_module(PagesTarget target, const std::string& id);
     void remove_module(PagesTarget target); // Remove Module: the synth's module (the track stays, empty) or the effect
-    // My Presets (user_presets.h), on a synth's module: one loaded (its state
-    // set, every value asked again), the current one saved over, or saved
-    // under a new name (a number on where it is taken).
-    void load_user_preset(PagesTarget target, const UserPreset& preset);
-    void save_user_preset_as(PagesTarget target, const std::string& name, bool overwrite);
     std::vector<ModuleInfo> catalog;
     std::string modules_root;
     void rescan_modules();

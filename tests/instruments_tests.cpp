@@ -709,7 +709,8 @@ void test_screens() {
         CHECK(studio.project().tracks[1].params[melodee::plugin_track::Macro1] == 0);
     }
     // Its pages (the push; Schwung's page code), on to the last, Module: in,
-    // its third row, Auto Sample (Melodee's, after Swap and Remove).
+    // its fourth row, Auto Sample (Melodee's, after Schwung's Add to List,
+    // Swap and Remove).
     auto frames = [&](int n) {
         AudioBlock in {}, out {};
         juce::Image screen(juce::Image::ARGB, 128, 64, true);
@@ -727,7 +728,7 @@ void test_screens() {
     for (int n = 0; n < 12 && !has(melodee.status(), "pages=Module,"); ++n) { wheel(1); frames(1); }
     button(Button::MainPush);
     frames(1);
-    wheel(2);
+    wheel(3);
     frames(1);
     button(Button::MainPush);
     CHECK(has(melodee.status(), "page=auto-sample"));

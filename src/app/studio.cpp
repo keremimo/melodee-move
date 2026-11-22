@@ -955,7 +955,6 @@ void Studio::set_click(bool on, unsigned level) {
 
 void Studio::synth_set(ModuleTrack& track, const std::string& key, const std::string& value) {
     track.player.set(key, value);
-    if (!track.user_preset.empty() && key != "state") track.user_preset_dirty = true; // My Presets marks it (* name)
     track.set_at[key] = track.player.last_serial();
     if (std::find(track.edited.begin(), track.edited.end(), key) == track.edited.end()) track.edited.push_back(key); // undo compares it
 }
@@ -998,10 +997,17 @@ CanvasPage::Host Studio::canvas_host(unsigned t) {
         auto* module = module_track(t);
         if (!module) return;
         synth_set(*module, key, value);
+        // A whole state with no audio thread to take it (a test, a tool):
+        // set here as well, where the reads are made, so the next read is of
+        // it (Schwung's My Presets hashes what the module says after a load).
+        if (key == "state" && module->module && !module->player.rendering()) module->module->set_now(key, value);
         if (ModuleParam* param = module->module ? module->module->param(key) : nullptr) param->take(value); // the knobs and the save see it too
-        if (module->module && key == module->module->preset_param) { // a preset sets every value: each asked again, to show and save
+        // A preset, or a whole state (a user preset loaded, Schwung's My
+        // Presets), sets every value: each asked again, to show and save.
+        if (module->module && (key == module->module->preset_param || key == "state")) {
             auto& loaded = *module->module;
-            loaded.preset = std::atoi(value.c_str());
+            if (key == loaded.preset_param) loaded.preset = std::atoi(value.c_str());
+            else changed(); // a user preset loaded, heard or put back: the project saved as it ends up
             if (!loaded.preset_name_param.empty()) module->player.ask(loaded.preset_name_param, true);
             for (const auto& param : loaded.params)
                 if (param.key != loaded.preset_param) module->player.ask(param.key);
@@ -1039,10 +1045,14 @@ CanvasPage::Host Studio::canvas_host(unsigned t) {
 // A module's pages by Schwung's own code (schwung_pages.h), started off the
 // lock (its imports take their time): what its module.json declares where
 // the module does not say (as Schwung's chain host answers), which track and
-// place it is (Schwung's slot and component), and its drawn pages' state as
-// the project kept it. Null where Melodee finds no Schwung code.
+// place it is (Schwung's slot and component), its drawn pages' state and the
+// user preset it is on as the project kept them, and what its trailing pages
+// offer: My Presets on a synth's module (its state is read through the
+// track's player; an effect's is not readable), Melodee's Auto Sample on an
+// instrument's. Null where Melodee finds no Schwung code.
 std::unique_ptr<SchwungPages> Studio::start_pages(CanvasPage::Host host, const LoadedModule& module, const std::string& dir,
-                                                  const std::vector<std::pair<std::string, std::string>>& kept, PagesTarget target) {
+                                                  const std::vector<std::pair<std::string, std::string>>& kept, const std::string& record,
+                                                  PagesTarget target) {
     if (SchwungPages::shared_folder().empty()) return nullptr;
     std::map<std::string, std::string> contract {{"ui_hierarchy", module.declared("ui_hierarchy")}, {"chain_params", module.declared("chain_params")}};
     auto asked = host.read ? host.read : [get = host.get](const std::string& key) { return std::optional<std::string>(get(key)); };
@@ -1061,9 +1071,12 @@ std::unique_ptr<SchwungPages> Studio::start_pages(CanvasPage::Host host, const L
     hooks.module_dir = dir;
     hooks.shift = [this] { return shift; };
     hooks.reader = [this] { return screen_reader.load(std::memory_order_relaxed); };
-    bool instrument = !module.source && target.fx_entry == melodee::no_plugin;
-    hooks.trailing = [this, target, instrument] { return pages_trailing(target, instrument); };
+    hooks.presets = target.fx_entry == melodee::no_plugin;
+    hooks.instrument = !module.source && target.fx_entry == melodee::no_plugin;
+    hooks.preset_record = record;
+    hooks.modules = [this, target] { return pages_modules(target); };
     hooks.action = [this, target](const std::string& action) { pages_action(target, action); };
+    hooks.changed = [this] { changed(); };
     hooks.pad_block = [this](bool on) { pads_typing.store(on || typing); }; // Schwung's keyboard's pads: letters, not notes
     auto states = juce::DynamicObject::Ptr(new juce::DynamicObject());
     for (const auto& [key, state] : kept) states->setProperty(juce::Identifier(key), juce::String(state)); // each page's own JSON text
@@ -1083,110 +1096,66 @@ SchwungPages* Studio::pages_of(PagesTarget target) {
     return track && track->module ? track->schwung_pages.get() : nullptr;
 }
 
-// The pages Melodee adds after a module's own, as Schwung adds its My Presets
-// and Module (shadow_ui.js componentTrailingMenus), in its trailingMenus
-// shape. My Presets on a synth's module (its state is asked of it on the
-// audio thread; an effect's is not); Module everywhere: its help where it has
-// one, Swap, Remove, and Melodee's Auto Sample for an instrument.
-std::string Studio::pages_trailing(PagesTarget target, bool instrument) {
-    auto entry = [](const std::string& label, const std::string& action, const std::string& value = {}) {
-        auto e = juce::DynamicObject::Ptr(new juce::DynamicObject());
-        e->setProperty("label", juce::String(label));
-        e->setProperty("action", juce::String(action));
-        if (!value.empty()) e->setProperty("value", juce::String(value));
-        return juce::var(e.get());
-    };
-    auto page = [](const std::string& name, juce::Array<juce::var> entries) {
-        auto p = juce::DynamicObject::Ptr(new juce::DynamicObject());
-        p->setProperty("name", juce::String(name));
-        p->setProperty("entries", entries);
-        return juce::var(p.get());
-    };
-    juce::Array<juce::var> pages;
-    const LoadedModule* module = nullptr;
-    if (target.fx_entry == melodee::no_plugin) {
-        ModuleTrack* track = module_track(target.track);
-        module = track ? track->module.get() : nullptr;
-        if (track && module && !user_presets_folder().empty()) {
-            bool loaded = !track->user_preset.empty();
-            juce::Array<juce::var> mine;
-            mine.add(entry("Preset", "up_load", loaded ? (track->user_preset_dirty ? "* " : "") + track->user_preset : "(none)"));
-            if (loaded) mine.add(entry("Save", "up_save"));
-            mine.add(entry("Save As", "up_save_as"));
-            if (loaded) mine.add(entry("Delete", "up_delete"));
-            pages.add(page("My Presets", mine));
-        }
-    } else if (FxModule* fx = fx_module(target.fx_entry)) {
-        module = fx->module.get();
+// The modules a Swap from a module's pages may pick, for Schwung's picker:
+// the sound generators or the audio effects Melodee finds (read again, as
+// Schwung scans at each opening), those it can load (API 2), each with what
+// its module.json declares of what Schwung's picker reads.
+std::string Studio::pages_modules(PagesTarget target) {
+    bool effect = target.fx_entry != melodee::no_plugin;
+    if (effect) rescan_fx();
+    else rescan_modules();
+    auto declared = [](const juce::var& value) { return value.isVoid() || value.isUndefined() ? juce::String() : value.toString(); };
+    juce::Array<juce::var> list;
+    for (const auto& info : effect ? fx_catalog : catalog) {
+        if (info.api != 2) continue;
+        auto manifest = juce::JSON::parse(juce::String(info.manifest));
+        auto type = manifest["component_type"];
+        if (type.isVoid() || type.isUndefined()) type = manifest["capabilities"]["component_type"];
+        auto* one = new juce::DynamicObject();
+        one->setProperty("id", juce::String(info.id));
+        one->setProperty("name", juce::String(info.name));
+        one->setProperty("abbrev", declared(manifest["abbrev"]));
+        one->setProperty("component_type", declared(type));
+        one->setProperty("subcategory", declared(manifest["subcategory"]));
+        list.add(juce::var(one));
     }
-    juce::Array<juce::var> about;
-    std::error_code error;
-    if (module && std::filesystem::exists(std::filesystem::path(module->info().dir) / "help.json", error)) about.add(entry("Module Help", "module_help"));
-    about.add(entry("Swap Module", "swap_module"));
-    about.add(entry("Remove Module", "remove_module"));
-    if (instrument) about.add(entry("Auto Sample", "melodee:auto_sample"));
-    pages.add(page("Module", about));
-    return juce::JSON::toString(juce::var(pages), true).toStdString();
+    return juce::JSON::toString(juce::var(list), true).toStdString();
 }
 
-// Each over the pages (push, not open): Back or done comes back to them, as
-// Schwung's editors return to the grid.
+// What a module's trailing pages ask of Melodee. Auto Sample: its sheet over
+// the pages, which start over on "Module", its menu open, when they are
+// shown again (as Schwung comes back from its own Module screens). Remove
+// and Swap: done by the pages screen once Schwung's code has returned
+// (screens/module_pages.cpp).
 void Studio::pages_action(PagesTarget target, const std::string& action) {
-    if (action == "melodee:auto_sample") { if (target.track == selected) push("auto-sample"); return; }
-    if (action == "swap_module") { swap_from_pages = target; push(target.fx_entry == melodee::no_plugin ? "load-modules" : "fx-browser"); return; }
-    if (action == "remove_module") { remove_from_pages = target; return; } // taken by the pages screen: it closes, then removes
-    if (action == "module_help") { push("module-help"); return; }
-    ModuleTrack* track = target.fx_entry == melodee::no_plugin ? module_track(target.track) : nullptr;
-    if (!track || !track->module) return;
-    if (action == "up_load") { push("module-presets"); return; }
-    if (action == "up_save") { save_user_preset_as(target, track->user_preset, true); return; }
-    if (action == "up_save_as") {
-        std::string initial = track->user_preset.empty() ? track->module->info().name : track->user_preset;
-        ask_name("SAVE AS", initial, 24, [this, target](const std::string& name) { save_user_preset_as(target, name, false); });
+    if (action == "auto_sample") {
+        if (target.track != selected) return;
+        push("auto-sample");
+        if (SchwungPages* pages = pages_of(target)) pages->enter("Module", true);
         return;
     }
-    if (action == "up_delete") {
-        Question question;
-        question.rail_top = "PRST";
-        question.rail_bottom = "DEL";
-        question.asked = "DELETE?";
-        question.line1 = upper(track->user_preset).substr(0, 16);
-        question.yes = [this, target] {
-            ModuleTrack* t = module_track(target.track);
-            if (!t || !t->module) return;
-            if (delete_user_preset(user_presets_folder(), t->module->info().id, t->user_preset)) say("DELETED");
-            t->user_preset.clear();
-            t->user_preset_dirty = false;
-        };
-        ask(std::move(question));
+    if (action == "remove") { remove_from_pages = target; return; }
+    if (action.rfind("swap ", 0) == 0 && action.size() > 5) swap_from_pages = PagesSwap {target, action.substr(5)};
+}
+
+// Loaded as Melodee's own lists load them: a synth's on the service thread
+// (load_module_now: one undo brings the old one back), an effect in the
+// same slot of its chain, a new plug-in entry (load_fx).
+Studio::PagesTarget Studio::swap_module(PagesTarget target, const std::string& id) {
+    if (target.fx_entry == melodee::no_plugin) {
+        if (ModuleTrack* track = module_track(target.track)) {
+            track->job = id;
+            track->job_restores = false;
+        }
+        return target;
     }
-}
-
-void Studio::load_user_preset(PagesTarget target, const UserPreset& preset) {
-    ModuleTrack* track = target.fx_entry == melodee::no_plugin ? module_track(target.track) : nullptr;
-    if (!track || !track->module) return;
-    std::string state = user_preset_state(preset.file);
-    if (state.empty()) { say("UNREADABLE"); return; }
-    synth_set(*track, "state", state);
-    auto& loaded = *track->module;
-    if (!loaded.preset_name_param.empty()) track->player.ask(loaded.preset_name_param, true);
-    for (const auto& param : loaded.params) track->player.ask(param.key); // a state sets every value: each asked again
-    track->user_preset = preset.name;
-    track->user_preset_dirty = false;
-    say(upper(preset.name).substr(0, 17));
-    changed();
-}
-
-void Studio::save_user_preset_as(PagesTarget target, const std::string& name, bool overwrite) {
-    ModuleTrack* track = target.fx_entry == melodee::no_plugin ? module_track(target.track) : nullptr;
-    if (!track || !track->module || name.empty()) return;
-    std::string state = module_get(*track, "state");
-    if (state.empty()) { say("NO STATE TO SAVE"); return; } // as Schwung: a module that keeps none has no user presets
-    std::string saved = save_user_preset(user_presets_folder(), track->module->info().id, name, state, overwrite);
-    if (saved.empty()) { say("NOT SAVED"); return; }
-    track->user_preset = saved;
-    track->user_preset_dirty = false;
-    say(("SAVED " + upper(saved)).substr(0, 17));
+    unsigned chain = target.track, at = fx_position(target);
+    if (chain >= melodee::chain_count || at >= mixing::slots(*this, chain)) return target;
+    const auto& was = mixing::slot(*this, chain, at);
+    if (was.kind != uint8_t(melodee::EffectKind::Plugin) || uint8_t(was.params[0]) != target.fx_entry) return target; // moved or gone meanwhile
+    rescan_fx();
+    if (!load_fx(chain, at, id)) return target;
+    return {chain, uint8_t(mixing::slot(*this, chain, at).params[0])};
 }
 
 void Studio::remove_module(PagesTarget target) {
@@ -1549,6 +1518,7 @@ SynthFile Studio::module_state(unsigned t) const {
         file.preset = track->saved.preset;
         file.values = track->saved.values;
         file.pages = track->saved.pages;
+        file.user_preset = track->saved.user_preset;
         return file;
     }
     const auto& module = *track->module;
@@ -1565,7 +1535,7 @@ SynthFile Studio::module_state(unsigned t) const {
             for (const auto& property : object->getProperties())
                 if (auto text = property.value.toString().toStdString(); text != "{}" && !text.empty())
                     file.pages.emplace_back(property.name.toString().toStdString(), text);
-        return file;
+        file.user_preset = track->schwung_pages->preset_record(); // the user preset it is on (Schwung's My Presets)
     }
     return file;
 }
@@ -2239,7 +2209,7 @@ std::string Studio::load_module_now(unsigned t, const std::string& id, const Syn
     std::unique_ptr<SchwungPages> schwung_pages;
     if (loaded)
         schwung_pages = start_pages(canvas_host(t), *loaded, info.dir, saved && saved->module == id ? saved->pages : std::vector<std::pair<std::string, std::string>> {},
-                                    PagesTarget {t, melodee::no_plugin});
+                                    saved && saved->module == id ? saved->user_preset : std::string(), PagesTarget {t, melodee::no_plugin});
     std::unique_lock<std::mutex> guard(lock);
     auto* track = modules[t].get();
     if (!track) return "track gone"; // deleted meanwhile: `loaded` destroyed here, never played
@@ -2267,11 +2237,12 @@ std::string Studio::load_module_now(unsigned t, const std::string& id, const Syn
     if (typing && typing_track == int(t)) { typing = false; pads_typing.store(false); typing_canvas = typing_track = -1; }
     track->set_at.clear();
     track->player.drop_asks(); // the module before's keys
-    track->user_preset.clear();
-    track->user_preset_dirty = false;
     track->saved = {};
     if (!saved) {
-        if (t == selected && stack.size() > 1) home(); // to play it
+        // To play it; but a swap from the module's pages stays on them: the
+        // new module's are shown (screens/module_pages.cpp).
+        bool on_pages = top() == screen("module-pages") && pages_target == PagesTarget {t, melodee::no_plugin};
+        if (t == selected && stack.size() > 1 && !on_pages) home();
         say(upper(info.name).substr(0, 16));
         changed();
         name_step("SYNTH " + upper(info.name), int(t)); // a module picked is a step of its own (one undo brings the old one back)

@@ -630,8 +630,23 @@ bool SynthPlayer::set(const std::string& key, const std::string& value) {
     command.kind = Command::Kind::Set;
     command.serial = ++serial;
     std::snprintf(command.key, key_size, "%s", key.c_str());
-    std::snprintf(command.value, value_size, "%s", value.c_str());
-    return commands.push(command);
+    if (value.size() < value_size) {
+        std::snprintf(command.value, value_size, "%s", value.c_str());
+        return commands.push(command);
+    }
+    if (value.size() >= long_set_buffer.size()) return false;
+    auto until = Clock::now() + std::chrono::milliseconds(100);
+    while (long_set_state.load(std::memory_order_acquire) != 0) {
+        if (Clock::now() > until) return false;
+        std::this_thread::sleep_for(std::chrono::microseconds(100));
+    }
+    std::memcpy(long_set_buffer.data(), value.data(), value.size());
+    long_set_buffer[value.size()] = 0;
+    command.kind = Command::Kind::SetLong;
+    long_set_state.store(1, std::memory_order_release);
+    if (commands.push(command)) return true;
+    long_set_state.store(0, std::memory_order_release);
+    return false;
 }
 
 void SynthPlayer::ask(const std::string& key, bool first) {
@@ -756,6 +771,11 @@ bool SynthPlayer::apply() {
         case Command::Kind::Set:
             if (current && current->api->set_param) current->api->set_param(current->instance, command.key, command.value);
             timed(begun, "set", command.key, command.value);
+            break;
+        case Command::Kind::SetLong:
+            if (current && current->api->set_param) current->api->set_param(current->instance, command.key, long_set_buffer.data());
+            long_set_state.store(0, std::memory_order_release);
+            timed(begun, "set", command.key, nullptr);
             break;
         case Command::Kind::Ask: {
             ++asked;

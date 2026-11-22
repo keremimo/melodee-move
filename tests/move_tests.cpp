@@ -847,6 +847,28 @@ void test_module_pages_shown() {
     CHECK((loaded->page_knobs(1) == std::vector<std::string> {"level", "words", "voices"}));
 }
 
+// A Schwung folder of a test's own, MELODEE_SCHWUNG_ROOT while it lives:
+// the pinned code linked in (shared, shadow, host), Schwung's files (its
+// presets, module lists, settings) the test's alone.
+struct OwnSchwung {
+    std::string before, root;
+    explicit OwnSchwung(const std::string& name) {
+        const char* was = std::getenv("MELODEE_SCHWUNG_ROOT");
+        before = was ? was : "";
+        root = std::filesystem::absolute("build/" + name).string();
+        std::filesystem::remove_all(root);
+        std::filesystem::create_directories(root);
+        if (before.empty()) return;
+        for (const char* part : {"shared", "shadow", "host"})
+            std::filesystem::create_directory_symlink(std::filesystem::absolute(std::filesystem::path(before) / part), std::filesystem::path(root) / part);
+        setenv("MELODEE_SCHWUNG_ROOT", root.c_str(), 1);
+    }
+    ~OwnSchwung() {
+        if (before.empty()) unsetenv("MELODEE_SCHWUNG_ROOT");
+        else setenv("MELODEE_SCHWUNG_ROOT", before.c_str(), 1);
+    }
+};
+
 void test_schwung_pages() {
     // A module's pages shown by Schwung's own screen code (schwung_pages.h),
     // run from the pinned Schwung (tools/dependencies.py, MELODEE_SCHWUNG_ROOT
@@ -864,6 +886,7 @@ void test_schwung_pages() {
         std::unique_ptr<app::SchwungPages> pages;
         std::vector<std::string> actions;
         std::map<std::string, std::string> answers; // what the module is made to answer, before its own
+        std::string modules = "[]";                 // what a Swap may pick
         bool shift = false;
         juce::Image screen {juce::Image::ARGB, 128, 64, true};
         void frames(int n) {
@@ -917,7 +940,9 @@ void test_schwung_pages() {
         hooks.module_abbrev = info.abbrev;
         hooks.module_dir = info.dir;
         hooks.shift = [&run] { return run.shift; };
-        hooks.trailing = [] { return std::string(R"([{"name": "Module", "entries": [{"label": "Auto Sample", "action": "melodee:auto_sample"}]}])"); };
+        hooks.instrument = true;
+        hooks.presets = true;
+        hooks.modules = [&run] { return run.modules; };
         hooks.action = [&run](const std::string& action) { run.actions.push_back(action); };
         run.pages = app::SchwungPages::load(host, hooks, error);
         CHECK(run.pages != nullptr);
@@ -969,12 +994,16 @@ void test_schwung_pages() {
         CHECK(run.module->get_now("preset") == "1");
         run.press(51);
         CHECK(run.s().footer[0].second == "PAGE" && !run.pages->left());
-        // Melodee's page after the module's: its row pushed, its action back.
+        // Schwung's Module page after the module's (no help.json: no Module
+        // Help; no Clear Automation), Melodee's Auto Sample last: its row
+        // pushed, Melodee asked.
         CHECK(run.to("Module"));
-        CHECK(run.s().kind == "menu" && !run.s().rows.empty() && run.s().rows[0].first == "Auto Sample");
+        CHECK(run.s().kind == "menu" && run.s().rows.size() == 4 && run.s().rows[0].first == "Add to List"
+              && run.s().rows[1].first == "Swap Module" && run.s().rows[2].first == "Remove Module" && run.s().rows[3].first == "Auto Sample");
         run.press(3);
+        for (int n = 0; n < 3; ++n) run.cc(14, 1);
         run.press(3);
-        CHECK((run.actions == std::vector<std::string> {"melodee:auto_sample"}));
+        CHECK((run.actions == std::vector<std::string> {"auto_sample"}));
         // Shift + the wheel: a section, not a page (Envelope is one).
         CHECK(run.to("", "knobs"));
         std::string first = run.s().page;
@@ -1192,6 +1221,125 @@ void test_schwung_pages() {
         CHECK(p.s().view == "compedit" && !p.pages->left());
         p.press(51);
         CHECK(p.pages->left() && p.s().view == "chainedit");
+    }
+
+    // The Module page's screens, Schwung's own (shadow_ui.js's, written
+    // again in host.js), Schwung's files in a folder of the test's: Module
+    // Help (help.json's topics; Back off them, Module with its menu open),
+    // Add to List (Schwung's module_lists.json), the module picker (Melodee's
+    // modules of the kind; Back: My Presets, its menu open; another module
+    // asked of Melodee over Schwung's loading screen), None and Remove
+    // Module (asked of Melodee, no question).
+    {
+        OwnSchwung own("test-schwung-trailing");
+        const std::string helped_root = "build/test-modules-help", helped_dir = helped_root + "/sound_generators/helped";
+        std::filesystem::remove_all(helped_root);
+        std::filesystem::create_directories(helped_dir);
+        std::filesystem::copy("build/test-modules/sound_generators/fake", helped_dir, std::filesystem::copy_options::recursive);
+        {
+            std::ifstream in(helped_dir + "/module.json");
+            std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            in.close();
+            text.replace(text.find("\"fake\""), 6, "\"helped\"");
+            text.replace(text.find("Fake Synth"), 10, "Helped");
+            std::ofstream(helped_dir + "/module.json") << text;
+        }
+        std::ofstream(helped_dir + "/help.json") << R"({"title": "Helped", "children": [
+          {"title": "Overview", "lines": ["A stand-in module", "for the tests"]},
+          {"title": "Controls", "children": [{"title": "Knobs", "lines": ["Turn them"]}]}]})";
+        auto helped = app::scan_modules(helped_root);
+        CHECK(helped.size() == 1);
+        if (helped.empty()) return;
+        Run t;
+        t.modules = R"([{"id": "helped", "name": "Helped", "abbrev": "HLP", "component_type": "sound_generator", "subcategory": ""},
+                        {"id": "other", "name": "Another", "abbrev": "", "component_type": "sound_generator", "subcategory": ""},
+                        {"id": "fx-one", "name": "An Effect", "abbrev": "", "component_type": "audio_fx", "subcategory": ""}])";
+        if (!start(helped[0], t)) return;
+        auto module_rows = [&] {
+            std::vector<std::string> labels;
+            for (const auto& row : t.s().rows) labels.push_back(row.first);
+            return labels;
+        };
+        CHECK(t.to("Module"));
+        CHECK((module_rows() == std::vector<std::string> {"Module Help", "Add to List", "Swap Module", "Remove Module", "Auto Sample"}));
+        // Module Help.
+        t.press(3);
+        t.press(3);
+        CHECK(t.s().view == "globalsettings" && t.s().title == "Help: Helped" && t.s().rows.size() == 2 && t.s().rows[1].first == "Controls");
+        CHECK(t.lit(0, 0, 127, 9) > 10 && t.lit(0, 56, 127, 63) > 10); // its header and its "Back: Helped"
+        t.press(3); // Overview: its text
+        CHECK(t.s().view == "globalsettings" && t.s().title == "Overview" && t.s().rows.empty());
+        t.press(51);
+        t.cc(14, 1);
+        t.press(3); // Controls: a list of its own
+        CHECK(t.s().title == "Controls" && t.s().rows.size() == 1 && t.s().rows[0].first == "Knobs");
+        t.press(51);
+        t.press(51);
+        CHECK(t.s().view == "parampages" && t.s().page == "Module" && t.wheel() && !t.pages->left());
+        // Add to List: Favorites ticked, Schwung's file written; Back: the
+        // Module page, its menu open, the row counting the list.
+        t.cc(14, 1);
+        t.press(3);
+        CHECK(t.s().view == "modulelists" && t.s().rows.size() == 3 && t.s().rows[0] == std::make_pair(std::string("Favorites"), std::string())
+              && t.s().rows[2].first == "Edit Lists...");
+        t.press(3);
+        CHECK(t.s().rows[0].second == "*");
+        {
+            std::ifstream in(own.root + "/module_lists.json");
+            std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            CHECK(has(text, "\"Favorites\"") && has(text, "\"helped\""));
+        }
+        t.press(51);
+        CHECK(t.s().view == "parampages" && t.s().page == "Module" && t.wheel() && t.s().rows.size() == 5
+              && t.s().rows[1] == std::make_pair(std::string("Add to List"), std::string("1")));
+        // Swap Module (a new grid: its menu on the first row): the picker,
+        // on the module loaded.
+        t.cc(14, 1);
+        t.cc(14, 1);
+        t.press(3);
+        CHECK(t.s().view == "compselect" && t.s().title == "S2 > Synth" && t.s().rows.size() == 5 && t.s().index == 4);
+        CHECK(t.s().rows.size() == 5 && t.s().rows[0] == std::make_pair(std::string("List"), std::string("All"))
+              && t.s().rows[1] == std::make_pair(std::string("Sort"), std::string("A-Z")) && t.s().rows[2].first == "None"
+              && t.s().rows[3].first == "Another" && t.s().rows[4] == std::make_pair(std::string("Helped"), std::string("*")));
+        CHECK(t.lit(0, 0, 127, 7) > 10);
+        t.press(51); // Back: the grid again, on My Presets, its menu open
+        CHECK(t.s().view == "parampages" && t.s().page == "My Presets" && t.wheel() && t.actions.empty());
+        // Another: asked of Melodee, Schwung's loading screen up until the
+        // new module's pages are in (Back: out to the Device View).
+        CHECK(t.to("Module"));
+        t.press(3);
+        t.cc(14, 1);
+        t.cc(14, 1);
+        t.press(3);
+        CHECK(t.s().view == "compselect");
+        t.cc(14, 127);
+        t.press(3);
+        t.frames(3);
+        CHECK(t.s().view == "comploading" && (t.actions == std::vector<std::string> {"swap other"}) && t.lit(0, 0, 127, 9) > 10);
+        t.frames(10);
+        CHECK(t.s().view == "comploading" && !t.pages->left());
+        t.press(51);
+        CHECK(t.pages->left());
+        // None: removed, asked of Melodee; and so does Remove Module's row.
+        t.pages->enter();
+        t.frames(10);
+        CHECK(t.to("Module"));
+        t.press(3);
+        t.cc(14, 1);
+        t.cc(14, 1);
+        t.press(3);
+        t.cc(14, 127);
+        t.cc(14, 127);
+        CHECK(t.s().view == "compselect" && t.s().index == 2);
+        t.press(3);
+        CHECK(t.actions.back() == "remove" && t.pages->left());
+        t.pages->enter();
+        t.frames(10);
+        CHECK(t.to("Module"));
+        t.press(3);
+        for (int n = 0; n < 3; ++n) t.cc(14, 1);
+        t.press(3);
+        CHECK(t.actions.size() == 3 && t.actions.back() == "remove" && t.pages->left());
     }
 }
 
@@ -1915,80 +2063,301 @@ void test_synth_track() {
     CHECK(back.module.empty());
 }
 
+// On a module's pages (screens/module_pages.cpp), page `name`'s row `row`
+// pushed: to the page, into its menu, to its top, down to the row, the push.
+void push_row(app::MelodeeApp& melodee, const std::string& name, int row) {
+    to_page(melodee, name);
+    press_button(melodee, Button::MainPush);
+    frames(melodee, 1);
+    turn_wheel(melodee, -16);
+    frames(melodee, 1);
+    if (row) { turn_wheel(melodee, row); frames(melodee, 1); }
+    press_button(melodee, Button::MainPush);
+    frames(melodee, 2);
+}
+
+// What Schwung's pages for `target` show.
+app::SchwungPages::Status pages_status(app::MelodeeApp& melodee, app::Studio::PagesTarget target) {
+    std::lock_guard<std::mutex> guard(melodee.studio().lock);
+    auto* pages = melodee.studio().pages_of(target);
+    return pages ? pages->status() : app::SchwungPages::Status {};
+}
+
+std::string file_text(const std::string& path) {
+    std::ifstream in(path);
+    return std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+}
+
 void test_user_presets() {
-    // My Presets on a module's pages, Schwung's files shared: Save As (a
-    // taken name gets a number), the Preset row marks an edit "* name", the
-    // list loads one, Delete asks first. MELODEE_SCHWUNG_PRESETS keeps the
-    // tests' own.
-    const std::string presets = "build/test-presets", home = "build/test-home-presets";
-    std::filesystem::remove_all(presets);
+    // My Presets on a module's pages, Schwung's own (shadow_ui_presets.mjs),
+    // its files in a Schwung folder of the test's, Pad Typing and Audition on
+    // as on Kerem's Move: Save As through Schwung's keyboard (a taken name
+    // gets a number), the Preset row marks an edit "* name", the list plays
+    // the one under the cursor and Back puts the sound back, a push loads
+    // one, Delete asks first; the preset it is on kept with the project.
+    if (app::SchwungPages::shared_folder().empty()) return;
+    OwnSchwung own("test-schwung-presets");
+    std::ofstream(own.root + "/shadow_config.json") << R"({"pad_typing": true, "browser_preview": true})";
+    const std::string home = "build/test-home-presets", presets = own.root + "/presets/fake";
     std::filesystem::remove_all(home);
-    setenv("MELODEE_SCHWUNG_PRESETS", presets.c_str(), 1);
-    app::MelodeeApp melodee("build/test-samples", home, "build/test-modules");
+    const app::Studio::PagesTarget target {1, melodee::no_plugin};
+    using Row = std::pair<std::string, std::string>;
+    {
+        app::MelodeeApp melodee("build/test-samples", home, "build/test-modules");
+        Session session;
+        melodee.attach(session);
+        melodee.audio_opened(AudioFormat {});
+        CHECK(melodee.restore_now().empty());
+        press_button(melodee, Button::Row2);
+        press_button(melodee, Button::MainPush);
+        press_button(melodee, Button::MainPush);
+        melodee.service();
+        CHECK(has(melodee.status(), "synth=fake"));
+        press_button(melodee, Button::MainPush);
+        CHECK(has(melodee.status(), "page=module-pages"));
+        frames(melodee, 10);
+        to_page(melodee, "My Presets");
+        auto s = pages_status(melodee, target);
+        CHECK(s.rows.size() == 2 && s.rows[0] == Row("Preset", "(none)") && s.rows[1].first == "Save As");
+        // Save As: Schwung's keyboard over the page, the module's preset
+        // name given; its OK (pad 8, the bottom row's last) saves.
+        push_row(melodee, "My Presets", 1);
+        s = pages_status(melodee, target);
+        CHECK(s.typing && s.text == "Fake 0");
+        tap_pad(melodee, 7);
+        frames(melodee, 5);
+        s = pages_status(melodee, target);
+        CHECK(!s.typing && std::filesystem::exists(presets + "/Fake 0.json"));
+        CHECK(s.rows.size() == 4 && s.rows[0] == Row("Preset", "Fake 0") && s.rows[1].first == "Save" && s.rows[2].first == "Save As"
+              && s.rows[3].first == "Delete");
+        // Again: the name is taken, Schwung numbers it.
+        push_row(melodee, "My Presets", 2);
+        CHECK(pages_status(melodee, target).typing);
+        tap_pad(melodee, 7);
+        frames(melodee, 5);
+        CHECK(std::filesystem::exists(presets + "/Fake 0 2.json"));
+        auto text = file_text(presets + "/Fake 0 2.json");
+        CHECK(has(text, "\"module\":\"fake\"") && has(text, "\"level\"") && has(text, "\"version\":1") && has(text, "\"name\":\"Fake 0 2\""));
+        CHECK(pages_status(melodee, target).rows[0] == Row("Preset", "Fake 0 2"));
+        // An edit, out on the Device View: in again, the row says so.
+        for (int n = 0; n < 4 && has(melodee.status(), "page=module-pages"); ++n) { press_button(melodee, Button::Back); frames(melodee, 1); }
+        CHECK(has(melodee.status(), "page=synth-play"));
+        melodee.surface(make_event(0xb0, knob_first_cc, 10)); // level up ten
+        CHECK(melodee.synth_value("level") == "0.6");
+        press_button(melodee, Button::MainPush);
+        frames(melodee, 8);
+        to_page(melodee, "My Presets");
+        CHECK(pages_status(melodee, target).rows[0] == Row("Preset", "* Fake 0 2"));
+        // The list, on the one it is on; the one under the cursor heard
+        // (Audition); Back: the sound as it was, My Presets, its menu open.
+        push_row(melodee, "My Presets", 0);
+        CHECK(pages_status(melodee, target).view == "modpresets");
+        turn_wheel(melodee, -1);
+        frames(melodee, 4);
+        CHECK(pages_status(melodee, target).said == "Preset: Fake 0" && melodee.synth_value("level") == "0.5");
+        press_button(melodee, Button::Back);
+        frames(melodee, 3);
+        s = pages_status(melodee, target);
+        CHECK(s.view == "parampages" && s.page == "My Presets" && has(melodee.status(), ",wheel") && melodee.synth_value("level") == "0.6");
+        // A push loads one: back on My Presets, the door closed, the row
+        // naming it, unmarked.
+        press_button(melodee, Button::Back);
+        frames(melodee, 1);
+        push_row(melodee, "My Presets", 0);
+        turn_wheel(melodee, -1);
+        frames(melodee, 1);
+        press_button(melodee, Button::MainPush);
+        frames(melodee, 4);
+        s = pages_status(melodee, target);
+        CHECK(s.view == "parampages" && s.page == "My Presets" && !has(melodee.status(), ",wheel") && melodee.synth_value("level") == "0.5");
+        CHECK(s.rows.size() == 4 && s.rows[0] == Row("Preset", "Fake 0"));
+        // An edit on the pages: once the hand settles, the row marks it.
+        to_page(melodee, "Main");
+        melodee.surface(make_event(0x90, 0, 127));
+        melodee.surface(make_event(0xb0, knob_first_cc, 3));
+        frames(melodee, 2);
+        melodee.surface(make_event(0x90, 0, 0));
+        frames(melodee, 12);
+        CHECK(melodee.synth_value("level") != "0.5");
+        to_page(melodee, "My Presets");
+        CHECK(pages_status(melodee, target).rows[0].second == "* Fake 0");
+        // Delete: Schwung's question, No first; Yes: gone, My Presets with
+        // its menu open, none loaded.
+        push_row(melodee, "My Presets", 3);
+        CHECK(pages_status(melodee, target).view == "modpresetdetail" && std::filesystem::exists(presets + "/Fake 0.json"));
+        turn_wheel(melodee, 1);
+        frames(melodee, 1);
+        CHECK(pages_status(melodee, target).said == "Confirm: Yes");
+        press_button(melodee, Button::MainPush);
+        frames(melodee, 3);
+        s = pages_status(melodee, target);
+        CHECK(!std::filesystem::exists(presets + "/Fake 0.json") && std::filesystem::exists(presets + "/Fake 0 2.json"));
+        CHECK(s.view == "parampages" && s.page == "My Presets" && has(melodee.status(), ",wheel") && s.rows.size() == 2
+              && s.rows[0] == Row("Preset", "(none)"));
+        // Saved again, and the project saved: the preset it is on goes with it.
+        push_row(melodee, "My Presets", 1);
+        tap_pad(melodee, 7);
+        frames(melodee, 5);
+        CHECK(pages_status(melodee, target).rows[0].second == "Fake 0");
+        CHECK(melodee.save_now().empty());
+    }
+    {
+        app::MelodeeApp second("build/test-samples", home, "build/test-modules");
+        Session session;
+        second.attach(session);
+        second.audio_opened(AudioFormat {});
+        CHECK(second.restore_now().empty());
+        CHECK(has(second.status(), "synth=fake"));
+        press_button(second, Button::MainPush);
+        frames(second, 10);
+        to_page(second, "My Presets");
+        auto s = pages_status(second, target);
+        CHECK(s.rows.size() == 4 && s.rows[0] == Row("Preset", "Fake 0"));
+    }
+}
+
+void test_module_page() {
+    // A synth's Module page, Schwung's, with Melodee's part of it: Swap
+    // Module through Schwung's picker loads another module in place
+    // (Melodee's loader), whose pages come up next, as Schwung opens the new
+    // module's; the module loaded picked again, the grid back on My Presets;
+    // Auto Sample's sheet over the pages, which come back on Module, its menu
+    // open; Remove Module, out to the Device View, the module gone.
+    if (app::SchwungPages::shared_folder().empty()) return;
+    OwnSchwung own("test-schwung-module-page");
+    std::string home = "build/test-home-module-page", modules = "build/test-modules-swap";
+    std::filesystem::remove_all(home);
+    std::filesystem::remove_all(modules);
+    auto generators = std::filesystem::path(modules) / "sound_generators";
+    std::filesystem::create_directories(generators);
+    std::filesystem::copy("build/test-modules/sound_generators/fake", generators / "fake", std::filesystem::copy_options::recursive);
+    std::filesystem::copy("build/test-modules/sound_generators/fake", generators / "fake2", std::filesystem::copy_options::recursive);
+    {
+        auto manifest = generators / "fake2" / "module.json";
+        std::string text = file_text(manifest.string());
+        text.replace(text.find("\"fake\""), 6, "\"fake2\"");
+        text.replace(text.find("Fake Synth"), 10, "Fake Two");
+        std::ofstream(manifest) << text;
+    }
+    // Two effects with pages of their own (a hierarchy), the tests' stand-in's library each.
+    for (const char* id : {"fxa", "fxb"}) {
+        auto folder = std::filesystem::path(modules) / "audio_fx" / id;
+        std::filesystem::create_directories(folder);
+        std::filesystem::copy_file("build/test-modules/audio_fx/fake-fx/fake-fx.so", folder / (std::string(id) + ".so"));
+        std::ofstream(folder / "module.json") << R"({"id": ")" << id << R"(", "name": "Effect )" << (id[2] == 'a' ? "A" : "B")
+            << R"(", "api_version": 2, "component_type": "audio_fx", "capabilities": {"chainable": true,
+              "chain_params": [{"key": "gain", "name": "Gain", "type": "float", "min": 0, "max": 2, "step": 0.01, "default": 0.5}],
+              "ui_hierarchy": {"levels": {"root": {"name": "Effect", "knobs": ["gain"], "params": ["gain"]}}}}})";
+    }
+    const app::Studio::PagesTarget target {1, melodee::no_plugin};
+    using Row = std::pair<std::string, std::string>;
+    app::MelodeeApp melodee("build/test-samples", home, modules);
     Session session;
     melodee.attach(session);
     melodee.audio_opened(AudioFormat {});
     CHECK(melodee.restore_now().empty());
     press_button(melodee, Button::Row2);
     press_button(melodee, Button::MainPush);
-    press_button(melodee, Button::MainPush);
+    press_button(melodee, Button::MainPush); // Fake Synth
     melodee.service();
-    CHECK(has(melodee.status(), "synth=fake"));
-    auto& studio = melodee.studio();
-    const app::Studio::PagesTarget target {1, melodee::no_plugin};
-    {
-        std::lock_guard<std::mutex> guard(studio.lock);
-        studio.save_user_preset_as(target, "Bright", false);
-        studio.save_user_preset_as(target, "Bright", false); // taken: Bright 2
-    }
-    CHECK(std::filesystem::exists(presets + "/fake/Bright.json") && std::filesystem::exists(presets + "/fake/Bright 2.json"));
-    std::ifstream in(presets + "/fake/Bright.json");
-    std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-    CHECK(has(text, "\"module\": \"fake\"") || has(text, "\"module\":\"fake\""));
-    CHECK(has(text, "\"level\"") && has(text, "\"version\""));
-    // An edit after: the Preset row says so.
-    melodee.surface(make_event(0xb0, knob_first_cc, 10)); // level up ten
+    CHECK(has(melodee.status(), "synth=fake "));
     press_button(melodee, Button::MainPush);
-    frames(melodee, 8);
-    to_page(melodee, "My Presets");
-    auto rows = [&] {
-        std::lock_guard<std::mutex> guard(studio.lock);
-        auto* pages = studio.pages_of(target);
-        return pages ? pages->status().rows : std::vector<std::pair<std::string, std::string>> {};
-    };
-    frames(melodee, 2);
-    auto mine = rows();
-    CHECK(mine.size() == 4 && mine[0].first == "Preset" && mine[0].second == "* Bright 2" && mine[3].first == "Delete");
-    // The list: the first, loaded; back on the pages, the level as saved.
-    press_button(melodee, Button::MainPush); // into the page
+    frames(melodee, 10);
+    to_page(melodee, "Module");
+    auto s = pages_status(melodee, target);
+    CHECK(s.rows.size() == 4 && s.rows[0].first == "Add to List" && s.rows[1].first == "Swap Module" && s.rows[2].first == "Remove Module"
+          && s.rows[3].first == "Auto Sample");
+    // Swap Module: Schwung's picker, the synths Melodee has, the one loaded
+    // marked and under the cursor; the other loaded, its pages next.
+    push_row(melodee, "Module", 1);
+    s = pages_status(melodee, target);
+    CHECK(s.view == "compselect" && s.title == "S2 > Synth" && s.rows.size() == 5 && s.rows[2].first == "None"
+          && s.rows[3] == Row("Fake Synth", "*") && s.rows[4].first == "Fake Two" && s.index == 3);
+    turn_wheel(melodee, 1);
     frames(melodee, 1);
-    press_button(melodee, Button::MainPush); // Preset: the list
-    CHECK(has(melodee.status(), "page=module-presets") && has(melodee.status(), "presets=2 preset_cursor=1"));
-    turn_wheel(melodee, -1);
+    press_button(melodee, Button::MainPush);
+    frames(melodee, 1); // Schwung's loading screen, Melodee asked (its service loads it on the next)
+    CHECK(pages_status(melodee, target).view == "comploading" && has(melodee.status(), "page=module-pages"));
+    frames(melodee, 10);
+    s = pages_status(melodee, target);
+    CHECK(has(melodee.status(), "synth=fake2 ") && has(melodee.status(), "page=module-pages") && s.view == "parampages" && s.kind == "knobs");
+    // The one loaded picked: nothing loaded, the grid back on My Presets.
+    push_row(melodee, "Module", 1);
+    CHECK(pages_status(melodee, target).view == "compselect" && pages_status(melodee, target).index == 4);
     press_button(melodee, Button::MainPush);
     frames(melodee, 3);
+    s = pages_status(melodee, target);
+    CHECK(s.view == "parampages" && s.page == "My Presets" && has(melodee.status(), ",wheel") && has(melodee.status(), "synth=fake2 "));
+    // Auto Sample: Melodee's sheet; Back: the pages on Module, its menu open.
+    press_button(melodee, Button::Back);
+    frames(melodee, 1);
+    push_row(melodee, "Module", 3);
+    CHECK(has(melodee.status(), "page=auto-sample"));
+    for (int n = 0; n < 200 && has(melodee.status(), "page=auto-sample"); ++n) {
+        press_button(melodee, Button::Back);
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
     CHECK(has(melodee.status(), "page=module-pages"));
-    CHECK(melodee.synth_value("level") == "0.5");
-    frames(melodee, 2);
-    mine = rows();
-    CHECK(!mine.empty() && mine[0].second == "Bright");
-    // As Schwung after a Load: its pages started over, on My Presets, the
-    // door closed; the push opens it again.
+    frames(melodee, 3);
+    s = pages_status(melodee, target);
+    CHECK(s.view == "parampages" && s.page == "Module" && has(melodee.status(), ",wheel"));
+    // An effect's Module page (no My Presets, no Auto Sample): Swap loads
+    // the other into its slot of the chain (a new plug-in entry), Schwung's
+    // loading screen kept up meanwhile, its pages next.
+    for (int n = 0; n < 3 && has(melodee.status(), "page=module-pages"); ++n) { press_button(melodee, Button::Back); frames(melodee, 1); }
+    CHECK(has(melodee.status(), "page=synth-play"));
+    auto& studio = melodee.studio();
     {
         std::lock_guard<std::mutex> guard(studio.lock);
-        auto* pages = studio.pages_of(target);
-        CHECK(pages && pages->status().page == "My Presets" && pages->status().footer.size() > 1 && pages->status().footer[1].second == "ENTER");
+        studio.rescan_fx();
+        CHECK(studio.load_fx(1, 0, "fxa"));
     }
+    melodee.service();
+    frames(melodee, 2);
+    turn_wheel(melodee, 1);
+    CHECK(has(melodee.status(), "item=fx1"));
+    press_button(melodee, Button::MainPush);
+    frames(melodee, 8);
+    app::Studio::PagesTarget fx_target;
+    {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        fx_target = studio.pages_target;
+    }
+    CHECK(fx_target.fx_entry != melodee::no_plugin && has(melodee.status(), "page=module-pages"));
+    to_page(melodee, "Module");
+    s = pages_status(melodee, fx_target);
+    CHECK(s.rows.size() == 3 && s.rows[0].first == "Add to List" && s.rows[1].first == "Swap Module" && s.rows[2].first == "Remove Module");
+    push_row(melodee, "Module", 1);
+    s = pages_status(melodee, fx_target);
+    CHECK(s.view == "compselect" && s.title == "S2 > FX 1" && s.rows.size() == 5 && s.rows[3] == Row("Effect A", "*")
+          && s.rows[4].first == "Effect B" && s.index == 3);
+    turn_wheel(melodee, 1);
+    frames(melodee, 1);
     press_button(melodee, Button::MainPush);
     frames(melodee, 1);
-    // Delete: its row, a question, yes.
-    turn_wheel(melodee, 3);
-    frames(melodee, 1);
+    CHECK(has(melodee.status(), "page=module-pages"));
+    melodee.service(); // loads it
+    frames(melodee, 8);
+    {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        auto now = studio.pages_target;
+        const auto& slot = studio.project().chain(1).slots[0];
+        auto* effect = studio.fx_module(now.fx_entry);
+        CHECK(now.fx_entry != fx_target.fx_entry && slot.params[0] == now.fx_entry && effect && effect->module
+              && effect->module->info().id == "fxb");
+        fx_target = now;
+    }
+    s = pages_status(melodee, fx_target);
+    CHECK(s.view == "parampages" && s.kind == "knobs" && has(melodee.status(), "page=module-pages"));
+    for (int n = 0; n < 3 && has(melodee.status(), "page=module-pages"); ++n) { press_button(melodee, Button::Back); frames(melodee, 1); }
+    CHECK(has(melodee.status(), "page=synth-play") && has(melodee.status(), "item=fx1"));
+    // Remove Module, the synth's: no question, out to the Device View, gone.
+    turn_wheel(melodee, -1);
+    CHECK(has(melodee.status(), "item=sound"));
     press_button(melodee, Button::MainPush);
-    CHECK(has(melodee.status(), "page=question"));
-    press_button(melodee, Button::MainPush);
-    CHECK(!std::filesystem::exists(presets + "/fake/Bright.json") && std::filesystem::exists(presets + "/fake/Bright 2.json"));
-    unsetenv("MELODEE_SCHWUNG_PRESETS");
+    frames(melodee, 8);
+    push_row(melodee, "Module", 2);
+    CHECK(has(melodee.status(), "page=synth-play") && has(melodee.status(), "synth=-"));
 }
 
 void test_module_replace() {
@@ -3450,6 +3819,7 @@ int main() {
     test_synth_track();
     test_module_replace();
     test_user_presets();
+    test_module_page();
     test_tracks();
     test_step_icons();
     test_migration();

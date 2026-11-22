@@ -9,7 +9,10 @@
 // code asks for it, and gets it held or locked. While Schwung's keyboard has
 // the pads (its pad typing) they are its keys: their notes and pressure go
 // to it alone, lit in its colours, and play nothing. Back at the top of the
-// pages leaves for the Device View.
+// pages leaves for the Device View. A module swapped in from them (Swap
+// Module) has pages of its own: Schwung's loading screen stays up until they
+// are in, then they start, as Schwung opens the new module's editor; Remove
+// Module leaves for the Device View, then removes it.
 #include "app/screens/note_pages.h"
 
 namespace app::screens {
@@ -23,7 +26,9 @@ public:
     // return from one is no entry): Schwung's pages start over.
     void enter() override {
         held.fill(false);
-        if (SchwungPages* pages = studio.pages_of(studio.pages_target)) pages->enter();
+        entered = 0;
+        swapped = false;
+        shown();
     }
 
     // Gone with the pads still the keyboard's: given back to the track.
@@ -36,8 +41,9 @@ public:
     void input(const move::Input& input) override {
         using Kind = move::Input::Kind;
         if (input.kind == Kind::Pad && input.index < pad_count) held[input.index] = input.pressed;
-        SchwungPages* pages = studio.pages_of(studio.pages_target);
-        if (!pages || studio.top() != this) return;
+        if (studio.top() != this) return;
+        SchwungPages* pages = shown();
+        if (!pages) return;
         if (input.kind == Kind::Touch && input.index < 8) pages->midi(input.pressed ? 0x90 : 0x80, input.index, input.pressed ? 127 : 0);
         if (input.kind == Kind::Button && input.index == uint8_t(move::Button::Mute))
             pages->midi(0xb0, move::button_cc(move::Button::Mute), input.pressed ? 127 : 0);
@@ -50,7 +56,7 @@ public:
 
     bool job(bindings::Job job, const bindings::Use& use) override {
         using bindings::Job;
-        SchwungPages* pages = studio.pages_of(studio.pages_target);
+        SchwungPages* pages = shown();
         if (!pages) {
             if (job == Job::CanvasBack || job == Job::Back) { studio.close(); return true; }
             return job == Job::CanvasTurn || job == Job::CanvasPush;
@@ -113,27 +119,64 @@ public:
     }
 
     void draw(juce::Graphics& g) override {
-        SchwungPages* pages = studio.pages_of(studio.pages_target);
+        SchwungPages* pages = shown();
+        if (!pages && swapped) { // an effect swapped in, its pages not in yet: Schwung's last screen (its Loading...)
+            juce::Image image(juce::Image::ARGB, SchwungDisplay::width, SchwungDisplay::height, false);
+            {
+                juce::Image::BitmapData pixels(image, juce::Image::BitmapData::writeOnly);
+                for (int y = 0; y < SchwungDisplay::height; ++y)
+                    for (int x = 0; x < SchwungDisplay::width; ++x)
+                        pixels.setPixelColour(x, y, last[size_t(y * SchwungDisplay::width + x)] ? juce::Colours::white : juce::Colours::black);
+            }
+            g.drawImageAt(image, 0, 0);
+            return;
+        }
         if (!pages) {
             move::draw_text_centred(g, ui::content_x, 24, ui::content_width, "NO MODULE");
             ui::detail(g, "BACK: OUT");
             return;
         }
         pages->frame(g); // Schwung's screen, all of it
+        last = pages->screen().pixels;
         leave_if_asked(*pages);
     }
 
 private:
     std::array<bool, pad_count> held {};
+    uint64_t entered = 0;  // the pages entered (SchwungPages::serial)
+    bool swapped = false;  // a module swapped in from them, its pages awaited
+    std::array<uint8_t, SchwungDisplay::width * SchwungDisplay::height> last {}; // Schwung's screen as last drawn
+
+    // The pages of the module the screen is on, started when they are new
+    // to it (a module swapped in: Schwung's host opens the new one's editor).
+    SchwungPages* shown() {
+        SchwungPages* pages = studio.pages_of(studio.pages_target);
+        if (pages && pages->serial() != entered) {
+            entered = pages->serial();
+            swapped = false;
+            pages->enter();
+        }
+        return pages;
+    }
 
     // Back at the top of Schwung's pages: out to the Device View. Remove
-    // Module asked from them: out first, then gone.
+    // Module asked from them: out first, then gone. Swap Module: the new
+    // module loaded where this one is (an effect's pages then are another
+    // entry's), this screen on, its last frame Schwung's loading screen.
     void leave_if_asked(SchwungPages& pages) {
         if (studio.remove_from_pages && *studio.remove_from_pages == studio.pages_target) {
             auto target = *studio.remove_from_pages;
             studio.remove_from_pages.reset();
             if (studio.top() == this) studio.close();
             studio.remove_module(target);
+            return;
+        }
+        if (studio.swap_from_pages && studio.swap_from_pages->target == studio.pages_target) {
+            auto swap = *studio.swap_from_pages;
+            studio.swap_from_pages.reset();
+            last = pages.screen().pixels;
+            swapped = true;
+            studio.pages_target = studio.swap_module(swap.target, swap.id);
             return;
         }
         if (pages.left() && studio.top() == this) studio.close();

@@ -59,6 +59,8 @@ std::string read_project_bytes(const std::vector<uint8_t>& bytes, melodee::Proje
 //   page browse {...}  each of the module's own pages: what it keeps in
 //                      ctx.state, as JSON (a provider picked, where its
 //                      menus are), by the page's parameter key
+//   user_preset {...}  the user preset it is on, as Schwung's My Presets
+//                      keeps it ({"name", "hash"}, schwung_pages.h)
 struct SynthFile {
     unsigned track = 0;
     int octave = 0;
@@ -66,6 +68,7 @@ struct SynthFile {
     int preset = -1;
     std::vector<std::pair<std::string, std::string>> values;
     std::vector<std::pair<std::string, std::string>> pages;
+    std::string user_preset;
 };
 std::string synth_text(const SynthFile& synth);
 bool read_synth(const std::string& text, SynthFile& synth); // false: not a module's state (synth left empty)
