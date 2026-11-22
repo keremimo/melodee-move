@@ -541,8 +541,10 @@ draws the real screens into `DIR/sequencer/`.
   chain them; Copy + a pad, then another, asks before replacing; Delete + a
   pad clears it at once (17.1.4). The wheel moves the playhead by Q
   (stopped: Play continues there); its push opens the column's sheet
-  (`SCNE`): knob 1 its tempo, knob 2 a ready name, pads of other columns
-  chain sequences, push launches. Held, Note/Session peeks.
+  (`SCNE`): knob 1 its tempo, knob 2 a ready name, knob 3 its colour (none
+  or a track's, melodee-sample's issue 19), pads of other columns chain
+  sequences, push launches. The steps under the eight columns light in their
+  sequences' colours, the sequence in hand bright. Held, Note/Session peeks.
 - **Rec**: from stopped a bar's count-in (`REC` / `CNT`, the beat large,
   Rec flashing), then the take from the top; while playing at once. Notes
   land at the tick the pad was heard (the audio thread stamps it), with Rec

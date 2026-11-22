@@ -10,7 +10,9 @@
 //   Delete + Pad         the pattern cleared at once (17.1.4)
 //   Plus / Minus         the bank of four tracks; Left / Right eight patterns
 //   Wheel                the playhead by the pattern's Q; stopped, Play continues there
-//   Wheel push           the selected pattern's column, every track (Melodee's sequence), its tempo on knob 1
+//   Wheel push           the selected pattern's column, every track (Melodee's sequence), its tempo on knob 1,
+//                        its name on knob 2, its colour on knob 3
+//   Steps 1-8            (lights only) each column's sequence in its colour, the sequence in hand bright
 //   Note/Session or Back back to Play; Note/Session held peeks (the sequencer lets it go)
 #include "app/screens/common.h"
 #include "app/sequencer.h"
@@ -23,6 +25,12 @@ using bindings::Job;
 using Clock = std::chrono::steady_clock;
 
 unsigned bank_first(const Studio& studio) { return ui::bank_of(studio.track()) * ui::tracks_a_bank; }
+
+// A sequence's colour (melodee-sample's issue 19, Scene::colour): 0 none, 1-16
+// a track's colour, named as the projects' colours are.
+constexpr const char* scene_colour_names[16] {"AZURE", "ORANGE", "VIOLET", "GREEN", "YELLOW", "MAGENTA", "CYAN", "RED",
+                                              "ROYAL", "PINK", "MINT", "PURPLE", "LIME", "ROSE", "SKY", "TAN"};
+std::string scene_colour_name(uint8_t colour) { return colour && colour <= 16 ? scene_colour_names[colour - 1] : "NONE"; }
 
 class Session final : public Screen {
 public:
@@ -114,7 +122,14 @@ public:
             if (t == studio.track() && n == seq.number(t) && blink && cell != ui::seq::Cell::Queued) shown = colour::white; // selected: pulsing white
             lights.pad(pad, shown);
         }
-        for (unsigned s = 0; s < step_count; ++s) lights.step(s, colour::off);
+        // The steps under the eight columns: each sequence in its colour (none: dark), the sequence in hand bright.
+        for (unsigned s = 0; s < step_count; ++s) {
+            const unsigned n = first + s;
+            const uint8_t c = s < 8 && n < melodee::pattern_count ? studio.project().scenes[n].colour : 0;
+            if (!c || c > 16) { lights.step(s, colour::off); continue; }
+            const auto shade = ui::track_colours[size_t(c - 1)];
+            lights.step(s, n == studio.project().scene % melodee::pattern_count ? shade.bright : shade.dim);
+        }
         lights.button(Button::Menu, white_bright);
         lights.button(Button::Back, white_dim);
         lights.button(Button::Left, first ? white_dim : 0);
@@ -264,6 +279,7 @@ public:
         case Job::TurnKnob: case Job::TurnKnobFine:
             if (use.index == 0) seq.set_scene_tempo(n, use.delta);
             if (use.index == 1) name(n, use.delta);
+            if (use.index == 2) colour(n, use.delta);
             return true;
         case Job::ListTurn: seq.set_scene_tempo(n, use.delta); return true;
         case Job::Back: studio.close(); return true;
@@ -283,7 +299,8 @@ public:
         char tempo[16];
         if (scene.tempo) std::snprintf(tempo, sizeof tempo, "%u.%u", scene.tempo / 10, scene.tempo % 10);
         else std::snprintf(tempo, sizeof tempo, "--");
-        ui::seq::value_cells(g, ui::content(11, 40), {"BPM", "NAM", "", "", "", "", "", ""}, {tempo, scene.name[0] ? upper(scene.name).substr(0, 4) : "-", "", "", "", "", "", ""});
+        ui::seq::value_cells(g, ui::content(11, 40), {"BPM", "NAM", "COL", "", "", "", "", ""},
+                             {tempo, scene.name[0] ? upper(scene.name).substr(0, 4) : "-", scene.colour ? scene_colour_name(scene.colour).substr(0, 4) : "-", "", "", "", "", ""});
         if (chain.size() >= 2) move::draw_text(g, ui::content_x + 2, 33, "CHAIN " + chain_text());
         else move::draw_text(g, ui::content_x + 2, 33, "PATTERN " + std::to_string(n + 1) + " OF EACH");
         move::draw_text(g, ui::content_x + 2, 42, chain.size() >= 2 ? "EACH ONCE, ROUND" : "TRACK, NEXT BAR");
@@ -292,6 +309,7 @@ public:
     Knob knob(unsigned which) const override {
         const auto& scene = studio.project().scenes[studio.sequencer().number(studio.track())];
         if (which == 1) return {"SEQUENCE NAME", scene.name[0] ? upper(scene.name) : "NONE", 0.0f};
+        if (which == 2) return {"SEQUENCE COLOUR", scene_colour_name(scene.colour), scene.colour / 16.0f};
         if (which) return {};
         return {"SEQUENCE TEMPO", scene.tempo ? std::to_string(scene.tempo / 10) + "." + std::to_string(scene.tempo % 10) : "NONE", scene.tempo / 3000.0f};
     }
@@ -313,6 +331,13 @@ private:
         std::string text;
         for (auto k : chain) text += (text.empty() ? "" : ">") + std::to_string(k + 1);
         return text;
+    }
+    // None, then the sixteen track colours, a detent each; its cell and step light in it.
+    void colour(unsigned n, int delta) {
+        auto& scene = studio.project().scenes[n];
+        scene.colour = uint8_t(std::clamp(int(scene.colour) + (delta > 0 ? 1 : -1), 0, 16));
+        studio.name_step("COLOUR SEQ " + std::to_string(n + 1));
+        studio.changed();
     }
 };
 

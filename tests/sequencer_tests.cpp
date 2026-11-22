@@ -636,6 +636,9 @@ void test_screens(app::MelodeeApp& melodee) {
     h.knob(1, 1);
     h.knob(1, 1); // a ready name, a detent each: Verse
     CHECK(std::string(melodee.studio().project().scenes[seqr.number(0)].name) == "Verse");
+    h.knob(2, 1);
+    h.knob(2, 1); // its colour: the second track's, a detent each
+    CHECK(melodee.studio().project().scenes[seqr.number(0)].colour == 2);
     h.pad(3); // another column: a chain of sequences
     CHECK(has(h.status(), "scene_chain=2"));
     h.button(Button::MainPush);
