@@ -3,6 +3,7 @@
 // after melodee-sample's shell/midi_io.cpp, which does the same for the
 // MPC's jacks and USB.
 #include "app/midi.h"
+#include "app/scale_keys.h"
 #include "app/sequencer.h"
 #include "app/studio.h"
 #include "melodee/engine/engine_host.h"
@@ -102,10 +103,11 @@ void Midi::write_settings(std::ostream& out) const {
     // Melodee writes key=value; Move.settings has key value.
     std::string text = keys.str();
     std::replace(text.begin(), text.end(), '=', ' ');
-    out << text;
+    out << text << "scale_keys " << int(scale_keys) << '\n';
 }
 
 bool Midi::read_setting(const std::string& key, int value) {
+    if (key == "scale_keys") { scale_keys = value != 0; return true; }
     if (!melodee::read_midi_config(config, key, value)) return false;
     config.port = melodee::MidiPort::Usb; // one port: whatever an MPC's file said
     config.cv_out = false;                 // no sync jack
@@ -292,6 +294,7 @@ void Midi::receive(Studio& studio, const move::ExternalMidi& m) {
             if (!((tracks >> t) & 1) || ((echo >> t) & 1)) continue;
             if (type == 0xa0) {
                 int key = melodee::note_key(project.tracks[t], a);
+                if (key >= 0 && held[t][size_t(key)]) key = played[t][size_t(key)]; // the note it plays (SCALE KEYS moves it)
                 if (key >= 0) studio.send({Type::Pressure, uint8_t(t), 0, uint16_t(key), int16_t(b)});
             } else {
                 for (int k = 0; k < 128; ++k)
@@ -322,12 +325,22 @@ void Midi::receive(Studio& studio, const move::ExternalMidi& m) {
 void Midi::note_in(Studio& studio, unsigned t, int key, int velocity, bool down, uint64_t ns, bool echo) {
     t %= track_count;
     if (key < 0 || key > 127) return;
-    if (down) held[t][size_t(key)] = true;
-    else if (held[t][size_t(key)]) held[t][size_t(key)] = false;
-    else return;
-    if (down) played[t][size_t(key)] = int16_t(key);
-    int plays = played[t][size_t(key)] >= 0 ? played[t][size_t(key)] : key;
     const auto& track = studio.project().tracks[t];
+    if (down) {
+        // SCALE KEYS: a white key a note of the scale, a black key nothing (not
+        // held, so its release does nothing). Kept from the press, so its end
+        // finds it whatever has changed meanwhile.
+        int note = key;
+        if (scale_keys && melodee::scale_keys_on(studio.project(), track)) note = melodee::scale_key_note(studio.project(), key);
+        if (note < 0) return;
+        held[t][size_t(key)] = true;
+        played[t][size_t(key)] = int16_t(note);
+    } else if (held[t][size_t(key)]) {
+        held[t][size_t(key)] = false;
+    } else {
+        return;
+    }
+    int plays = played[t][size_t(key)] >= 0 ? played[t][size_t(key)] : key;
     studio.sequencer().midi_key(t, plays, velocity, down); // Seq Record, Step Edit's ENTRY and Capture take it as a pad's
     Command c {down ? Type::NoteOn : Type::NoteOff, uint8_t(t), uint8_t(echo ? 0 : 1), uint16_t(plays), int16_t(down ? std::max(velocity, 1) : 0)};
     if (track.repeat) { c.type = Type::RepeatKey; c.pattern = 0; c.value = int16_t(down ? velocity : 0); }

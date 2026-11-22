@@ -70,7 +70,10 @@ reader (`shell/midi_route.cpp`, `shell/mtc_in.cpp`) are compiled unchanged.
   selected track (a kit hears 36 as A01), a track's own channel (its MIDI IN)
   plays it whichever is selected, each at the frame it came in at; pressure,
   the mod wheel, the pitch wheel, the sustain pedal and other CCs, All Notes
-  Off. A MIDI track echoes what plays it on its own channel, unless that is
+  Off. With MIDI Config's SCALE KEYS on, an In-Key track (Melodee's Scale
+  and Chords layouts) plays the scale on the white keys: C4 the root nearest
+  it, a note of the scale a white key, the black keys nothing (melodee-sample's
+  Scale on white keys, `src/app/scale_keys.h`). A MIDI track echoes what plays it on its own channel, unless that is
   the channel it came on (a keyboard and its own synth: Local Off), and a CC
   that one of its slots sends turns that slot. Remote CCs (102, 103, 104 on
   the Remote channel) select a track, launch a pattern or a sequence;
@@ -88,7 +91,7 @@ reader (`shell/midi_route.cpp`, `shell/mtc_in.cpp`) are compiled unchanged.
   input as if it came in on the port; `--ctl 'melodee-midi panic'` is MIDI
   Config's Panic (`MelodeeApp::command()`, under the studio's lock).
 - **Files**: MIDI Config in `Move.settings`, under Melodee's own keys
-  (`midi_in_channel`, `midi_sync_out`, ...), written with Setup's settings; each track's MIDI OUT in the
+  (`midi_in_channel`, `midi_sync_out`, ..., and `scale_keys`), written with Setup's settings; each track's MIDI OUT in the
   project's `MVMO` section (a section of the Move's own, which Melodee's
   reader skips, read again as each project opens; MIDI IN is Melodee's
   track channel, `MIDC`); a MIDI track's

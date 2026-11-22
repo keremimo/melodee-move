@@ -11,8 +11,8 @@
 namespace app::screens {
 namespace {
 
-enum Row { InChannel, OutChannel, PadIn, PadOut, SyncIn, SyncOut, Thru, ProgramChange, RemoteChannel, TrackCc, PatternCc, SequenceCc, Panic, RowCount };
-const char* const labels[] {"IN CHANNEL", "OUT CHANNEL", "PAD IN", "PAD OUT", "SYNC IN", "SYNC OUT", "THRU", "PROG CHANGE", "REMOTE CH",
+enum Row { InChannel, OutChannel, PadIn, ScaleKeys, PadOut, SyncIn, SyncOut, Thru, ProgramChange, RemoteChannel, TrackCc, PatternCc, SequenceCc, Panic, RowCount };
+const char* const labels[] {"IN CHANNEL", "OUT CHANNEL", "PAD IN", "SCALE KEYS", "PAD OUT", "SYNC IN", "SYNC OUT", "THRU", "PROG CHANGE", "REMOTE CH",
                             "TRACK CC", "PATTERN CC", "SEQUENCE CC", "PANIC"};
 const char* const syncs[] {"OFF", "CLOCK", "MTC"};
 const char* const pad_outs[] {"NEVER", "ALWAYS", "EMPTY"};
@@ -89,6 +89,7 @@ private:
         case InChannel: return channel_or(c.in_channel, "ALL");
         case OutChannel: return std::to_string(c.out_channel);
         case PadIn: return c.pad_in ? "ON" : "OFF";
+        case ScaleKeys: return studio.midi.scale_keys ? "ON" : "OFF";
         case PadOut: return pad_outs[unsigned(c.pad_out) % 3];
         case SyncIn: return syncs[unsigned(c.sync_in) % 3];
         case SyncOut: return syncs[unsigned(c.sync_out) % 3];
@@ -108,6 +109,7 @@ private:
         if (midi.following()) return "EXT CLOCK";
         switch (row) {
         case InChannel: return "PLAYS THE TRACK";
+        case ScaleKeys: return "WHITE KEYS: SCALE";
         case PadOut: return "PADS AND PATTERNS";
         case SyncOut: return midi.config.sync_out == melodee::MidiSync::Mtc ? "MTC 25 FPS OUT" : "";
         case ProgramChange: return "LAUNCHES PATTERN";
@@ -125,6 +127,7 @@ private:
         case InChannel: c.in_channel = uint8_t(std::clamp(int(c.in_channel) + delta, 0, 16)); break;
         case OutChannel: c.out_channel = uint8_t(std::clamp(int(c.out_channel) + delta, 1, 16)); break;
         case PadIn: c.pad_in = way > 0; break;
+        case ScaleKeys: studio.midi.scale_keys = way > 0; break;
         case PadOut: c.pad_out = melodee::PadMidiOut(cycle(unsigned(c.pad_out), 3)); break;
         case SyncIn: c.sync_in = melodee::MidiSync(cycle(unsigned(c.sync_in), 3)); break;
         case SyncOut: c.sync_out = melodee::MidiSync(cycle(unsigned(c.sync_out), 3)); break;

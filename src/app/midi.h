@@ -54,6 +54,10 @@ public:
 
     // ---------------------------------------------------------- under the studio's lock
     melodee::MidiConfig config;
+    // MIDI Config's SCALE KEYS: on an In-Key track a keyboard's white keys
+    // play the scale, its black keys nothing (app/scale_keys.h). The Move's
+    // own key in Move.settings, as melodee-sample keeps it in its settings.
+    bool scale_keys = false;
     // Each track's MIDI OUT (the Move's track options): 0 AUTO (its MIDI IN
     // channel, else MIDI Config's out channel), else 1-16. Kept in the
     // project's MVMO section; the MPC keeps one channel a track.

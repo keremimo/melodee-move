@@ -631,8 +631,9 @@ it. `docs/ui/midi.png` is the sheet (`src/ui/mockups_midi.cpp`).
   each loads as the wheel turns, push or Back done. Shift held: SAVE SOUND,
   STAR or UNSTAR, SHOW (all, starred, recent).
 - **MIDI Config** (Setup, Shift + Step 2: its MIDI and MIDI SYNC rows push it; Back goes back to Setup): in
-  and out channels, pad MIDI in and out, sync in and out (MIDI clock or
-  MTC), Thru, program change, the Remote channel and CCs, PANIC. The wheel
+  and out channels, pad MIDI in, SCALE KEYS (on an In-Key track a
+  keyboard's white keys play the scale, its black keys nothing), pad MIDI
+  out, sync in and out (MIDI clock or MTC), Thru, program change, the Remote channel and CCs, PANIC. The wheel
   picks a row, push edits it (`[MTC]`), the wheel sets it, push again done;
   push on PANIC sends it. The rail's bottom says `IN` and `OUT` as MIDI
   passes; the detail line `EXT CLOCK` and the tempo heard, or `EXT MTC`,

@@ -295,6 +295,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Track channel, Track MIDI in, Pad MIDI in / out**: a controller a track (guide/midi-and-sync.md) | done | Shift + a track button: MIDI IN and MIDI OUT (Kerem); Pad MIDI in and out in MIDI Config; Track MIDI in's ports: one port | [ ] |
 | **Remote CCs**: select a track, launch a pattern or a sequence (CC 102-104) (guide/midi-and-sync.md) | done | MIDI Config: Remote channel and CCs | [ ] |
 | **Program change** launches that pattern (MELODEE.md › MIDI and sync) | done | MIDI Config: PROG CHANGE | [ ] |
+| **Scale on white keys**: a keyboard's white keys play the scale on a Scale or Chords track, its black keys nothing (guide/midi-and-sync.md) | done | MIDI Config: SCALE KEYS, after PAD IN | [ ] |
 | **MIDI out**: pads, patterns, the arp, each at the frame it is heard (MELODEE.md › MIDI and sync, Out) | done | automatic: with the exchange that carries the block it is heard in (block timing, 2.9 ms: the device takes MIDI once an exchange); played by hand at once | [ ] |
 | **MIDI clock in and out**: Start, Continue, Stop, Song Position, tempo (MELODEE.md › MIDI and sync) | done | MIDI Config: SYNC IN, SYNC OUT; Tempo shows the tempo heard | [ ] |
 | **MTC in and out**: in at 24, 25, 29.97 df, 30 fps; out at 25 (MELODEE.md › MIDI and sync) | done | MIDI Config: SYNC IN, SYNC OUT (a cue while stopped leaves the playhead) | [ ] |

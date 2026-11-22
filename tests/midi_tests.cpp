@@ -234,6 +234,30 @@ void test_in() {
     CHECK(count_of(sent, 0x92, 60) == 1);
     rig.in_message({0x80, 60, 0});
     CHECK(count_of(rig.blocks(2), 0x82, 60) == 1);
+    // SCALE KEYS on an In-Key track, in D major: C4 plays D4, D4 plays E4, C#4 nothing; the key's release ends
+    // the note it played.
+    {
+        std::lock_guard<std::mutex> hold(rig.studio().lock);
+        rig.studio().midi.scale_keys = true;
+        rig.studio().project().root = 2;
+        rig.studio().project().scale = 0;
+        rig.studio().project().tracks[2].layout = melodee::PadLayout::Scale;
+    }
+    rig.in_message({0x90, 60, 90});
+    rig.in_message({0x90, 61, 90});
+    rig.in_message({0x90, 62, 90});
+    sent = rig.blocks(2);
+    CHECK(count_of(sent, 0x92, 62) == 1 && count_of(sent, 0x92, 64) == 1 && count_of(sent, 0x92, 60) == 0 && count_of(sent, 0x92, 61) == 0);
+    rig.in_message({0x80, 60, 0});
+    rig.in_message({0x80, 61, 0});
+    rig.in_message({0x80, 62, 0});
+    sent = rig.blocks(2);
+    CHECK(count_of(sent, 0x82, 62) == 1 && count_of(sent, 0x82, 64) == 1 && count_of(sent, 0x82, 61) == 0);
+    {
+        std::lock_guard<std::mutex> hold(rig.studio().lock);
+        rig.studio().midi.scale_keys = false;
+        rig.studio().project().root = 0;
+    }
     // A CC is echoed as it came (no slot sends CC 20), re-channelled.
     rig.in_message({0xb0, 20, 77});
     CHECK(count_of(rig.blocks(2), 0xb2, 20) == 1);
@@ -425,6 +449,7 @@ void test_saved() {
             midi.config.in_channel = 5;
             midi.config.sync_out = melodee::MidiSync::Mtc;
             midi.config.remote_channel = 16;
+            midi.scale_keys = true;
             midi.track_out[0] = 7;
             CHECK(midi.out_channel(rig.studio(), 0) == 7);
             CHECK(midi.out_channel(rig.studio(), 1) == 1);  // AUTO: MIDI Config's out channel
@@ -437,6 +462,7 @@ void test_saved() {
     std::lock_guard<std::mutex> hold(again.studio().lock);
     const auto& midi = again.studio().midi;
     CHECK(midi.config.in_channel == 5 && midi.config.sync_out == melodee::MidiSync::Mtc && midi.config.remote_channel == 16);
+    CHECK(midi.scale_keys);
     CHECK(midi.track_out[0] == 7 && midi.track_out[1] == 0);
     CHECK(midi.config.port == melodee::MidiPort::Usb && !midi.config.cv_out);
 }
@@ -586,7 +612,7 @@ void test_screens() {
     hand.press(Button::MainPush);
     CHECK(has(*rig.melodee, "page=midi-config"));
     snap(*rig.melodee, "config");
-    hand.wheel(4);
+    hand.wheel(5); // SYNC IN
     hand.press(Button::MainPush);
     hand.wheel(1);
     snap(*rig.melodee, "config-edit");
