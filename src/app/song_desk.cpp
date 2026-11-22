@@ -317,8 +317,11 @@ void SongDesk::launched(unsigned t, unsigned p) {
     send_song();
 }
 
-// Each bar the clips being written grow by one, so the song always holds the
-// bar after the one playing; past 16 bars a new clip carries on.
+void SongDesk::launched_off(unsigned t) {
+    t %= melodee::track_count;
+    if (record_on && song_playing() && (recording_tracks >> t & 1)) finish_launches(uint16_t(1u << t));
+}
+
 void SongDesk::jam_tick() {
     const auto& host = studio.host();
     const auto& project = studio.project();
@@ -376,6 +379,8 @@ bool SongDesk::take_jam(std::string& said) {
     return true;
 }
 
+// Each bar the clips being written grow by one, so the song always holds the
+// bar after the one playing; past 16 bars a new clip carries on.
 void SongDesk::tick() {
     exporter->tick(); // an MPC 3 export's prints, then the export
     jam_tick();       // jam capture: the bar playing outside Song logged
@@ -410,11 +415,11 @@ void SongDesk::tick() {
     send_song();
 }
 
-void SongDesk::finish_launches() {
+void SongDesk::finish_launches(uint16_t tracks) {
     auto& s = song();
     unsigned bar = seen_bar == ~0u ? 0 : seen_bar;
     for (unsigned t = 0; t < melodee::track_count; ++t) {
-        if (!(recording_tracks & (1u << t))) continue;
+        if (!(recording_tracks & tracks & (1u << t))) continue;
         for (unsigned n = 0; n < s.count; ++n) {
             auto& c = s.clips[n];
             if (c.track != t || c.bar != recording_from[t]) continue;
@@ -423,7 +428,7 @@ void SongDesk::finish_launches() {
             break;
         }
     }
-    recording_tracks = 0;
+    recording_tracks = uint16_t(recording_tracks & ~tracks);
     send_song();
 }
 

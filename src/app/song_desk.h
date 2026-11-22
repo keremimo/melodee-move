@@ -85,6 +85,7 @@ public:
     void set_recording(bool on);
     // Studio::send(): a launch while recording into the playing song is written as a clip (and sent on too).
     void launched(unsigned track, unsigned pattern);
+    void launched_off(unsigned track); // a track off (sequence links): its clip being written ends with the bar playing
     void tick(); // MIDI or service thread, under the lock, often: follows the song's bar
 
     // Jam capture (melodee-sample's, after Melodee FM-1's jam to song;
@@ -120,7 +121,7 @@ private:
     uint16_t recording_tracks = 0;          // the lanes being written
     std::array<uint16_t, melodee::track_count> recording_from {};
     unsigned seen_bar = ~0u;
-    void finish_launches();
+    void finish_launches(uint16_t tracks = 0xffff); // the clips being written on these lanes end with the bar playing
     void jam_tick();
     melodee::JamLog jam;
     melodee::JamBar jam_now;      // the bar playing, logged when the next begins

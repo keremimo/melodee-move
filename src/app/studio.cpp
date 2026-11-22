@@ -520,7 +520,10 @@ void Studio::audio_event(const move::SurfaceEvent& event) {
 // ---------------------------------------------------------------- the model, under `lock`
 
 bool Studio::send(const melodee::Command& command) {
-    if (command.type == Type::Pattern && arranger) arranger->launched(command.track, unsigned(command.value)); // Rec into the song
+    if (command.type == Type::Pattern && arranger) { // Rec into the song: a launch written as a clip; off (below 0) ends it
+        if (command.value < 0) arranger->launched_off(command.track);
+        else arranger->launched(command.track, unsigned(command.value));
+    }
     if (commands.push(command)) return true;
     say("BUSY, TRY AGAIN");
     return false;

@@ -280,6 +280,22 @@ void test_song_plays() {
         CHECK(at >= 0 && desk.song().clips[size_t(at)].end() <= rig.studio().host().song_bar() + 1u);
         rig.studio().stop();
     }
+    // A track turned off while Rec writes the song (sequence links): its clip ends, and no clip is written for it.
+    {
+        std::lock_guard<std::mutex> guard(rig.studio().lock);
+        desk.play_from(0);
+        desk.set_recording(true);
+    }
+    rig.render(8);
+    {
+        std::lock_guard<std::mutex> guard(rig.studio().lock);
+        rig.studio().send({melodee::Command::Type::Pattern, 2, 0, 0, 0}); // track 3 launches A1: a clip from bar 2
+        CHECK(desk.clip_at(2, 1) >= 0);
+        rig.studio().sequencer().pick_off(2);
+        for (unsigned n = 0; n < desk.song().count; ++n) CHECK(desk.song().clips[n].pattern != 127);
+        desk.set_recording(false);
+        rig.studio().stop();
+    }
 }
 
 void test_midi_file() {
