@@ -359,6 +359,14 @@ the screens were built; the screens are `src/app/screens/kit_play.cpp`,
   loudest frame to full scale), SAVE SAMPLE (a name typed, then
   `Samples/<name>.wav`). On LAYERS with layer 2-4 in hand they are the
   layer's, and REMOVE LAYER takes it off.
+- **Slice hits** (melodee-sample's issue 24): Chop's pads while Rec runs
+  write the chopped pad's note with its slice, not the pad played; the kit
+  stays as it is. They play the slice as the chop is now (a moved cut moves
+  them); a change that renumbers the slices they play (another type or
+  amount, a cut taken out, Split, Merge, Remove all cuts, a manual take's
+  lit pad) asks first (`RENUMBER SLICES?`), once a visit to Chop. MPC
+  projects open their Chop pad hits as slice hits. The MPC 3 export lays
+  them on free pads of their kit.
 - **The browser** lists bank files (`.mldb`, tagged `BANK`), which load into
   the bank of the pad in view, and MPC drum programs (`.xpm`, `.xty`, tagged
   `KIT`), whose push opens **LOAD KIT**: WHOLE KIT, a row a bank of the kit

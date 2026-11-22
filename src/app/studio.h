@@ -237,6 +237,13 @@ public:
     // While Chop is open the engine's kit pads 0-31 are its slices: the pads
     // play them by their number in the pad layout, whatever bank is in view.
     void pads_play_slices(bool on) { audio_slices.store(on, std::memory_order_relaxed); }
+    // Chop open (melodee-sample's issue 24): the kit pad it chops and the slice
+    // on the first pad, so Seq Record writes a pad hit there as a slice hit (the
+    // kit pad's note with its slice) and the kit is left as it is. track < 0:
+    // Chop closed. MIDI thread.
+    struct ChopHits { int track = -1, pad = -1; unsigned first = 0; };
+    ChopHits chop_hits;
+    bool chop_sent(unsigned slot) const { return chops_sent.count(slot) != 0; } // the engine holds the sample's chop
     // Copy the sound of one pad onto another (its sample and values, chain,
     // mute, zone trims). Clear: the pad's notes in the selected pattern, or
     // with none its sound, or an empty pad's gap closed (the pads after it
@@ -632,6 +639,10 @@ private:
     void forward();                        // audio thread: the ring into the host
     void apply_track(unsigned track);      // the engine's track made whole again from the project's (TrackLoad)
     void sync_keyed_roots();               // a keygroup of one sample plays from its note (KeyedRoot)
+    // Each sample's chop to the engine as slice hits play it (Command::Chop, issue 24), a few a pass, as it changes
+    // (Chop keeps it in the project as it is edited); the copies it replaced freed. Under the lock.
+    void sync_chops();
+    std::map<unsigned, melodee::Slices> chops_sent; // what the engine holds, by sample slot
     std::array<int16_t, melodee::track_count> keyed_sent {};
     unsigned free_slot() const;
     void setup_modules();                  // a ModuleTrack for each Schwung track of the project, offered

@@ -9,6 +9,7 @@
 #include "melodee/model/print.h"
 #include "melodee/shell/live_export.h"
 #include "melodee/shell/mpc3_export.h"
+#include "melodee/model/slice_hits.h"
 #include "ui/track_style.h"
 #include <algorithm>
 #include <chrono>
@@ -407,10 +408,15 @@ void Exports::project_job() {
         std::snprintf(said, sizeof said, "%u TRACKS %u CLIPS%s", report.tracks, report.clips + report.arranged,
                       left ? (" " + std::to_string(left) + " LEFT").c_str() : "");
     } else {
+        // MPC 3 plays no slice of a pad's chop from a note: slice hits (issue 24) go onto free pads of their kit
+        // first, in the copies (model/slice_hits.h); one with no free pad plays its whole pad.
+        const unsigned hits_left = melodee::lay_slice_hits(*copy_project, *copy_bank, [this](unsigned sample) -> const melodee::Slices& {
+            return copy_project->chops[sample].slices;
+        });
         melodee::Mpc3Export report;
         error = melodee::export_mpc3_project(*copy_project, *copy_bank, path, name, report, copy_prints.get(), copy_prints_dir);
         if (error.empty()) give_to_owner_of(path, studio.home_folder());
-        unsigned left = report.skipped_tracks + report.skipped_pads;
+        unsigned left = report.skipped_tracks + report.skipped_pads + hits_left;
         std::snprintf(said, sizeof said, "%u TRACKS %u SEQ%s", report.tracks + report.keygroups + report.audio + report.midi, report.sequences,
                       left ? (" " + std::to_string(left) + " LEFT").c_str() : "");
     }

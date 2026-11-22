@@ -143,7 +143,7 @@ Session (a row a track of the bank, a column a pattern) and the Overview.
 | Pad pressure | Polyphonic aftertouch (Drift, Wavetable) | Polyphonic aftertouch to the Schwung module; a kit pad's pressure waits for its job | done |
 | Shift + Pad (Play, kit) | No job (Control Live's Drum mode: selects a pad without playing it) | Makes the pad the last pad without sounding it (the MPC's Sample held + pad) | done |
 | Pad (Browser) | Picks the drum pad the browser loads onto; the browser stays where it is | Plays the pad and makes it the one a sample loads onto | done |
-| Pad (Chop) | In Slicing Mode, picks the slice the third knob moves | Plays the slice and selects it, 32 at once | done |
+| Pad (Chop) | In Slicing Mode, picks the slice the third knob moves | Plays the slice and selects it, 32 at once; while Rec runs, written as a slice hit (the chopped pad's note with its slice, melodee-sample's issue 24) | done |
 | Pad (Typing) | (Text is typed with the wheel) | A key: letters, space, backspace | done |
 | Shift held + Pad (Typing) | (Text is typed with the wheel) | A key as a capital, Shift held or locked (Kerem, 2026-11-21) | done |
 | Pad (Sampling) | Records into that pad (pulsing red); the pad again, any pad or Sampling stops; held, records until let go; another pad while recording carries on onto it from there | Melodee's Record onto the pad; a pad hit while recording starts the next part there; with Melodee's own sound as the source the pads play it once the take is armed | done |

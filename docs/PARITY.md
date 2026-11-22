@@ -242,6 +242,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **To Pads**: Poly, Mono, Thru (MELODEE.md › Sampler, Chop) | done | Chop: push; jogwheel | [ ] |
 | **To Pads KIT**: a pad a sound (MELODEE.md › Sampler, Chop) | done | To Pads sheet, its fourth row | [ ] |
 | **To Pads PATTERN**: a note for each slice into the pattern (MELODEE.md › Sampler, Chop) | done | To Pads' last row PATTERN (push flips it, kept for next time): a note a slice where it falls (KIT: on its sound's pad) into the track's pattern when it is empty, else the first empty one, which then plays; one undo with the pads | [ ] |
+| **Slice hits** (issue 24): Chop's pads recorded as their slices while Seq Record runs (SLCE), the kit untouched; hits follow the chop; a renumbering change asks; the MPC 3 export lays them on free pads (guide/kits-and-sampling.md) | done | Chop's pads while Rec runs; RENUMBER SLICES? (push yes, Back no), once a visit | [ ] |
 | **Slices kept with the sample** (in its WAV on the MPC; here in the project, its own `MVCH` section, so the Move's library is never written) (MELODEE.md › Sampler, Chop) | done | automatic | [ ] |
 | **Zero Snap and 2 ms edge fades** on every cut (MELODEE.md › Sampler, Chop) | done | automatic | [ ] |
 | **A sample's note** found as it loads: a pitch, or a chord's root (MELODEE.md › Sampler) | done | automatic, every sample read (kept in the project) | [ ] |

@@ -5,6 +5,7 @@
 #include "move/app.h"
 #include "move/lights.h"
 #include "melodee/model/project.h"
+#include "melodee/model/slice_hits.h"
 #include "melodee/shell/capture_ring.h"
 #include <juce_graphics/juce_graphics.h>
 #include <array>
@@ -194,8 +195,8 @@ public:
 
 private:
     Studio& studio;
-    void write_note(int key, int velocity, int position, uint32_t ticks, bool early);
-    void release_note(int key, uint32_t ticks);
+    void write_note(int key, int velocity, int position, uint32_t ticks, bool early, int slice = -1); // slice: a slice hit's
+    void release_note(int key, uint32_t ticks, int slice = -1);
     void start_take();
     void end_take();
     void grow_take();
@@ -222,9 +223,10 @@ private:
     bool take_free = false;                // the take grows a free pattern
     unsigned take_track = 0, take_number = 0;
     bool any_written = false;
-    struct HeldNote { int key = -1; unsigned track = 0, number = 0; uint32_t tick = 0, since = 0; };
+    struct HeldNote { int key = -1; unsigned track = 0, number = 0; uint32_t tick = 0, since = 0; int slice = -1; };
     std::array<HeldNote, 32> held_notes {};
     std::array<int, move::pad_count> pad_keys {}; // what each pad played (its first key), -1 none
+    std::array<int, move::pad_count> pad_slices {}; // Chop: the slice hit each pad wrote (-1 none), on Studio::chop_hits' pad
     std::array<std::vector<int>, move::pad_count> pad_chords; // and all its keys (a chord pad's)
     std::array<int, move::pad_count> pad_tracks {};
     std::vector<uint8_t> keys_down; // a note track's keys held, for a step's chord

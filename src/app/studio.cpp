@@ -831,6 +831,33 @@ void Studio::set_kit_param(unsigned t, int param, int value) {
     changed();
 }
 
+void Studio::sync_chops() {
+    const melodee::Slices* retired = nullptr;
+    while (engine->take_retired_chop(retired)) delete retired;
+    unsigned sent = 0;
+    const size_t span = std::min<size_t>(song->chops.span(), melodee::sample_slots);
+    auto send_chop = [&](unsigned slot, const melodee::Slices* now) {
+        Command c {Type::Chop, 0, 0, uint16_t(slot)};
+        c.chop = now ? new melodee::Slices(*now) : nullptr;
+        if (!send(c)) { delete c.chop; return false; } // the queue full: the rest next pass
+        if (now) chops_sent[slot] = *now;
+        else chops_sent.erase(slot);
+        ++sent;
+        return true;
+    };
+    for (size_t n = 0; n < span && sent < 16; ++n) {
+        const auto& chop = song->chops[n];
+        const bool used = chop.used() && chop.slices.count;
+        auto at = chops_sent.find(unsigned(n));
+        if (used && (at == chops_sent.end() || !at->second.same(chop.slices))) { if (!send_chop(unsigned(n), &chop.slices)) return; }
+        else if (!used && at != chops_sent.end()) { if (!send_chop(unsigned(n), nullptr)) return; }
+    }
+    for (auto it = chops_sent.begin(); it != chops_sent.end() && sent < 16;) { // slots past the table's span now
+        const unsigned slot = (it++)->first;
+        if (slot >= span && !send_chop(slot, nullptr)) return;
+    }
+}
+
 melodee::SampleChop* Studio::chop_of(unsigned slot) {
     return slot < melodee::sample_slots ? &song->chops.edit(slot) : nullptr;
 }
@@ -1931,6 +1958,7 @@ void Studio::service() {
     loading = false;
     landings->reap();
     sync_keyed_roots();
+    sync_chops();
     // Autosave: three seconds after the last change, as on the MPC; AUTOSAVE
     // off, only SAVE writes the project, and Move.settings goes alone.
     auto now = Clock::now();

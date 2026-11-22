@@ -3797,6 +3797,74 @@ void test_speech() {
     shm_unlink(segment.c_str());
 }
 
+void test_slice_hits() {
+    // Chop's pads while Rec runs (melodee-sample's issue 24): each writes a
+    // slice hit, the chopped pad's note with its slice, the kit left as it
+    // is; the chop reaches the engine; a change that renumbers the slices the
+    // hits play asks first (Back: no; push: yes).
+    std::string folder = "build/test-samples", home = "build/test-home-slice-hits", loop = folder + "/loop.wav";
+    std::filesystem::create_directories(folder);
+    std::filesystem::remove_all(home);
+    CHECK(write_test_loop(loop));
+    app::MelodeeApp melodee(folder, home, "build/test-no-modules");
+    Session session;
+    melodee.attach(session);
+    melodee.audio_opened(AudioFormat {});
+    CHECK(melodee.restore_now().empty());
+    CHECK(melodee.load_now(loop, 0).empty());
+    Lights lights;
+    AudioBlock in {}, out {};
+    auto settle = [&](int blocks) {
+        for (int n = 0; n < blocks; ++n) { melodee.service(); out.fill(0); melodee.render(in, out); melodee.lights(lights, App::Clock::now()); }
+    };
+    auto knob = [&](unsigned n, int detents) { melodee.surface(make_event(0xb0, uint8_t(knob_first_cc + n), uint8_t(detents < 0 ? 128 + detents : detents))); };
+    auto hit = [&](unsigned pad, bool down) {
+        auto e = make_event(down ? 0x90 : 0x80, pad_note(pad), down ? 100 : 0);
+        melodee.audio_event(e); // as the device host has it: the audio thread first
+        melodee.surface(e);
+    };
+    auto& studio = melodee.studio();
+    open_chop(melodee);
+    knob(2, 1);
+    knob(2, 1); // Regions
+    CHECK(has(melodee.status(), "chop=Regions"));
+    const unsigned slices = melodee.slice_count();
+    CHECK(slices >= 4);
+    press_button(melodee, Button::Play);
+    settle(8);
+    press_button(melodee, Button::Rec); // playing: at once
+    settle(8);
+    const unsigned third = app::physical_pad(2, app::pad_layout()); // slice 3
+    hit(third, true);
+    settle(40);
+    hit(third, false);
+    press_button(melodee, Button::Rec);
+    press_button(melodee, Button::Play);
+    settle(20);
+    {
+        const auto& p = studio.sequencer().pattern(0, studio.sequencer().number(0));
+        bool slice_hit = false, plain = false;
+        for (const auto& e : p.events) {
+            slice_hit |= e.key == melodee::sampler_first_note && e.slice == 3;
+            plain |= e.key == melodee::sampler_first_note + 2;
+        }
+        CHECK(slice_hit && !plain);
+        CHECK(!studio.project().tracks[0].pads[2].used()); // the kit as it was
+        CHECK(studio.chop_sent(studio.project().tracks[0].pads[0].sample)); // the engine has the chop
+    }
+    // Another type renumbers slice 3: asked first. Back: no.
+    knob(2, 1);
+    CHECK(has(melodee.status(), "page=question"));
+    press_button(melodee, Button::Back);
+    CHECK(has(melodee.status(), "page=chop") && has(melodee.status(), "chop=Regions"));
+    knob(2, 1);
+    CHECK(has(melodee.status(), "page=question"));
+    press_button(melodee, Button::MainPush); // yes: Threshold
+    CHECK(has(melodee.status(), "page=chop") && has(melodee.status(), "chop=Threshold"));
+    knob(2, -1); // yes said on this visit: no question
+    CHECK(has(melodee.status(), "page=chop") && has(melodee.status(), "chop=Regions"));
+}
+
 int main() {
     test_controls();
     test_press_messages();
@@ -3830,6 +3898,7 @@ int main() {
     test_sampling();
     test_sample_files();
     test_chop_depth();
+    test_slice_hits();
     test_audio_track();
     test_sampling_pad_layout();
     test_screen_reader();

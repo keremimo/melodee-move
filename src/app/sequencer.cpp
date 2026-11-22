@@ -60,6 +60,7 @@ int pad_lane_named(const std::string& name) {
 
 Sequencer::Sequencer(Studio& owner) : studio(owner), ring(std::make_unique<melodee::CaptureRing>()) {
     pad_keys.fill(-1);
+    pad_slices.fill(-1);
     pad_tracks.fill(-1);
     loop_sent.fill(-1);
 }
@@ -667,7 +668,7 @@ void Sequencer::end_take() {
     studio.say(std::to_string(seq::bars_of(p, bar)) + " BARS");
 }
 
-void Sequencer::write_note(int key, int velocity, int position, uint32_t ticks, bool early) {
+void Sequencer::write_note(int key, int velocity, int position, uint32_t ticks, bool early, int slice) {
     unsigned t = take_track;
     unsigned n = take_number;
     auto& p = pattern(t, n);
@@ -681,22 +682,23 @@ void Sequencer::write_note(int key, int velocity, int position, uint32_t ticks, 
     e.key = uint8_t(key & 0xff);
     e.pitch = int8_t(key >> 8);
     e.velocity = uint8_t(std::clamp(velocity, 1, 127));
+    if (slice >= 0) e.slice = uint8_t(slice + 1); // issue 24: a slice hit
     if (!p.add(e)) { studio.say("PATTERN FULL"); return; }
     if (p.free) p.free = take_free; // a take on a fixed pattern keeps it fixed
     any_written = true;
     sync(t, n);
     if (ahead) { Command c {Type::Recorded, uint8_t(t), uint8_t(n), uint16_t(key)}; c.position = at; studio.send(c); }
     for (auto& h : held_notes)
-        if (h.key < 0) { h = {key, t, n, at, ticks}; break; }
+        if (h.key < 0) { h = {key, t, n, at, ticks, slice}; break; }
 }
 
-void Sequencer::release_note(int key, uint32_t ticks) {
+void Sequencer::release_note(int key, uint32_t ticks, int slice) {
     for (auto& h : held_notes) {
-        if (h.key != key) continue;
+        if (h.key != key || h.slice != slice) continue;
         h.key = -1;
         auto& p = pattern(h.track, h.number);
         for (size_t at = p.lower(h.tick); at < p.events.size() && p.events[at].tick == h.tick; ++at)
-            if (p.events[at].key == uint8_t(key & 0xff)) {
+            if (p.events[at].key == uint8_t(key & 0xff) && p.events[at].slice == uint8_t(slice + 1)) {
                 p.events[at].length = uint16_t(std::clamp<int64_t>(int64_t(ticks) - int64_t(h.since), 1, 65535));
                 sync(h.track, h.number);
                 break;
@@ -1107,9 +1109,19 @@ void Sequencer::input(const move::SurfaceEvent& event) {
         }
         const auto& track = studio.project().tracks[unsigned(t) % melodee::track_count];
         bool repeats = track.repeat || track.arp; // the engine writes what it plays
+        pad_slices[in.index] = -1;
         if (rec && !repeats && unsigned(t) == take_track && studio.playing()) {
             bool early = studio.host().count_in() != 0;
             if (early && studio.host().count_in_ticks() > melodee::sixteenth_ticks) return; // counting in: not yet
+            // Chop open (issue 24): the engine's pad plays a slice; written as a slice hit, the chopped kit pad's note
+            // with its slice, the kit left as it is.
+            const auto& hits = studio.chop_hits;
+            const int at = key - int(melodee::sampler_first_note);
+            if (hits.track == t && hits.pad >= 0 && at >= 0 && at < int(move::pad_count)) {
+                pad_slices[in.index] = int(hits.first) + at;
+                write_note(int(melodee::sampler_first_note) + hits.pad, velocity, position, ticks, early, pad_slices[in.index]);
+                return;
+            }
             for (int k : chord) write_note(k, velocity, position, ticks, early);
         }
         return;
@@ -1125,10 +1137,14 @@ void Sequencer::input(const move::SurfaceEvent& event) {
         entry_written = false; // the chord let go: the caret moves on
         caret += entry_length;
     }
+    const int slice = pad_slices[in.index];
+    pad_slices[in.index] = -1;
     for (int k : chord) {
         ring->release(unsigned(t), k, ms_now(), studio.host().ticks());
-        if (rec) release_note(k, studio.host().ticks());
+        if (rec && slice < 0) release_note(k, studio.host().ticks());
     }
+    if (rec && slice >= 0 && studio.chop_hits.pad >= 0)
+        release_note(int(melodee::sampler_first_note) + studio.chop_hits.pad, studio.host().ticks(), slice);
 }
 
 void Sequencer::entry_write(const std::vector<int>& keys, int velocity) {

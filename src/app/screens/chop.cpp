@@ -73,6 +73,8 @@ public:
         if (sounding) studio.sound_pads(track); // the pads back as the kit has them
         sounding = false;
         studio.pads_play_slices(false);
+        studio.chop_hits = {}; // Seq Record writes the pads as they are again
+        rechop_ok = false;     // the next visit asks again
         manual_playing = false;
     }
 
@@ -270,6 +272,7 @@ public:
     void split() {
         const Sample* sample = studio.sample_of(track, pad);
         if (!sample || selected >= slices.count) return;
+        if (asks(selected + 1, [this] { split(); })) return;
         uint32_t frames = sample->data->model_frames();
         uint32_t a = slices.start[selected], b = slices.end(selected, frames);
         if (!slices.split(selected, frames)) { studio.say(slices.count >= melodee::max_slices ? "64 SLICES AT MOST" : "TOO SHORT"); return; }
@@ -286,10 +289,12 @@ public:
     }
     void merge() {
         if (selected + 1 >= slices.count) { studio.say("THE LAST SLICE"); return; }
+        if (asks(selected + 1, [this] { merge(); })) return;
         slices.remove(selected + 1);
         edited();
     }
     void remove_all() {
+        if (asks(1, [this] { remove_all(); })) return;
         const auto& sound = studio.project().tracks[track].pads[pad];
         slices.whole(sound.start, sound.end);
         mode = ChopMode::Manual;
@@ -337,6 +342,7 @@ private:
     void play_slices() {
         const Sample* sample = studio.sample_of(track, pad);
         if (!sample) return;
+        studio.chop_hits = {int(track), int(pad), bank * bank_size}; // Seq Record: the pads' slices as slice hits
         uint32_t frames = sample->data->model_frames();
         const auto& parent = studio.project().tracks[track].pads[pad];
         auto play = mode == ChopMode::Manual && manual_next >= 0 ? SlicePlay::Thru : SlicePlay::Poly;
@@ -344,6 +350,28 @@ private:
             unsigned n = bank * bank_size + at;
             studio.sound_pad(track, at, n < slices.count ? melodee::slice_pad(parent, slices, n, frames, play, 0) : PadSound {});
         }
+    }
+
+    // Issue 24: a change that renumbers the slices from `first` on, while slice
+    // hits play them, asks first, once a visit (melodee-sample's Rechop); a yes
+    // runs `again`, the change. True: asked, nothing changed yet.
+    bool rechop_ok = false; // a renumbering said yes to on this visit
+    bool asks(unsigned first, std::function<void()> again) {
+        if (rechop_ok) return false;
+        const auto& sound = studio.project().tracks[track].pads[pad];
+        const unsigned hits = melodee::slice_hits(studio.project(), studio.patterns(), sound.sample, first);
+        if (!hits) return false;
+        Studio::Question q;
+        q.rail_top = "SLC";
+        q.rail_big = two_digits(first + 1);
+        q.rail_bottom = "HITS";
+        q.asked = "RENUMBER SLICES?";
+        q.line1 = std::to_string(hits) + (hits == 1 ? " HIT PLAYS" : " HITS PLAY");
+        q.line2 = "SLICE " + std::to_string(first + 1) + " ON";
+        q.undoable = true;
+        q.yes = [this, again] { rechop_ok = true; again(); };
+        studio.ask(q);
+        return true;
     }
 
     // The sample's chop, kept in the project (CHOP), as Melodee keeps it.
@@ -410,6 +438,7 @@ private:
             return;
         }
         if (n < slices.count) { // a lit pad: plays again from its slice, the cuts after it gone (the MPC 3's way)
+            if (n + 1 < slices.count && asks(n + 1, [this, n] { manual_tap(n); })) return;
             while (slices.count > n + 1) slices.remove(slices.count - 1);
             selected = n;
             manual_next = int(n + 1);
@@ -484,11 +513,14 @@ private:
             if (slices.stop[n] == frames) slices.stop[n] = 0;
             moved(1);
         } else if (which == 2 && delta) {
+            if (asks(0, [this, which, delta] { turn(which, delta); })) return;
             auto at = std::find(chop_types.begin(), chop_types.end(), mode) - chop_types.begin();
             mode = chop_types[size_t((at + (delta > 0 ? 1 : int(chop_types.size()) - 1)) % chop_types.size())];
             chop_again();
             return;
         } else if (which == 3) {
+            if (mode == ChopMode::Manual) return; // a take's cuts are the hand's
+            if (asks(0, [this, which, delta] { turn(which, delta); })) return;
             int& amount = amounts[unsigned(mode)];
             switch (mode) {
             case ChopMode::Auto: amount = std::clamp(amount + delta, 0, int(melodee::auto_counts) - 1); break;
@@ -522,6 +554,7 @@ private:
     }
     void remove_cut(unsigned n) {
         if (n >= slices.count || slices.count < 2) return;
+        if (asks(n ? n : 1, [this, n] { remove_cut(n); })) return;
         slices.remove(n ? n : 1); // into the one before; the first takes the one after
         if (selected >= n && selected) --selected;
         edited();

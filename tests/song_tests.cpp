@@ -13,6 +13,7 @@
 #include "app/prints.h"
 #include "app/project_store.h"
 #include "app/sequencer.h"
+#include "melodee/shell/mpc_project.h"
 #include "app/song_desk.h"
 #include "app/wav_out.h"
 #include "move/audio.h"
@@ -576,15 +577,43 @@ void test_exports() {
     }
     CHECK(rig.until([&] { return !exports.busy(); }, 5));
     CHECK(!exports.shown().done && !fs::exists(home + "/Mixdowns/Tune 2.wav") && !fs::exists(home + "/Mixdowns/Tune 2.wav.part"));
-    // The MPC 3 project: its file and its data folder.
+    // The MPC 3 project: its file and its data folder. A slice hit (issue 24) goes onto a free pad of its kit, in
+    // the export's copy only: MPC 3 plays no slice of a pad's chop from a note.
     {
         std::lock_guard<std::mutex> guard(rig.studio().lock);
+        auto& project = rig.studio().project();
+        auto& chop = project.chops.edit(project.tracks[0].pads[0].sample);
+        chop.slices = {};
+        chop.slices.count = 2;
+        chop.slices.start[1] = 20000;
+        melodee::Event hit;
+        hit.tick = 48;
+        hit.key = uint8_t(melodee::sampler_first_note);
+        hit.slice = 2;
+        hit.length = 12;
+        rig.studio().patterns().at[0][0].add(hit);
         CHECK(exports.start(app::Exports::Kind::Mpc3).empty());
     }
     for (int wait = 0; wait < 1200 && exports.busy(); ++wait) std::this_thread::sleep_for(std::chrono::milliseconds(50)); // its own thread: no song plays
     CHECK(exports.shown().done && exports.shown().error.empty());
     CHECK(fs::exists(home + "/MPC 3/Tune.xpj") && fs::is_directory(home + "/MPC 3/Tune_[ProjectData]"));
     CHECK(fs::exists(home + "/MPC 3/Tune_[ProjectData]/loop.wav"));
+    {
+        std::lock_guard<std::mutex> guard(rig.studio().lock);
+        CHECK(!rig.studio().project().tracks[0].pads[1].used()); // the project as it was
+        std::ifstream in(home + "/MPC 3/Tune.xpj", std::ios::binary);
+        std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        auto back = app::new_project();
+        auto bank = std::make_unique<melodee::PatternBank>();
+        melodee::MpcImport report;
+        CHECK(melodee::import_mpc_project(bytes, home + "/MPC 3/Tune.xpj", *back, *bank, report).empty());
+        unsigned laid = 0;
+        for (const auto& track : back->tracks)
+            if (track.engine == melodee::EngineKind::Sampler && track.pads[0].used() && track.pads[1].used()) ++laid;
+        CHECK(laid == 1); // DRUMS' slice on its second pad
+        auto& events = rig.studio().patterns().at[0][0].events; // the hit out again, for the Live Set below
+        events.erase(std::remove_if(events.begin(), events.end(), [](const melodee::Event& e) { return e.slice != 0; }), events.end());
+    }
     // The Live Set: its folder, the set (gzip around Live's XML) and its samples beside it.
     {
         std::lock_guard<std::mutex> guard(rig.studio().lock);
