@@ -16,6 +16,7 @@
 #include "app/pad_layout.h"
 #include "app/screens/common.h"
 #include "app/screens/device_fx.h"
+#include "app/screens/edit_preview.h"
 #include "app/screens/kit_common.h"
 #include "melodee/shell/pad_gap.h"
 
@@ -29,7 +30,10 @@ public:
     using Screen::Screen;
 
     void enter() override { fine = -1; }
-    void leave() override { fine = -1; }
+    void leave() override {
+        fine = -1;
+        preview.stop(studio);
+    }
 
     void input(const move::Input& input) override {
         using Kind = move::Input::Kind;
@@ -102,6 +106,7 @@ public:
 
     void lights(move::Lights& lights) override {
         using namespace move;
+        if (preview.ready()) hear_moved();
         kit_pads(studio, lights, copy_from);
         steps_playhead(studio, lights);
         // Plus and Minus where they move the banks (or 16 Pitches' octave).
@@ -226,6 +231,7 @@ private:
     bool copy_down = false;
     int copy_from = -1; // Copy held: the kit pad picked to copy
     DeviceFx fx {studio};
+    EditPreview preview; // START or END turned: heard once still
     std::string item(int which) const {
         switch (which) {
         case 0: return "KIT";
@@ -353,6 +359,14 @@ private:
         default: return;
         }
         studio.set_pad(studio.track(), studio.pad(), sound);
+        if (which == 3 || which == 4) preview.moved(studio.track(), which == 4);
+    }
+    // A START or END turned and still now: the pad's sample heard there (edit_preview.h).
+    void hear_moved() {
+        const Sample* sample = studio.sample_of_pad();
+        if (!sample || preview.track != studio.track()) return;
+        const PadSound& sound = studio.current().pads[studio.pad()];
+        preview.play(studio, sound.sample, sound.start, sound.end ? sound.end : sample->data->model_frames());
     }
 };
 

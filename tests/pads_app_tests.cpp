@@ -8,6 +8,7 @@
 // build/test-modules, the stand-in Schwung module.
 #include "app/melodee_app.h"
 #include "app/pad_layout.h"
+#include "app/screens/edit_preview.h"
 #include "move/audio.h"
 #include "move/controls.h"
 #include "move/lights.h"
@@ -24,6 +25,7 @@
 #include <mutex>
 #include <sstream>
 #include <string>
+#include <thread>
 
 using namespace move;
 using app::PadLayout;
@@ -171,6 +173,36 @@ void test_kit_and_chop() {
         hit(melodee, 4, true); hit(melodee, 4, false);       // back to B01
         CHECK(quiet());
 
+        // END turned (knob 5), then START (knob 4): each heard once still
+        // for 150 ms (edit_preview.h), not while the knob may still turn.
+        auto knob = [&](unsigned n, int detents) { melodee.surface(make_event(0xb0, uint8_t(knob_first_cc + n), uint8_t(detents < 0 ? 128 + detents : detents))); };
+        auto heard_once_still = [&] {
+            pad_lights(melodee);
+            bool early = loudest(20) == 0; // not while the knob may still turn
+            std::this_thread::sleep_for(app::screens::EditPreview::still + std::chrono::milliseconds(50));
+            pad_lights(melodee);                        // lights() hears it
+            bool heard = loudest(200) > to_s32(0.02f);  // within 0.6 s: the loop has silent sixteenths
+            loudest(2000);                              // played out: the region is 4 s at most
+            pad_lights(melodee);
+            return early && heard && loudest(400) == 0; // once: nothing repeats
+        };
+        knob(4, -20);
+        CHECK(heard_once_still());
+        knob(3, 20);
+        CHECK(heard_once_still());
+        knob(3, -20); // the region back, for Chop's
+        knob(4, 20);
+        CHECK(heard_once_still());
+        // The same on the pad pages' TRIM (Shift + the wheel): END is knob 2.
+        with_shift(melodee, [&] { turn_wheel(melodee, 1); });
+        CHECK(has(melodee.status(), "kit_page=TRIM"));
+        knob(1, -20);
+        CHECK(heard_once_still());
+        knob(1, 20);
+        CHECK(heard_once_still());
+        press_button(melodee, Button::Back);
+        CHECK(has(melodee.status(), "page=kit-play"));
+
         // Chop in Banks: slice n on pad n; slice 5 is the left bank's second row (physical 8).
         with_shift(melodee, [&] { press_button(melodee, Button::MainPush); });
         press_button(melodee, Button::MainPush);
@@ -203,6 +235,70 @@ void test_kit_and_chop() {
         melodee.save_now();
     }
     CHECK(has(read_file(home + "/Move.settings"), "pads 0"));
+}
+
+// What a moved start or end plays of its region (Melodee's Chop): a start
+// from 300 ms before it to the region's end; an end its last second, or the
+// whole region when shorter.
+void test_edit_preview_stretch() {
+    using app::screens::EditPreview;
+    auto start = EditPreview::stretch(44100, 441000, false);
+    CHECK(start.from == 44100 - 13230 && start.to == 441000);
+    start = EditPreview::stretch(1000, 441000, false);
+    CHECK(start.from == 0 && start.to == 441000);
+    auto end = EditPreview::stretch(44100, 441000, true);
+    CHECK(end.from == 441000 - 44100 && end.to == 441000);
+    end = EditPreview::stretch(44100, 66150, true);
+    CHECK(end.from == 44100 && end.to == 66150);
+}
+
+// A keygroup's one sample: its TRIM (keys_page 1) START and END heard as a
+// kit pad's are, once still (edit_preview.h).
+void test_keys_trim_heard() {
+    std::string folder = "build/test-samples", loop = folder + "/loop.wav", home = "build/test-home-pads-keys";
+    std::filesystem::create_directories(folder);
+    CHECK(write_test_loop(loop));
+    std::filesystem::remove_all(home);
+    app::MelodeeApp melodee(folder, home);
+    Session session;
+    melodee.attach(session);
+    melodee.audio_opened(AudioFormat {});
+    auto& studio = melodee.studio();
+    {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        CHECK(studio.new_track(2, app::TrackKind::Keys));
+        studio.select(2);
+        studio.jobs.push_back({loop, 2, 0});
+    }
+    melodee.service();
+    CHECK(has(melodee.status(), "page=keys-play") && has(melodee.status(), "keys_page=1"));
+    AudioBlock in {}, out {};
+    auto loudest = [&](int blocks) {
+        int32_t peak = 0;
+        for (int block = 0; block < blocks; ++block) { out.fill(0); melodee.render(in, out); peak = std::max(peak, peak_of(out)); }
+        return peak;
+    };
+    auto knob = [&](unsigned n, int detents) { melodee.surface(make_event(0xb0, uint8_t(knob_first_cc + n), uint8_t(detents < 0 ? 128 + detents : detents))); };
+    auto heard_once_still = [&] {
+        pad_lights(melodee);
+        bool early = loudest(20) == 0;
+        std::this_thread::sleep_for(app::screens::EditPreview::still + std::chrono::milliseconds(50));
+        pad_lights(melodee);
+        bool heard = loudest(200) > to_s32(0.02f);
+        loudest(2000);
+        pad_lights(melodee);
+        return early && heard && loudest(400) == 0;
+    };
+    loudest(400); // whatever the load played
+    knob(1, -20); // END
+    CHECK(heard_once_still());
+    knob(0, 20);  // START
+    CHECK(heard_once_still());
+    knob(2, 1);   // LOOP: not a place, nothing heard
+    pad_lights(melodee);
+    std::this_thread::sleep_for(app::screens::EditPreview::still + std::chrono::milliseconds(50));
+    pad_lights(melodee);
+    CHECK(loudest(200) == 0);
 }
 
 void test_synth_notes() {
@@ -268,7 +364,9 @@ void test_synth_notes() {
 } // namespace
 
 int main() {
+    test_edit_preview_stretch();
     test_kit_and_chop();
+    test_keys_trim_heard();
     test_synth_notes();
     std::cout << "pads-app-tests: " << checks - failures << '/' << checks << " passed\n";
     return failures ? 1 : 0;

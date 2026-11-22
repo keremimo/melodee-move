@@ -69,6 +69,12 @@ eight times nearer than the whole (32 with Shift held, as a turn moves
 1/256 of the sample, Shift 1/8192), the place a line down the middle with a
 notch on top, what does not play half lit, the region's other end dotted
 where in view; the detail line says the knob's name and how near (`X8`).
+A moved start or end is heard once the knob has been still for 150 ms, as
+Melodee's Chop hears a moved cut: the sample once, a start from 300 ms
+before it on to the region's end, an end the region's last second; each
+turn puts it off again. Chop's cuts, a kit pad's START and END (on Play
+and on TRIM) and a keygroup's one sample (`src/app/screens/edit_preview.h`).
+An audio track's region is not heard yet: its engine has no audition voice.
 
 **Sheets** (a choice such as TO PADS, NEW TRACK) take the subject; the
 jogwheel picks, a push confirms, Back leaves.

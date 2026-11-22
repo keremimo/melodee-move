@@ -10,6 +10,7 @@
 // sample's region and loop), PLAY, AMP ENV, FILTER (with its envelope), ARP
 // and CHORD. Plus and Minus move the octave (Drums: 16 pads).
 #include "app/instruments.h"
+#include "app/screens/edit_preview.h"
 #include "app/screens/note_pages.h"
 #include "app/screens/zones.h"
 #include "melodee/engine/command.h"
@@ -27,6 +28,7 @@ class KeysPlay final : public Screen {
 public:
     using Screen::Screen;
     void enter() override { held.fill(false); }
+    void leave() override { preview.stop(studio); }
 
     void input(const move::Input& input) override {
         if (input.kind == move::Input::Kind::Pad && input.index < pad_count) {
@@ -58,6 +60,7 @@ public:
 
     void lights(move::Lights& lights) override {
         using namespace move;
+        if (preview.ready()) hear_moved();
         key_pads(studio, lights, held, last_pad);
         steps_playhead(studio, lights);
         int octave = studio.octave(studio.track());
@@ -306,7 +309,16 @@ private:
             }
         }
         studio.set_pad(t, 0, sound);
+        if (page == Page::Zones && n <= 1) preview.moved(t, n == 1);
     }
+    // One sample's START or END turned and still now: heard there (edit_preview.h).
+    void hear_moved() {
+        const Sample* sample = studio.keys_sample(studio.track());
+        if (!sample || zones_of(sample) || preview.track != studio.track()) return;
+        const auto& sound = studio.current().pads[0];
+        preview.play(studio, sound.sample, sound.start, end_of(*sample, sound));
+    }
+    EditPreview preview; // START or END turned: heard once still
 };
 
 RegisterScreen keys("keys-play", make<KeysPlay>, {}, kind_bit(TrackKind::Keys));

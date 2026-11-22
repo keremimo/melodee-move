@@ -8,6 +8,7 @@
 // Shift finer. On LAYERS the wheel's push loads a sample onto the layer in
 // hand (knob 1) and Shift + push's Sample Options can remove it. TRIM,
 // LAYERS and CLOUD draw their picture, the rest their eight knobs as cells.
+#include "app/screens/edit_preview.h"
 #include "app/screens/kit_common.h"
 #include "app/screens/zones.h"
 #include "melodee/engine/sampler.h"
@@ -198,7 +199,10 @@ public:
     using Screen::Screen;
 
     void enter() override { fresh = true; }
-    void leave() override { studio.layer_target = {}; }
+    void leave() override {
+        studio.layer_target = {};
+        preview.stop(studio);
+    }
 
     void input(const move::Input& input) override {
         if (input.kind == move::Input::Kind::Touch && !input.pressed && int(input.index) == fine) fine = -1;
@@ -242,6 +246,7 @@ public:
 
     void lights(move::Lights& lights) override {
         using namespace move;
+        if (preview.ready()) hear_moved();
         if (auto* play = studio.screen("kit-play")) play->lights(lights); // the pads and buttons as on Play
         lights.button(Button::Back, white_dim);
     }
@@ -313,6 +318,7 @@ private:
     int fine = -1;
     bool fresh = true; // opened: the first Shift + turn picks the first or last page
     unsigned zone = 0; // ZONES' zone in hand (an instrument pad's TRIM)
+    EditPreview preview; // TRIM's START or END turned: heard once still
 
     // The pad's instrument (an SFZ, EXS or DecentSampler preset loaded onto it): its TRIM page is ZONES.
     const Sample* instrument() const { return zones_of(studio.sample_of_pad()); }
@@ -344,6 +350,14 @@ private:
         int64_t v = std::clamp<int64_t>(int64_t(value.get(edit)) + int64_t(delta) * step, value.low, high);
         value.set(edit, int(v));
         studio.set_pad(studio.track(), studio.pad(), sound);
+        if (page == Trim && which <= 1) preview.moved(studio.track(), which == 1);
+    }
+    // TRIM's START or END turned and still now: the pad's sample heard there (edit_preview.h).
+    void hear_moved() {
+        const Sample* sample = studio.sample_of_pad();
+        if (!sample || instrument() || preview.track != studio.track()) return;
+        const PadSound& sound = studio.current().pads[studio.pad()];
+        preview.play(studio, sound.sample, sound.start, sound.end ? sound.end : sample->data->model_frames());
     }
 
     // Shift + a knob touched: its value in full, finer to turn; on TRIM the

@@ -16,6 +16,7 @@
 #include "app/sequencer.h"
 #include "app/pad_layout.h"
 #include "app/screens/common.h"
+#include "app/screens/edit_preview.h"
 #include "melodee/shell/chop.h"
 #include <cmath>
 
@@ -32,7 +33,6 @@ constexpr const char* to_pads_names[] {"POLY", "MONO", "THRU", "KIT"};
 constexpr int to_pads_pattern = 4; // the sheet's last row: PATTERN on or off (a push flips it)
 constexpr unsigned bank_size = pad_count; // 32 slices on the pads at a time
 constexpr auto close_linger = std::chrono::milliseconds(1200); // the cut close up, after the last turn
-constexpr auto still_before_play = std::chrono::milliseconds(150); // a moved cut plays its slice once still this long
 constexpr uint32_t close_frames = 5292; // about 120 ms across, as Melodee's chop_follow
 
 bool pulse_on() { return std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now().time_since_epoch()).count() / 300 % 2 == 0; }
@@ -53,7 +53,7 @@ public:
         manual_next = -1;
         manual_playing = false;
         close_until = {};
-        audition_due = {};
+        preview = {};
         // The sample's chop as it was left, where it was of this same region.
         const auto& sound = studio.current().pads[pad];
         uint32_t frames = sample->data->model_frames();
@@ -478,17 +478,14 @@ private:
     }
     // Every lights(): a manual take played to the end; a moved cut still long enough plays its slice.
     void tick(uint32_t frames) {
-        auto now = Clock::now();
         if (manual_playing && slices.count && heard_at() >= slices.end(slices.count - 1, frames)) {
             manual_playing = false;
             manual_next = -1; // played to the end: no red
             play_slices();
         }
-        if (audition_due != Clock::time_point {} && now >= audition_due && selected < slices.count) {
-            audition_due = {};
-            uint32_t start = slices.start[selected], end = slices.end(selected, frames);
-            if (close_which == 0) audition(start > 13230 ? start - 13230 : 0, end); // from 300 ms before the start into the slice
-            else audition(end > 44100 && end - 44100 > start ? end - 44100 : start, end); // the slice's last second
+        if (preview.ready() && selected < slices.count) { // from 300 ms before the start into the slice; the end, its last second
+            auto heard = EditPreview::stretch(slices.start[selected], slices.end(selected, frames), preview.end);
+            audition(heard.from, heard.to);
         }
     }
 
@@ -496,7 +493,7 @@ private:
     void moved(unsigned which) {
         close_which = which;
         close_until = Clock::now() + close_linger;
-        audition_due = Clock::now() + still_before_play;
+        preview.moved(track, which == 1);
     }
     void turn(unsigned which, int delta) {
         const Sample* sample = studio.sample_of(track, pad);
@@ -614,7 +611,8 @@ private:
     bool manual_playing = false;
     uint32_t played_from = 0;      // where the sound began (44.1 kHz frames)
     Clock::time_point played_at {};
-    Clock::time_point close_until {}, audition_due {};
+    Clock::time_point close_until {};
+    EditPreview preview;           // a moved cut, heard once still (edit_preview.h)
     unsigned close_which = 0;      // 0 the start, 1 the end
 };
 
