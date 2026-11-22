@@ -27,11 +27,12 @@ and `jackd -d move` on poundhard-armbian (`jack`), and the apps on it
 - Never read or adapt code from bobbydigitales/move-anything (CC BY-NC-SA,
   forbids AI-made adaptations). Schwung and schwung-spi are MIT; EvilGenius
   is MPL-2.0: learn from them, write our own, credit them in THIRD_PARTY.md.
-  One exception (Kerem, 2026-11-21): a module's pages and menus are decided
-  by Schwung's own page controller, imported at run time from the Schwung on
-  the Move (`src/app/schwung_pages.h`), and drawn by Melodee in its own look
-  (`src/app/screens/module_pages.cpp`); never copy Schwung's code into this
-  repository.
+  One exception (Kerem, 2026-11-21): a module's pages are Schwung's own
+  screen code, imported at run time from the Schwung on the Move
+  (`src/app/schwung_pages.h`) and drawn by it on a screen that draws as
+  Schwung's does (`src/app/schwung_display.h`); what Schwung's shadow_ui.js
+  gives that code is written again in `src/app/schwung_pages/host.js`. Never
+  copy Schwung's code into this repository.
   Never use FM-1 firmware code (EvilGenius's core is one).
 - Nothing here may change a Move for good: scripts stop and start Ableton's
   app, add folders under `/data/UserData` and say how to remove them.

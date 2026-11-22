@@ -6,6 +6,14 @@ Melodee for Ableton Move as Schwung's module catalog installs it
 
 ## Unreleased
 
+- A module's pages are now Schwung's own screens, exactly as Schwung shows
+  them: from the push into a module until Back, Melodee runs Schwung's own
+  screen code on a screen that draws as Schwung's does. Header, page bar,
+  knob cells, footers, Sections, the enum lists, the keyboard (with pad
+  typing and text preview as set in Schwung), file browsers, a module's
+  drawn pages, My Presets and the Module page are Schwung's, pixel for pixel,
+  and so are the knob lights. Schimera's Lyrics now opens as in Schwung:
+  hold knob 3 and push the wheel (turning it no longer types).
 - Typing works with Shift held or locked: a pad types a capital, the steps,
   the wheel and its push type as without it.
 - A module's pages start over each time you go in, as under Schwung, so
