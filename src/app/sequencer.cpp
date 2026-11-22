@@ -15,6 +15,7 @@
 #include "melodee/model/generators.h"
 #include "melodee/model/pad_params.h"
 #include "melodee/model/scales.h"
+#include "melodee/model/scene_links.h"
 #include "melodee/shell/free_length.h"
 #include "melodee/shell/record_place.h"
 #include <algorithm>
@@ -123,6 +124,7 @@ void Sequencer::launch(unsigned track, unsigned n) {
         studio.send({Type::Chained, uint8_t(track), 0, 0, 0});
     }
     t.pattern = uint8_t(n);
+    t.off = false; // a launch ends off (sequence links)
     studio.send({Type::Pattern, uint8_t(track), 0, 0, int16_t(n)});
     if (track == studio.track()) pages[track] = 0;
     if (studio.project().seq_tempo && studio.project().pattern_tempo[n])
@@ -142,13 +144,67 @@ void Sequencer::chain(unsigned track, const std::vector<uint8_t>& numbers) {
     studio.changed();
 }
 
+uint32_t Sequencer::stopped_tracks() const {
+    return studio.playing() && !studio.song_desk().song_playing() ? studio.host().stopped_tracks() : 0;
+}
+
+void Sequencer::pick(unsigned track, unsigned n) {
+    launch(track, n);
+    if (studio.song_desk().song_playing()) return; // the song plays the tracks: nothing is kept
+    auto& project = studio.project();
+    melodee::keep_pick(project, project.scene, track % melodee::track_count, int(n % melodee::pattern_count), stopped_tracks());
+}
+
+void Sequencer::pick_off(unsigned track) {
+    track %= melodee::track_count;
+    auto& t = studio.project().tracks[track];
+    if (t.chained()) {
+        t.chain_count = 0;
+        studio.send({Type::Chained, uint8_t(track), 0, 0, 0});
+    }
+    t.off = true;
+    studio.send({Type::Pattern, uint8_t(track), 0, 0, int16_t(-1)}); // off from the next bar (stopped: from Play)
+    if (!studio.song_desk().song_playing())
+        melodee::keep_pick(studio.project(), studio.project().scene, track, melodee::scene_stops, stopped_tracks());
+    studio.changed();
+}
+
+void Sequencer::capture_scene(unsigned n) {
+    melodee::keep_all(studio.project(), n % melodee::pattern_count, stopped_tracks());
+    studio.changed();
+}
+
+void Sequencer::clear_scene(unsigned n) {
+    n %= melodee::pattern_count;
+    melodee::forget_scene(studio.project(), n);
+    studio.project().scenes[n] = melodee::Scene {};
+    studio.changed();
+}
+
 void Sequencer::launch_scene(unsigned n) {
     n %= melodee::pattern_count;
+    auto& project = studio.project();
+    const bool kept = melodee::scene_kept(project, n);
     for (unsigned t = 0; t < melodee::track_count; ++t) {
-        if (!studio.project().tracks[t].used()) continue;
-        if (t == studio.track() || !pattern(t, n).empty()) launch(t, n);
+        auto& track = project.tracks[t];
+        if (!track.used()) continue;
+        if (!kept) { // nothing kept: the column, as before links
+            if (t == studio.track() || !pattern(t, n).empty()) launch(t, n);
+            continue;
+        }
+        const int target = melodee::scene_target(track, n);
+        if (target == melodee::scene_plays_on) continue;
+        if (target == melodee::scene_stops) {
+            if (track.chained()) { track.chain_count = 0; studio.send({Type::Chained, uint8_t(t), 0, 0, 0}); }
+            track.off = true;
+            studio.send({Type::Pattern, uint8_t(t), 0, 0, int16_t(-1)});
+            continue;
+        }
+        launch(t, unsigned(target));
     }
-    if (auto tempo = studio.project().scenes[n].tempo) studio.send({Type::SceneTempo, 0, 0, 0, int16_t(tempo)});
+    project.scene = uint8_t(n);
+    studio.changed();
+    if (auto tempo = project.scenes[n].tempo) studio.send({Type::SceneTempo, 0, 0, 0, int16_t(tempo)});
     studio.song_desk().scene_launched(n); // jam capture: a marker where it takes over
 }
 

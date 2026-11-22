@@ -537,13 +537,20 @@ draws the real screens into `DIR/sequencer/`.
   (blinking), about to stop blinking in its colour, the selected one
   pulsing white; on the screen the same cells as the pads sit, a follow
   action's arrow, the playing one's progress. A pad launches (the next bar
-  while playing, at once stopped); a pad held and others of its row tapped
-  chain them; Copy + a pad, then another, asks before replacing; Delete + a
+  while playing, at once stopped) and is kept in the sequence in hand (the
+  one launched last; melodee-sample's sequence links); the playing pattern's
+  pad again, while playing, turns its track off from the next bar (kept off;
+  any pad of its row launches it again); a pad held and others of its row
+  tapped chain them; Copy + a pad, then another, asks before replacing; Delete + a
   pad clears it at once (17.1.4). The wheel moves the playhead by Q
   (stopped: Play continues there); its push opens the column's sheet
   (`SCNE`): knob 1 its tempo, knob 2 a ready name, knob 3 its colour (none
-  or a track's, melodee-sample's issue 19), pads of other columns chain
-  sequences, push launches. The steps under the eight columns light in their
+  or a track's, melodee-sample's issue 19), what it keeps for the bank's
+  four tracks (`KEEPS T1-4`: a pattern number, `OFF`, or `--` plays on),
+  Capture keeps what every track is on now, Delete clears it; pads of other
+  columns chain sequences (their columns), push launches: each track on what
+  the sequence keeps, one that keeps nothing as its column (`PATTERN n OF
+  EACH`). The steps under the eight columns light in their
   sequences' colours, the sequence in hand bright. Held, Note/Session peeks.
 - **Rec**: from stopped a bar's count-in (`REC` / `CNT`, the beat large,
   Rec flashing), then the take from the top; while playing at once. Notes

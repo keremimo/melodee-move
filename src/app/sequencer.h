@@ -76,7 +76,19 @@ public:
     // an empty, free one as long as the one playing. Ends a chain.
     void launch(unsigned track, unsigned number);
     void chain(unsigned track, const std::vector<uint8_t>& numbers); // Melodee's CHAN: each once, round again
-    void launch_scene(unsigned number);  // pattern n of every track with notes there, and the scene's tempo
+    // Sequence links (melodee-sample's, model/scene_links.h): a sequence keeps
+    // a pattern, or off, for each track. A pattern launched by hand (pick()) is
+    // kept in the sequence in hand (Project::scene, the one launched last).
+    // launch_scene(): each track on what the sequence keeps, off where it keeps
+    // off, playing on where it keeps nothing; a sequence that keeps nothing
+    // launches its column (pattern n of every track with notes there), as
+    // Session's grid lays it out. The scene's tempo with it.
+    void launch_scene(unsigned number);
+    void pick(unsigned track, unsigned number); // launch(), kept in the sequence in hand
+    void pick_off(unsigned track);              // the track off from the next bar (stopped: from Play), kept so
+    void capture_scene(unsigned number);        // the sequence keeps what every track is on now
+    void clear_scene(unsigned number);          // keeps nothing again; its name, tempo and colour gone
+    uint32_t stopped_tracks() const;            // a bit a track stopped (off, a follow action's STOP), not in the song
     int next_empty(unsigned track, unsigned after) const; // -1: none
     bool copy_pattern(unsigned track, unsigned from, unsigned to_track, unsigned to);
     void clear_pattern(unsigned track, unsigned number);

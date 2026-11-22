@@ -77,7 +77,9 @@ reader (`shell/midi_route.cpp`, `shell/mtc_in.cpp`) are compiled unchanged.
   the channel it came on (a keyboard and its own synth: Local Off), and a CC
   that one of its slots sends turns that slot. Remote CCs (102, 103, 104 on
   the Remote channel) select a track, launch a pattern or a sequence;
-  program change launches that pattern on every track; Thru sends on what no
+  program change launches sequence n (what it keeps; one that keeps nothing
+  is its column); a pattern launched by Remote CC 103 is kept in the
+  sequence in hand, as one launched by hand; Thru sends on what no
   MIDI track echoed. MIDI clock in (Start, Continue from Song Position,
   Stop, the tempo from the pulses) and MTC in (24, 25, 29.97 df, 30 fps)
   lead the transport while Sync In says so (an MTC cue while stopped

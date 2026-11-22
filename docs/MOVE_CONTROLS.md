@@ -148,7 +148,7 @@ Session (a row a track of the bank, a column a pattern) and the Overview.
 | Shift held + Pad (Typing) | (Text is typed with the wheel) | A key as a capital, Shift held or locked (Kerem, 2026-11-21) | done |
 | Pad (Sampling) | Records into that pad (pulsing red); the pad again, any pad or Sampling stops; held, records until let go; another pad while recording carries on onto it from there | Melodee's Record onto the pad; a pad hit while recording starts the next part there; with Melodee's own sound as the source the pads play it once the take is armed | done |
 | Pad let go (Sampling) | A pad held while recording: the recording ends as it is let go | The same: held 0.4 s or more, the take ends as the pad is let go; tapped, it records on | done |
-| Pad (Session) | Launches the clip (a row a track, a column a scene); an empty slot is selected for a new clip; sliding down a column plays the scene | Launches the track's pattern; a column is a scene | done |
+| Pad (Session) | Launches the clip (a row a track, a column a scene); an empty slot is selected for a new clip; sliding down a column plays the scene | Launches the track's pattern, kept in the sequence in hand (melodee-sample's sequence links); a column is a scene. The playing pattern's pad again, while playing: the track off from the next bar, kept off | done |
 | Pad held + Pad (Session) | No job | Chains the held pad's pattern with the next ones of its row: each plays once, then round again (Melodee's CHAN) | done |
 | Shift + Pad (Session) | With an audio clip copied: pastes it bounced into an audio clip slot | Pastes the copied pattern printed to audio | wave 2: song & export |
 | Pad (Overview) | Selects a Set; Play previews it | Picks a project (pulsing), a folder or an empty pad; Back or a track button opens it | done |
@@ -321,7 +321,7 @@ while Shift is held.
 | Wheel push (Typing) | Types the character, or Enter | Done | done |
 | Shift held + Wheel push (Typing) | The same | The same | done |
 | Wheel turn (Session) | No job | Moves the playhead by the pattern's Q (Melodee's Shift + wheel on Patterns); stopped, Play continues from it | done |
-| Wheel push (Session) | No job (a scene launches by sliding down a column) | Launches the selected pattern's column on every track (Melodee's sequence), with its tempo | done |
+| Wheel push (Session) | No job (a scene launches by sliding down a column) | The selected pattern's column as a sequence: its sheet shows what it keeps for the bank's tracks; push launches each track's kept pattern (off where it keeps off; one that keeps nothing: the column), with its tempo; Capture keeps what every track is on, Delete clears it | done |
 | Loop held + Wheel turn | The loop's length in bars | The pattern's length, longer or shorter, on a Play screen and in Loop Mode alike | done |
 | Shift + Loop held + Wheel turn | The loop's length, fine | The same | done |
 | Wheel turn (Typing) | Moves through the characters | The same: the strip of characters, SPACE, DEL and OK at its end | done |

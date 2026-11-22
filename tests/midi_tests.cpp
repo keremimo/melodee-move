@@ -275,11 +275,18 @@ void test_in() {
     { std::lock_guard<std::mutex> hold(rig.studio().lock); CHECK(rig.studio().track() == 0); }
     rig.in_message({0xbf, 103, 5}); // pattern 6 on the selected track
     { std::lock_guard<std::mutex> hold(rig.studio().lock); CHECK(rig.studio().project().tracks[0].pattern == 5); }
-    // Program change launches that pattern on every track (once turned on).
+    // Program change launches that sequence (once turned on): one that keeps nothing is its column (the selected
+    // track and those with notes there); one that keeps patterns puts each track on its own.
     rig.in_message({0xc0, 3});
     { std::lock_guard<std::mutex> hold(rig.studio().lock); CHECK(rig.studio().project().tracks[2].pattern == 0); rig.studio().midi.config.program_change = true; }
     rig.in_message({0xc0, 3});
-    { std::lock_guard<std::mutex> hold(rig.studio().lock); CHECK(rig.studio().project().tracks[2].pattern == 3 && rig.studio().project().tracks[0].pattern == 3); }
+    { std::lock_guard<std::mutex> hold(rig.studio().lock); CHECK(rig.studio().project().tracks[2].pattern == 0 && rig.studio().project().tracks[0].pattern == 3); }
+    {
+        std::lock_guard<std::mutex> hold(rig.studio().lock);
+        rig.studio().project().tracks[2].in_scene[6] = 8; // sequence 7 keeps pattern 8 on track 3
+    }
+    rig.in_message({0xc0, 6});
+    { std::lock_guard<std::mutex> hold(rig.studio().lock); CHECK(rig.studio().project().tracks[2].pattern == 7 && rig.studio().project().scene == 6); }
     // Thru (the kit selected: nothing echoed): what comes in goes out as it came.
     { std::lock_guard<std::mutex> hold(rig.studio().lock); rig.studio().midi.config.thru = true; }
     rig.in_message({0xb4, 7, 100});

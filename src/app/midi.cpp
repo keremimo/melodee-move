@@ -185,9 +185,9 @@ void Midi::receive(Studio& studio, const move::ExternalMidi& m) {
         using K = melodee::RemoteJob::Kind;
         if (job.kind != K::None) {
             if (job.kind == K::Track) { studio.select(job.index); studio.say("TRACK " + std::to_string(job.index + 1)); }
-            else if (job.kind == K::Pattern) launch(studio, studio.track(), job.index);
+            else if (job.kind == K::Pattern) studio.sequencer().pick(studio.track(), job.index); // kept in the sequence in hand
             else if (job.kind == K::Scene) {
-                for (unsigned t = 0; t < track_count; ++t) if (project.tracks[t].used()) launch(studio, t, job.index);
+                studio.sequencer().launch_scene(job.index); // what it keeps (sequence links)
                 studio.say("SEQUENCE " + std::to_string(job.index + 1));
             }
             return;
@@ -254,11 +254,11 @@ void Midi::receive(Studio& studio, const move::ExternalMidi& m) {
     }
     if (!channel_message) return;
 
-    if (type == 0xc0) { // program change: that pattern on every track
+    if (type == 0xc0) { // program change: sequence n, as the column sheet's push (sequence links)
         if (!config.program_change || (config.in_channel && config.in_channel != channel)) return;
         if (a >= melodee::pattern_count) return;
-        for (unsigned t = 0; t < track_count; ++t) if (project.tracks[t].used()) launch(studio, t, a);
-        studio.say("PROGRAM CHANGE P" + std::to_string(a + 1));
+        studio.sequencer().launch_scene(a);
+        studio.say("PROGRAM CHANGE SEQ " + std::to_string(a + 1));
         return;
     }
     if (type == 0x80 || (type == 0x90 && b == 0)) { // a note off ends the note wherever it is held
@@ -358,13 +358,6 @@ void Midi::release_all(Studio& studio) {
     for (unsigned t = 0; t < track_count; ++t)
         for (int k = 0; k < 128; ++k)
             if (held[t][size_t(k)]) note_in(studio, t, k, 0, false, 0, studio.project().tracks[t].engine == EngineKind::Midi);
-}
-
-void Midi::launch(Studio& studio, unsigned t, unsigned pattern) {
-    auto& track = studio.project().tracks[t % track_count];
-    track.pattern = uint8_t(pattern % melodee::pattern_count);
-    studio.send({Type::Pattern, uint8_t(t % track_count), 0, 0, int16_t(track.pattern)});
-    studio.changed();
 }
 
 // A CC, bend or pressure for MIDI tracks: a CC a slot sends turns that slot,

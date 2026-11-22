@@ -4,19 +4,24 @@
 // the first on top), a column a pattern number (eight at a time).
 //
 //   Pad                  launches that track's pattern (the next bar while
-//                        playing, at once stopped) and selects it
+//                        playing, at once stopped) and selects it, kept in
+//                        the sequence in hand (sequence links); the playing
+//                        pattern's pad again, while playing: the track off
+//                        from the next bar, kept so
 //   Pad held + pads of its row   a chain: each plays once, round again (Melodee's CHAN)
 //   Copy + Pad, then a Pad       the pattern copied there (asks before replacing)
 //   Delete + Pad         the pattern cleared at once (17.1.4)
 //   Plus / Minus         the bank of four tracks; Left / Right eight patterns
 //   Wheel                the playhead by the pattern's Q; stopped, Play continues there
-//   Wheel push           the selected pattern's column, every track (Melodee's sequence), its tempo on knob 1,
-//                        its name on knob 2, its colour on knob 3
+//   Wheel push           the selected pattern's column as a sequence: its sheet (tempo on knob 1, name on
+//                        knob 2, colour on knob 3; what it keeps for the bank's four tracks; Capture keeps what
+//                        every track is on, Delete clears it); push launches it
 //   Steps 1-8            (lights only) each column's sequence in its colour, the sequence in hand bright
 //   Note/Session or Back back to Play; Note/Session held peeks (the sequencer lets it go)
 #include "app/screens/common.h"
 #include "app/sequencer.h"
 #include "ui/seq_widgets.h"
+#include "melodee/model/scene_links.h"
 
 namespace app::screens {
 namespace {
@@ -49,16 +54,20 @@ public:
         int row = 3 - int(move::pad_row(unsigned(use.index))), column = int(move::pad_column(unsigned(use.index)));
         unsigned t = bank_first(studio) + unsigned(row), n = first + unsigned(column);
         switch (job) {
-        case Job::LaunchPattern:
+        case Job::LaunchPattern: {
             if (!studio.project().tracks[t].used()) { studio.say("EMPTY TRACK"); return true; }
             pick(t);
             chain_row = row;
             chain = {uint8_t(n)};
             held_pad = use.index;
-            seq.launch(t, n);
+            // The playing pattern's pad again, while playing: off, as it is let go (unless a chain is made meanwhile).
+            off_pending = cell_of(t, n) == ui::seq::Cell::Playing;
+            if (!off_pending) seq.pick(t, n);
             return true;
+        }
         case Job::ChainPattern: // a pad held, then more of its row: a chain, in one hold
             if (chain_row != row || chain.empty()) return true;
+            off_pending = false;
             if (chain.size() < melodee::max_chain) chain.push_back(uint8_t(n));
             studio.say(chain_text());
             return true;
@@ -98,10 +107,15 @@ public:
         using Kind = move::Input::Kind;
         if (input.kind == Kind::Pad && !input.pressed && int(input.index) == held_pad) {
             held_pad = -1;
+            const unsigned t = bank_first(studio) + unsigned(chain_row);
             if (chain.size() >= 2) {
-                studio.sequencer().chain(bank_first(studio) + unsigned(chain_row), chain);
+                studio.sequencer().chain(t, chain);
                 studio.say("CHAIN " + chain_text());
+            } else if (off_pending) {
+                studio.sequencer().pick_off(t);
+                studio.say("TRACK " + std::to_string(t + 1) + " OFF");
             }
+            off_pending = false;
             chain.clear();
             chain_row = -1;
         }
@@ -183,6 +197,7 @@ private:
     unsigned first = 0; // the first pattern number of the eight in view
     int held_pad = -1, chain_row = -1;
     bool keeping = false;
+    bool off_pending = false; // the playing pattern's pad held: off when let go
     std::vector<uint8_t> chain;
 
     void pick(unsigned t) {
@@ -194,11 +209,13 @@ private:
     ui::seq::Cell cell_of(unsigned t, unsigned n) const {
         auto& seq = studio.sequencer();
         bool notes = !seq.pattern(t, n).empty();
-        bool playing = studio.playing() && studio.host().pattern_of(t) == n;
+        bool off = studio.project().tracks[t].off; // sequence links: stopped until a launch
+        bool stopped = (seq.stopped_tracks() >> t) & 1;
+        bool playing = studio.playing() && studio.host().pattern_of(t) == n && !stopped;
         bool chosen = seq.number(t) == n;
-        if (playing && !chosen) return ui::seq::Cell::Stopping; // another waits for the bar
+        if (playing && (off || !chosen)) return ui::seq::Cell::Stopping; // another, or off, waits for the bar
         if (playing) return ui::seq::Cell::Playing;
-        if (chosen && studio.playing()) return ui::seq::Cell::Queued;
+        if (chosen && studio.playing() && !off && !stopped) return ui::seq::Cell::Queued;
         return notes ? ui::seq::Cell::Notes : ui::seq::Cell::Empty;
     }
     std::string chain_text() const {
@@ -282,6 +299,16 @@ public:
             if (use.index == 2) colour(n, use.delta);
             return true;
         case Job::ListTurn: seq.set_scene_tempo(n, use.delta); return true;
+        case Job::Recall: // Capture: the sequence keeps what every track is on now
+            seq.capture_scene(n);
+            studio.name_step("CAPTURE SEQ " + std::to_string(n + 1));
+            studio.say("SEQUENCE " + std::to_string(n + 1) + " KEPT");
+            return true;
+        case Job::DeleteCurrentPattern: // Delete: it keeps nothing, its name, tempo and colour gone
+            seq.clear_scene(n);
+            studio.name_step("CLEAR SEQ " + std::to_string(n + 1));
+            studio.say("SEQUENCE " + std::to_string(n + 1) + " CLEARED");
+            return true;
         case Job::Back: studio.close(); return true;
         default: return false;
         }
@@ -301,9 +328,25 @@ public:
         else std::snprintf(tempo, sizeof tempo, "--");
         ui::seq::value_cells(g, ui::content(11, 40), {"BPM", "NAM", "COL", "", "", "", "", ""},
                              {tempo, scene.name[0] ? upper(scene.name).substr(0, 4) : "-", scene.colour ? scene_colour_name(scene.colour).substr(0, 4) : "-", "", "", "", "", ""});
-        if (chain.size() >= 2) move::draw_text(g, ui::content_x + 2, 33, "CHAIN " + chain_text());
-        else move::draw_text(g, ui::content_x + 2, 33, "PATTERN " + std::to_string(n + 1) + " OF EACH");
-        move::draw_text(g, ui::content_x + 2, 42, chain.size() >= 2 ? "EACH ONCE, ROUND" : "TRACK, NEXT BAR");
+        const auto& project = studio.project();
+        if (chain.size() >= 2) {
+            move::draw_text(g, ui::content_x + 2, 33, "CHAIN " + chain_text());
+            move::draw_text(g, ui::content_x + 2, 42, "EACH ONCE, ROUND");
+        } else if (melodee::scene_kept(project, n)) { // what it keeps for the bank's four tracks
+            unsigned bank = bank_first(studio);
+            std::string kept;
+            for (unsigned t = bank; t < bank + ui::tracks_a_bank; ++t) {
+                int target = melodee::scene_target(project.tracks[t], n);
+                std::string one = !project.tracks[t].used() || target == melodee::scene_plays_on ? "--"
+                                : target == melodee::scene_stops ? "OFF" : std::to_string(target + 1);
+                kept += one + std::string(one.size() < 4 ? 4 - one.size() : 1, ' ');
+            }
+            move::draw_text(g, ui::content_x + 2, 33, "KEEPS T" + std::to_string(bank + 1) + "-" + std::to_string(bank + 4));
+            move::draw_text(g, ui::content_x + 2, 42, kept);
+        } else {
+            move::draw_text(g, ui::content_x + 2, 33, "PATTERN " + std::to_string(n + 1) + " OF EACH");
+            move::draw_text(g, ui::content_x + 2, 42, "TRACK, NEXT BAR");
+        }
         ui::detail(g, "PUSH: LAUNCH");
     }
     Knob knob(unsigned which) const override {
@@ -313,7 +356,10 @@ public:
         if (which) return {};
         return {"SEQUENCE TEMPO", scene.tempo ? std::to_string(scene.tempo / 10) + "." + std::to_string(scene.tempo % 10) : "NONE", scene.tempo / 3000.0f};
     }
-    std::string status() const override { return " scene_chain=" + std::to_string(chain.size()); }
+    std::string status() const override {
+        unsigned n = studio.sequencer().number(studio.track());
+        return " scene_chain=" + std::to_string(chain.size()) + " scene_kept=" + std::to_string(int(melodee::scene_kept(studio.project(), n)));
+    }
 
 private:
     std::vector<uint8_t> chain;

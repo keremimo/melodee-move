@@ -7,6 +7,7 @@
 #include "app/screen.h"
 #include "app/seq_edit.h"
 #include "app/sequencer.h"
+#include "melodee/model/scene_links.h"
 #include "move/audio.h"
 #include "move/controls.h"
 #include "move/tools.h"
@@ -848,11 +849,73 @@ void test_app() {
     CHECK(again.studio().sequencer().workflow.quantize == 60 && !again.studio().sequencer().workflow.count_in);
 }
 
+// Sequence links (melodee-sample's, model/scene_links.h): a pattern launched by hand is kept in the sequence in hand;
+// a sequence launches what it keeps (off where it keeps off), one that keeps nothing its column; the playing
+// pattern's pad again turns its track off from the next bar, kept so; a launch ends off; all saved (SEQL).
+void test_links() {
+    std::string home = "build/test-home-links";
+    std::filesystem::remove_all(home);
+    std::filesystem::create_directories(home + "/Projects");
+    {
+        app::MelodeeApp melodee("build/test-samples", home, "build/test-no-modules");
+        Session session;
+        melodee.attach(session);
+        melodee.audio_opened(AudioFormat {});
+        CHECK(melodee.restore_now().empty());
+        Hands h {melodee};
+        auto& seqr = melodee.studio().sequencer();
+        auto& project = melodee.studio().project();
+        for (auto [t, n] : {std::pair<unsigned, unsigned>{0, 0}, {0, 1}, {1, 0}, {1, 2}}) {
+            auto& p = seqr.pattern(t, n);
+            p.length = seqr.bar_ticks();
+            p.free = false;
+            melodee::Event e;
+            e.key = uint8_t(t ? 60 : melodee::sampler_first_note);
+            e.length = 24;
+            p.events.push_back(e);
+            seqr.sync(t, n);
+        }
+        h.button(Button::Menu);
+        CHECK(has(h.status(), "page=session"));
+        h.pad(24 + 1); // track 1's pattern 2, kept in the sequence in hand (1); track 2 keeps what it is on
+        CHECK(project.scene == 0 && project.tracks[0].in_scene[0] == 2 && project.tracks[1].in_scene[0] == 1);
+        // Sequence 3 keeps track 1 off and track 2's pattern 3.
+        project.tracks[0].in_scene[2] = melodee::scene_off;
+        project.tracks[1].in_scene[2] = 3;
+        seqr.launch_scene(2);
+        CHECK(project.scene == 2 && project.tracks[0].off && project.tracks[1].pattern == 2);
+        // Sequence 2 keeps nothing: its column (track 1 has notes there), track 2 plays on.
+        seqr.launch_scene(1);
+        CHECK(project.scene == 1 && !project.tracks[0].off && project.tracks[0].pattern == 1 && project.tracks[1].pattern == 2);
+        // Its sheet (the wheel's push): it keeps nothing; Capture keeps what every track is on.
+        h.button(Button::MainPush);
+        CHECK(has(h.status(), "page=scene") && has(h.status(), "scene_kept=0"));
+        h.button(Button::Capture);
+        CHECK(has(h.status(), "scene_kept=1") && project.tracks[0].in_scene[1] == 2 && project.tracks[1].in_scene[1] == 3);
+        h.button(Button::Back);
+        // Playing: the playing pattern's pad again turns track 1 off, as it is let go, kept off in sequence 2.
+        h.button(Button::Play);
+        h.render(8);
+        h.pad(24 + 1);
+        CHECK(project.tracks[0].off && project.tracks[0].in_scene[1] == melodee::scene_off);
+        h.render(800); // past the bar
+        CHECK((seqr.stopped_tracks() & 1) && !(seqr.stopped_tracks() & 2));
+        h.pad(24 + 0); // a launch ends off, and is kept
+        CHECK(!project.tracks[0].off && project.tracks[0].in_scene[1] == 1);
+        h.button(Button::Play);
+        CHECK(melodee.save_now().empty());
+    }
+    app::MelodeeApp again("build/test-samples", home, "build/test-no-modules");
+    const auto& project = again.studio().project();
+    CHECK(project.scene == 1 && project.tracks[1].in_scene[2] == 3 && project.tracks[0].in_scene[2] == melodee::scene_off);
+}
+
 } // namespace
 
 int main() {
     test_edits();
     test_app();
+    test_links();
     std::cout << "sequencer-tests: " << checks - failures << " of " << checks << " checks passed\n";
     return failures ? 1 : 0;
 }

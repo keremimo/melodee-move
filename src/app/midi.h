@@ -129,7 +129,6 @@ private:
     void configure(Studio& studio, bool force = false);
     void note_in(Studio& studio, unsigned track, int key, int velocity, bool down, uint64_t ns, bool echo);
     void release_all(Studio& studio);
-    void launch(Studio& studio, unsigned track, unsigned pattern);
     void follow_mtc(Studio& studio, const melodee::MtcReader::Event& event);
     void send_mtc(Studio& studio, uint16_t what, const melodee::MtcReader::Event& event);
     void echo_raw(Studio& studio, const uint8_t* bytes, unsigned size, uint16_t tracks, uint64_t ns);

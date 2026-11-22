@@ -49,7 +49,7 @@ Three parts so far:
   length, transpose, nudge, a knob a lock, push Melodee's TRIG: chance,
   conditions, ratchets, accent, slide, tie); Loop is Loop Mode (the bars,
   the loop); Note/Session the Patterns grid (launch, chains, copy, delete,
-  sequences); Rec Seq Record with its count-in and a free length; Capture
+  sequences, each keeping a pattern or off for each track); Rec Seq Record with its count-in and a free length; Capture
   Melodee's Recall; Shift + Step 3 Workflow, 11 Repeat, 14 a new pattern,
   15 double, 16 quantize; Loop held Fill; Shift + Loop Melodee's SEQ pages
   (Pattern, step entry, Roll, Motion, MOD, macros, feel, follow actions,
