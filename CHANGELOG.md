@@ -4,6 +4,42 @@ Melodee for Ableton Move as Schwung's module catalog installs it
 (`melodee-move-module.tar.gz`). A version is `module/module.json`'s;
 `tools/release.sh` builds it and takes its release notes from here.
 
+## 0.4.0 (2026-11-22)
+
+- Melodee's engine from ellic-core b410da7, as Melodee 0.6.5 on the MPC
+  Sample has it.
+- Sequences keep a pattern, or off, for each track. A pattern launched in
+  Session is kept in the sequence launched last. The column's sheet (the
+  wheel's push in Session) shows what the sequence keeps for the four tracks
+  in view: push launches it, Capture keeps what every track plays now, Delete
+  clears it. A sequence that keeps nothing launches its column, as before.
+  The playing pattern's pad pressed again turns its track off from the next
+  bar. Program change and the Remote CCs launch sequences the same way.
+- A sequence has a colour: knob 3 on the column's sheet. The steps under
+  Session's eight columns light in their sequences' colours.
+- Jam capture: the bars played outside Song are logged. On Song, Capture
+  lays them after the song's end as clips, with markers where a sequence
+  took over and tempo steps where the tempo changed. Song's detail line
+  counts them (JAM 12), and Capture lights while there is a jam.
+- Chop's pads record slice hits while Rec runs: the chopped pad's note with
+  its slice, the kit left as it is. A change that renumbers the slices they
+  play asks first. MPC Sample projects open their Chop pad hits as slice
+  hits, and the MPC 3 export puts slice hits on free pads.
+- An MPC Sample project's song opens as Song: a clip a step, markers named
+  after its sequences, the tempo lane where the sequences' tempos change.
+  Its sequences keep their names.
+- Setup's AUTOSAVE can be turned off. Then only SAVE writes the project,
+  REVERT on the open project's options goes back to its file, and opening
+  another project, a new one or leaving keeps it as it was saved.
+- MIDI Config's SCALE KEYS: on an In-Key track, a keyboard's white keys play
+  the scale and its black keys nothing.
+- Fixed: an audio track's MONITOR is OFF, AUTO or ON. A new track showed
+  OFF, and its input was not heard while armed.
+- Fixed: a track named in its options keeps the name when its sound or
+  module changes.
+- Fixed: keygroup programs whose zones have RootNote 0 (MPC-V exports) play
+  at each WAV's own root.
+
 ## 0.3.0 (2026-11-22)
 
 - A Schwung module's pages are Schwung's own screens. From the push into a
