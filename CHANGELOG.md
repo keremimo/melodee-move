@@ -4,44 +4,32 @@ Melodee for Ableton Move as Schwung's module catalog installs it
 (`melodee-move-module.tar.gz`). A version is `module/module.json`'s;
 `tools/release.sh` builds it and takes its release notes from here.
 
-## Unreleased
+## 0.3.0 (2026-11-22)
 
-- A module's pages are now Schwung's own screens, exactly as Schwung shows
-  them: from the push into a module until Back, Melodee runs Schwung's own
-  screen code on a screen that draws as Schwung's does. Header, page bar,
-  knob cells, footers, Sections, the enum lists, the keyboard (with pad
-  typing and text preview as set in Schwung), file browsers, a module's
-  drawn pages, My Presets and the Module page are Schwung's, pixel for pixel,
-  and so are the knob lights. Schimera's Lyrics now opens as in Schwung:
-  hold knob 3 and push the wheel (turning it no longer types).
-- Typing works with Shift held or locked: a pad types a capital, the steps,
-  the wheel and its push type as without it.
-- A module's pages start over each time you go in, as under Schwung, so
-  pages that depend on a setting changed elsewhere show up: Schimera's Vowel
-  and Mouth pages, with its mouth, appear in Vowel mode whichever way it was
-  chosen. Loading one of My Presets does the same and lands on My Presets.
-- A module's pages now behave exactly as under Schwung, in Melodee's own
-  look. On a synth track the push on the module goes into its pages; there
-  the wheel turns pages, Shift + the wheel jumps a section, the push with no
-  knob held opens the Sections list, Back steps out one layer at a time and
-  finally back to the Device View. A page the module draws (Schimera's mouth,
-  Webstream's Browse) shows in place. Schwung's effects work the same way.
-- ARP and CHORD are now items before the module in the Device View, like
-  Schwung's MIDI effects; push shows the page, Mute + push turns it on or off.
-- Shift + push on a module swaps it, Delete + push removes it, Mute + push
-  bypasses it. Shift + the wheel moves a Schwung effect along the chain.
-- My Presets on a module's pages saves and loads its whole state, shared with
-  Schwung's own presets. The Module page has the module's help, Swap, Remove
-  and Auto Sample.
+- A Schwung module's pages are Schwung's own screens. From the push into a
+  module (a synth's sound, or a Schwung effect) until Back, Melodee runs the
+  screen code of the Schwung on the Move, on a screen that draws exactly as
+  Schwung's: header, page bar, knob cells, footers, Sections, the enum lists,
+  the keyboard (with pad typing and text preview as set in Schwung), file
+  browsers, a module's drawn pages (Schimera's mouth and lyrics, Webstream's
+  Browse), the loading screen, My Presets, the Module page (Module Help, Add
+  to List, Swap Module, Remove Module, and Melodee's Auto Sample) and the knob
+  lights. Schimera's Lyrics opens as in Schwung: hold knob 3 and push the
+  wheel.
+- My Presets shares Schwung's own preset files: a preset saved in Melodee is
+  in Schwung's My Presets, and the other way round.
+- A module's pages start over each time you go in, as in Schwung, so pages a
+  setting shows or hides are there: Schimera's Vowel and Mouth pages, with
+  its mouth, in Vowel mode however it was chosen.
+- The Device View is laid out as Schwung's chain editor. ARP and CHORD are
+  items before the module, like Schwung's MIDI effects: push shows the page,
+  Mute + push turns it on or off. On a module, push goes into its pages,
+  Shift + push swaps it, Delete + push removes it, Mute + push bypasses it;
+  Shift + the wheel moves a Schwung effect along the chain.
+- A module's whole state now reaches it in full: loading a preset of a large
+  module no longer cuts it short.
+- Typing works with Shift held or locked: a pad types a capital.
 - With Shift locked (a double press), Back works again.
-- A module's text, such as Schimera's Lyrics, opens the keyboard when its knob
-  is turned (knob 3 on Line and Play), as well as with its knob held and the
-  wheel pushed. Sections and the other lists no longer draw over a page the
-  module draws.
-- A Schwung module's pages follow what the module declares, as under
-  Schwung: its pages shown or hidden as it asks (Schimera's Vowel pages in
-  Vowel mode), its presets page and lists, and a text parameter opens the
-  keyboard: touch its knob and push the wheel (Schimera's Lyrics).
 - Pad lights fade. A pad going to a new colour (a press, a sound, a page
   changing) now gets there smoothly through the Move's true RGB instead of
   jumping between the palette's few shades: up in a quarter of Setup's PAD
