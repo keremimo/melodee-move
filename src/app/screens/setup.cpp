@@ -104,6 +104,7 @@ private:
             top.push_back({"MIDI SYNC", {}, studio.screen("midi-sync") ? "midi-sync" : "midi-config"});
         }
         if (studio.screen("web-page")) top.push_back({"WEB PAGE", {}, "web-page"});
+        top.push_back({"AUTOSAVE", {"OFF", "ON"}});
         top.push_back({"USAGE LOG", {"OFF", "ON"}});
         top.push_back({"ABOUT", {}, "about"});
         top.push_back({"BACK TO MOVE", {}});
@@ -118,6 +119,7 @@ private:
         if (name == "BRIGHTNESS") return s.brightness;
         if (name == "LIGHT SHOW") return s.light_show;
         if (name == "SHOW STYLE") return s.show_style;
+        if (name == "AUTOSAVE") return s.autosave;
         if (name == "USAGE LOG") return s.usage_log;
         return 0;
     }
@@ -130,6 +132,7 @@ private:
         else if (name == "BRIGHTNESS") s.brightness = uint8_t(v);
         else if (name == "LIGHT SHOW") s.light_show = v != 0;
         else if (name == "SHOW STYLE") s.show_style = uint8_t(v);
+        else if (name == "AUTOSAVE") s.autosave = v != 0;
         else if (name == "USAGE LOG") s.usage_log = v != 0;
         studio.settings_changed();
     }

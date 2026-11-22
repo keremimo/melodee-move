@@ -274,7 +274,9 @@ Three parts so far:
 - **Saving**: the whole project is one Melodee project file in
   `/data/UserData/Melodee/Projects` (`--home` moves the folder; the first
   one is `Move.mldp`), saved three seconds after the last change, as
-  Melodee autosaves on the MPC, and on the way out; the next start opens
+  Melodee autosaves on the MPC, and on the way out (Setup's AUTOSAVE off:
+  only the project's SAVE writes it, REVERT goes back to its file, and
+  opening another, a new one or leaving keeps it as saved); the next start opens
   the one set to open at start, else the one open last. Melodee on the MPC opens
   it, and the Move opens the MPC's (where the samples' paths lead to the
   same files). Samples are kept by path; one that has gone keeps its pads,

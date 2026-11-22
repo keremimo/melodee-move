@@ -778,8 +778,11 @@ sheet (`src/ui/mockups_projects.cpp`); the screens draw with the same code
   preview). The wheel walks the pads. A folder's push goes in, Back comes
   out. MPC projects (`.xpj`) open as a copy, saved as a `.mldp` beside it.
 - **Options** (the wheel's push, or Shift + a pad): the open project's SAVE
-  (the sample slots nothing plays freed), SAVE AS NEW, RENAME, COLOUR,
-  DUPLICATE, MOVE TO FOLDER, NEW FOLDER, OPEN AT START; another's OPEN,
+  (the sample slots nothing plays freed), REVERT while it has changes not
+  saved (`TO SAVED`; its file opened again, the changes left behind; push
+  twice), SAVE AS NEW, RENAME, COLOUR,
+  DUPLICATE, MOVE TO FOLDER, NEW FOLDER, OPEN AT START; another's OPEN
+  (with AUTOSAVE off and changes: `CHANGES LOST`, push twice),
   LOAD KIT (its first kit onto the selected track, its patterns left: one
   undo), RENAME, COLOUR, DUPLICATE, MOVE TO FOLDER, OPEN AT START, DELETE.
 - **Copy and Delete**, as the Move: Copy + a pad, then a pad copies it
@@ -798,7 +801,9 @@ sheet (`src/ui/mockups_projects.cpp`); the screens draw with the same code
   the rows above it struck through (undone once it is reached); the wheel
   or Plus / Minus move it, a push goes there, Back closes it.
 - **UNSAVED**: a black mark in the rail's top right corner while the
-  project has changes not saved yet (autosave takes it away).
+  project has changes not saved yet (autosave takes it away; with AUTOSAVE
+  off, SAVE). With AUTOSAVE off the Overview's Back on another project or an
+  empty pad says `BACK: DISCARDS`.
 - **The name sheet** (rename, save as new, a track's name, a module page's
   text): the Move's own typing. The wheel walks a strip of characters (the
   one in the box inverted), its push types it; the strip ends with SP, DL
@@ -811,7 +816,10 @@ sheet (`src/ui/mockups_projects.cpp`); the screens draw with the same code
   Move's true RGB; brightness
   low to max, as the Move's; the light show and its style: Pulse, Sweep,
   Chase, Ripple, Levels, in time with the tempo), MIDI and SYNC (move-midi),
-  WEB PAGE (move-web), USAGE LOG, ABOUT (the audio cycle's share and
+  WEB PAGE (move-web), AUTOSAVE (on: three seconds after the last change and
+  on the way out; off: only SAVE writes the project, and opening another, a
+  new one or leaving keeps it as it was saved; melodee-sample's issue 18),
+  USAGE LOG, ABOUT (the audio cycle's share and
   longest, late exchanges, room left, synths and their slow calls, the
   build), BACK TO MOVE. No FEATURES (Basic or Full): the Move is always
   Full (Kerem, 2026-11-20). A push opens a door or edits a value

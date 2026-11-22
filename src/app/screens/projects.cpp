@@ -165,7 +165,7 @@ public:
         }
         if (picked < 0 || !item) {
             facts.kind = sys::ProjectFacts::Kind::Empty;
-            left = picked < 0 ? "A PAD PICKS" : "BACK: NEW";
+            left = picked < 0 ? "A PAD PICKS" : !studio.settings.autosave && studio.dirty ? "BACK: DISCARDS" : "BACK: NEW";
         } else if (item->kind == Entry::Kind::Folder) {
             facts.kind = sys::ProjectFacts::Kind::Folder;
             facts.name = upper(item->name);
@@ -185,7 +185,8 @@ public:
                 facts.tempo = studio.tempo();
                 left = "PUSH: OPTIONS";
             } else {
-                left = "BACK: OPEN";
+                // AUTOSAVE off: the open project's changes are left behind.
+                left = !studio.settings.autosave && studio.dirty ? "BACK: DISCARDS" : "BACK: OPEN";
                 right = "PLAY";
             }
         }
@@ -322,6 +323,7 @@ public:
         cursor = 0;
         editing = false;
         folders = false;
+        armed = false;
         const Entry* item = overview_of(studio).entry();
         if (!item) {
             target = {};
@@ -336,6 +338,8 @@ public:
         case Entry::Kind::Mpc: rows = {"OPEN AS A COPY", "LOAD KIT"}; break;
         case Entry::Kind::Project:
             if (open) rows = {"SAVE", "SAVE AS NEW", "RENAME", "COLOUR", "DUPLICATE", "MOVE TO FOLDER", "NEW FOLDER", "OPEN AT START"};
+            // REVERT while it has changes since it was saved (melodee-sample's issue 18): its file opened again.
+            if (open && studio.dirty) rows.insert(rows.begin() + 1, "REVERT");
             else rows = {"OPEN", "LOAD KIT", "RENAME", "COLOUR", "DUPLICATE", "MOVE TO FOLDER", "OPEN AT START", "DELETE"};
             break;
         }
@@ -347,7 +351,7 @@ public:
         switch (job) {
         case Job::ListTurn: case Job::ListTurnFine:
             if (editing) colour_index = std::clamp(colour_index + use.delta, 0, 16);
-            else cursor = std::clamp(cursor + use.delta, 0, int(shown().size()) - 1);
+            else { cursor = std::clamp(cursor + use.delta, 0, int(shown().size()) - 1); armed = false; }
             return true;
         case Job::ListPush: push(); return true;
         case Job::Back:
@@ -373,6 +377,8 @@ public:
             if (row == "RENAME" || row == "SAVE AS NEW" || row == "MOVE TO FOLDER") drawn.door = true;
             if (row == "COLOUR") { drawn.value = editing ? colour_label(colour_index) : colour_name(colour); drawn.editing = editing; }
             if (row == "OPEN AT START") drawn.value = studio.settings.start == target.path ? "ON" : "OFF";
+            if (row == "REVERT") drawn.value = armed && row == rows[size_t(cursor)] ? "PUSH AGAIN" : "TO SAVED";
+            if (row == "OPEN" && discards()) drawn.value = armed && row == rows[size_t(cursor)] ? "PUSH AGAIN" : "CHANGES LOST";
             list.push_back(drawn);
         }
         sys::setup_list(g, folders ? "MOVE" : "OPT", target.kind == Entry::Kind::Folder ? "FLDR" : "PRJ", list, cursor);
@@ -382,11 +388,14 @@ private:
     std::vector<std::string> rows, folder_rows;
     int cursor = 0;
     bool editing = false, folders = false;
+    bool armed = false; // REVERT, or OPEN that leaves changes behind: pushed once, the next push does it
     int colour_index = 0;
     uint8_t colour = 0;
     Entry target;
 
     const std::vector<std::string>& shown() const { return folders ? folder_rows : rows; }
+    // AUTOSAVE off with changes: opening another project leaves them behind.
+    bool discards() const { return !studio.settings.autosave && studio.dirty && target.kind == Entry::Kind::Project; }
     static std::string colour_label(int index) { return index == 0 ? "NONE" : colour_names[index - 1]; }
 
     void ask(Studio::ProjectJob::Kind kind, std::string name = {}) {
@@ -441,9 +450,12 @@ private:
             studio.settings_changed();
             return;
         }
+        if ((row == "REVERT" || (row == "OPEN" && discards())) && !armed) { armed = true; return; } // asks once more
+        armed = false;
         auto& overview = overview_of(studio);
         studio.close();
         if (row == "SAVE") ask(Kind::Save);
+        else if (row == "REVERT") ask(Kind::Revert);
         else if (row == "OPEN" && target.kind == Entry::Kind::Folder) overview.go_in(target.name);
         else if (row == "OPEN" || row == "OPEN AS A COPY") ask(Kind::Open);
         else if (row == "LOAD KIT") { ask(Kind::LoadKit); studio.home(); }

@@ -1442,7 +1442,7 @@ std::string Studio::settings_text() const {
         << "pad_lights " << unsigned(settings.pad_lights) << '\n' << "pad_fade " << unsigned(settings.pad_fade) << '\n'
         << "brightness " << unsigned(settings.brightness) << '\n' << "light_show " << int(settings.light_show) << '\n'
         << "show_style " << unsigned(settings.show_style) << '\n'
-        << "usage_log " << int(settings.usage_log) << '\n' << "last " << path << '\n';
+        << "usage_log " << int(settings.usage_log) << '\n' << "autosave " << int(settings.autosave) << '\n' << "last " << path << '\n';
     if (!settings.start.empty()) out << "start " << settings.start << '\n';
     // The other areas' own: the pad layout, the sequencer's, MIDI Config, the Looper's input delay.
     out << "pads " << int(pad_layout() == PadLayout::Banks) << '\n';
@@ -1484,6 +1484,7 @@ void Studio::read_settings() {
         else if (word == "show_style") settings.show_style = uint8_t(std::min(value, 4u));
         else if (word == "full") continue; // FEATURES, Basic or Full, is gone: the Move is always Full
         else if (word == "usage_log") settings.usage_log = value != 0;
+        else if (word == "autosave") settings.autosave = value != 0;
         else if (word == "usb_full") continue; // USB VOLUME went with USB audio (2026-11-21)
         else if (word == "last") last_path = rest;
         else if (word == "start") settings.start = rest;
@@ -1927,9 +1928,10 @@ void Studio::service() {
     loading = false;
     landings->reap();
     sync_keyed_roots();
-    // Autosave: three seconds after the last change, as on the MPC.
+    // Autosave: three seconds after the last change, as on the MPC; AUTOSAVE
+    // off, only SAVE writes the project, and Move.settings goes alone.
     auto now = Clock::now();
-    if (dirty && now - changed_at >= autosave_idle && now >= retry_at) {
+    if (dirty && settings.autosave && now - changed_at >= autosave_idle && now >= retry_at) {
         auto bytes = bytes_to_save();
         auto settings = settings_text();
         dirty = false;
@@ -1939,7 +1941,7 @@ void Studio::service() {
         guard.lock();
         if (error.empty()) ++saves;
         else { dirty = true; retry_at = now + autosave_retry; say("NOT SAVED"); }
-    } else if (settings_dirty && !dirty && !opening && now - settings_at >= autosave_idle && now >= retry_at) {
+    } else if (settings_dirty && (!dirty || !settings.autosave) && !opening && now - settings_at >= autosave_idle && now >= retry_at) {
         // Move.settings alone (the main volume): the project as its file.
         auto settings = settings_text();
         settings_dirty = false;
@@ -2129,14 +2131,14 @@ void Studio::run_file_jobs() {
 void Studio::stopping() {
     loop_desk->flush(std::chrono::milliseconds(300)); // a loop being written is waited for, a moment
     bool unsaved = false;
-    std::string settings; // the main volume turned and not written yet
+    std::string settings_now; // the main volume turned and not written yet
     {
         std::lock_guard<std::mutex> guard(lock);
-        unsaved = dirty;
-        if (!dirty && settings_dirty) { settings = settings_text(); settings_dirty = false; }
+        unsaved = dirty && settings.autosave; // AUTOSAVE off: left as it was saved
+        if (!unsaved && settings_dirty) { settings_now = settings_text(); settings_dirty = false; }
     }
     if (unsaved) save_now();
-    else if (!settings.empty()) write_settings(settings);
+    else if (!settings_now.empty()) write_settings(settings_now);
 }
 
 void Studio::loop_pads(bool shown, bool free) {
@@ -2328,13 +2330,13 @@ std::string Studio::save_project(const std::string& as) {
     return error;
 }
 
-std::string Studio::open_project(const std::string& file, bool fresh) {
+std::string Studio::open_project(const std::string& file, bool fresh, bool save_first) {
     // Other areas' last writes into it, while the audio thread still runs (the Looper's playing loops).
     for (const auto& hook : closing) if (hook) hook();
-    // What is open now, saved first.
+    // What is open now, saved first (AUTOSAVE off, or REVERT: left as it was saved).
     {
         std::unique_lock<std::mutex> guard(lock);
-        if (dirty) {
+        if (dirty && save_first && settings.autosave) {
             auto bytes = bytes_to_save();
             auto settings_now = settings_text();
             dirty = false;
@@ -2535,6 +2537,16 @@ void Studio::run_project_job(const ProjectJob& job) {
         break;
     }
     case Kind::Save: failed = save_project(); break;
+    case Kind::Revert: { // the open project's file read again, its changes left behind
+        std::string open;
+        {
+            std::lock_guard<std::mutex> guard(lock);
+            open = path;
+        }
+        failed = open_project(open, false, false);
+        if (failed.empty()) say("REVERTED TO SAVED");
+        break;
+    }
     case Kind::SaveAs: {
         auto folder = folder_path();
         auto file = projects::path_for(folder, projects::free_name(folder, job.name.empty() ? project_name() : job.name));
@@ -2616,13 +2628,13 @@ void Studio::run_project_job(const ProjectJob& job) {
     }
     }
     // A project opened: its samples and modules read now, the Loading sheet up meanwhile.
-    if (job.kind == Kind::Open || job.kind == Kind::New) restore();
+    if (job.kind == Kind::Open || job.kind == Kind::New || job.kind == Kind::Revert) restore();
     // Saved before the folder is read, so the open one shows as it is.
-    if (job.kind != Kind::List && job.kind != Kind::Open && job.kind != Kind::New && job.kind != Kind::Save) {
+    if (job.kind != Kind::List && job.kind != Kind::Open && job.kind != Kind::New && job.kind != Kind::Save && job.kind != Kind::Revert) {
         bool unsaved = false;
         {
             std::lock_guard<std::mutex> guard(lock);
-            unsaved = dirty;
+            unsaved = dirty && settings.autosave; // AUTOSAVE off: only SAVE writes it
         }
         if (unsaved) save_now();
     }

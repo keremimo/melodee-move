@@ -15,6 +15,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <thread>
 
 using namespace move;
 
@@ -369,10 +370,15 @@ void test_setup_and_tracks() {
         CHECK(!again.studio().settings_more.count("full") && !again.studio().settings_more.count("usb_full"));
     }
     // ABOUT, past PADS, LIGHTS, then move-midi's MIDI and MIDI SYNC and
-    // move-web's WEB PAGE where those screens are here, and USAGE LOG. No
-    // FEATURES: the Move is always Full.
+    // move-web's WEB PAGE where those screens are here, AUTOSAVE (a push
+    // turns it off, again on) and USAGE LOG. No FEATURES: the Move is always Full.
     int doors = (studio.screen("midi-config") ? 2 : 0) + (studio.screen("web-page") ? 1 : 0);
-    turn_wheel(melodee, 3 + doors);
+    turn_wheel(melodee, 2 + doors);
+    press(melodee, Button::MainPush);
+    CHECK(!studio.settings.autosave);
+    press(melodee, Button::MainPush);
+    CHECK(studio.settings.autosave);
+    turn_wheel(melodee, 2);
     press(melodee, Button::MainPush);
     CHECK(has(status(), "page=about"));
     press(melodee, Button::Back);
@@ -535,12 +541,63 @@ void test_mpc_projects() {
     CHECK(studio.project_path() != projects + "/Song.mldp" && std::filesystem::exists(projects + "/Song.mldp"));
 }
 
+// Setup's AUTOSAVE off (melodee-sample's issue 18): only SAVE writes the project;
+// REVERT on the open project's options, pushed twice, reads its file again; a
+// new project leaves the changes behind.
+void test_autosave_off() {
+    std::string folder = "build/test-samples", home = "build/test-home-autosave";
+    std::filesystem::remove_all(home);
+    app::MelodeeApp melodee(folder, home);
+    Session session;
+    melodee.attach(session);
+    auto status = [&] { return melodee.status(); };
+    auto& studio = melodee.studio();
+    CHECK(melodee.save_now().empty());
+    const std::string file = melodee.project_path();
+    auto bytes_of = [](const std::string& path) {
+        std::ifstream in(path, std::ios::binary);
+        return std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    };
+    const std::string saved = bytes_of(file);
+    const unsigned tempo = studio.tempo();
+    auto change = [&] {
+        std::lock_guard<std::mutex> hold(studio.lock);
+        studio.set_tempo(studio.tempo() + 100);
+        studio.changed();
+    };
+    { std::lock_guard<std::mutex> hold(studio.lock); studio.settings.autosave = false; }
+    change();
+    std::this_thread::sleep_for(std::chrono::milliseconds(3300)); // past the autosave's three seconds
+    melodee.service();
+    CHECK(has(status(), "unsaved=1") && bytes_of(file) == saved);
+    // REVERT, second in the open project's options while it has changes: the first push asks, the second does it.
+    shift_step(melodee, 0);
+    melodee.service();
+    press(melodee, Button::MainPush);
+    CHECK(has(status(), "page=project-options"));
+    turn_wheel(melodee, 1);
+    press(melodee, Button::MainPush);
+    CHECK(has(status(), "page=project-options") && studio.tempo() != tempo);
+    press(melodee, Button::MainPush);
+    melodee.service();
+    CHECK(studio.tempo() == tempo && has(status(), "unsaved=0") && has(status(), " project=Move "));
+    // A new project from an empty pad: the open one's changes left behind, its file as it was saved.
+    change();
+    shift_step(melodee, 0);
+    melodee.service();
+    tap_pad(melodee, overview_pad(1));
+    press(melodee, Button::Back);
+    melodee.service();
+    CHECK(has(status(), " project=Project_1 ") && bytes_of(file) == saved);
+}
+
 int main() {
     test_history();
     test_undo_app();
     test_projects();
     test_setup_and_tracks();
     test_mpc_projects();
+    test_autosave_off();
     std::cout << "projects-tests: " << checks - failures << "/" << checks << " checks passed\n";
     return failures ? 1 : 0;
 }

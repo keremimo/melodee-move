@@ -139,11 +139,15 @@ struct Settings {
     bool light_show = false;
     uint8_t show_style = 0;  // Pulse, Sweep, Chase, Ripple, Levels
     bool usage_log = false;  // what the hands do, a file each start (Usage/)
+    // Setup's AUTOSAVE (melodee-sample's issue 18): on, the project saves itself
+    // a moment after the last change; off, only SAVE writes it, REVERT goes back
+    // to its file, and opening another, a new one or leaving keeps it as saved.
+    bool autosave = true;
     std::string start;       // the project opened at start; empty: the one open last
     bool operator==(const Settings& o) const {
         return response == o.response && pressure == o.pressure && pad_lights == o.pad_lights && pad_fade == o.pad_fade &&
                brightness == o.brightness && light_show == o.light_show && show_style == o.show_style &&
-               usage_log == o.usage_log && start == o.start;
+               usage_log == o.usage_log && autosave == o.autosave && start == o.start;
     }
 };
 constexpr unsigned pad_fade_ms[4] {150, 250, 400, 600};
@@ -437,7 +441,7 @@ public:
     // `lock` a screen asks (ask_projects()), the service thread does it and
     // reads the folder again (`listing`).
     struct ProjectJob {
-        enum class Kind : uint8_t { List, Open, New, SaveAs, Save, Rename, Duplicate, Delete, MoveTo, NewFolder, LoadKit, Copy, Colour } kind = Kind::List;
+        enum class Kind : uint8_t { List, Open, New, SaveAs, Save, Rename, Duplicate, Delete, MoveTo, NewFolder, LoadKit, Copy, Colour, Revert } kind = Kind::List;
         std::string path, name;  // the project or folder; a name, a folder (MoveTo), the target (Copy)
         int pad = -1;            // where a new one lies
         uint8_t colour = 0;
@@ -488,7 +492,8 @@ public:
     // is built (park()), fades back in; then its samples and modules are read
     // with the Loading sheet up. An MPC project (.xpj) opens as a copy, not
     // saved until it is a .mldp beside it. Empty on success.
-    std::string open_project(const std::string& file, bool fresh = false);
+    // What is open saved first, unless AUTOSAVE is off or `save_first` false (REVERT).
+    std::string open_project(const std::string& file, bool fresh = false, bool save_first = true);
     // Saved now, the sample slots nothing can play again freed (Melodee's Save).
     std::string save_project(const std::string& as = {});
     // The first kit of the project at `file` onto the selected track, its
