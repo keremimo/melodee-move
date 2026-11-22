@@ -497,7 +497,7 @@ sections, each on Shift + Step n.
 
 | Status | Rows |
 | --- | --- |
-| `done` | 280 |
+| `done` | 286 |
 | `sequencer` | 0 |
 | `sampling` | 0 |
 | `kit depth` | 0 |
@@ -509,7 +509,7 @@ sections, each on Shift + Step n.
 | `web page` | 0 |
 | `schwung` | 20 |
 | `n/a` | 34 |
-| All rows | 336 |
+| All rows | 342 |
 
 # Ableton Move parity
 
