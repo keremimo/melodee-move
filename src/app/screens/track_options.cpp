@@ -57,6 +57,7 @@ public:
                 studio.ask_name("NAME TRACK " + std::to_string(t + 1), studio.project().tracks[t].name, melodee::name_length - 1,
                                 [where, t](const std::string& name) {
                                     where->project().tracks[t].set_name(name.c_str());
+                                    where->project().tracks[t].named = true; // kept when its sound or module changes (TNAM)
                                     where->name_step("NAME T" + std::to_string(t + 1), int(t));
                                     where->changed();
                                 });
