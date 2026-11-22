@@ -77,13 +77,14 @@ def prepare_quickjs(root=ROOT):
 
 
 def prepare_schwung(root=ROOT):
-    """Schwung's src/shared and src/shadow in build/deps/schwung, and its
-    screen font in host/, as /data/UserData/schwung has them on a Move
+    """Schwung's src/shared and src/shadow in build/deps/schwung, its screen
+    font in host/, as /data/UserData/schwung has them on a Move, and its
+    licence (Melodee adapts some of its code and ships it)
     (MELODEE_SCHWUNG_ROOT in the tests). The font is drawn from Schwung's own
     table of it (tools/param-pages/font5x7.json, made from the Move's
     font.png), cell for cell."""
     path = Path(root) / "build/deps/schwung"
-    wanted = ["shared/param_pages/page_controller.mjs", "shadow/shadow_ui_param_pages.mjs", "host/font.png"]
+    wanted = ["shared/param_pages/page_controller.mjs", "shadow/shadow_ui_param_pages.mjs", "host/font.png", "LICENSE"]
     if all((path / name).exists() for name in wanted):
         return
     archive = Path(root) / f"build/deps/schwung-{SCHWUNG_REVISION[:7]}.tar.gz"
@@ -97,16 +98,18 @@ def prepare_schwung(root=ROOT):
     top = f"schwung-{SCHWUNG_REVISION}/"
     parts = {"src/shared/": "shared", "src/shadow/": "shadow"}
     table = top + "tools/param-pages/font5x7.json"
+    licence = top + "LICENSE"
     staging = Path(root) / "build/deps/schwung-staging"
     subprocess.run(["rm", "-rf", str(staging), str(path)], check=True)
     with tarfile.open(archive) as tar:
         members = [m for m in tar.getmembers()
-                   if any(m.name.startswith(top + prefix) for prefix in parts) or m.name == table]
+                   if any(m.name.startswith(top + prefix) for prefix in parts) or m.name in (table, licence)]
         tar.extractall(staging, members=members, filter="data")
     path.mkdir(parents=True, exist_ok=True)
     for prefix, name in parts.items():
         (staging / top / prefix).rename(path / name)
     write_schwung_font(json.loads((staging / table).read_text(encoding="utf-8")), path / "host")
+    (staging / licence).rename(path / "LICENSE")  # shipped with Melodee: host.js adapts Schwung's code
     subprocess.run(["rm", "-rf", str(staging)], check=True)
 
 

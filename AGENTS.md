@@ -25,15 +25,17 @@ and `jackd -d move` on poundhard-armbian (`jack`), and the apps on it
   from a Move; keep downloads, captures, probe reports and device data in
   ignored `build/`, `dist/` or `.local/`.
 - Never read or adapt code from bobbydigitales/move-anything (CC BY-NC-SA,
-  forbids AI-made adaptations). Schwung and schwung-spi are MIT; EvilGenius
-  is MPL-2.0: learn from them, write our own, credit them in THIRD_PARTY.md.
-  One exception (Kerem, 2026-11-21): a module's pages are Schwung's own
-  screen code, imported at run time from the Schwung on the Move
-  (`src/app/schwung_pages.h`) and drawn by it on a screen that draws as
-  Schwung's does (`src/app/schwung_display.h`); what Schwung's shadow_ui.js
-  gives that code is written again in `src/app/schwung_pages/host.js`. Never
-  copy Schwung's code into this repository.
-  Never use FM-1 firmware code (EvilGenius's core is one).
+  forbids AI-made adaptations). EvilGenius is MPL-2.0: learn from it, write
+  our own, credit it in THIRD_PARTY.md. Never use FM-1 firmware code
+  (EvilGenius's core is one).
+- Schwung and schwung-spi are MIT (Kerem, 2026-11-22): their code may be
+  run, adapted or copied here, with their notice kept. Run Schwung's own
+  code from the Schwung on the Move where it can be run (a module's pages:
+  `src/app/schwung_pages.h`), so Melodee follows Schwung as it changes; adapt
+  only what cannot be run, as `src/app/schwung_pages/host.js` adapts
+  Schwung's `shadow_ui.js`. A file that takes Schwung's code says so at its
+  top with Schwung's copyright line; Schwung's licence ships in `licenses/`
+  (`tools/bundle.sh`); THIRD_PARTY.md says what was taken and where.
 - Nothing here may change a Move for good: scripts stop and start Ableton's
   app, add folders under `/data/UserData` and say how to remove them.
 - Melodee's engine, model and files (`melodee/engine`, `melodee/model`,

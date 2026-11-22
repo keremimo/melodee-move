@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+// Adapted from Schwung's src/host/js_display.c (v1.9.4): Copyright (c)
+// 2025-2026 Charles Vestal, MIT License (licenses/Schwung-LICENSE.txt).
 #include "app/schwung_display.h"
 #include <juce_graphics/juce_graphics.h>
 #include <quickjs.h>

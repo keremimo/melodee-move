@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+// Portions adapted from Schwung's src/shadow/shadow_ui.js (v1.9.4):
+// Copyright (c) 2025-2026 Charles Vestal, MIT License (licenses/Schwung-LICENSE.txt).
+//
 // A Schwung module's pages, shown by Schwung's own screen code (Kerem,
 // 2026-11-21: "perfectly replicate Schwung's GUI"): from the push into a
 // module until Back out, every pixel is drawn by the code Schwung's shadow UI
@@ -11,9 +14,8 @@
 //                                     its screens draw with
 //
 // What Schwung's shadow_ui.js gives those (it cannot be imported: it is the
-// whole shadow UI) is written here again after reading it, no code copied:
-// the `ctx` it fills, the shim's globals, its tick and draw order, its views
-// and how input reaches them. Schwung's screen itself, its shapes and font,
+// whole shadow UI) is adapted here from it: the `ctx` it fills, the shim's
+// globals, its tick and draw order, its views and how input reaches them. Schwung's screen itself, its shapes and font,
 // is Melodee's C++ (schwung_display.h), as is shadow_load_ui_module
 // (canvas_page.cpp). Imports name Schwung's folder on the Move;
 // MELODEE_SCHWUNG_ROOT moves it (the tests').

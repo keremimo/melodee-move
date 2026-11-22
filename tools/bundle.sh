@@ -40,13 +40,16 @@ ldd build/melodee-move | awk '$3 ~ /^\// { print $3 }' \
 # fontconfig wants a configuration; melodee-move draws with its own pixel font.
 printf '<?xml version="1.0"?>\n<fontconfig></fontconfig>\n' > "$OUT/lib/fonts.conf"
 # Melodee's licence and the third parts' (THIRD_PARTY.md): JUCE and QuickJS
-# are linked in, Rubik is carried by the web page (tools/web_bundle.py).
+# are linked in, Rubik is carried by the web page (tools/web_bundle.py),
+# Schwung's code is adapted in src/app/schwung_pages/host.js and
+# src/app/schwung_display.cpp.
 cp LICENSE "$OUT/licenses/LICENSE-AGPL-3.0.txt"
 cp THIRD_PARTY.md "$OUT/licenses/THIRD_PARTY.md"
 cp core/LICENSE "$OUT/licenses/ellic-core-LICENSE.txt"
 cp build/deps/JUCE/LICENSE.md "$OUT/licenses/JUCE-LICENSE.md"
 cp build/deps/quickjs/LICENSE "$OUT/licenses/QuickJS-LICENSE.txt"
 cp build/deps/rubik/OFL.txt "$OUT/licenses/Rubik-OFL.txt"
+cp build/deps/schwung/LICENSE "$OUT/licenses/Schwung-LICENSE.txt"
 
 # Where this build's source is, as the AGPL asks of a program given out:
 # the commits ./build.sh passes in (tools/release.sh: a release's, clean),

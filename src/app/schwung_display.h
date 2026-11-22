@@ -12,9 +12,8 @@ namespace app {
 
 // Schwung's screen as its shadow UI draws it, so that Schwung's own screen
 // code (a module's pages, run from the Move: schwung_pages.h) draws here the
-// pixels it draws there. Written again after reading Schwung's
-// src/host/js_display.c (MIT, Charles Vestal); no code copied. Its rules,
-// each one kept:
+// pixels it draws there. Adapted from Schwung's src/host/js_display.c (MIT,
+// Charles Vestal; schwung_display.cpp). Its rules, each one kept:
 //
 //   - one byte a pixel, 0 or 1; any non-zero colour is white; nothing XORs;
 //     every write is clipped pixel by pixel; the host never clears it
