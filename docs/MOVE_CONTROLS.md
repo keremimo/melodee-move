@@ -466,6 +466,7 @@ controls take Session's and Loop Mode's meanings where they have one.
 | Shift + Play (Song) | Restarts the playing clips | The song from the cursor again | done |
 | Rec (Song) | Records into the selected track | Patterns launched while the song plays written as clips (stopped: the song starts from the cursor) | done |
 | Sampling (Song) | Sampling Mode; its Resampling source records the Move's whole output | EXPORT: a mixdown (32-bit float, 24 or 16-bit), stems, a MIDI file, an MPC 3 project, the song to a pattern | done |
+| Capture (Song) | Keeps the notes played without recording, in a clip | TAKE JAM: the bars played outside Song laid after the song's end, as clips, markers and tempo steps (melodee-sample's jam capture); lit while there is a jam | done |
 
 ### Print and freeze
 

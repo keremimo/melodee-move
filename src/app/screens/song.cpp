@@ -112,6 +112,12 @@ public:
             }
             return true;
         case Job::SongExport: studio.push("song-export"); return true;
+        case Job::TakeJam: { // the bars played outside Song, after its end (jam capture)
+            std::string said;
+            if (desk.take_jam(said)) studio.name_step("TAKE JAM");
+            studio.say(said);
+            return true;
+        }
         case Job::TurnKnob: case Job::TurnKnobFine: turn(use.index, use.delta, job == Job::TurnKnobFine); return true;
         default: return false;
         }
@@ -222,6 +228,8 @@ public:
         } else if (studio.kind() != TrackKind::Empty) {
             left = "PLACE " + pattern_name(desk.next_pattern) + " X" + std::to_string(desk.next_bars);
         }
+        // A jam logged: its bars, for Capture to lay after the end (the clock gives way).
+        if (!desk.song_playing() && desk.jam_bars()) right = "JAM " + std::to_string(desk.jam_bars());
         if (left.size() + right.size() > 15) right.clear();
         ui::detail(g, left, right);
     }

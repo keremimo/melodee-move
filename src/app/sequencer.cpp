@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "app/sequencer.h"
+#include "app/song_desk.h"
 #include "app/screen.h"
 #include "app/studio.h"
 #include "move/display.h"
@@ -148,6 +149,7 @@ void Sequencer::launch_scene(unsigned n) {
         if (t == studio.track() || !pattern(t, n).empty()) launch(t, n);
     }
     if (auto tempo = studio.project().scenes[n].tempo) studio.send({Type::SceneTempo, 0, 0, 0, int16_t(tempo)});
+    studio.song_desk().scene_launched(n); // jam capture: a marker where it takes over
 }
 
 bool Sequencer::copy_pattern(unsigned track, unsigned from, unsigned to_track, unsigned to) {
@@ -1200,7 +1202,9 @@ void Sequencer::transport_lights(move::Lights& lights, Clock::time_point now) {
     bool blink = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count() / 250 % 2;
     // Rec (14.1): dim when it can record, flashing through the count-in, red recording.
     lights.button(Button::Rec, counting_in() ? (blink ? colour::red : colour::off) : rec ? colour::red : colour::dark_grey);
-    lights.button(Button::Capture, can_capture() ? white_bright : 0);
+    // On Song, Capture lays the jam: lit while there is one.
+    const bool song = studio.top() && studio.top()->screen_kind() == bindings::Screen::Song;
+    lights.button(Button::Capture, (song ? studio.song_desk().jam_bars() > 0 : can_capture()) ? white_bright : 0);
 }
 
 void Sequencer::lights(move::Lights& lights, Clock::time_point now) {

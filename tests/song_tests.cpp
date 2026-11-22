@@ -12,6 +12,7 @@
 #include "app/pad_layout.h"
 #include "app/prints.h"
 #include "app/project_store.h"
+#include "app/sequencer.h"
 #include "app/song_desk.h"
 #include "app/wav_out.h"
 #include "move/audio.h"
@@ -1080,6 +1081,42 @@ void test_song_screens() {
 
 } // namespace
 
+// Jam capture (melodee-sample's, after Melodee FM-1's jam to song): the bars played outside Song are logged; Capture on
+// Song lays them after the song's end, a clip for each run of a pattern, a marker where a sequence took over.
+void test_jam_capture() {
+    std::string folder = "build/test-samples", home = "build/test-home-song-jam", loop = folder + "/loop.wav";
+    write_project(home, loop);
+    Rig rig(folder, home);
+    auto& app = rig.app;
+    auto& desk = rig.desk();
+    auto status = [&] { return app.status(); };
+    {
+        std::lock_guard<std::mutex> guard(rig.studio().lock);
+        desk.next_pattern = 0; desk.next_bars = 2;
+        desk.place(0, 0); // the song: two bars
+        rig.studio().select(0);
+        rig.studio().sequencer().launch_scene(1); // track 1's B1 (A2), track 2 plays on its A1
+        rig.studio().play();
+    }
+    const uint32_t bar = rig.studio().project().bar_ticks();
+    double bar_seconds = 60.0 / (rig.studio().tempo() / 10.0) * 4;
+    CHECK(rig.until([&] { std::lock_guard<std::mutex> g(rig.studio().lock); return rig.studio().host().ticks() >= 3 * bar; }, bar_seconds * 5));
+    { std::lock_guard<std::mutex> guard(rig.studio().lock); rig.studio().stop(); }
+    rig.render(4);
+    app.service();
+    CHECK(desk.jam_bars() >= 3);
+    with(app, Button::Shift, [&] { tap_step(app, 12); });
+    CHECK(has(status(), "page=song ") && has(status(), "jam="));
+    press(app, Button::Capture);
+    std::lock_guard<std::mutex> guard(rig.studio().lock);
+    const auto& song = desk.song();
+    int first = desk.clip_at(0, 2), second = desk.clip_at(1, 2);
+    CHECK(first >= 0 && song.clips[size_t(first)].pattern == 1 && song.clips[size_t(first)].bars >= 3);
+    CHECK(second >= 0 && song.clips[size_t(second)].pattern == 0);
+    CHECK(song.marker_count == 1 && song.markers[0].bar == 2 && std::string(song.markers[0].name) == "SEQ 2");
+    CHECK(desk.cursor == 2);
+}
+
 int main() {
     std::cerr << "test_wav_out\n";
     test_wav_out();
@@ -1087,6 +1124,8 @@ int main() {
     test_song_model();
     std::cerr << "test_song_plays\n";
     test_song_plays();
+    std::cerr << "test_jam_capture\n";
+    test_jam_capture();
     std::cerr << "test_midi_file\n";
     test_midi_file();
     std::cerr << "test_live_numbers\n";

@@ -182,8 +182,9 @@ Three parts so far:
   Loop act on the clip; Plus / Minus the bank, Shift + Left / Right the
   markers; knobs the pattern, length, zoom, the bar's tempo and its shape.
   Play plays the song from the cursor, Rec writes the patterns launched into
-  it. **Sampling on Song exports** (the Move's Resampling records its whole
-  output): a mixdown (32-bit float, or 24 or 16-bit dithered) or stems, the
+  it, and Capture lays the bars played outside Song after its end (jam
+  capture). **Sampling on Song exports** (the Move's Resampling records its
+  whole output): a mixdown (32-bit float, or 24 or 16-bit dithered) or stems, the
   song played once through in real time; a MIDI file; an MPC 3 project
   (synth tracks as their prints, made first); an Ableton Live Set, to go on
   with the project in Live 12.1 or later (each pattern a Session View clip,

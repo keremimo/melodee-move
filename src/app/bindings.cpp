@@ -317,6 +317,7 @@ std::vector<Binding> make_table() {
         {"Shift + Play (Song)", S::Song, T::Any, H::shift, C::Play, G::Press, J::RestartSong, St::Done},
         {"Rec (Song)", S::Song, T::Any, H::none, C::Rec, G::Press, J::RecordSong, St::Done},
         {"Sampling (Song)", S::Song, T::Any, H::none, C::Sampling, G::Press, J::SongExport, St::Done},
+        {"Capture (Song)", S::Song, T::Any, H::none, C::Capture, G::Press, J::TakeJam, St::Done},
 
         // Print and freeze: the PRINT sheet
         {"Track button held + Sampling", S::Any, T::Any, H::track, C::Sampling, G::Press, J::Print, St::Done},

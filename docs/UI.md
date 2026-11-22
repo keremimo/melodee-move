@@ -893,6 +893,14 @@ doors (docs/MOVE_CONTROLS.md, Decisions). `docs/ui/song.png` is the sheet
   **Rec** writes launches into it as clips, a bar at a time. Knob 5 sets the
   cursor's bar's tempo (under 30 BPM: none there), knob 6 its shape (Step,
   Ramp). A track button leaves for Play, as on the Move.
+- **Jam capture** (melodee-sample's, after Melodee FM-1's jam to song): from
+  Play outside Song to Stop, each bar is logged (the pattern each track
+  plays, the tracks muted, the tempo, a sequence launched). On Song the
+  detail line counts it (`JAM 12`) and Capture lights; **Capture** lays it
+  after the song's end: a clip for each run of a pattern (muted where the
+  track was), a marker where a sequence took over, tempo steps where the
+  tempo changed; the cursor goes to its first bar. Play outside Song starts
+  a new jam.
 - **EXPORT** (Sampling on Song; the Move's Resampling records its whole
   output): MIXDOWN 32 FLOAT, 24 BIT, 16 BIT, STEMS, MIDI FILE, MPC 3
   PROJECT, ABLETON LIVE SET, SONG TO PATTERN; the wheel picks, push exports,

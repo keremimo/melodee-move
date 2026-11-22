@@ -167,6 +167,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **Markers**: add, name, jump (MELODEE.md › Sequencing, Song) | done | Shift + push (on one: the next of Melodee's ready names, INTRO to OUTRO, then gone); Shift + Left / Right jump; typed names wait for a naming sheet | [ ] |
 | **Tempo lane**: tempo points by the bar, step or ramp, 64 points (TMPL) (MELODEE.md › Sequencing, Song) | done | knob 5 the cursor's bar's tempo (under 30 BPM: none), knob 6 Step or Ramp; notches on Song, the tempo in its detail | [ ] |
 | **Record into the song**: launches written as clips, punches too (guide/song.md) | done | Rec on Song: launches written as clips, a bar at a time; punches wait for Pad FX (mixer & effects) | [ ] |
+| **Jam capture**: bars played outside Song logged, laid after the song's end as clips, markers and tempo steps (guide/song.md) | done | Capture on Song (TAKE JAM), lit while there is a jam; JAM n on the detail line | [ ] |
 | **Mixdown export**: 32-bit float, or 24 or 16-bit dithered; tails up to 10 s (MELODEE.md › Sequencing, Song) | done | Sampling on Song: EXPORT, MIXDOWN 32 FLOAT, 24 or 16 BIT; Mixdowns/<project>.wav | [ ] |
 | **Stems export**: `Mix.wav`, each track and each bus after its chain (MELODEE.md › Sequencing, Song) | done | EXPORT: STEMS; Stems/<project>/Mix.wav, NN <track>.wav, Bus X.wav | [ ] |
 | **MIDI file export**: format 1, 96 ticks, tempo and time signature (MELODEE.md › Sequencing, Song) | done | EXPORT: MIDI FILE; MIDI/<project>.mid | [ ] |

@@ -319,8 +319,66 @@ void SongDesk::launched(unsigned t, unsigned p) {
 
 // Each bar the clips being written grow by one, so the song always holds the
 // bar after the one playing; past 16 bars a new clip carries on.
+void SongDesk::jam_tick() {
+    const auto& host = studio.host();
+    const auto& project = studio.project();
+    const bool running = host.playing() && !host.count_in() && !host.song_playing();
+    if (!running) {
+        if (jam_running && !jam.full()) jam.bars.push_back(jam_now); // the bar it stopped in
+        jam_running = false;
+        if (host.song_playing()) jam_scene = -1; // launched while the song plays: no jam's
+        return;
+    }
+    const uint32_t bar = host.ticks() / std::max(project.bar_ticks(), 1u);
+    auto begin_bar = [&] { // the tracks not heard and the tempo, as a bar begins
+        jam_now.scene = int16_t(jam_scene);
+        jam_scene = -1;
+        bool solo = false;
+        for (const auto& t : project.tracks) solo = solo || (t.used() && t.mix.solo);
+        jam_now.muted = 0;
+        for (unsigned t = 0; t < melodee::track_count; ++t) {
+            const auto& mix = project.tracks[t].mix;
+            if (mix.mute || (solo && !mix.solo)) jam_now.muted = uint16_t(jam_now.muted | 1u << t);
+        }
+        const unsigned tempo = host.tempo_now();
+        jam_now.tempo = uint16_t(tempo ? tempo : project.tempo);
+    };
+    if (!jam_running) { // Play outside Song: a new jam
+        jam.bars.clear();
+        jam.bars.reserve(64);
+        jam_running = true;
+        jam_bar_seen = bar;
+        jam_now = melodee::JamBar {};
+        begin_bar();
+    } else if (bar != jam_bar_seen) {
+        // The bar before is logged; bars passed between two looks played as it did.
+        const uint32_t passed = bar > jam_bar_seen ? std::min<uint32_t>(bar - jam_bar_seen, 64) : 1;
+        for (uint32_t n = 0; n < passed && !jam.full(); ++n) {
+            jam.bars.push_back(jam_now);
+            jam_now.scene = -1;
+        }
+        jam_bar_seen = bar;
+        begin_bar();
+    }
+    // The patterns played now; read through the bar, so the bar keeps what played to its end (a launch lands on a bar line).
+    for (unsigned t = 0; t < melodee::track_count; ++t)
+        jam_now.pattern[t] = project.tracks[t].used() && host.position_of(t) >= 0 ? uint8_t(host.pattern_of(t) % melodee::pattern_count)
+                                                                                    : melodee::jam_silent;
+}
+
+bool SongDesk::take_jam(std::string& said) {
+    if (jam.bars.empty()) { said = "NO JAM YET"; return false; }
+    const melodee::JamTake took = melodee::jam_to_song(studio.project(), studio.patterns(), jam);
+    if (!took.bars) { said = "SONG IS FULL"; return false; }
+    cursor = took.at;
+    send_song();
+    said = "JAM AT BAR " + std::to_string(took.at + 1) + (took.left_out ? ", SOME LEFT OUT" : "");
+    return true;
+}
+
 void SongDesk::tick() {
     exporter->tick(); // an MPC 3 export's prints, then the export
+    jam_tick();       // jam capture: the bar playing outside Song logged
     bool on = record_on && song_playing();
     if (!on) {
         if (recording_tracks) finish_launches();
@@ -431,9 +489,9 @@ std::string SongDesk::load_midi(const std::vector<uint8_t>& bytes, unsigned t) {
 std::string SongDesk::status() const {
     const auto& s = song();
     char text[200];
-    std::snprintf(text, sizeof text, " song_clips=%u song_markers=%u song_loop=%u-%u song_tempo=%u song_cursor=%u song_playing=%d song_bar=%u song_rec=%d",
+    std::snprintf(text, sizeof text, " song_clips=%u song_markers=%u song_loop=%u-%u song_tempo=%u song_cursor=%u song_playing=%d song_bar=%u song_rec=%d jam=%u",
                   unsigned(s.count), unsigned(s.marker_count), unsigned(s.loop_start), unsigned(s.loop_end), unsigned(s.tempo.count), cursor + 1,
-                  int(song_playing()), song_playing() ? studio.host().song_bar() + 1 : 0u, int(record_on));
+                  int(song_playing()), song_playing() ? studio.host().song_bar() + 1 : 0u, int(record_on), jam_bars());
     return std::string(text) + exporter->status() + prints->status();
 }
 

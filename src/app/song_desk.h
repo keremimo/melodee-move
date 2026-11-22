@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #pragma once
 #include "melodee/engine/command.h"
+#include "melodee/model/jam_log.h"
 #include "melodee/model/project.h"
 #include "melodee/model/smf.h"
 #include <array>
@@ -86,6 +87,15 @@ public:
     void launched(unsigned track, unsigned pattern);
     void tick(); // MIDI or service thread, under the lock, often: follows the song's bar
 
+    // Jam capture (melodee-sample's, after Melodee FM-1's jam to song;
+    // model/jam_log.h): from Play outside Song to Stop, each bar is logged as
+    // it plays (tick()): the pattern each used track plays, which tracks are not
+    // heard, the tempo, and a sequence that took over on it. Capture on Song
+    // lays the log after the song's end; Play outside Song starts a new one.
+    void scene_launched(unsigned n) { jam_scene = int(n % melodee::pattern_count); } // Sequencer::launch_scene()
+    unsigned jam_bars() const { return unsigned(jam.bars.size()); }
+    bool take_jam(std::string& said); // false: nothing laid (`said` says why)
+
     // ---- exports that take no time (exports.h has the ones that play the song)
     // The song laid end to end into the first pattern number free on every track (and used by no clip), as long as
     // the song, 128 bars at most; the number, or -1 when there is none or no notes.
@@ -111,6 +121,12 @@ private:
     std::array<uint16_t, melodee::track_count> recording_from {};
     unsigned seen_bar = ~0u;
     void finish_launches();
+    void jam_tick();
+    melodee::JamLog jam;
+    melodee::JamBar jam_now;      // the bar playing, logged when the next begins
+    bool jam_running = false;
+    uint32_t jam_bar_seen = 0;
+    int jam_scene = -1;           // a sequence launched, for the bar it takes over on
     std::unique_ptr<Exports> exporter;
     std::unique_ptr<Printer> prints;
 };

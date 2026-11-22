@@ -116,7 +116,7 @@ constexpr uint16_t none = 0, shift = 1 << 0, track = 1 << 1, step = 1 << 2, pad 
     X(PickProject) X(ProjectPage) X(DeleteSelection) X(MoveTrack) X(TypeTurn) \
     X(SongPick) X(SongCopyClip) X(SongDeleteClip) X(SongMuteClip) X(SongBar) X(SongLoopRange) X(SongCursor) X(SongPush) \
     X(SongMarker) X(SongDuplicate) X(SongDelete) X(SongLoopClip) X(SongPage) X(SongMarkerJump) X(PlaySong) X(RestartSong) \
-    X(RecordSong) X(SongExport) X(Print) X(PrintPattern) X(PrintBank) X(PrintTurn) X(PrintPush) \
+    X(RecordSong) X(SongExport) X(TakeJam) X(Print) X(PrintPattern) X(PrintBank) X(PrintTurn) X(PrintPush) \
     X(RecordPadUp) X(SliceOptions) X(JumpHit) X(DeleteFile) X(StarFile)
 
 enum class Job : uint8_t {
