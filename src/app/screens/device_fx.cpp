@@ -245,6 +245,14 @@ bool DeviceFx::mix_job(unsigned t, Job job, const bindings::Use& use) {
         mixing::set_send(studio, t, bus, int(mix.sends[bus]) + delta);
         return true;
     }
+    case 6: // OUTPUT: the master or a submix (Melodee's mixer), a place a detent
+        mixing::set_out(studio, t, unsigned(std::clamp(int(mix.out) + (delta > 0 ? 1 : delta < 0 ? -1 : 0), 0, int(melodee::sub_count))));
+        return true;
+    case 7: { // WIDTH, the strip's: 0 mono, 100 as it is, 200 twice as wide
+        const auto& strip = studio.project().tracks[t % melodee::track_count].strip;
+        mixing::set_strip(studio, t, melodee::StripPart::Width, int(strip.width) + delta * mixing::strip_step(melodee::StripPart::Width, job == Job::TurnKnobFine));
+        return true;
+    }
     default: return true;
     }
 }
@@ -261,10 +269,15 @@ void DeviceFx::draw_mix(juce::Graphics& g, unsigned t) const {
         ui::detail(g, "BEFORE THE CHAIN");
         return;
     }
-    move::draw_text(g, ui::content_x + 1, 11, upper(track.name).substr(0, 15));
-    std::array<std::string, 8> names {"VOL", "PAN", ">A", ">B", ">C", ">D", "", ""};
+    move::draw_text(g, ui::content_x + 1, 11, upper(track.name).substr(0, mix.out ? 11 : 15));
+    if (mix.out) { // where it plays: a submix
+        const std::string to = ">" + mixing::out_text(mix.out);
+        move::draw_text(g, ui::width - 6 - move::text_width(to), 11, to);
+    }
+    std::array<std::string, 8> names {"VOL", "PAN", ">A", ">B", ">C", ">D", "OUT", "WIDTH"};
     std::array<float, 8> values {mix.level / 127.0f, (mix.pan + 50) / 100.0f, mix.sends[0] / 100.0f, mix.sends[1] / 100.0f,
-                                 mix.sends[2] / 100.0f, mix.sends[3] / 100.0f, 0, 0};
+                                 mix.sends[2] / 100.0f, mix.sends[3] / 100.0f, float(mix.out) / float(melodee::sub_count),
+                                 track.strip.width / float(melodee::width_max)};
     ui::knob_cells(g, {ui::content_x, 20, ui::content_width - 6, 34}, names, values);
     // Its meter, beside them.
     int h = int(std::lround(meter_fraction(studio.host().meter(t)) * 34.0f));
@@ -287,7 +300,8 @@ bool DeviceFx::mix_lane(unsigned t, unsigned which, unsigned& param, unsigned& p
     if (which == 0) param = melodee::motion_level;
     else if (which == 1) param = melodee::motion_pan;
     else if (which < 6) param = melodee::motion_send(which - 2);
-    else return false;
+    else if (which == 7) param = unsigned(melodee::motion_strip(melodee::StripPart::Width));
+    else return false; // OUTPUT: no lane
     return true;
 }
 
@@ -304,6 +318,11 @@ Knob DeviceFx::mix_knob(unsigned t, unsigned which) const {
     case 2: case 3: case 4: case 5: {
         unsigned bus = which - 2;
         return {std::string("SEND ") + char('A' + int(bus)), std::to_string(mix.sends[bus]), mix.sends[bus] / 100.0f};
+    }
+    case 6: return {"OUTPUT", mixing::out_text(mix.out), float(mix.out) / float(melodee::sub_count)};
+    case 7: {
+        const unsigned w = studio.project().tracks[t % melodee::track_count].strip.width;
+        return {"WIDTH", std::to_string(w) + "%", w / float(melodee::width_max)};
     }
     default: return {};
     }

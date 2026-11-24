@@ -200,15 +200,13 @@ bool MelodeeApp::global(bindings::Job job, const bindings::Use& use) {
         return true;
     }
     case Job::TracksOverview: studio.open("tracks"); return true;
-    // A track by its step (the Mixer, the sixteen tracks): Mute held mutes it, Shift + Mute solos it.
-    case Job::MuteStep: {
+    // A track by its step (the Mixer, the sixteen tracks): Mute held mutes it, Shift + Mute solos it. On the Mixer's
+    // submixes a step is a submix: the Mixer takes it (screens/mixer.cpp).
+    case Job::MuteStep: case Job::SoloStep: {
+        if (Screen* top = studio.top(); top && top->screen_kind() == bindings::Screen::Mixer && top->job(job, use)) return true;
         unsigned t = unsigned(use.index) % melodee::track_count;
-        studio.set_mute(t, !studio.project().tracks[t].mix.mute);
-        return true;
-    }
-    case Job::SoloStep: {
-        unsigned t = unsigned(use.index) % melodee::track_count;
-        studio.set_solo(t, !studio.project().tracks[t].mix.solo);
+        if (job == Job::MuteStep) studio.set_mute(t, !studio.project().tracks[t].mix.mute);
+        else studio.set_solo(t, !studio.project().tracks[t].mix.solo);
         return true;
     }
     case Job::UnmuteAll: mixing::unmute_all(studio); studio.say("UNMUTED ALL"); return true;

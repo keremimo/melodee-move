@@ -2,7 +2,8 @@
 // The mix and its effects (src/app/mixing.*, fx_host.*, studio_fx.cpp), on
 // a whole studio and Melodee's engine host: effects into a track's chain,
 // heard; bypass, move, copy and paste, KEY; the strips, sends and returns;
-// a kit pad's mute and Unmute all; the master compressor; Knob FX; the pads
+// a kit pad's mute and Unmute all; the master compressor; the strip (EQ,
+// COMP, width) and the submixes on the Mixer, a track's output; Knob FX; the pads
 // as punches and as Flex Beat's, from the audio thread; a Schwung audio
 // effect (tests/fake_fx) loaded, heard, set, copied with its track; all of
 // it saved and opened again.
@@ -636,6 +637,110 @@ void test_layouts(Rig& rig) {
     rig.quiet();
 }
 
+// The mixer's strip and submixes (melodee-sample docs/MIXER_PLAN.md, step 8): EQ and COMP after MAIN on the
+// Mixer's wheel for the track in hand, Left / Right once more the submixes (a step picks one, Mute + a step mutes
+// it, the push its chain); the track item's knob 7 OUTPUT and knob 8 WIDTH. Saved: checked once opened again.
+void test_strip_screens(Rig& rig) {
+    auto& studio = rig.studio();
+    studio.select(0);
+    const auto& strip = studio.project().tracks[0].strip;
+    shift_step(rig, 3);
+    CHECK(page_of(rig) == "mixer");
+    wheel(rig, -10);
+    wheel(rig, 7); // EQ
+    CHECK(has(rig.melodee.status(), "mixer_page=7") && studio.top()->knob_owner() == "EQ");
+    turn(rig, knob_first_cc + 1, 4); // 125 Hz: half a dB a detent
+    CHECK(strip.eq[1] == 20 && has(rig.melodee.status(), "mixer_band=2"));
+    CHECK(studio.top()->knob(1).name == "125 HZ" && studio.top()->knob(1).value == "+2.0DB");
+    turn(rig, knob_first_cc + 2, -3); // 250 Hz down 1.5 dB
+    CHECK(strip.eq[2] == -15);
+    button(rig, Button::Shift, true);
+    turn(rig, knob_first_cc + 2, 5);
+    turn(rig, knob_first_cc + 7, 2); // Shift + knob 8: 16 kHz
+    turn(rig, knob_first_cc, -4);    // Shift + knob 1: the trim
+    CHECK(studio.top()->knob(7).name == "16 KHZ" && studio.top()->knob(0).name == "TRIM");
+    button(rig, Button::Shift, false);
+    CHECK(strip.eq[2] == -10 && strip.eq[8] == 10 && strip.eq[7] == 0 && strip.trim == -20);
+    press(rig, Button::MainPush); // the EQ off, its bands kept
+    CHECK(!strip.eq_on && strip.eq[1] == 20);
+    press(rig, Button::MainPush);
+    CHECK(strip.eq_on);
+    wheel(rig, 1); // COMP
+    CHECK(has(rig.melodee.status(), "mixer_page=8"));
+    turn(rig, knob_first_cc, 18);       // AMOUNT
+    turn(rig, knob_first_cc + 1, 4);    // RATIO: 4:1 to 6:1
+    turn(rig, knob_first_cc + 2, 1);    // SPEED: MED to SLOW
+    turn(rig, knob_first_cc + 7, -10);  // WIDTH
+    CHECK(strip.comp_amount == 18 && strip.comp_ratio == 60 && strip.comp_speed == uint8_t(melodee::CompSpeed::Slow) && strip.width == 80);
+    CHECK(studio.top()->knob(1).value == "6:1" && studio.top()->knob(0).value == "-18DB" && studio.top()->knob(6).name.empty());
+    turn(rig, knob_first_cc, -18);
+    turn(rig, knob_first_cc + 7, 10);
+
+    // The track item, the wheel all the way left: knob 7 OUTPUT, a detent a place; knob 8 WIDTH.
+    press(rig, Button::Back);
+    CHECK(page_of(rig) == "kit-play" || page_of(rig) == "synth-play");
+    for (int n = 0; n < 8; ++n) wheel(rig, -1);
+    const bool pad_sends = studio.top()->knob(1).name != "PAN"; // a kit's item left on its pad's sends: Shift + wheel back
+    if (pad_sends) { button(rig, Button::Shift, true); wheel(rig, -1); button(rig, Button::Shift, false); }
+    CHECK(studio.top()->knob(6).name == "OUTPUT" && studio.top()->knob(6).value == "MAIN");
+    turn(rig, knob_first_cc + 6, 5);
+    turn(rig, knob_first_cc + 6, 1);
+    CHECK(studio.project().tracks[0].mix.out == melodee::out_sub(1) && studio.top()->knob(6).value == "S2");
+    turn(rig, knob_first_cc + 7, -5);
+    CHECK(strip.width == 90 && studio.top()->knob(7).value == "90%");
+    turn(rig, knob_first_cc + 7, 5);
+    CHECK(mixing::sub_fed(studio, 1) && !mixing::sub_fed(studio, 0));
+    const auto sends = studio.project().tracks[0].mix.sends; // a send reaches its bus past a muted submix: none here
+    for (unsigned b = 0; b < 4; ++b) mixing::set_send(studio, 0, b, 0);
+    rig.blocks(8);
+    int32_t heard = rig.play(0, 30);
+    CHECK(heard > to_s32(0.1f)); // through submix 2 to the master
+    rig.quiet();
+    if (pad_sends) { button(rig, Button::Shift, true); wheel(rig, 1); button(rig, Button::Shift, false); }
+
+    // The Mixer's submixes: Right twice; a step picks one, Mute + a step mutes it, the push opens its chain.
+    shift_step(rig, 3);
+    CHECK(page_of(rig) == "mixer");
+    wheel(rig, -10);
+    press(rig, Button::Right);
+    press(rig, Button::Right);
+    press(rig, Button::Right); // no further
+    CHECK(has(rig.melodee.status(), "mixer_half=2"));
+    tap_step(rig, 1);
+    CHECK(has(rig.melodee.status(), "mixer_sub=2") && studio.track() == 0 && page_of(rig) == "mixer");
+    turn(rig, knob_first_cc + 1, -7);
+    CHECK(studio.project().subs[1].mix.level == 93 && studio.top()->knob(1).name == "S2 LEVEL");
+    button(rig, Button::Mute, true);
+    tap_step(rig, 1);
+    button(rig, Button::Mute, false);
+    CHECK(studio.project().subs[1].mix.mute && !studio.project().tracks[1].mix.mute);
+    rig.blocks(8);
+    CHECK(rig.play(0, 30) < to_s32(0.001f)); // the submix muted: track 1 quiet
+    button(rig, Button::Shift, true);
+    press(rig, Button::Mute); // Shift + Mute: every mute let go, the submixes' too
+    button(rig, Button::Shift, false);
+    CHECK(!studio.project().subs[1].mix.mute);
+    rig.blocks(8);
+    CHECK(rig.play(0, 30) > heard / 2);
+    rig.quiet();
+    for (unsigned b = 0; b < 4; ++b) mixing::set_send(studio, 0, b, sends[b]);
+    wheel(rig, 7); // the submix's EQ
+    turn(rig, knob_first_cc + 4, 6);
+    CHECK(studio.project().subs[1].strip.eq[4] == 30 && strip.eq[4] == 0);
+    turn(rig, knob_first_cc + 4, -6);
+    wheel(rig, -10);
+    press(rig, Button::MainPush); // its chain: its level first
+    CHECK(page_of(rig) == "chain" && has(rig.melodee.status(), "chain=S2") && studio.top()->knob_owner() == "SUB");
+    turn(rig, knob_first_cc, 7);
+    CHECK(studio.project().subs[1].mix.level == 100);
+    press(rig, Button::Back);
+    press(rig, Button::Left);
+    press(rig, Button::Left);
+    CHECK(has(rig.melodee.status(), "mixer_half=0"));
+    press(rig, Button::Back);
+    rig.quiet();
+}
+
 // Two projects for timing the cycle in the simulated Move (docs/PARITY.md,
 // mixer & effects: process_us with a busy chain on all sixteen tracks):
 // sixteen kit tracks each playing the loop on every beat, and, in the busy
@@ -789,6 +894,7 @@ int main() {
         test_screens(rig);
         test_layouts(rig);
         test_motion(rig);
+        test_strip_screens(rig);
         // Left for the file: an Echo keyed... a Compressor on track 2 keyed by bus C, a send, a return, the
         // compressor, Knob FX, a pad muted, the Schwung effect on track 1 at gain 1.
         mixing::set_send(rig.studio(), 0, 1, 40);
@@ -808,6 +914,10 @@ int main() {
         auto* fx = studio.fx_module(uint8_t(mixing::slot(studio, 0, 0).params[0]));
         CHECK(fx && fx->module && fx->module->param("gain") && fx->module->param("gain")->value == 1.0);
         CHECK(has(rig.melodee.status(), "schwung_fx=1"));
+        // The strip and the output: track 1 into submix 2, its 125 Hz up 2 dB and its 16 kHz up 1, the trim down 2.
+        const auto& strip = studio.project().tracks[0].strip;
+        CHECK(studio.project().tracks[0].mix.out == melodee::out_sub(1) && strip.eq[1] == 20 && strip.eq[8] == 10 && strip.trim == -20);
+        CHECK(strip.comp_ratio == 60 && strip.width == 100 && studio.project().subs[1].mix.level == 100);
     }
     write_bench_project("build/bench-home-dry", samples + "/loop.wav", false);
     write_bench_project("build/bench-home-busy", samples + "/loop.wav", true);

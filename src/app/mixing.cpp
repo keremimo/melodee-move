@@ -267,7 +267,129 @@ void solo_pad(Studio& studio, unsigned t, unsigned pad) {
     studio.changed();
 }
 
+void set_strip(Studio& studio, unsigned n, melodee::StripPart part, int value) {
+    if (n >= melodee::strip_channels) return;
+    auto& strip = studio.project().strip(n);
+    melodee::strip_set(strip, part, value);
+    studio.send({Type::StripValue, uint8_t(n), 0, uint16_t(part), int16_t(melodee::strip_get(strip, part))});
+    studio.changed();
+}
+
+namespace {
+struct StripRange { int lo, hi; };
+StripRange strip_range(melodee::StripPart part) {
+    using P = melodee::StripPart;
+    const unsigned p = unsigned(part);
+    if (p >= unsigned(P::Eq0) && p <= unsigned(P::Eq8)) return {-melodee::eq_range, melodee::eq_range};
+    switch (part) {
+    case P::Trim: return {-melodee::trim_range, melodee::trim_range};
+    case P::Width: return {0, int(melodee::width_max)};
+    case P::Amount: return {0, int(melodee::comp_amount_max)};
+    case P::Ratio: return {int(melodee::comp_ratio_min), int(melodee::comp_ratio_max)};
+    case P::Speed: return {0, int(melodee::CompSpeed::Count) - 1};
+    case P::Key: return {0, melodee::strip_key_most};
+    case P::Mix: return {0, 100};
+    case P::Gain: return {melodee::comp_gain_min, melodee::comp_gain_max};
+    default: return {0, 1};
+    }
+}
+std::string tenths_db(int v) {
+    char text[16];
+    std::snprintf(text, sizeof text, "%s%.1fDB", v > 0 ? "+" : v < 0 ? "-" : "", std::abs(v) / 10.0);
+    return text;
+}
+} // namespace
+
+std::string strip_text(melodee::StripPart part, int value) {
+    using P = melodee::StripPart;
+    const unsigned p = unsigned(part);
+    if ((p >= unsigned(P::Eq0) && p <= unsigned(P::Eq8)) || part == P::Trim || part == P::Gain) return tenths_db(value);
+    switch (part) {
+    case P::Width: return std::to_string(value) + "%";
+    case P::Amount: return value ? "-" + std::to_string(value) + "DB" : "OFF";
+    case P::Ratio: {
+        char text[16];
+        if (value % 10) std::snprintf(text, sizeof text, "%.1f:1", value / 10.0);
+        else std::snprintf(text, sizeof text, "%d:1", value / 10);
+        return text;
+    }
+    case P::Speed: { static const char* const names[] {"FAST", "MED", "SLOW", "AUTO"}; return names[unsigned(value) % 4]; }
+    case P::Key: {
+        const unsigned k = unsigned(value);
+        if (!k) return "OWN";
+        if (melodee::fx_key_is_track(k)) return "TRACK " + std::to_string(k);
+        if (melodee::fx_key_is_bus(k)) return std::string("BUS ") + char('A' + int(k - melodee::fx_key_bus(0)));
+        return "SUB " + std::to_string(k - melodee::fx_key_sub(0) + 1);
+    }
+    case P::Mix: return std::to_string(value) + "%";
+    case P::EqOn: case P::CompOn: return value ? "ON" : "OFF";
+    default: return std::to_string(value);
+    }
+}
+
+float strip_fraction(melodee::StripPart part, int value) {
+    const auto r = strip_range(part);
+    return r.hi > r.lo ? std::clamp(float(value - r.lo) / float(r.hi - r.lo), 0.0f, 1.0f) : 0.0f;
+}
+
+int strip_step(melodee::StripPart part, bool fine) {
+    using P = melodee::StripPart;
+    const unsigned p = unsigned(part);
+    if ((p >= unsigned(P::Eq0) && p <= unsigned(P::Eq8)) || part == P::Trim || part == P::Gain || part == P::Ratio) return fine ? 1 : 5;
+    if (part == P::Width) return fine ? 1 : 2;
+    return 1;
+}
+
+void set_out(Studio& studio, unsigned t, unsigned out) {
+    auto& mix = studio.project().tracks[t % melodee::track_count].mix;
+    mix.out = uint8_t(out <= melodee::sub_count ? out : 0);
+    studio.send({Type::TrackOut, uint8_t(t % melodee::track_count), 0, 0, int16_t(mix.out)});
+    studio.changed();
+}
+
+std::string out_text(unsigned out) { return out ? "S" + std::to_string(out) : "MAIN"; }
+
+namespace {
+void sub_part(Studio& studio, unsigned sub, unsigned part, int value) {
+    studio.send({Type::SubMix, uint8_t(sub % melodee::sub_count), 0, uint16_t(part), int16_t(value)});
+    studio.changed();
+}
+} // namespace
+
+void set_sub_level(Studio& studio, unsigned sub, int level) {
+    auto& mix = studio.project().subs[sub % melodee::sub_count].mix;
+    mix.level = uint8_t(std::clamp(level, 0, 127));
+    sub_part(studio, sub, melodee::Command::SubLevel, mix.level);
+}
+void set_sub_pan(Studio& studio, unsigned sub, int pan) {
+    auto& mix = studio.project().subs[sub % melodee::sub_count].mix;
+    mix.pan = int8_t(std::clamp(pan, -50, 50));
+    sub_part(studio, sub, melodee::Command::SubPan, mix.pan);
+}
+void set_sub_send(Studio& studio, unsigned sub, unsigned bus, int value) {
+    auto& mix = studio.project().subs[sub % melodee::sub_count].mix;
+    mix.sends[bus % melodee::bus_count] = uint8_t(std::clamp(value, 0, 100));
+    sub_part(studio, sub, melodee::Command::SubSend0 + bus % melodee::bus_count, mix.sends[bus % melodee::bus_count]);
+}
+void set_sub_mute(Studio& studio, unsigned sub, bool on) {
+    studio.project().subs[sub % melodee::sub_count].mix.mute = on;
+    sub_part(studio, sub, melodee::Command::SubMute, on);
+}
+void set_sub_solo(Studio& studio, unsigned sub, bool on) {
+    studio.project().subs[sub % melodee::sub_count].mix.solo = on;
+    sub_part(studio, sub, melodee::Command::SubSolo, on);
+}
+
+bool sub_fed(const Studio& studio, unsigned sub) {
+    for (const auto& t : studio.project().tracks) if (t.used() && t.mix.out == melodee::out_sub(sub)) return true;
+    return false;
+}
+
 void unmute_all(Studio& studio) {
+    for (unsigned s = 0; s < melodee::sub_count; ++s) { // the submixes too
+        if (studio.project().subs[s].mix.mute) set_sub_mute(studio, s, false);
+        if (studio.project().subs[s].mix.solo) set_sub_solo(studio, s, false);
+    }
     for (unsigned t = 0; t < melodee::track_count; ++t) {
         auto& track = studio.project().tracks[t];
         if (track.mix.mute) studio.set_mute(t, false);

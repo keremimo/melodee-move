@@ -462,10 +462,12 @@ it (`src/app/screens/device_fx.*`, `mixer.cpp`), the logic in
   another slot (any chain's) and a push pastes it. A Schwung effect pasted
   or on a copied track gets its own instance, set as the one copied.
 - **The track's mix** (the wheel on the track item): knob 1 its level, 2 its
-  pan, 3-6 its sends into buses A-D; its meter on the right; the detail
-  line its level in dB and its share of the CPU.
+  pan, 3-6 its sends into buses A-D, 7 its output (MAIN or a submix S1-S8,
+  a detent a place; the title then shows `>S2`), 8 its width (0% mono, 100%
+  as it is, 200%); its meter on the right; the detail line its level in dB
+  and its share of the CPU.
 - **The Mixer** (Shift + Step 4): Melodee's MIX hub, its pages on the row
-  the wheel walks: VOL, PAN, SNDA-SNDD, MAIN. On VOL, PAN
+  the wheel walks: VOL, PAN, SNDA-SNDD, MAIN, EQ, COMP. On VOL, PAN
   and the sends the knobs are eight tracks (Left and Right: 1-8 or 9-16),
   each a strip with its meter, the selected one's number inverted, a muted
   one hollow, a soloed one marked S; a send page shows the bus's return
@@ -476,6 +478,24 @@ it (`src/app/screens/device_fx.*`, `mixer.cpp`), the logic in
   8 its pad). The steps are the sixteen tracks: a step selects one, Mute +
   a step mutes it, Shift + Mute + a step solos it, as with the track
   buttons. A touched knob shows that track large, in dB.
+- **The strip** (melodee-sample docs/MIXER_PLAN.md; Kerem's B, 2026-11-24):
+  every track, submix, bus, the input and the master has one after its
+  chain. EQ and COMP are the Mixer's last pages, for the track in hand (a
+  step picks it) or the submix picked. **EQ**: the nine bands as a curve,
+  knobs 1-8 63 Hz-8 kHz (half a dB a detent, Shift a tenth), Shift + knob
+  8 16 kHz, Shift + knob 1 the trim; the band turned last ringed, its value
+  on the detail line; the push turns the EQ off (the curve dotted, its
+  bands kept) and on. **COMP**: its curve in a square and what it took off
+  of late, hanging from the top; knobs 1-6 amount, ratio, speed, key, mix,
+  gain, knob 8 the width; the push turns it off and on. The strip's moves
+  are lanes of the selected track's pattern under Rec.
+- **Submixes**: Left / Right past 9-16 shows the eight submixes S1-S8: a
+  dot for one no track plays into, the knobs their levels, pans and sends;
+  a step picks one, Mute + a step mutes it, Shift + Mute + a step solos it
+  (a track button held: the tracks, as anywhere). The push on VOL or PAN
+  opens its chain: its level first (knob 1, the tracks that play into it on
+  the detail line), then its six effects. EQ and COMP are the picked
+  submix's. A submix's moves are not recorded.
 - **Shift + Step 4 again** (Kerem's choice): from the Mixer, Knob FX;
   again Pad FX; again Flex Beat; again the Mixer.
 - **Knob FX**: the mode turns on as it opens (the MPC's Knob FX lit) and
@@ -507,12 +527,16 @@ it (`src/app/screens/device_fx.*`, `mixer.cpp`), the logic in
 | --- | --- | --- | --- |
 | An effect in the Device View | track kind / track / `FX1`-`FX6`, a pad's `A05` | the row, the effect's name, its knobs | |
 | `+` | the same / `FXn` | `ADD AN EFFECT` | slots used, `PUSH: BROWSE` |
-| The track item | kind / track / `MIX` | the track's name, its six knobs, its meter | level in dB, CPU share |
+| The track item | kind / track / `MIX` | the track's name (`>S2` its submix), its eight knobs, its meter | level in dB, CPU share |
 | Effect browser | `LOAD` / track / slot | families, then effects | `PUSH: OK` |
 | Effect options | `OPT` / track / effect | Bypass, Move, Copy, Paste, Remove | |
 | Mixer page | `MIX` / track / `1-8` or `9-16` | the hub row, eight strips | the selected track, its value |
+| Mixer, submixes | `MIX` / `S1`-`S8` / `S1-8` | the hub row, eight submixes | the submix picked, its value |
+| Mixer EQ | `MIX` / track or `S2` / `EQ` | the hub row, the bands' curve | the band turned last, its gain |
+| Mixer COMP | `MIX` / track or `S2` / `COMP` | the hub row, its curve, what it took off | the channel, the reduction |
 | Mixer MAIN | `MIX` / / `MAIN` | returns, reduction, out | reduction, `PUSH: FX` |
 | A bus's chain | `BUS` / `A`-`D` / item | the row, the return or the effect | the tracks sending |
+| A submix's chain | `SUB` / `1`-`8` / `LVL` or item | the row, its level or the effect | the tracks playing into it |
 | The master's chain | `MAIN` / / item | the row, an effect or the compressor's bar | its key, the reduction |
 | Knob FX | `KFX` / `A` or `B` / `ON`, `OFF`, `BYP` | the effect's name, its knobs | |
 | Pad FX | `PFX` / bank / `MST` or `TRK` | the punches held, the bar | quantize, `PUSH: KEEP` |

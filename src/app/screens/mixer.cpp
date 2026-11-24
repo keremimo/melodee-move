@@ -31,6 +31,7 @@ std::string chain_tag(const Studio& studio, unsigned chain) {
     if (mixing::is_pad_chain(chain)) return pad_label((chain - melodee::pad_chain_base) % melodee::sampler_pads);
     if (chain < melodee::track_count) return std::to_string(chain + 1);
     if (chain == mixing::master) return "MAIN";
+    if (melodee::is_sub_chain(chain)) return "S" + std::to_string(chain - melodee::sub_chain(0) + 1);
     (void)studio;
     return std::string(1, char('A' + int(chain - melodee::track_count)));
 }
@@ -102,7 +103,7 @@ private:
     int cursor = 0, family = 0, schwung_row = 0, none_row = 0;
     bool loaded = false; // something was put in the slot here: the push leaves
 
-    bool pad_chain() const { return mixing::is_pad_chain(studio.desk.chain); }
+    bool pad_chain() const { return studio.desk.chain >= melodee::chain_count; } // a kit pad's or a submix's: no Schwung effect
 
     void rows_now() {
         rows.clear();
@@ -248,26 +249,55 @@ void play_lights(Studio& studio, move::Lights& lights) {
     if (auto* play = studio.screen(home_screen(studio.kind()))) play->lights(lights);
 }
 
-// The hub's pages, as the wheel walks them (docs/UI.md, "Mixer and effects").
-enum Page : int { Vol, Pan, SendA, SendB, SendC, SendD, Main, page_count };
+// The hub's pages, as the wheel walks them (docs/UI.md, "Mixer and effects"): the levels, pans and sends of
+// eight channels, MAIN, then the channel in hand's strip, EQ and COMP (Melodee's mixer, Kerem's pick B).
+enum Page : int { Vol, Pan, SendA, SendB, SendC, SendD, Main, Eq, Comp, page_count };
 bool is_send(int page) { return page >= SendA && page <= SendD; }
+constexpr int subs_bank = 2; // Left / Right: tracks 1-8, 9-16, then the submixes S1-S8
+
+// The strip's pictures (ui/mix_widgets.h) from its values.
+void eq_curve(juce::Graphics& g, juce::Rectangle<int> area, const melodee::Strip& strip, int touched) {
+    std::array<float, 9> db {};
+    for (size_t b = 0; b < db.size(); ++b) db[b] = strip.eq[b] / 10.0f;
+    ui::mix::eq_curve(g, area, db, strip.eq_on, touched);
+}
+void comp_picture(juce::Graphics& g, juce::Rectangle<int> area, const melodee::Strip& strip, const std::vector<float>& taken) {
+    ui::mix::comp_picture(g, area, 1.0f - float(strip.comp_amount) / float(melodee::comp_amount_max), strip.comp_ratio / 10.0f,
+                          strip.comp_on && strip.comp_amount, taken);
+}
 
 class Mixer final : public Screen {
 public:
     using Screen::Screen;
     bindings::Screen screen_kind() const override { return bindings::Screen::Mixer; }
-    void enter() override { half = studio.track() / 8; }
+    void enter() override { if (half != subs_bank) half = int(studio.track() / 8); taken.assign(64, 0.0f); }
 
     bool job(Job job, const bindings::Use& use) override {
         switch (job) {
         case Job::MixerPage: page = std::clamp(page + use.delta, 0, page_count - 1); return true;
-        case Job::MixerHalf: half = use.control == bindings::Control::Left ? 0 : 1; return true;
-        case Job::TurnKnob: case Job::TurnKnobFine: turn(unsigned(use.index), use.delta); return true;
+        case Job::MixerHalf: half = std::clamp(half + (use.control == bindings::Control::Left ? -1 : 1), 0, subs_bank); return true;
+        case Job::TurnKnob: case Job::TurnKnobFine: turn(unsigned(use.index), use.delta, job == Job::TurnKnobFine); return true;
         case Job::PickTrack:
+            if (half == subs_bank) { if (use.index < int(melodee::sub_count)) sub = use.index; return true; } // the submixes: steps 1-8
             studio.select(unsigned(use.index));
+            half = int(studio.track() / 8);
             studio.open(own_page()); // select() goes home: back here
             return true;
+        case Job::MuteStep: case Job::SoloStep: { // on the submixes: Mute + a step mutes it, Shift + Mute + a step solos it
+            if (half != subs_bank || (use.held & bindings::held::track)) return false; // a track button held: the tracks
+            if (use.index >= int(melodee::sub_count)) return true;
+            const auto& mix = studio.project().subs[unsigned(use.index)].mix;
+            if (job == Job::MuteStep) mixing::set_sub_mute(studio, unsigned(use.index), !mix.mute);
+            else mixing::set_sub_solo(studio, unsigned(use.index), !mix.solo);
+            return true;
+        }
         case Job::OpenChain:
+            if (page == Eq || page == Comp) { // the push: the EQ or the compressor on or off
+                const auto part = page == Eq ? melodee::StripPart::EqOn : melodee::StripPart::CompOn;
+                mixing::set_strip(studio, channel(), part, melodee::strip_get(studio.project().strip(channel()), part) ? 0 : 1);
+                return true;
+            }
+            if (half == subs_bank && page < SendA) { studio.desk.chain = melodee::sub_chain(unsigned(sub)); studio.push("chain"); return true; }
             if (page < SendA) { studio.desk.show_effects = true; studio.home(); return true; } // the track's Device View, on its effects
             studio.desk.chain = page == Main ? mixing::master : mixing::bus(unsigned(page - SendA));
             studio.push("chain");
@@ -275,26 +305,29 @@ public:
         case Job::Mixer: studio.open("knob-fx"); return true; // Shift + Step 4 again
         case Job::Back: studio.close(); return true;
         default:
-            return (use.held & bindings::held::step) || job == Job::ToggleStep; // the steps are the tracks here
+            return (use.held & bindings::held::step) || job == Job::ToggleStep; // the steps are the channels here
         }
     }
 
     void lights(move::Lights& lights) override {
         play_lights(studio, lights);
-        track_steps(studio, lights);
-        lights.button(move::Button::Left, half ? move::white_dim : move::white_bright);
-        lights.button(move::Button::Right, half ? move::white_bright : move::white_dim);
+        if (half == subs_bank) sub_steps(lights);
+        else track_steps(studio, lights);
+        lights.button(move::Button::Left, half ? move::white_bright : move::white_dim);
+        lights.button(move::Button::Right, half < subs_bank ? move::white_bright : move::white_dim);
         lights.button(move::Button::Back, move::white_dim);
     }
 
     void draw(juce::Graphics& g) override {
-        unsigned first = unsigned(half) * 8;
-        ui::rail(g, "MIX", page == Main ? "" : track_number(studio), page == Main ? "MAIN" : half ? "9-16" : "1-8");
+        const bool subs = half == subs_bank;
+        const std::string number = subs ? "S" + std::to_string(sub + 1) : track_number(studio);
+        if (page == Eq || page == Comp) { draw_strip(g, number); return; }
+        ui::rail(g, "MIX", page == Main ? "" : number, page == Main ? "MAIN" : subs ? "S1-8" : half ? "9-16" : "1-8");
         ui::mix::item_row(g, hub(), page);
         if (page == Main) { draw_main(g); return; }
         std::vector<ui::mix::Strip> list;
-        for (unsigned t = first; t < first + 8; ++t) list.push_back(strip(t));
-        int selected = int(studio.track()) - int(first);
+        for (unsigned n = 0; n < 8; ++n) list.push_back(subs ? sub_strip(n) : strip(unsigned(half) * 8 + n));
+        int selected = subs ? sub : int(studio.track()) - half * 8;
         if (is_send(page)) { // a send page: the bus's return last
             unsigned b = unsigned(page - SendA);
             ui::mix::Strip back;
@@ -303,25 +336,37 @@ public:
             list.push_back(back);
         }
         ui::mix::strips(g, ui::content(10, 44), list, selected >= 0 && selected < 8 ? selected : -1);
-        const auto& track = studio.current();
         if (is_send(page)) {
             unsigned b = unsigned(page - SendA);
             ui::detail(g, "RTN " + std::to_string(studio.project().buses[b].level), "PUSH: FX");
+        } else if (subs) {
+            const auto& x = studio.project().subs[unsigned(sub)];
+            const std::string name = x.name[0] ? upper(x.name).substr(0, 9) : "SUBMIX " + std::to_string(sub + 1);
+            ui::detail(g, name, page == Vol ? mixing::level_text(x.mix.level) : mixing::pan_text(x.mix.pan));
         } else {
+            const auto& track = studio.current();
             ui::detail(g, upper(track.name).substr(0, 9), page == Vol ? mixing::level_text(track.mix.level) : mixing::pan_text(track.mix.pan));
         }
     }
 
-    // Mix in Motion (Melodee's): the selected track's level, pan and sends, and the returns, as lanes of its pattern.
+    // Mix in Motion (Melodee's): the selected track's level, pan, sends and strip, and the returns, as lanes of its
+    // pattern. A submix's moves are not recorded (Melodee's decision 7).
     bool knob_lane(unsigned which, unsigned& param, unsigned& pad) const override {
         pad = 0;
-        if (page == 6) {
+        if (page == Main) {
             if (which >= 4) return false; // the compressor: no lane in Melodee
             param = melodee::motion_return(which);
             return true;
         }
+        if (half == subs_bank) return false;
+        if (page == Eq || page == Comp) {
+            const int lane = melodee::motion_strip(part_of(which, studio.shift));
+            if (lane < 0 || part_of(which, studio.shift) == melodee::StripPart::Count) return false;
+            param = unsigned(lane);
+            return true;
+        }
         if (unsigned(half) * 8 + which != studio.track()) return false; // another track's: not the selected pattern's lane
-        param = page == 0 ? melodee::motion_level : page == 1 ? melodee::motion_pan : melodee::motion_send(unsigned(page - 2));
+        param = page == Vol ? melodee::motion_level : page == Pan ? melodee::motion_pan : melodee::motion_send(unsigned(page - SendA));
         return true;
     }
     Knob knob(unsigned which) const override {
@@ -330,6 +375,20 @@ public:
                                    studio.project().buses[which].level / 100.0f};
             if (which == 7) return {"COMP AMOUNT", std::to_string(studio.project().compressor.amount) + "%", studio.project().compressor.amount / 100.0f};
             return {};
+        }
+        if (page == Eq || page == Comp) {
+            const auto part = part_of(which, studio.shift);
+            if (part == melodee::StripPart::Count) return {};
+            const int v = melodee::strip_get(studio.project().strip(channel()), part);
+            return {part_name(part), mixing::strip_text(part, v), mixing::strip_fraction(part, v)};
+        }
+        if (half == subs_bank) {
+            const auto& mix = studio.project().subs[which].mix;
+            const std::string who = "S" + std::to_string(which + 1) + " ";
+            if (page == Vol) return {who + "LEVEL", mixing::level_text(mix.level), mix.level / 127.0f};
+            if (page == Pan) return {who + "PAN", mixing::pan_text(mix.pan), (mix.pan + 50) / 100.0f};
+            unsigned b = unsigned(page - SendA);
+            return {who + ">" + char('A' + int(b)), std::to_string(mix.sends[b]), mix.sends[b] / 100.0f};
         }
         unsigned t = unsigned(half) * 8 + which;
         if (studio.kind(t) == TrackKind::Empty) return {};
@@ -341,17 +400,57 @@ public:
         return {who + ">" + char('A' + int(b)), std::to_string(track.mix.sends[b]), track.mix.sends[b] / 100.0f};
     }
     std::string knob_owner() const override {
-        static const char* const names[] {"VOL", "PAN", "SNDA", "SNDB", "SNDC", "SNDD", "MAIN"};
+        static const char* const names[] {"VOL", "PAN", "SNDA", "SNDB", "SNDC", "SNDD", "MAIN", "EQ", "COMP"};
         return names[page];
     }
-    std::string status() const override { return " mixer_page=" + std::to_string(page) + " mixer_half=" + std::to_string(half); }
+    std::string status() const override {
+        return " mixer_page=" + std::to_string(page) + " mixer_half=" + std::to_string(half) + " mixer_sub=" + std::to_string(sub + 1)
+             + " mixer_band=" + std::to_string(band + 1);
+    }
 
 private:
-    int page = Vol, half = 0; // half: 0 tracks 1-8, 1 tracks 9-16
+    int page = Vol, half = 0, sub = 0; // half: 0 tracks 1-8, 1 tracks 9-16, 2 the submixes (sub the one in hand)
+    int band = 1;                      // the EQ's band a knob turned last (its ring)
+    std::vector<float> taken;          // what the channel's compressor took off of late, dB, a column a frame
 
-    static std::vector<ui::mix::Item> hub() { return {{"VOL"}, {"PAN"}, {"SNDA"}, {"SNDB"}, {"SNDC"}, {"SNDD"}, {"MAIN"}}; }
+    static std::vector<ui::mix::Item> hub() {
+        return {{"VOL"}, {"PAN"}, {"SNDA"}, {"SNDB"}, {"SNDC"}, {"SNDD"}, {"MAIN"}, {"EQ"}, {"COMP"}};
+    }
 
     std::string own_page() const { return "mixer"; }
+
+    // The channel in hand, by Melodee's strip number: the selected track, or on the submixes the one picked.
+    unsigned channel() const { return half == subs_bank ? melodee::strip_sub(unsigned(sub)) : studio.track(); }
+
+    // What knob `which` sets on EQ or COMP: EQ the bands 63 Hz .. 8 kHz, Shift + knob 8 16 kHz and Shift + knob 1
+    // the trim; COMP amount, ratio, speed, key, mix, gain on knobs 1-6, knob 8 the width. Count: none.
+    melodee::StripPart part_of(unsigned which, bool shift) const {
+        using P = melodee::StripPart;
+        if (page == Eq) {
+            if (shift && which == 0) return P::Trim;
+            if (shift && which == 7) return melodee::eq_part(8);
+            return which < 8 ? melodee::eq_part(which) : P::Count;
+        }
+        static const P comp[8] {P::Amount, P::Ratio, P::Speed, P::Key, P::Mix, P::Gain, P::Count, P::Width};
+        return comp[which % 8];
+    }
+    static std::string part_name(melodee::StripPart part) {
+        using P = melodee::StripPart;
+        static const char* const bands[9] {"63 HZ", "125 HZ", "250 HZ", "500 HZ", "1 KHZ", "2 KHZ", "4 KHZ", "8 KHZ", "16 KHZ"};
+        const unsigned p = unsigned(part);
+        if (p >= unsigned(P::Eq0) && p <= unsigned(P::Eq8)) return bands[p - unsigned(P::Eq0)];
+        switch (part) {
+        case P::Trim: return "TRIM";
+        case P::Width: return "WIDTH";
+        case P::Amount: return "AMOUNT";
+        case P::Ratio: return "RATIO";
+        case P::Speed: return "SPEED";
+        case P::Key: return "KEY";
+        case P::Mix: return "MIX";
+        case P::Gain: return "GAIN";
+        default: return {};
+        }
+    }
 
     ui::mix::Strip strip(unsigned t) const {
         const auto& mix = studio.project().tracks[t].mix;
@@ -365,11 +464,49 @@ private:
         else s.value = page == Vol ? mix.level / 127.0f : mix.sends[unsigned(page - SendA)] / 100.0f;
         return s;
     }
+    ui::mix::Strip sub_strip(unsigned n) const {
+        const auto& mix = studio.project().subs[n].mix;
+        const auto m = studio.host().strip_meter(melodee::strip_sub(n));
+        ui::mix::Strip s;
+        s.label = std::to_string(n + 1); // the rail says S1-8
+        s.used = mixing::sub_fed(studio, n);
+        s.muted = mix.mute;
+        s.soloed = mix.solo;
+        s.meter = meter_fraction(std::max(m.left, m.right));
+        if (page == Pan) { s.bipolar = true; s.value = mix.pan / 50.0f; }
+        else s.value = page == Vol ? mix.level / 127.0f : mix.sends[unsigned(page - SendA)] / 100.0f;
+        return s;
+    }
+    void sub_steps(move::Lights& lights) const {
+        for (unsigned n = 0; n < move::step_count; ++n) {
+            if (n >= melodee::sub_count) { lights.step(n, move::colour::off); continue; }
+            const auto& mix = studio.project().subs[n].mix;
+            lights.step(n, int(n) == sub ? move::colour::white : mix.solo ? move::colour::blue : mix.mute ? move::colour::dark_grey
+                           : mixing::sub_fed(studio, n) ? move::colour::light_grey : move::colour::dark_grey);
+        }
+    }
 
-    void turn(unsigned which, int delta) {
+    void turn(unsigned which, int delta, bool fine) {
         if (page == Main) {
             if (which < 4) mixing::set_return(studio, which, int(studio.project().buses[which].level) + delta);
             else if (which == 7) mixing::set_compressor(studio, mixing::CompAmount, int(studio.project().compressor.amount) + delta);
+            return;
+        }
+        if (page == Eq || page == Comp) {
+            if (half != subs_bank && studio.kind(studio.track()) == TrackKind::Empty) return;
+            const auto part = part_of(which, fine);
+            if (part == melodee::StripPart::Count) return;
+            const bool finer = fine && !(page == Eq && (which == 0 || which == 7)); // Shift + knob 1 / 8 on EQ: another value, as fast
+            const int now = melodee::strip_get(studio.project().strip(channel()), part);
+            mixing::set_strip(studio, channel(), part, now + delta * mixing::strip_step(part, finer));
+            if (page == Eq) band = part == melodee::StripPart::Trim ? band : int(unsigned(part) - unsigned(melodee::StripPart::Eq0));
+            return;
+        }
+        if (half == subs_bank) {
+            const auto& mix = studio.project().subs[which].mix;
+            if (page == Vol) mixing::set_sub_level(studio, which, int(mix.level) + delta);
+            else if (page == Pan) mixing::set_sub_pan(studio, which, mix.pan + delta);
+            else mixing::set_sub_send(studio, which, unsigned(page - SendA), int(mix.sends[unsigned(page - SendA)]) + delta);
             return;
         }
         unsigned t = unsigned(half) * 8 + which;
@@ -378,6 +515,31 @@ private:
         if (page == Vol) studio.set_level(t, int(mix.level) + delta);
         else if (page == Pan) mixing::set_pan(studio, t, mix.pan + delta);
         else mixing::set_send(studio, t, unsigned(page - SendA), int(mix.sends[unsigned(page - SendA)]) + delta);
+    }
+
+    // EQ and COMP: the channel in hand's strip, the selected track's or a submix's (an empty track has none).
+    void draw_strip(juce::Graphics& g, const std::string& number) {
+        ui::rail(g, "MIX", number, page == Eq ? "EQ" : "COMP");
+        ui::mix::item_row(g, hub(), page);
+        if (half != subs_bank && studio.kind(studio.track()) == TrackKind::Empty) {
+            move::draw_text_centred(g, ui::content_x, 28, ui::content_width, "EMPTY TRACK");
+            return;
+        }
+        const auto& strip = studio.project().strip(channel());
+        const std::string name = half == subs_bank ? "SUBMIX " + std::to_string(sub + 1) : upper(studio.current().name).substr(0, 9);
+        if (page == Eq) {
+            eq_curve(g, ui::content(11, 41), strip, band);
+            const auto part = melodee::eq_part(unsigned(band));
+            ui::detail(g, strip.eq_on ? part_name(part) : "EQ OFF", strip.eq_on ? mixing::strip_text(part, strip.eq[size_t(band)]) : "PUSH: ON");
+            return;
+        }
+        const float now = studio.host().strip_meter(channel()).reduction;
+        taken.erase(taken.begin());
+        taken.push_back(now);
+        comp_picture(g, ui::content(12, 38), strip, taken);
+        char gr[16];
+        std::snprintf(gr, sizeof gr, "%.1fDB", now < 0.05f ? 0.0 : -double(now));
+        ui::detail(g, name, strip.comp_on && strip.comp_amount ? gr : "PUSH: ON");
     }
 
     void draw_main(juce::Graphics& g) {
@@ -438,13 +600,23 @@ public:
         focus = std::min(focus, int(all.size()) - 1);
         const Entry& at = all[size_t(focus)];
         unsigned chain = studio.desk.chain;
-        bool main = chain == mixing::master;
-        std::string bottom = at.kind == Entry::Head ? "RTN" : at.kind == Entry::Comp ? "COMP" : fx.rail_bottom(at.item);
-        ui::rail(g, main ? "MAIN" : "BUS", main ? "" : chain_tag(studio, chain), bottom);
+        bool main = chain == mixing::master, sub = melodee::is_sub_chain(chain);
+        std::string bottom = at.kind == Entry::Head ? (sub ? "LVL" : "RTN") : at.kind == Entry::Comp ? "COMP" : fx.rail_bottom(at.item);
+        ui::rail(g, main ? "MAIN" : sub ? "SUB" : "BUS", main ? "" : sub ? chain_tag(studio, chain).substr(1) : chain_tag(studio, chain), bottom);
         std::vector<ui::mix::Item> row;
         for (const auto& entry : all) row.push_back(entry.kind == Entry::Effect ? fx.row_item(entry.item) : ui::mix::Item {name_of(entry)});
         ui::mix::item_row(g, row, focus);
         if (at.kind == Entry::Effect) { fx.draw(g, at.item); return; }
+        if (at.kind == Entry::Head && sub) { // a submix: its level, and the tracks that play into it
+            const unsigned n = chain - melodee::sub_chain(0);
+            const int level = studio.project().subs[n].mix.level;
+            ui::big_parameter(g, ui::content(12, 34), "LEVEL", mixing::level_text(level), level / 127.0f);
+            std::string from = "FROM";
+            for (unsigned t = 0; t < melodee::track_count; ++t)
+                if (studio.project().tracks[t].mix.out == melodee::out_sub(n) && studio.kind(t) != TrackKind::Empty && from.size() < 14) from += " " + std::to_string(t + 1);
+            ui::detail(g, from.size() > 4 ? from : "NOTHING PLAYS IN");
+            return;
+        }
         if (at.kind == Entry::Head) {
             unsigned b = chain - melodee::track_count;
             int level = studio.project().buses[b].level;
@@ -464,13 +636,17 @@ public:
         const Entry& at = all[size_t(std::min(focus, int(all.size()) - 1))];
         pad = 0;
         if (at.kind == Entry::Effect) return fx.lane(at.item, which, param);
-        if (at.kind == Entry::Head && which == 0) { param = melodee::motion_return(studio.desk.chain - melodee::track_count); return true; }
+        if (at.kind == Entry::Head && which == 0 && !melodee::is_sub_chain(studio.desk.chain)) { param = melodee::motion_return(studio.desk.chain - melodee::track_count); return true; }
         return false;
     }
     Knob knob(unsigned which) const override {
         auto all = const_cast<Chain*>(this)->items();
         const Entry& at = all[size_t(std::min(focus, int(all.size()) - 1))];
         if (at.kind == Entry::Effect) return fx.knob(at.item, which);
+        if (at.kind == Entry::Head && melodee::is_sub_chain(studio.desk.chain)) {
+            const int level = studio.project().subs[studio.desk.chain - melodee::sub_chain(0)].mix.level;
+            return which == 0 ? Knob {"LEVEL", mixing::level_text(level), level / 127.0f} : Knob {};
+        }
         if (at.kind == Entry::Head) {
             unsigned b = studio.desk.chain - melodee::track_count;
             return which == 0 ? Knob {"RETURN", std::to_string(studio.project().buses[b].level), studio.project().buses[b].level / 100.0f} : Knob {};
@@ -489,7 +665,7 @@ public:
         default: return {};
         }
     }
-    std::string knob_owner() const override { return studio.desk.chain == mixing::master ? "MAIN" : "BUS"; }
+    std::string knob_owner() const override { return studio.desk.chain == mixing::master ? "MAIN" : melodee::is_sub_chain(studio.desk.chain) ? "SUB" : "BUS"; }
     std::string status() const override { return " chain=" + chain_tag(studio, studio.desk.chain) + " chain_focus=" + std::to_string(focus); }
 
 private:
@@ -513,6 +689,11 @@ private:
     }
 
     void turn(const Entry& at, unsigned which, int delta) {
+        if (at.kind == Entry::Head && melodee::is_sub_chain(studio.desk.chain)) {
+            const unsigned n = studio.desk.chain - melodee::sub_chain(0);
+            if (which == 0) mixing::set_sub_level(studio, n, int(studio.project().subs[n].mix.level) + delta);
+            return;
+        }
         if (at.kind == Entry::Head) {
             unsigned b = studio.desk.chain - melodee::track_count;
             if (which == 0) mixing::set_return(studio, b, int(studio.project().buses[b].level) + delta);

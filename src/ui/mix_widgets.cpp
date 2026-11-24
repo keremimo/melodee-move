@@ -126,4 +126,53 @@ std::string db_text(float db) {
     return text;
 }
 
+
+void eq_curve(juce::Graphics& g, juce::Rectangle<int> area, const std::array<float, 9>& db, bool on, int touched) {
+    const int x0 = area.getX() + 2, w = area.getWidth() - 4, mid = area.getY() + area.getHeight() / 2, half = area.getHeight() / 2 - 2;
+    for (int x = x0; x < x0 + w; x += 2) g.fillRect(x, mid, 1, 1); // 0 dB, dotted
+    auto band_x = [&](int b) { return x0 + 2 + (w - 5) * b / 8; };
+    auto db_at = [&](float f) { // f: 0..8 along the bands; a peak a band, an octave wide
+        if (!on) return 0.0f;
+        float sum = 0;
+        for (int b = 0; b < 9; ++b) { const float d = f - float(b); sum += db[size_t(b)] * std::exp(-d * d * 1.6f); }
+        return sum;
+    };
+    auto y_of = [&](float v) { return mid - int(std::lround(std::clamp(v, -12.0f, 12.0f) / 12.0f * float(half))); };
+    int last = -1;
+    for (int x = x0; x < x0 + w; ++x) {
+        const int y = y_of(db_at(float(x - x0 - 2) / float(w - 5) * 8));
+        if (last < 0) last = y;
+        if (on || (x % 2)) g.fillRect(x, std::min(y, last), 1, std::abs(y - last) + 1);
+        last = y;
+    }
+    for (int b = 0; b < 9; ++b) {
+        const int x = band_x(b), y = y_of(db_at(float(b)));
+        if (b == touched) {
+            g.setColour(juce::Colours::black); g.fillRect(x - 3, y - 3, 7, 7);
+            g.setColour(juce::Colours::white); g.drawRect(x - 3, y - 3, 7, 7);
+        } else g.fillRect(x - 1, y - 1, 3, 3);
+    }
+}
+
+void comp_picture(juce::Graphics& g, juce::Rectangle<int> area, float threshold, float ratio, bool on, const std::vector<float>& taken) {
+    const int s = area.getHeight(), x0 = area.getX(), y0 = area.getY();
+    g.drawRect(x0, y0, s, s);
+    ratio = std::max(ratio, 1.0f);
+    int last = -1;
+    for (int x = 0; x < s - 2; ++x) {
+        const float in = float(x) / float(s - 3), out = !on || in < threshold ? in : threshold + (in - threshold) / ratio;
+        const int y = y0 + s - 2 - int(std::lround(out * float(s - 3)));
+        if (last < 0) last = y;
+        g.fillRect(x0 + 1 + x, std::min(y, last), 1, std::abs(y - last) + 1);
+        last = y;
+    }
+    const int hx = x0 + s + 4, hw = area.getRight() - hx;
+    if (!on) { move::draw_text_centred(g, hx, y0 + s / 2 - 3, hw, "OFF"); return; }
+    const int shown = std::min(hw / 2, int(taken.size()));
+    for (int c = 0; c < shown; ++c) {
+        const float r = taken[taken.size() - size_t(shown) + size_t(c)];
+        if (r >= 0.05f) g.fillRect(hx + c * 2, y0, 1, std::max(1, int(std::lround(std::min(r / 12.0f, 1.0f) * float(s - 4)))));
+    }
+}
+
 } // namespace ui::mix

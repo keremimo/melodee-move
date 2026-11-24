@@ -9,8 +9,10 @@
 // a track, four buses and six on the master before its compressor. Shift +
 // Step 4 (no Move job) opens the Mixer: Melodee's MIX hub, its pages along
 // the top the wheel walks: the sixteen tracks' levels, pans and sends, the
-// main out. Shift + Step 4 again: Knob FX, again Pad FX, again Flex Beat
-// (Kerem, 2026-11-20).
+// main out, then the strip of the track in hand (EQ, COMP); Left / Right
+// past 9-16 the eight submixes (melodee-sample docs/MIXER_PLAN.md, step 8).
+// Shift + Step 4 again: Knob FX, again Pad FX, again Flex Beat (Kerem,
+// 2026-11-20).
 #include "ui/mockups.h"
 #include "move/controls.h"
 #include "move/display.h"
@@ -68,7 +70,23 @@ std::vector<Strip> track_strips(unsigned first, int which) { // which: 0 level, 
 }
 
 // The hub's pages along the top: the wheel walks them.
-std::vector<Item> hub() { return {{"VOL"}, {"PAN"}, {"SNDA"}, {"SNDB"}, {"SNDC"}, {"SNDD"}, {"MAIN"}}; }
+std::vector<Item> hub() { return {{"VOL"}, {"PAN"}, {"SNDA"}, {"SNDB"}, {"SNDC"}, {"SNDD"}, {"MAIN"}, {"EQ"}, {"COMP"}}; }
+
+// The submixes: drums (1, 5, 9) into S1, the lead and the pad (2, 7) into S2.
+std::vector<Strip> sub_strips() {
+    const float level[8] {0.78f, 0.7f, 100 / 127.0f, 100 / 127.0f, 100 / 127.0f, 100 / 127.0f, 100 / 127.0f, 100 / 127.0f};
+    const float heard[8] {0.6f, 0.5f, 0, 0, 0, 0, 0, 0};
+    std::vector<Strip> out;
+    for (int n = 0; n < 8; ++n) {
+        Strip s;
+        s.label = std::to_string(n + 1); // the rail says S1-8
+        s.value = level[n];
+        s.meter = heard[n];
+        s.used = n < 2; // no track plays into it: a dot
+        out.push_back(s);
+    }
+    return out;
+}
 
 // The kit's Device View: the kit, its pad A05, A05's own effect and the
 // plus that adds its next, the track's two and the plus that adds the next.
@@ -113,8 +131,9 @@ std::vector<Screen> mixer_screens() {
             rail(g, "KIT", "1", "MIX");
             mix::item_row(g, kit_items(), 0);
             move::draw_text(g, content_x + 1, 11, "DRUMS");
-            knob_cells(g, {content_x, 20, content_width - 6, 34}, {"VOL", "PAN", ">A", ">B", ">C", ">D", "", ""},
-                       {100 / 127.0f, 0.5f, 0.1f, 0, 0, 0.3f, 0, 0});
+            move::draw_text(g, width - 6 - move::text_width(">S1"), 11, ">S1"); // where it plays: submix 1
+            knob_cells(g, {content_x, 20, content_width - 6, 34}, {"VOL", "PAN", ">A", ">B", ">C", ">D", "OUT", "WIDTH"},
+                       {100 / 127.0f, 0.5f, 0.1f, 0, 0, 0.3f, 1 / 8.0f, 0.5f});
             g.fillRect(width - 4, 14, 1, 1);
             g.fillRect(width - 4, 20, 2, 34); // its meter, left and right
             g.fillRect(width - 1, 23, 1, 31);
@@ -217,6 +236,33 @@ std::vector<Screen> mixer_screens() {
             mix::item_row(g, {{"DRIV"}, {"EQ"}, {"+"}, {"COMP"}}, 3);
             mix::reduction(g, content(11, 40), pump(content_width), 4, 70);
             detail(g, "KEY 1", "-4.5DB");
+        }},
+        // The strip of the track in hand, after MAIN on the wheel; a step picks the track.
+        {"mixer-eq", "EQ: TRACK 5'S NINE BANDS, KNOBS 1-8", [](juce::Graphics& g) {
+            rail(g, "MIX", "5", "EQ");
+            mix::item_row(g, hub(), 7);
+            mix::eq_curve(g, content(11, 41), {4, 6, 2, -5, -3, 0, 2, 0, -4}, true, 1);
+            detail(g, "125 HZ", "+6.0DB");
+        }},
+        {"mixer-comp", "COMP: ITS CURVE AND WHAT IT TAKES OFF", [](juce::Graphics& g) {
+            rail(g, "MIX", "5", "COMP");
+            mix::item_row(g, hub(), 8);
+            auto taken = pump(64);
+            for (auto& t : taken) t *= 6; // dB
+            mix::comp_picture(g, content(12, 38), 1 - 18 / 48.0f, 4, true, taken);
+            detail(g, "BREAKS", "-4.5DB");
+        }},
+        {"mixer-subs", "RIGHT PAST 9-16: THE SUBMIXES", [](juce::Graphics& g) {
+            rail(g, "MIX", "S2", "S1-8");
+            mix::item_row(g, hub(), 0);
+            mix::strips(g, content(10, 44), sub_strips(), 1);
+            detail(g, "SUBMIX 2", "-2.8DB");
+        }},
+        {"sub-chain", "PUSH: THE SUBMIX'S CHAIN, LEVEL FIRST", [](juce::Graphics& g) {
+            rail(g, "SUB", "2", "LVL");
+            mix::item_row(g, {{"S2"}, {"DRIV"}, {"+"}}, 0);
+            big_parameter(g, content(12, 34), "LEVEL", "-2.8DB", 0.7f);
+            detail(g, "FROM 2 7");
         }},
         // Melodee's performance effects: Shift + Step 4 again, and again, and again.
         {"knob-fx", "SHIFT + STEP 4 AGAIN: KNOB FX", [](juce::Graphics& g) {
@@ -430,7 +476,7 @@ juce::Image sheet(const std::vector<Screen>& screens, const std::vector<Lights>&
     g.setColour(juce::Colour(0xffd8f0ff));
     move::draw_text(g, gap, 20, "MELODEE ON MOVE: MIXER AND EFFECTS", 4);
     g.setColour(juce::Colour(0xff8a96a3));
-    move::draw_text(g, gap, 60, "EFFECTS IN THE DEVICE VIEW; SHIFT + STEP 4 THE MIXER. DOCS/UI.MD", 2);
+    move::draw_text(g, gap, 60, "EFFECTS IN THE DEVICE VIEW; SHIFT + STEP 4 THE MIXER, EQ, COMP, SUBMIXES. DOCS/UI.MD", 2);
     auto place = [&](size_t n, int from) { return juce::Point<int>(gap + int(n % 2) * (screen_w + gap), from + int(n / 2) * (screen_h + caption + gap)); };
     for (size_t n = 0; n < screens.size(); ++n) {
         auto at = place(n, top);

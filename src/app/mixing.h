@@ -4,6 +4,7 @@
 #include "melodee/engine/engine_host.h"
 #include "melodee/engine/punch.h"
 #include "melodee/model/project.h"
+#include "melodee/model/strip.h"
 #include <array>
 #include <atomic>
 #include <cstdint>
@@ -80,6 +81,29 @@ void toggle_pad_mute(Studio& studio, unsigned track, unsigned pad);
 // soloed already, the kit back as it was.
 void solo_pad(Studio& studio, unsigned track, unsigned pad);
 void unmute_all(Studio& studio);
+
+// ---------------------------------------------------------------- the mixer's strip and submixes
+//
+// Melodee's mixer (melodee-sample docs/MIXER_PLAN.md): every channel has a strip after its chain (trim, nine
+// bands, a compressor, width), named by its strip number (tracks 0-15, buses 16-19, the master 20, the input
+// 21, the submixes melodee::strip_sub(0-7)); a track plays into the master or a submix (Mix::out). A submix
+// has a level, pan, mute, solo and four sends, as a track. Mute and solo on the Move: Mute held + a step on the
+// Mixer's submixes.
+void set_strip(Studio& studio, unsigned strip, melodee::StripPart part, int value);
+// Its value as the Move shows it ("+6.0DB", "4:1", "MED", "-18DB", "OFF", "TRACK 3"), and its place along a bar.
+std::string strip_text(melodee::StripPart part, int value);
+float strip_fraction(melodee::StripPart part, int value);
+// A knob's step for the part: a detent half a dB on a band, a tenth with Shift held (`fine`).
+int strip_step(melodee::StripPart part, bool fine);
+void set_out(Studio& studio, unsigned track, unsigned out); // 0 the master, melodee::out_sub(s)
+std::string out_text(unsigned out);                         // "MAIN", "S2"
+void set_sub_level(Studio& studio, unsigned sub, int level); // 0..127
+void set_sub_pan(Studio& studio, unsigned sub, int pan);
+void set_sub_send(Studio& studio, unsigned sub, unsigned bus, int value);
+void set_sub_mute(Studio& studio, unsigned sub, bool on);
+void set_sub_solo(Studio& studio, unsigned sub, bool on);
+// Whether a track plays into submix `sub`.
+bool sub_fed(const Studio& studio, unsigned sub);
 float level_db(int level); // 0..127 as Melodee shows it, -inf at 0
 std::string level_text(int level); // "-1.4DB", "0.0DB", "-INF"
 std::string pan_text(int pan);     // "C", "L12", "R40"

@@ -171,10 +171,12 @@ Three parts so far:
   its compressor. On Play the wheel walks them as the Move walks a Track
   Preset's devices, the knobs following; push the browser, Shift + push the
   effect's options; Mute, Delete or Copy held + push bypasses, removes or
-  copies it. The track item's knobs are its level, pan and four sends.
+  copies it. The track item's knobs are its level, pan, four sends, its
+  output (the master or a submix) and its width.
   **Shift + Step 4** opens the Mixer (eight tracks' levels, pans or sends on
-  the knobs, Left / Right the other eight, the steps the sixteen tracks,
-  MAIN the returns and the compressor; the push a bus's or the master's
+  the knobs, Left / Right the other eight and the submixes S1-S8, the steps
+  the sixteen tracks, MAIN the returns and the compressor, EQ and COMP the
+  strip of the track in hand; the push a bus's, a submix's or the master's
   chain); again Knob FX, Pad FX (the pads as punches, from the audio
   thread), Flex Beat. Mute held + a kit pad mutes it, Shift + Mute alone
   lets every mute go; touching the Volume knob shows the main meter.

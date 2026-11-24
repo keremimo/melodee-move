@@ -8,7 +8,8 @@
 // The mixer's and the effects' pieces (docs/UI.md, "Mixer and effects"),
 // for the mockups (mockups_mixer.cpp) and the screens alike: the Device
 // View's row of items when a track's chain makes it longer than four, the
-// mixer's strips, a compressor's reduction, and Pad FX's bar of punches.
+// mixer's strips, a compressor's reduction, the strip's EQ and compressor
+// pictures, and Pad FX's bar of punches.
 namespace ui::mix {
 
 // One item of the Device View's row: a name of up to four characters; `pad`
@@ -45,6 +46,17 @@ void reduction(juce::Graphics& g, juce::Rectangle<int> area, const std::vector<f
 // pattern), live ones solid; `now` the playhead's sixteenth (-1: stopped).
 struct Lane { int from = 0, to = 0; bool kept = false; };
 void punch_lanes(juce::Graphics& g, juce::Rectangle<int> area, const std::vector<Lane>& lanes, int now);
+
+// The mixer's EQ (Melodee's strip): nine bands, 63 Hz .. 16 kHz, each `db`
+// -12..12, as a curve across `area`, a dot on each band and `touched` (the
+// band a knob turned last) a ring; flat and dotted while it is `on` no more.
+void eq_curve(juce::Graphics& g, juce::Rectangle<int> area, const std::array<float, 9>& db, bool on, int touched);
+
+// The strip's compressor: its curve in a square (in against out, the knee
+// at `threshold` 0..1 of the way up, `ratio` past it) and what it took off
+// of late, `taken` dB a column, hanging from the top to its right; OFF
+// there while it is not `on`.
+void comp_picture(juce::Graphics& g, juce::Rectangle<int> area, float threshold, float ratio, bool on, const std::vector<float>& taken);
 
 // A level in dB as the mixer shows it: "-4.2DB", "0.0DB", "-INF".
 std::string db_text(float db);

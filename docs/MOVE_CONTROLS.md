@@ -96,7 +96,7 @@ after Schwung) differ for some buttons:
 | Effect shortcuts | The manual gives none; Control Live deactivates a device with Mute + push. **Mute held + push bypasses the effect in focus, Delete held + push removes it, Copy held + push copies it** (and, Copy still held, a push on another slot pastes it). |
 | Knob FX, Pad FX, Flex Beat | **Shift + Step 4 again** (on the Mixer) opens Knob FX, again Pad FX, again Flex Beat, then the Mixer once more. |
 | USB audio | **No USB audio to a computer beyond Ableton's own** (Kerem, 2026-11-21). Ableton's "Ableton Move Audio" belongs to the XMOS, whose firmware fixes it at 2 in and 2 out, and Melodee reaches the XMOS only with one 16-bit stereo stream (the SPI page), so it cannot gain channels. A second device, an 18-channel UAC2 gadget beside the CM4's USB network (kernel modules built to match the stock kernel, eight stereo submixes), was built and seen on a Mac with 18 inputs, then dropped: a separate device, a root step each boot, the Move's kernel added to. In git history (0a65227, 67ad2f2) should it come back. |
-| Mixer | **Shift + Step 4**: knobs 1-8 are eight tracks of the page (the wheel: levels, pans, sends A-D, MAIN), **Left and Right 1-8 or 9-16**; the 16 steps are the tracks: a step selects, **Mute held + step mutes, Shift + Mute held + step solos** (as with the track buttons); the push opens the page's chain (the track's, a bus's, the master's with its compressor). **Touching the Volume knob shows the main meter**; **Shift + Mute alone lets every mute go** (Melodee's Unmute everything). |
+| Mixer | **Shift + Step 4**: knobs 1-8 are eight tracks of the page (the wheel: levels, pans, sends A-D, MAIN, then **EQ and COMP of the track in hand**), **Left and Right 1-8, 9-16, then the submixes S1-S8**; the 16 steps are the tracks: a step selects, **Mute held + step mutes, Shift + Mute held + step solos** (as with the track buttons); on the submixes, steps 1-8 are the submixes. The push opens the page's chain (the track's, a submix's, a bus's, the master's with its compressor); on EQ or COMP it turns that off or on. **Touching the Volume knob shows the main meter**; **Shift + Mute alone lets every mute go** (Melodee's Unmute everything). |
 | Step TRIG (sequencer) | Step held + knob stays the Move's per-step automation (locks). **Step held + wheel push turns the knobs to Melodee's TRIG** for the step's notes (chance, condition, ratchet, ramp, pitch ramp, accent, slide, tie); push again, back to the locks. |
 | Melodee's sequencer pages | **Shift + Loop (a tap) opens Melodee's SEQ pages**: Pattern (its push: Half and Double Seq and Speed, the variations), Step entry, Roll, Motion, MOD, Macros, Feel, Follow, Lane and Euclid; Shift + turn the page. Held with the wheel, Shift + Loop stays the Move's fine length. Chop stays on Shift + push. |
 | Fill | **Loop held 0.4 s while playing is Fill** until it is let go (FILL conditions play). Loop tapped stays Loop Mode; Loop held + wheel the length. |
@@ -211,9 +211,9 @@ Session (a row a track of the bank, a column a pattern) and the Overview.
 | Track button held + Step | No job | Picks track 1-16; an empty one opens the new-track sheet | done |
 | Track button held + Mute held + Step | No job | Mutes or unmutes track 1-16 | done |
 | Track button held + Shift + Mute held + Step | No job | Solos or unsolos track 1-16 | done |
-| Step (Mixer) | (No Mixer on the Move) | Selects that track | done |
-| Mute held + Step (Mixer) | (As above) | Mutes or unmutes that track | done |
-| Shift + Mute held + Step (Mixer) | (As above) | Solos or unsolos that track | done |
+| Step (Mixer) | (No Mixer on the Move) | Selects that track; on the submixes, steps 1-8 pick a submix | done |
+| Mute held + Step (Mixer) | (As above) | Mutes or unmutes that track; on the submixes, that submix | done |
+| Shift + Mute held + Step (Mixer) | (As above) | Solos or unsolos that track; on the submixes, that submix | done |
 | Step (Knob FX) | (No Knob FX on the Move) | Knob FX on or off for that track | done |
 
 ### Shift + steps
@@ -294,8 +294,8 @@ while Shift is held.
 | Delete held + Wheel push (Play) | No job | Removes the effect in focus (the rest close up) or the module (the track stays, empty) | done |
 | Copy held + Wheel push (Play) | No job | Copies the effect in focus; Copy still held, a push on another slot pastes it | done |
 | Copy held + Wheel turn (Play) | No job | Walks the items as without Copy, to the slot to paste on | done |
-| Wheel turn (Mixer) | (No Mixer on the Move) | The page: levels, pans, sends A-D, MAIN | done |
-| Wheel push (Mixer) | (As above) | The page's chain: the selected track's, the bus's, the master's | done |
+| Wheel turn (Mixer) | (No Mixer on the Move) | The page: levels, pans, sends A-D, MAIN, EQ, COMP | done |
+| Wheel push (Mixer) | (As above) | The page's chain: the selected track's (a submix's on the submixes), the bus's, the master's; on EQ or COMP, that off or on | done |
 | Wheel turn (Knob FX) | (No Knob FX on the Move) | Walks the MPC's 28 and Melodee's 15 | done |
 | Wheel push (Knob FX) | (As above) | Loads the one turned to | done |
 | Shift + Wheel push (Knob FX) | (As above) | Every track (or the bank's kit pads) on, or all off | done |
@@ -409,7 +409,7 @@ while Shift is held.
 | Shift + Left or Right | No job (Control Live: 16 bars) | 16 bars | done |
 | Left or Right (Session) | No job (Control Live: the session ring a track) | The patterns' page, eight at a time | done |
 | Left or Right (Chop) | No job | The slice before or after | done |
-| Left or Right (Mixer) | (No Mixer on the Move) | Tracks 1-8 or 9-16 | done |
+| Left or Right (Mixer) | (No Mixer on the Move) | Tracks 1-8, 9-16, then the submixes S1-S8 | done |
 | Plus or Minus (Pad FX) | (No Pad FX on the Move) | The other bank of punches | done |
 | Plus or Minus (Overview) | No job | The folder's next or previous 32 pads | done |
 
@@ -511,7 +511,7 @@ Not checked by the tests: they follow from the screens.
 | Sampling | Pulses red in Sampling Mode | Red in Sampling Mode, pulsing while it records; dim where it can record (a kit or audio track) | done |
 | Capture | Lit while there is something to keep, dark once cleared | The same | done |
 | Brightness (Setup) | The lights dimmer; Play, Rec and Sampling keep their colours | Pads, steps and track buttons go down their own colour's darker versions (the palette's dim and dark rows, the greys' ramp), or stay where a colour has none; white lights dimmer; Play, Rec and Sampling as they are | done |
-| Steps, Mixer | No Mixer | The sixteen tracks: each its colour, the selected one white, a muted one grey, a soloed one blue, an empty one dark | done |
+| Steps, Mixer | No Mixer | The sixteen tracks: each its colour, the selected one white, a muted one grey, a soloed one blue, an empty one dark; on the submixes steps 1-8, the picked one white, one a track plays into light grey | done |
 | Pads, Knob FX | No Knob FX | A kit's pads with Knob FX white, the rest dim; the steps the tracks with it bright | done |
 | Pads, Pad FX | No Pad FX | The MPC's sixteen orange, Melodee's cyan, a sounding one white; the steps where the kept punches fall | done |
 | Pads, Flex Beat | No Flex Beat | Pads 1-16 violet, pad 1 (Empty) grey, the one playing white | done |
