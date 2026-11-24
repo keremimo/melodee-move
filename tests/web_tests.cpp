@@ -153,7 +153,7 @@ void test_page(const fs::path& scratch) {
     // The page itself is open to any browser: it holds nothing of the Move's.
     auto index = page.handle(request("GET", "/", {}, "10.0.0.5"), none);
     CHECK(index.status == 200 && index.type.find("text/html") == 0 && index.body.find("Melodee") != std::string::npos);
-    CHECK(index.body.find("The kit track") != std::string::npos); // the guide is in it
+    CHECK(index.body.find("Saving a kit") != std::string::npos); // the guide is in it
     CHECK(page.handle(request("GET", "/files"), none).body == index.body);
     CHECK(page.handle(request("GET", "/app.js"), none).type.find("javascript") != std::string::npos);
     CHECK(page.handle(request("GET", "/font/rubik.ttf"), none).body.size() > 100000);
