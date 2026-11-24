@@ -3,21 +3,26 @@
 // the last pad, read by Melodee's own read_audio (WAV, AIFF, FLAC, Ogg,
 // MP3). It opens on a list of places: STARRED and RECENT first (Melodee's,
 // when they hold files), the Move's own sample folders, Melodee's, Ableton's
-// Core Library, all of /data/UserData (or only --samples DIR). The jogwheel
-// picks, and each file plays as it lands (PREVIEW, on Sampling's settings
-// page); its push opens a place or folder, loads a file (into RECENT), or
-// installs an MPC expansion; Shift + push stars a file; Delete asks, then
-// deletes (docs/MOVE_CONTROLS.md, Decisions); a pad picks the pad a file
-// loads onto. Back goes up, then back to the places. Kit depth: a bank file
-// (.mldb) loads into the bank of the pad in view, an MPC drum program (.xpm,
-// .xty) opens the LOAD KIT sheet (load_kit.cpp), Shift held the browser's
-// options (Save Sample, Save Bank). A Standard MIDI File's notes load onto
-// the track's pattern playing (song_desk.h, as Melodee's browser loads one).
+// Core Library (its samples and drum kits), all of /data/UserData (or only
+// --samples DIR). The jogwheel picks, and each file plays as it lands
+// (PREVIEW, on Sampling's settings page); its push opens a place or folder,
+// loads a file (into RECENT), or installs an MPC expansion; Shift + push
+// stars a file; Delete asks, then deletes (docs/MOVE_CONTROLS.md,
+// Decisions); a pad picks the pad a file loads onto. Back goes up, then back
+// to the places. Kit depth: a bank file (.mldb) loads into the bank of the
+// pad in view, and so does a Move drum kit (a Track Preset's Drum Rack,
+// app/move_kits.h: the Core Library's Track Presets > Drums, the User Library's
+// Track Presets), its sixteen pads replacing that bank's (Kerem,
+// 2026-11-23); an MPC drum program (.xpm, .xty) opens the LOAD KIT sheet
+// (load_kit.cpp); Shift held the browser's options (Save Sample, Save
+// Bank). A Standard MIDI File's notes load onto the track's pattern playing
+// (song_desk.h, as Melodee's browser loads one).
 #include "app/instruments.h"
 #include "app/sampling.h"
 #include "app/pad_layout.h"
 #include "app/screens/kit_common.h"
 #include "app/song_desk.h"
+#include "melodee/shell/drum_rack.h"
 #include "melodee/shell/mpc_program.h"
 #include <filesystem>
 #include <fstream>
@@ -33,7 +38,7 @@ struct MovePlace { const char* name; const char* path; const char* tag; };
 constexpr MovePlace move_places[] {
     {"MY SAMPLES", "/data/UserData/UserLibrary/Samples", "SMP"},
     {"RECORDINGS", "/data/UserData/UserLibrary/Recordings", "REC"},
-    {"CORE LIBRARY", "/data/CoreLibrary/Samples", "CORE"},
+    {"CORE LIBRARY", "/data/CoreLibrary", "CORE"}, // its Samples, and its Track Presets: the Move's drum kits (Kerem, 2026-11-23)
     {"ALL USER DATA", "/data/UserData", "ALL"},
 };
 
@@ -231,6 +236,10 @@ private:
         case Kind::Expansion: sampling().install(entry->path); return;
         case Kind::Program: // a drum program: the LOAD KIT sheet (load_kit.cpp); keygroups load with the instruments
             if (entry->tag != "KIT") { studio.say("PROGRAMS: NOT YET"); return; }
+            if (melodee::is_drum_rack_preset(entry->path)) { // a Move drum kit: straight into the bank of the pad it loads onto
+                if (auto failed = studio.load_move_kit(entry->path, studio.pad() / 16); !failed.empty()) studio.say(failed);
+                return;
+            }
             studio.program_path = entry->path;
             studio.push("load-kit");
             return;
@@ -304,6 +313,8 @@ private:
                 else if (is_expansion(item.path())) found.push_back({name, item.path().string(), Kind::Expansion});
                 else if (is_program(item.path()))
                     found.push_back({name, item.path().string(), Kind::Program, List::None, -1, melodee::is_drum_program(item.path().string()) ? "KIT" : "PROG"});
+                else if (melodee::is_drum_rack_preset(item.path().string())) // a Move drum kit: into a bank, as a bank file
+                    found.push_back({name, item.path().string(), Kind::Program, List::None, -1, "KIT"});
                 else if (is_bank_file(item.path())) found.push_back({name, item.path().string(), Kind::Bank, List::None, -1, "BANK"});
                 else if (is_midi_file(item.path())) found.push_back({name, item.path().string(), Kind::Midi});
                 else if (instrument_file(item.path().string()) && !soundfont_file(item.path().string())) // an SFZ, EXS, DecentSampler

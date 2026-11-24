@@ -378,8 +378,22 @@ the screens were built; the screens are `src/app/screens/kit_play.cpp`,
   the bank of the pad in view, and MPC drum programs (`.xpm`, `.xty`, tagged
   `KIT`), whose push opens **LOAD KIT**: WHOLE KIT, a row a bank of the kit
   (its push steps through the program's filled banks, then none) and LOAD
-  BANKS. **Shift held** in the browser opens its options: Save Sample, Save
-  Bank for the two banks in view.
+  BANKS. **The Move's own drum kits** (Ableton's Drum Rack Track Presets:
+  CORE LIBRARY > Track Presets > Drums > Acoustic, Electronic or Hybrid, and
+  Sliced Loops and Templates; the User Library's under ALL USER DATA >
+  UserLibrary > Track Presets) list tagged `KIT` too, play their first pad's
+  sample as the wheel lands, and their push puts the kit's 16 pads (notes
+  36-51) straight into the bank of the pad it loads onto: pad 1 of the kit on
+  pad 1 of the bank, the bank's other pads emptied, the other banks kept, as
+  a bank file loads (Kerem, 2026-11-23). Each pad takes its sample, its
+  region (Start and Length), Volume and Gain as its level, Pan, Transpose and
+  Detune, its choke group as its mute group, Vel > Vol as its velocity
+  sense, the A-S-R envelope as Gate (A-H-D a one shot) and a low- or
+  high-pass filter that cuts; the Drum Sampler's envelope times and effect,
+  the rack's effects, sends and macros are left out, and a sample from a
+  pack the Move does not hold leaves its pad empty (`MISSING`). Ellic-core
+  reads them (`shell/drum_rack.h`). **Shift held** in the browser opens its
+  options: Save Sample, Save Bank for the two banks in view.
 - **Long samples** (over ten seconds, up to six hours, or shorter ones memory
   has no room for) play from storage as Melodee's do (`engine/stream_pager.h`):
   half a second where each pad starts held in memory, the pager reading

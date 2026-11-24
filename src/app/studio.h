@@ -290,10 +290,13 @@ public:
     // Kits and banks from files, onto the selected kit (Melodee's
     // shell/project_kits.h): an MPC drum program (.xpm, .xty) whole or a bank
     // of it into a bank (`from_bank` -1: the whole kit), a bank file (.mldb)
-    // into a bank; Save Bank writes Samples/Banks/<name>.mldb. Their files
+    // or a Move drum kit into a bank; Save Bank writes Samples/Banks/<name>.mldb. Their files
     // are read by the service thread (`slots_wanted`). Empty on success.
     std::string load_program(const melodee::Project& program, int from_bank, unsigned into_bank);
     std::string load_bank_file(const std::string& path, unsigned bank);
+    // A Move drum kit (a Track Preset's Drum Rack, app/move_kits.h) into bank `bank`, as a bank file loads: its
+    // sixteen pads (notes 36-51) replace that bank's, the other banks and the kit's own values stay.
+    std::string load_move_kit(const std::string& path, unsigned bank);
     std::string save_bank_file(unsigned bank, const std::string& name);
     int slot_for(const melodee::SampleRef& ref); // this project's slot for a file, a new one queued to be read; -1 none free
     std::vector<unsigned> slots_wanted;

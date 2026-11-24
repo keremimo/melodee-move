@@ -3,6 +3,7 @@
 // lists, its preview, deleting from storage, Trim Sample, Save Sample,
 // Extract, and an MPC expansion installed. The MIDI thread asks under the
 // studio's lock; every file is read and written here, on the service thread.
+#include "app/move_kits.h"
 #include "app/sampling.h"
 #include "app/sampling_jobs.h"
 #include "app/studio.h"
@@ -14,6 +15,7 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 
 namespace app {
 namespace {
@@ -282,6 +284,16 @@ void Sampling::service_files() {
                 auto candidate = fs::path(wanted).parent_path() / "[Previews]" / (fs::path(wanted).filename().string() + kind);
                 if (fs::exists(candidate, error)) { file = candidate.string(); break; }
             }
+        } else if (extension == ".JSON") { // a Move drum kit: its lowest pad's sample, as the kit's first hit
+            file.clear();
+            std::ifstream in(wanted, std::ios::binary);
+            std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            melodee::DrumRack rack;
+            int lowest = 1 << 30;
+            std::error_code error;
+            if (melodee::parse_drum_rack(text, wanted, move_libraries(), rack).empty())
+                for (const auto& pad : rack.pads)
+                    if (pad.note < lowest && !pad.file.empty() && fs::is_regular_file(pad.file, error)) { lowest = pad.note; file = pad.file; }
         }
         auto data = std::make_unique<melodee::SampleData>();
         bool read = !file.empty() && melodee::read_audio(file, *data, preview_seconds, nullptr).empty() && data->frames;

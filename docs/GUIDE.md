@@ -48,6 +48,10 @@ download, upload, rename and delete samples and projects. **Guide** is this.
 
 - It opens on the places: My Samples, Melodee (the web page's uploads),
   Recordings, Ableton's Core Library, and all of the Move's user data.
+- **The Move's drum kits** are in the Core Library under Track Presets >
+  Drums (Acoustic, Electronic, Hybrid); your own saved kits under all of the
+  user data, UserLibrary > Track Presets. Tap a pad to pick the bank, then
+  push: the kit's 16 pads go into that bank, the other banks stay.
 - **Jogwheel**: turn to choose; push to open a folder or load a file.
 - **Back** goes up a folder, then back to the places.
 

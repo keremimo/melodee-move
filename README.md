@@ -75,15 +75,19 @@ Three parts so far:
   Step 8 16 Pitches of the last pad in the project's key; Copy + a pad and
   another copies it, Delete + a pad clears its notes, its sound or its gap;
   Sample Options: Chop, Reverse, Trim Sample, Normalize, Save Sample; bank
-  files and MPC drum programs from the browser; samples over ten seconds
+  files, MPC drum programs and the Move's own drum kits (Ableton's Drum Rack
+  Track Presets, their 16 pads into the bank of the pad picked, with each
+  pad's region, level, pan, tune, choke, Vel > Vol, gate and filter) from the
+  browser; samples over ten seconds
   (up to six hours) played from storage, long MP3, FLAC, Ogg and AIFF
   decoded once into `Melodee/Cache`; a load memory has no room for refused
   (`MEMORY FULL`).
 - **Load** (the wheel's push on the pad, the Move's Device View): WAV,
   AIFF, FLAC, Ogg and MP3 files onto the last pad,
   read by Melodee's own `read_audio`. It opens on a list of places: My
-  Samples, Recordings, Ableton's Core Library (`/data/CoreLibrary/Samples`)
-  and all of `/data/UserData` (or only `--samples DIR`); STARRED and RECENT
+  Samples, Recordings, Ableton's Core Library (`/data/CoreLibrary`: its
+  Samples, and its Track Presets > Drums, the Move's kits) and all of
+  `/data/UserData` (or only `--samples DIR`); STARRED and RECENT
   lead them, and MELODEE (its takes, edits, expansions). The jogwheel picks,
   and each file plays as it lands (PREVIEW); its push opens a place or folder,
   loads, or installs an MPC expansion (`.xpn`, into `Samples/Expansions`);

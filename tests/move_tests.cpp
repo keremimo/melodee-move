@@ -19,6 +19,8 @@
 #include "app/schwung_pages.h"
 #include <juce_core/juce_core.h>
 #include "app/melodee_app.h"
+#include "app/move_kits.h"
+#include "melodee/shell/drum_rack.h"
 #include "app/pad_layout.h"
 #include "app/project_store.h"
 #include "app/sequencer.h"
@@ -33,6 +35,7 @@
 #include "melodee/engine/macros.h"
 #include "melodee/engine/sampler.h"
 #include "melodee/model/scales.h"
+#include "melodee/shell/project_kits.h"
 #include <algorithm>
 #include <iterator>
 #include <map>
@@ -3015,6 +3018,153 @@ void test_sample_files() {
     CHECK(has(melodee.status(), "track=3 kind=kit") && has(melodee.status(), "page=kit-play") && has(melodee.status(), "pads=0"));
 }
 
+// A Move drum kit as the Move keeps one (a Track Preset: an Instrument Rack holding a Drum Rack), written here with
+// the few pads and values the tests need. `uris` are the pads' samples, notes 36 up; "" a pad with none.
+std::string move_kit_text(const std::vector<std::string>& uris) {
+    std::string chains;
+    for (size_t n = 0; n < uris.size(); ++n) {
+        bool first = n == 0;
+        if (n) chains += ",";
+        chains += std::string(R"({"name": "", "color": 0, "devices": [{"presetUri": null, "kind": "drumCell", "name": "", "parameters": {)") +
+                  (first ? R"("Pan": 0.5, "Voice_Detune": 0.25, "Voice_Envelope_Mode": "A-S-R", "Voice_Filter_Frequency": 1000.0,)"
+                           R"( "Voice_Filter_On": true, "Voice_Filter_Resonance": 0.3, "Voice_Filter_Type": "Lowpass", "Voice_Gain": 1.0,)"
+                           R"( "Voice_PlaybackLength": 0.5, "Voice_PlaybackStart": 0.25, "Voice_Transpose": -2,)"
+                           R"( "Voice_VelocityToVolume": 0.5, "Volume": -6.0)"
+                         : R"("Pan": 0.0, "Voice_Detune": 0.0, "Voice_Envelope_Mode": "A-H-D", "Voice_Filter_Frequency": 21999.99,)"
+                           R"( "Voice_Filter_On": true, "Voice_Filter_Resonance": 0.0, "Voice_Filter_Type": "Lowpass", "Voice_Gain": 1.0,)"
+                           R"( "Voice_PlaybackLength": 1.0, "Voice_PlaybackStart": 0.0, "Voice_Transpose": 0,)"
+                           R"( "Voice_VelocityToVolume": 0.35, "Volume": -12.0)") +
+                  R"(}, "deviceData": {"sampleUri": )" + (uris[n].empty() ? std::string("null") : "\"" + uris[n] + "\"") + "}}], " +
+                  R"("mixer": {"pan": 0.0, "solo-cue": false, "speakerOn": true, "volume": )" + (n == 1 ? "3.0" : "0.0") + R"(, "sends": []}, )" +
+                  R"("drumZoneSettings": {"receivingNote": )" + std::to_string(36 + n) + R"(, "sendingNote": 60, "chokeGroup": )" +
+                  (first ? "1" : "null") + "}}";
+    }
+    return R"({"$schema": "http://tech.ableton.com/schema/song/1.8.3/devicePreset.json", "kind": "instrumentRack", "name": "Test Kit",)"
+           R"( "parameters": {"Enabled": true}, "chains": [{"name": "", "color": 0, "devices": [{"presetUri": null, "kind": "drumRack",)"
+           R"( "name": "Test Kit", "parameters": {"Enabled": true}, "chains": [)" + chains + R"(], "returnChains": []},)"
+           R"( {"kind": "saturator", "parameters": {}}], "mixer": {"pan": 0.0, "volume": 0.0, "sends": []}}]})";
+}
+
+void test_move_kits() {
+    // The Move's drum kits: a Track Preset's JSON read as a Drum Rack by
+    // ellic-core (shell/drum_rack.h; its core tests check the pads' values and
+    // the import without JUCE), its samples found in the Move's libraries, the
+    // kit as a project with each region measured from its file, then loaded
+    // from the browser into a bank (src/app/move_kits.h, Studio::load_move_kit).
+    std::string folder = "build/test-move-kits";
+    std::filesystem::remove_all(folder);
+    std::filesystem::create_directories(folder + "/core/Samples/Drums/Kick");
+    std::filesystem::create_directories(folder + "/user/Recordings");
+    const melodee::AbletonLibraries libraries {folder + "/core", folder + "/user"};
+    CHECK(write_test_loop(folder + "/core/Samples/Drums/Kick/Kick Test.wav") && write_test_loop(folder + "/user/Recordings/Snare.wav"));
+    CHECK(melodee::ableton_sample_path("ableton:/packs/abl-core-library/Samples/Drums/Kick/Kick%20808.wav", "/x", app::move_libraries()) ==
+          "/data/CoreLibrary/Samples/Drums/Kick/Kick 808.wav"); // on the Move
+    CHECK(melodee::ableton_sample_path("ableton:/user-library/Recordings/Take.wav", "/x", app::move_libraries()) ==
+          "/data/UserData/UserLibrary/Recordings/Take.wav");
+
+    const std::string text = move_kit_text({"ableton:/packs/abl-core-library/Samples/Drums/Kick/Kick%20Test.wav",
+                                            "ableton:/user-library/Recordings/Snare.wav", "", "ableton:/packs/some-other-pack/Samples/A.wav",
+                                            "ableton:/user-library/Recordings/Gone.wav"});
+    std::string preset = folder + "/Test Kit.json";
+    {
+        std::ofstream out(preset, std::ios::binary);
+        out << text;
+    }
+    melodee::DrumRack rack;
+    CHECK(melodee::parse_drum_rack(text, preset, libraries, rack).empty());
+    CHECK(rack.name == "Test Kit" && rack.pads.size() == 5);
+    if (rack.pads.size() == 5) {
+        const auto& kick = rack.pads[0];
+        CHECK(kick.note == 36 && kick.choke == 1 && kick.gate && kick.transpose == -2 && kick.filter == "Lowpass");
+        CHECK(kick.file == folder + "/core/Samples/Drums/Kick/Kick Test.wav");
+        CHECK(std::abs(kick.volume_db + 6.0) < 1e-6 && std::abs(kick.pan - 0.5) < 1e-6 && std::abs(kick.detune - 0.25) < 1e-6);
+        CHECK(std::abs(kick.start - 0.25) < 1e-6 && std::abs(kick.length - 0.5) < 1e-6 && std::abs(kick.velocity_to_volume - 0.5) < 1e-6);
+        CHECK(std::abs(kick.cutoff_hz - 1000) < 1e-3 && std::abs(kick.resonance - 0.3) < 1e-6);
+        const auto& snare = rack.pads[1];
+        CHECK(snare.note == 37 && snare.choke == 0 && !snare.gate && std::abs(snare.volume_db + 9.0) < 1e-6); // -12 dB, its chain +3
+        CHECK(snare.file == folder + "/user/Recordings/Snare.wav");
+        CHECK(rack.pads[2].note == 38 && rack.pads[2].uri.empty() && rack.pads[2].file.empty()); // null: no sample
+        CHECK(rack.pads[3].note == 39 && !rack.pads[3].uri.empty() && rack.pads[3].file.empty()); // another pack's
+    }
+    // Which files are kits, and what is not one.
+    CHECK(melodee::is_drum_rack_preset(preset));
+    {
+        std::ofstream out(folder + "/Synth.json", std::ios::binary);
+        out << R"({"$schema": "http://tech.ableton.com/schema/song/1.8.3/devicePreset.json", "kind": "instrumentRack", "chains": [{"devices": [{"kind": "drift"}]}]})";
+    }
+    CHECK(!melodee::is_drum_rack_preset(folder + "/Synth.json"));
+    std::ifstream synth(folder + "/Synth.json");
+    std::string synth_text((std::istreambuf_iterator<char>(synth)), std::istreambuf_iterator<char>());
+    CHECK(melodee::parse_drum_rack(synth_text, folder + "/Synth.json", libraries, rack) == "NOT A DRUM KIT");
+    CHECK(melodee::parse_drum_rack("{ not json", preset, libraries, rack) == "NOT A DRUM KIT");
+
+    // The file as a project of one kit track, each region measured from its WAV's header.
+    auto project = app::new_project();
+    unsigned missing = 0;
+    CHECK(melodee::import_drum_rack_preset(preset, libraries, *project, missing).empty());
+    CHECK(missing == 2); // the other pack's, and the file that is gone: their pads stay empty
+    const auto& track = project->tracks[0];
+    CHECK(track.engine == melodee::EngineKind::Sampler && std::string(track.name) == "Test Kit");
+    CHECK(track.pads[0].used() && track.pads[1].used() && !track.pads[2].used() && !track.pads[3].used() && !track.pads[4].used());
+    CHECK(std::string(project->samples[track.pads[0].sample].path) == folder + "/core/Samples/Drums/Kick/Kick Test.wav");
+    CHECK(track.pads[0].start == 44096 && track.pads[0].end == 132288); // a quarter and three quarters of the 4 s loop
+    CHECK(track.pads[0].group == 1 && track.pads[1].level == 57);
+    CHECK(melodee::kit_bank_pads(track)[0] == 2);
+    CHECK(melodee::import_drum_rack_preset(folder + "/nothing.json", libraries, *project, missing) == "UNREADABLE");
+
+    // From the browser, on a kit track: the kit lists (KIT), plays its first pad as the wheel lands, and its push
+    // puts its pads into the bank of the pad it loads onto, that bank's other pads emptied, the other banks kept.
+    std::string home = "build/test-home-move-kits", loop = folder + "/core/Samples/Drums/Kick/Kick Test.wav";
+    std::filesystem::remove_all(home);
+    {   // Its samples by a path from its own folder (no /data here); the Move's own kits name the libraries.
+        std::ofstream out(preset, std::ios::binary | std::ios::trunc);
+        out << move_kit_text({"core/Samples/Drums/Kick/Kick%20Test.wav", "user/Recordings/Snare.wav"});
+    }
+    app::MelodeeApp melodee(folder, home, "build/test-no-modules");
+    Session session;
+    melodee.attach(session);
+    melodee.audio_opened(AudioFormat {});
+    CHECK(melodee.restore_now().empty());
+    CHECK(melodee.load_now(loop, 15).empty() && melodee.load_now(loop, 16).empty()); // A16 and B01
+    Lights lights;
+    AudioBlock in {}, out {};
+    auto settle = [&] {
+        for (int n = 0; n < 20; ++n) {
+            melodee.service();
+            out.fill(0);
+            melodee.render(in, out);
+            melodee.lights(lights, App::Clock::now());
+        }
+    };
+    settle();
+    CHECK(has(melodee.status(), "kind=kit") && has(melodee.status(), "pads=2"));
+    press_button(melodee, Button::MainPush); // Load: one place, straight in; the kit first (Synth.json is no kit)
+    settle();
+    CHECK(has(melodee.status(), "page=load-samples") && has(melodee.status(), "preview=Test Kit.json"));
+    tap_pad(melodee, 0); // A01: the pad it loads onto
+    press_button(melodee, Button::MainPush);
+    settle();
+    CHECK(has(melodee.status(), "page=load-samples") && has(melodee.status(), "pads=3")); // A01, A02, B01; A16 emptied
+    {
+        std::lock_guard<std::mutex> guard(melodee.studio().lock);
+        const auto& kit = melodee.studio().current();
+        CHECK(kit.pads[0].used() && kit.pads[1].used() && !kit.pads[15].used() && kit.pads[16].used());
+        CHECK(kit.pads[0].start == 44096 && kit.pads[0].group == 1 && kit.pads[0].play == melodee::PadPlay::Gate && kit.pads[1].level == 57);
+    }
+    tap_pad(melodee, 17); // B02: bank B, the pad it loads onto now
+    press_button(melodee, Button::MainPush);
+    settle();
+    CHECK(has(melodee.status(), "pads=4") && has(melodee.status(), "pad=B02")); // B01 the kit's kick now, B02 its snare
+    press_button(melodee, Button::Back); // one place: out
+    settle();
+    CHECK(has(melodee.status(), "page=kit-play"));
+    int32_t heard = 0; // A02, the kit's snare, plays (a pad's sound is the audio thread's)
+    melodee.audio_event(make_event(0x90, pad_note(1), 100));
+    for (int block = 0; block < 40; ++block) { out.fill(0); melodee.render(in, out); heard = std::max(heard, peak_of(out)); }
+    melodee.audio_event(make_event(0x80, pad_note(1), 0));
+    CHECK(heard > to_s32(0.05f));
+}
+
 void test_chop_depth() {
     // Chop on the Move past the first scope: slices 33-64 on Plus, Delete +
     // a pad, the slice options (Extract, Split, Merge, Remove all cuts), a
@@ -3897,6 +4047,7 @@ int main() {
     test_looper();
     test_sampling();
     test_sample_files();
+    test_move_kits();
     test_chop_depth();
     test_slice_hits();
     test_audio_track();

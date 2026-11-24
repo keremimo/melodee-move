@@ -12,6 +12,7 @@
 #include "melodee/engine/audio_player.h"
 #include "app/auto_sampler.h"
 #include "app/instruments.h"
+#include "app/move_kits.h"
 #include "melodee/engine/engine_info.h"
 #include "melodee/engine/macros.h"
 #include "melodee/engine/render_pool.h"
@@ -2128,6 +2129,24 @@ std::string Studio::load_bank_file(const std::string& file, unsigned into_bank) 
     refresh_pads();
     changed();
     say("BANK " + std::string(1, char('A' + into_bank % 8)) + ": " + std::to_string(done.pads) + " PADS");
+    return {};
+}
+
+std::string Studio::load_move_kit(const std::string& file, unsigned into_bank) {
+    if (kind() != TrackKind::Kit) return "NOT A KIT";
+    auto program = app::new_project();
+    unsigned missing = 0;
+    if (auto failed = melodee::import_drum_rack_preset(file, move_libraries(), *program, missing); !failed.empty()) return failed;
+    // The rack's sixteen pads as a bank file has them (Melodee's bank_of()), so they replace the bank's whole.
+    auto bank_file = melodee::bank_of(*program, 0, 0, program->tracks[0].name);
+    auto& into = song->tracks[selected];
+    auto done = melodee::import_bank(bank_file, into_bank % melodee::sampler_banks, into, [this](const melodee::SampleRef& ref) { return slot_for(ref); });
+    apply_track(selected);
+    refresh_pads();
+    changed();
+    missing += done.missing;
+    std::string pads = "BANK " + std::string(1, char('A' + into_bank % 8)) + ": " + std::to_string(done.pads) + " PADS";
+    say(missing ? std::to_string(done.pads) + " PADS, " + std::to_string(missing) + " MISSING" : pads);
     return {};
 }
 
