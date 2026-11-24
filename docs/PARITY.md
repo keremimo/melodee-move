@@ -235,7 +235,7 @@ Kerem has checked it there. `n/a` rows have no box.
 | **A pad's own chain** of four effects (MELODEE.md › Effects) | done | the Device View: after the pad, its own effects and their `+` (a dotted underline) | [ ] |
 | **Chop**: Auto, Beats, Regions, Threshold; a slice's start and end (MELODEE.md › Sampler, Chop) | done | Loop; knobs 1-4; jogwheel or Left / Right the slice | [ ] |
 | **Chop Manual**: pads tapped as it plays, cuts pulled onto hits (MELODEE.md › Sampler, Chop) | done | Chop: knob 3 on Manual; the first pad plays, the red pad cuts, a lit pad plays again from its slice | [ ] |
-| **Slices 33-64** on a second bank (MELODEE.md › Sampler, Chop) | done | Plus / Minus in Chop | [ ] |
+| **Slices 33-128** on banks of 32 (MELODEE.md › Sampler, Chop) | done | Plus / Minus in Chop | [ ] |
 | **Chop close up**: the view follows the cut; a moved cut plays its slice; Shift + wheel jumps from hit to hit (MELODEE.md › Sampler, Chop) | done | knobs 1 and 2 close in on the cut (the wheel is the amount, as the Move's); Shift + the wheel from hit to hit | [ ] |
 | **Extract, Split, Merge**; a slice taken out; every cut out (MELODEE.md › Sampler, Chop) | done | Shift + push in Chop: Extract, Split, Merge, Remove all cuts; Delete + a pad takes its cut out | [ ] |
 | **CLEAN**: cut on the sample's drums stem (MELODEE.md › Sampler, Chop) | schwung | Schwung's separator writes the stems as files: Load the drums stem and Chop it | — |

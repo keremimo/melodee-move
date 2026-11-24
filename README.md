@@ -102,9 +102,10 @@ Three parts so far:
   Left / Right pick a slice, knobs 1 and 2 move its start and end. Push the
   jogwheel for **To Pads** (Poly, Mono, Thru), onto the first empty pads.
   Back leaves Chop without changing the pads. Past the first scope: Manual
-  (knob 3; the first pad plays, the red pad cuts), slices 33-64 on Plus and
-  Minus, knobs 1 and 2 close in on the cut and a moved cut plays its slice,
-  Shift + the wheel from hit to hit, Delete + a pad takes its cut out, a step
+  (knob 3; the first pad plays, the red pad cuts), slices 33-128 on Plus and
+  Minus (32 a press), knobs 1 and 2 close in on the cut and a moved cut
+  plays its slice, Shift + the wheel from hit to hit, Delete + a pad takes
+  its cut out, a step
   plays from its sixteenth, Shift + push the slice options (Extract, Split,
   Merge, Remove all cuts), To Pads KIT (a pad a sound) and To Pads PATTERN
   (its last row: a note a slice into the next empty pattern). Sample Options

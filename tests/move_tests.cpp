@@ -3166,7 +3166,7 @@ void test_move_kits() {
 }
 
 void test_chop_depth() {
-    // Chop on the Move past the first scope: slices 33-64 on Plus, Delete +
+    // Chop on the Move past the first scope: slices 33-128 on Plus, Delete +
     // a pad, the slice options (Extract, Split, Merge, Remove all cuts), a
     // manual take with the red pad, a step, To Pads KIT.
     std::string folder = "build/test-samples", home = "build/test-home-chop", loop = folder + "/loop.wav";
@@ -3203,6 +3203,21 @@ void test_chop_depth() {
     CHECK(has(melodee.status(), "slice=35"));
     press_button(melodee, Button::Down);
     CHECK(has(melodee.status(), "bank=1"));
+    // 128 slices, the most: four banks of 32, Plus and Minus a bank a press.
+    knob(3, 60);
+    knob(3, 28); // 40 + 88: 128 slices
+    CHECK(has(melodee.status(), "slices=128 chop=Regions"));
+    for (int n = 0; n < 4; ++n) press_button(melodee, Button::Up); // the fourth press stays on the last bank
+    CHECK(has(melodee.status(), "slice=97 bank=4"));
+    tap_pad(melodee, 2);
+    CHECK(has(melodee.status(), "slice=99 bank=4"));
+    press_button(melodee, Button::Down);
+    CHECK(has(melodee.status(), "slice=65 bank=3"));
+    knob(3, -60);
+    knob(3, -28); // back to 40 slices: the bank in view drops to the last one there is
+    CHECK(has(melodee.status(), "slices=40 chop=Regions") && has(melodee.status(), "bank=2"));
+    press_button(melodee, Button::Down);
+    CHECK(has(melodee.status(), "slice=1 bank=1"));
     melodee.surface(make_event(0xb0, button_cc(Button::Delete), 127)); // Delete + A02: its cut out
     tap_pad(melodee, 1);
     melodee.surface(make_event(0xb0, button_cc(Button::Delete), 0));

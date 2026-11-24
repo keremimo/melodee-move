@@ -2,10 +2,10 @@
 // Chop (Sample Options' first row, Shift + push on a kit pad's sample): the
 // last pad's sample, cut by Melodee's Auto, Beats, Regions, Threshold or
 // Manual (knob 3 the type, knob 4 or the wheel the amount). The pads play the
-// slices, 32 at a time (Plus and Minus: slices 33-64); the steps show where
-// the cuts fall and play the sample from their sixteenth; Left / Right pick a
-// slice; knobs 1 and 2 move its start and end, the view closing in on the cut
-// as they turn, and a moved cut plays its slice once it is still; Shift +
+// slices, 32 at a time (Plus and Minus step through 33-64, 65-96 and 97-128);
+// the steps show where the cuts fall and play the sample from their
+// sixteenth; Left / Right pick a slice; knobs 1 and 2 move its start and
+// end, the view closing in on the cut as they turn, and a moved cut plays its slice once it is still; Shift +
 // the wheel jumps the start from hit to hit; Delete + a pad takes its cut
 // out. Manual is a take: the red pad cuts next, as the sample plays from the
 // first pad (docs/ui/sampling.png). Push the jogwheel for To Pads (Poly,
@@ -96,8 +96,8 @@ public:
             if (slices.count) select(unsigned(std::clamp(int(selected) + (use.control == bindings::Control::Left ? -1 : 1), 0, int(slices.count) - 1)));
             return true;
         case Job::SlicePage:
-            if (slices.count <= bank_size) { studio.say("32 SLICES OR FEWER"); return true; }
-            bank = use.control == bindings::Control::Plus ? 1 : 0;
+            if (!last_bank()) { studio.say("32 SLICES OR FEWER"); return true; }
+            bank = use.control == bindings::Control::Plus ? std::min(bank + 1, last_bank()) : bank ? bank - 1 : 0;
             if (selected / bank_size != bank) selected = std::min(bank * bank_size, slices.count - 1);
             play_slices();
             return true;
@@ -128,11 +128,11 @@ public:
             for (unsigned n = 0; n < slices.count; ++n) cut |= slices.start[n] * step_count / frames == step;
             lights.step(step, cut ? (selected < slices.count && slices.start[selected] * step_count / frames == step ? colour::white : colour::orange) : colour::off);
         }
-        bool banks = slices.count > bank_size;
+        bool banks = last_bank() > 0; // Plus and Minus bright where they lead to another bank, as docs/ui/sampling.png draws it
         lights.button(Button::Left, white_dim);
         lights.button(Button::Right, white_dim);
-        lights.button(Button::Up, banks ? (bank == 1 ? white_bright : white_dim) : 0);
-        lights.button(Button::Down, banks ? (bank == 0 ? white_bright : white_dim) : 0);
+        lights.button(Button::Up, banks ? (bank < last_bank() ? white_bright : white_dim) : 0);
+        lights.button(Button::Down, banks ? (bank > 0 ? white_bright : white_dim) : 0);
         lights.button(Button::Loop, 0);
         lights.button(Button::Menu, 0);
         lights.button(Button::Back, white_dim);
@@ -155,7 +155,11 @@ public:
         std::string right;
         if (mode == ChopMode::Auto) right = melodee::sound_kind_name(sample->autos.kind);
         else if (sample->beats.found()) right = std::to_string(sample->beats.tempo / 10);
-        if (bank == 1) { ui::detail(g, "PADS 33-" + std::to_string(slices.count), upper(melodee::chop_mode_name(mode)).substr(0, 6)); return; }
+        if (bank) {
+            const std::string pads = "PADS " + std::to_string(bank * bank_size + 1) + "-" + std::to_string(std::min(slices.count, (bank + 1) * bank_size));
+            ui::detail(g, pads, upper(melodee::chop_mode_name(mode)).substr(0, pads.size() > 10 ? 5 : 6)); // 97-128: the type in five
+            return;
+        }
         ui::detail(g, upper(melodee::chop_mode_name(mode)).substr(0, 5) + " " + knob(3).value, right);
     }
 
@@ -275,7 +279,7 @@ public:
         if (asks(selected + 1, [this] { split(); })) return;
         uint32_t frames = sample->data->model_frames();
         uint32_t a = slices.start[selected], b = slices.end(selected, frames);
-        if (!slices.split(selected, frames)) { studio.say(slices.count >= melodee::max_slices ? "64 SLICES AT MOST" : "TOO SHORT"); return; }
+        if (!slices.split(selected, frames)) { studio.say(slices.count >= melodee::max_slices ? std::to_string(melodee::max_slices) + " SLICES AT MOST" : "TOO SHORT"); return; }
         // The new cut on the strongest hit of the slice's middle half, on a zero crossing.
         uint32_t middle = a + (b - a) / 2, cut = middle;
         uint8_t best = 0;
@@ -332,7 +336,7 @@ private:
             slices.start[n] = at;
         }
         selected = std::min(selected, slices.count ? slices.count - 1 : 0);
-        bank = std::min(bank, slices.count > bank_size ? 1u : 0u);
+        bank = std::min(bank, last_bank());
         play_slices();
         remember();
     }
@@ -389,7 +393,7 @@ private:
     }
     void edited() {
         selected = std::min(selected, slices.count ? slices.count - 1 : 0);
-        if (slices.count <= bank_size) bank = 0;
+        bank = std::min(bank, last_bank());
         play_slices();
         remember();
     }
@@ -432,7 +436,7 @@ private:
             selected = slices.count - 1;
             manual_next = int(slices.count);
             if (manual_next >= int(melodee::max_slices)) manual_next = -1;
-            if (manual_next >= 0 && unsigned(manual_next) / bank_size != bank) bank = unsigned(manual_next) / bank_size; // on to slices 33-64
+            if (manual_next >= 0 && unsigned(manual_next) / bank_size != bank) bank = unsigned(manual_next) / bank_size; // on to the next 32
             play_slices();
             remember();
             return;
@@ -607,6 +611,7 @@ private:
     std::array<int, unsigned(ChopMode::Count)> amounts {50, 16, 1, 0, 1}; // Threshold %, Regions, Beats division, Manual, Auto size
     melodee::Slices slices;
     unsigned selected = 0, bank = 0;
+    unsigned last_bank() const { return slices.count ? (slices.count - 1) / bank_size : 0; } // 0-3: slices in 32s
     int manual_next = -1;          // the slice the red pad cuts (-1: no take)
     bool manual_playing = false;
     uint32_t played_from = 0;      // where the sound began (44.1 kHz frames)

@@ -1021,7 +1021,7 @@ name typed on the pads); the browser leads with STARRED and RECENT, plays
 each file as the wheel lands, stars on Shift + push, deletes on Delete
 (asked; what the project plays is kept), installs an MPC expansion on push;
 Chop's manual take (the red pad cuts next), a cut close up while knob 1 or
-2 turns, slices 33-64 on Plus and Minus, slice options on Shift + push, To
+2 turns, slices 33-128 on Plus and Minus, slice options on Shift + push, To
 Pads KIT; an audio track's INPUT on Sampling, Rec arming it, its take's CLIP
 and WARP pages.
 
