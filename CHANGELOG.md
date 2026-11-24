@@ -4,6 +4,48 @@ Melodee for Ableton Move as Schwung's module catalog installs it
 (`melodee-move-module.tar.gz`). A version is `module/module.json`'s;
 `tools/release.sh` builds it and takes its release notes from here.
 
+## 0.5.0 (2026-11-24)
+
+- Melodee's engine from ellic-core 21dcb83, as Melodee on the MPC Sample
+  has it.
+- Steps work as on the Move: a step gets its note as it is pressed, so a
+  step held with a knob turned is a step lock; a step with notes is cleared
+  by a tap, and held or used it keeps them.
+- 16 Pitches is sequenced at its pitches: play a pitch, then press steps,
+  or hold a step and press pitches to put them on it (again: off). Shift +
+  Plus / Minus move the left 16 a whole bank, A to H, so every pad of the
+  kit can be reached.
+- Kits saved and loaded whole: SAVE KIT (Shift held in the browser) writes
+  the kit, its eight banks and their effects, to Melodee/Kits. The browser
+  lists saved kits and every Melodee project as KIT; pushing one loads its
+  kit whole.
+- An audio track loads a sound file: the jogwheel's push opens the browser,
+  and a file pushed there becomes the playing pattern's take, the pattern
+  its whole bars at the tempo found in it, WARP on so it follows the tempo.
+  Undo brings back the take before it.
+- The Mixer: EQ and COMP pages for the track in hand, the submixes S1-S8
+  after tracks 9-16, each with its chain, and the track's OUTPUT (a submix)
+  and WIDTH.
+- The power button asks SHUT DOWN?, with the battery's charge; the
+  jogwheel's push saves and turns the Move off, Back keeps it on.
+- The Move's own drum kits load onto a kit: the Core Library's Track
+  Presets > Drums list as KIT, and a push puts the kit's 16 pads into the
+  bank of the pad picked.
+- Chop's pads reach all 128 slices: Plus and Minus step through four banks
+  of 32.
+- Keys & Scale's Drums is two 4x4 banks in either pad layout, a Move kit on
+  the left 4x4.
+- A moved START or END is heard at once, as Chop's cuts are.
+- Pads held are played, not held: the knobs, the Volume knob, the transport
+  and the steps do their jobs while pads sound.
+- Follow, or a pad's Warp to SEQ with no # Beats, fits each loop by the
+  tempo found in it, exact at whole bars.
+- The web page's guide rewritten for the Move as it is now: where things
+  are, kits, 16 Pitches, isomorphic keys (CHROMATIC with 4THS), step locks,
+  loops under a bar (Shift + Loop + the jogwheel), time-stretch, audio
+  files, sends and buses.
+- Fixed: Undo and Redo on an audio track play the take they bring back.
+
 ## 0.4.0 (2026-11-22)
 
 - Melodee's engine from ellic-core b410da7, as Melodee 0.6.5 on the MPC
