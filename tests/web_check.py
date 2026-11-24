@@ -99,7 +99,7 @@ for _ in range(50):
         time.sleep(0.1)
 else:
     sys.exit("web check: the page never answered on port %d" % PORT)
-check(status == 200 and b"Melodee" in page and b"The kit track" in page, "the page and its guide")
+check(status == 200 and b"Melodee" in page and b"Saving a kit" in page, "the page and its guide")
 
 # On the Move itself: open.
 status, data, _ = call("127.0.0.1", "GET", "/api/status")
