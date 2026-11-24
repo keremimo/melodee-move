@@ -263,7 +263,7 @@ void eq_curve(juce::Graphics& g, juce::Rectangle<int> area, const melodee::Strip
 }
 void comp_picture(juce::Graphics& g, juce::Rectangle<int> area, const melodee::Strip& strip, const std::vector<float>& taken) {
     ui::mix::comp_picture(g, area, 1.0f - float(strip.comp_amount) / float(melodee::comp_amount_max), strip.comp_ratio / 10.0f,
-                          strip.comp_on && strip.comp_amount, taken);
+                          strip.comp_on, taken);
 }
 
 class Mixer final : public Screen {
@@ -539,7 +539,7 @@ private:
         comp_picture(g, ui::content(12, 38), strip, taken);
         char gr[16];
         std::snprintf(gr, sizeof gr, "%.1fDB", now < 0.05f ? 0.0 : -double(now));
-        ui::detail(g, name, strip.comp_on && strip.comp_amount ? gr : "PUSH: ON");
+        ui::detail(g, name, strip.comp_on ? gr : "PUSH: ON");
     }
 
     void draw_main(juce::Graphics& g) {

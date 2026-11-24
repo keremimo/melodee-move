@@ -129,10 +129,9 @@ std::string db_text(float db) {
 
 void eq_curve(juce::Graphics& g, juce::Rectangle<int> area, const std::array<float, 9>& db, bool on, int touched) {
     const int x0 = area.getX() + 2, w = area.getWidth() - 4, mid = area.getY() + area.getHeight() / 2, half = area.getHeight() / 2 - 2;
-    for (int x = x0; x < x0 + w; x += 2) g.fillRect(x, mid, 1, 1); // 0 dB, dotted
+    for (int x = x0; x < x0 + w; x += 4) g.fillRect(x, mid, 1, 1); // 0 dB, a dot every fourth column
     auto band_x = [&](int b) { return x0 + 2 + (w - 5) * b / 8; };
     auto db_at = [&](float f) { // f: 0..8 along the bands; a peak a band, an octave wide
-        if (!on) return 0.0f;
         float sum = 0;
         for (int b = 0; b < 9; ++b) { const float d = f - float(b); sum += db[size_t(b)] * std::exp(-d * d * 1.6f); }
         return sum;
@@ -142,7 +141,8 @@ void eq_curve(juce::Graphics& g, juce::Rectangle<int> area, const std::array<flo
     for (int x = x0; x < x0 + w; ++x) {
         const int y = y_of(db_at(float(x - x0 - 2) / float(w - 5) * 8));
         if (last < 0) last = y;
-        if (on || (x % 2)) g.fillRect(x, std::min(y, last), 1, std::abs(y - last) + 1);
+        // Off: the bands kept, dotted between the 0 dB line's dots, so a flat curve off is dotted too.
+        if (on || (x - x0) % 4 == 2) g.fillRect(x, std::min(y, last), 1, std::abs(y - last) + 1);
         last = y;
     }
     for (int b = 0; b < 9; ++b) {
@@ -167,7 +167,7 @@ void comp_picture(juce::Graphics& g, juce::Rectangle<int> area, float threshold,
         last = y;
     }
     const int hx = x0 + s + 4, hw = area.getRight() - hx;
-    if (!on) { move::draw_text_centred(g, hx, y0 + s / 2 - 3, hw, "OFF"); return; }
+    if (!on) { move::draw_text_centred(g, hx, y0 + s / 2 - 3, hw, "OFF"); return; } // amount 0 and on: a straight line, nothing taken
     const int shown = std::min(hw / 2, int(taken.size()));
     for (int c = 0; c < shown; ++c) {
         const float r = taken[taken.size() - size_t(shown) + size_t(c)];

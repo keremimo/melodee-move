@@ -49,13 +49,14 @@ void punch_lanes(juce::Graphics& g, juce::Rectangle<int> area, const std::vector
 
 // The mixer's EQ (Melodee's strip): nine bands, 63 Hz .. 16 kHz, each `db`
 // -12..12, as a curve across `area`, a dot on each band and `touched` (the
-// band a knob turned last) a ring; flat and dotted while it is `on` no more.
+// band a knob turned last) a ring; dotted while it is `on` no more, the
+// bands kept.
 void eq_curve(juce::Graphics& g, juce::Rectangle<int> area, const std::array<float, 9>& db, bool on, int touched);
 
 // The strip's compressor: its curve in a square (in against out, the knee
 // at `threshold` 0..1 of the way up, `ratio` past it) and what it took off
 // of late, `taken` dB a column, hanging from the top to its right; OFF
-// there while it is not `on`.
+// there while it is not `on` (switched off; amount 0 is on, a straight line).
 void comp_picture(juce::Graphics& g, juce::Rectangle<int> area, float threshold, float ratio, bool on, const std::vector<float>& taken);
 
 // A level in dB as the mixer shows it: "-4.2DB", "0.0DB", "-INF".
