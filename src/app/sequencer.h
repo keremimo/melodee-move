@@ -204,6 +204,8 @@ private:
     void lock_turn(unsigned knob, int delta);
     void tap_tempo_job(bool halve, bool doubled);
     std::vector<uint8_t> step_keys() const;
+    int step_pitch() const; // a kit's step's pitch: 16 Pitches' last pitch played, else 0
+    bool pitch_pad(unsigned physical) const; // 16 Pitches' right 16 on the selected kit
     unsigned step_of(unsigned index) const; // a step button as a step of the pattern
     bool on_tempo() const;
     melodee::Pattern copy_for(unsigned track, unsigned number) const;
@@ -214,6 +216,8 @@ private:
     bool was_playing = false;
     // Steps held, as pressed (the first is the one held).
     std::vector<unsigned> steps_down;
+    int clear_on_tap = -1; // a step pressed with notes on (Play): cleared if it is let go as a tap (ClearStep)
+    int last_pitch = 0;    // 16 Pitches: the semitones the selected kit's last pitch pad played (0: a kit pad)
     bool copy_down = false;
     int copy_from = -1, copy_to = -1; // Copy + steps: the steps copied (a range), -1 none
     int knob_shown = -1;

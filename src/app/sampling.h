@@ -172,6 +172,13 @@ public:
     int audio_recording() const;     // the track recording now, -1 none
     void arm_audio(unsigned track);  // Rec: arms, lets go, or ends the take
     void audio_changed(unsigned track); // its takes or their settings changed: its pack again
+    // A sound file onto an audio track (the browser's push there; a tester,
+    // 2026-11-24): read on the service thread into the project's next take,
+    // the take of the pattern playing from then on (Undo brings the old one
+    // back), the pattern its whole bars at the tempo found in it, WARP on so
+    // it follows the project's tempo; a hit (under 0.1 s, no tempo) keeps its
+    // speed, the pattern the bars it lasts.
+    void import_take(const std::string& path, unsigned track);
     void restore_audio();             // every audio track's pack, once the project is read
     // Another project opened (Studio's `opened` hooks, under the lock): the
     // last one's takes let go (the engine let their packs go as it reloaded),
@@ -216,6 +223,10 @@ private:
     std::unique_ptr<AudioJob> audio_job;
     std::map<unsigned, std::unique_ptr<TakeData>> takes;   // by take number, kept for the run (packs point into them)
     std::vector<unsigned> takes_wanted, packs_wanted;       // to read; tracks whose pack waits for them
+    struct Import { std::string path; unsigned track = 0, pattern = 0; };
+    std::vector<Import> imports;                            // files to make takes of (import_take())
+    void land_import(const Import& job);
+    unsigned next_take(const std::string& folder) const;
     int audio_quiet_sent = -1;
     bool audio_restored = false, folders_made = false;
 

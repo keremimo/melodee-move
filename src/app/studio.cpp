@@ -1437,6 +1437,8 @@ void Studio::apply_step(const Step& step, bool forward) {
     audio_kind.store(int(kind(selected)), std::memory_order_relaxed);
     audio_octave.store(octave(selected), std::memory_order_relaxed);
     if (kind(selected) != was) home();
+    // The audio tracks' takes as the patterns now have them (a take loaded or recorded over, undone or redone).
+    sampling().restore_audio();
     // What the modules' remaking changed (an entry let go) is no step.
     history.close(live(), {}, -1, Clock::now(), false);
     for (auto& module : modules)
@@ -2158,6 +2160,40 @@ std::string Studio::save_bank_file(unsigned which, const std::string& name) {
     fs::create_directories(folder, error);
     auto failed = write_whole((folder / (name + ".mldb")).string(), bytes.data(), bytes.size());
     if (failed.empty()) say(("SAVED " + upper(name)).substr(0, 16));
+    return failed;
+}
+
+std::string Studio::kits_folder() const { return (fs::path(home_path) / "Kits").string(); }
+
+std::string Studio::save_kit_file(const std::string& name) {
+    if (kind() != TrackKind::Kit) return "NOT A KIT";
+    const auto& from = song->tracks[selected];
+    auto kit = app::new_project();
+    kit->tracks[0] = from; // the first kit there is the one LOAD KIT takes
+    copy_text(kit->tracks[0].name, name);
+    copy_text(kit->name, name);
+    kit->tempo = song->tempo; // what Warp and Follow fit the pads to
+    kit->root = song->root;   // and 16 Pitches' key
+    kit->scale = song->scale;
+    auto keep = [&](unsigned slot) { // each file in the slot it has here, so the pads need no renumbering
+        if (slot >= melodee::sample_slots || !song->samples[slot].path[0]) return;
+        kit->samples.edit(slot) = song->samples[slot];
+        if (song->chops[slot].used()) kit->chops.edit(slot) = song->chops[slot];
+    };
+    for (const auto& pad : from.pads) {
+        if (!pad.used()) continue;
+        keep(pad.sample);
+        for (const auto& layer : pad.layers)
+            if (layer.used()) keep(layer.sample);
+    }
+    auto patterns = std::make_unique<melodee::PatternBank>();
+    PluginStates states;
+    auto bytes = project_file_bytes(*kit, *patterns, states);
+    auto folder = fs::path(kits_folder());
+    std::error_code error;
+    fs::create_directories(folder, error);
+    auto failed = write_whole((folder / (name + ".mldp")).string(), bytes.data(), bytes.size());
+    if (failed.empty()) say(("SAVED KIT " + upper(name)).substr(0, 16));
     return failed;
 }
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// Load (the wheel's push on a kit's pad, the Device View): sound files onto
-// the last pad, read by Melodee's own read_audio (WAV, AIFF, FLAC, Ogg,
+// Load (the wheel's push on a kit's pad, the Device View; on an audio track,
+// a file becomes its playing pattern's take): sound files onto the last pad, read by Melodee's own read_audio (WAV, AIFF, FLAC, Ogg,
 // MP3). It opens on a list of places: STARRED and RECENT first (Melodee's,
 // when they hold files), the Move's own sample folders, Melodee's, Ableton's
 // Core Library (its samples and drum kits), all of /data/UserData (or only
@@ -14,9 +14,11 @@
 // app/move_kits.h: the Core Library's Track Presets > Drums, the User Library's
 // Track Presets), its sixteen pads replacing that bank's (Kerem,
 // 2026-11-23); an MPC drum program (.xpm, .xty) opens the LOAD KIT sheet
-// (load_kit.cpp); Shift held the browser's options (Save Sample, Save
-// Bank). A Standard MIDI File's notes load onto the track's pattern playing
-// (song_desk.h, as Melodee's browser loads one).
+// (load_kit.cpp); a Melodee project (.mldp, Save Kit's Kits/<name>.mldp
+// among them) is a KIT, its first kit loaded whole onto the track, as the Set
+// Overview's LOAD KIT; Shift held the browser's options (Save Sample, Save
+// Bank, Save Kit). A Standard MIDI File's notes load onto the track's pattern
+// playing (song_desk.h, as Melodee's browser loads one).
 #include "app/instruments.h"
 #include "app/sampling.h"
 #include "app/pad_layout.h"
@@ -51,6 +53,7 @@ bool is_sound_file(const fs::path& path) {
 bool is_expansion(const fs::path& path) { return extension_of(path) == ".XPN"; }
 bool is_program(const fs::path& path) { auto e = extension_of(path); return e == ".XPM" || e == ".XTY"; }
 bool is_bank_file(const fs::path& path) { return extension_of(path) == ".MLDB"; }
+bool is_project_file(const fs::path& path) { return extension_of(path) == ".MLDP"; } // a saved kit, or any project's kit
 bool is_midi_file(const fs::path& path) { auto e = extension_of(path); return e == ".MID" || e == ".MIDI" || e == ".SMF"; }
 
 class LoadSamples final : public Screen {
@@ -193,7 +196,7 @@ public:
     void deleted() { pending.clear(); }
 
 private:
-    enum class Kind : uint8_t { Place, List, Folder, File, Expansion, Program, Bank, Midi };
+    enum class Kind : uint8_t { Place, List, Folder, File, Expansion, Program, Bank, Midi, Project };
     enum class List : uint8_t { None, Starred, Recent };
     struct Place { std::string name, path, tag; };
     struct Entry { std::string name, path; Kind kind = Kind::File; List list = List::None; int place = -1; std::string tag {}; };
@@ -211,7 +214,7 @@ private:
             return name + count;
         }
         case Kind::Expansion: return entry.name + " XPN";
-        case Kind::Program: case Kind::Bank: { // the name, then KIT (a drum program), PROG or BANK
+        case Kind::Program: case Kind::Bank: case Kind::Project: { // the name, then KIT (a drum program, a project), PROG or BANK
             auto name = fs::path(entry.name).stem().string().substr(0, 11);
             return name + std::string(12 - name.size(), ' ') + entry.tag;
         }
@@ -246,6 +249,15 @@ private:
         case Kind::Bank:
             if (auto failed = studio.load_bank_file(entry->path, studio.pad() / 16); !failed.empty()) studio.say(failed);
             return;
+        case Kind::Project: { // its first kit, whole, onto the track (the service thread's, as Overview's LOAD KIT)
+            if (studio.kind() != TrackKind::Kit) { studio.say("NOT A KIT TRACK"); return; }
+            Studio::ProjectJob job;
+            job.kind = Studio::ProjectJob::Kind::LoadKit;
+            job.path = entry->path;
+            studio.ask_projects(job);
+            studio.say("LOADING KIT");
+            return;
+        }
         case Kind::Midi: { // its notes onto the pattern playing
             std::ifstream in(entry->path, std::ios::binary);
             std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
@@ -254,6 +266,12 @@ private:
             return;
         }
         case Kind::File:
+            if (studio.kind() == TrackKind::Audio) { // an audio track: the file the playing pattern's take
+                if (!entry->tag.empty()) { studio.say("NOT AUDIO"); return; } // an instrument
+                sampling().import_take(entry->path, studio.track());
+                sampling().loaded(entry->path);
+                return;
+            }
             studio.jobs.push_back({entry->path, studio.track(), studio.pad()});
             sampling().loaded(entry->path);
             studio.say("LOADING");
@@ -316,12 +334,13 @@ private:
                 else if (melodee::is_drum_rack_preset(item.path().string())) // a Move drum kit: into a bank, as a bank file
                     found.push_back({name, item.path().string(), Kind::Program, List::None, -1, "KIT"});
                 else if (is_bank_file(item.path())) found.push_back({name, item.path().string(), Kind::Bank, List::None, -1, "BANK"});
+                else if (is_project_file(item.path())) found.push_back({name, item.path().string(), Kind::Project, List::None, -1, "KIT"});
                 else if (is_midi_file(item.path())) found.push_back({name, item.path().string(), Kind::Midi});
                 else if (instrument_file(item.path().string()) && !soundfont_file(item.path().string())) // an SFZ, EXS, DecentSampler
                     found.push_back({name, item.path().string(), Kind::File, List::None, -1, instrument_format(item.path().string())});
             }
             std::sort(found.begin(), found.end(), [](const Entry& a, const Entry& b) {
-                auto rank = [](Kind k) { return k == Kind::Program ? 0 : k == Kind::Folder ? 1 : 2; }; // programs, folders, files
+                auto rank = [](Kind k) { return k == Kind::Program || k == Kind::Project ? 0 : k == Kind::Folder ? 1 : 2; }; // kits and programs, folders, files
                 if (rank(a.kind) != rank(b.kind)) return rank(a.kind) < rank(b.kind);
                 return upper(a.name) < upper(b.name);
             });

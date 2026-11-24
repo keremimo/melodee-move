@@ -272,8 +272,15 @@ void test_pads_played() {
     CHECK(resolve(kit, use_of(Control::Volume, Gesture::Turn, held::pad)) == Job::PadLevel);
     CHECK(resolve(pitches, use_of(Control::Volume, Gesture::Turn, held::pad)) == Job::PadLevel);
     CHECK(resolve(overview, use_of(Control::Volume, Gesture::Turn, held::pad)) == Job::ProjectVolume);
-    // A step tapped with notes held puts them on it; a step held turns its knobs to motion.
-    CHECK(resolve(synth, use_of(Control::Step, Gesture::Tap, held::pad, 4)) == Job::ToggleStep);
+    // A step pressed with notes held puts them on it; a step held turns its knobs to motion.
+    CHECK(resolve(synth, use_of(Control::Step, Gesture::Press, held::pad, 4)) == Job::ToggleStep);
+    CHECK(resolve(synth, use_of(Control::Step, Gesture::Release, held::pad, 4)) == Job::ClearStep);
+    // A screen's own step tap keeps Play's press and let-go from it: Loop Mode's steps are bars.
+    for (Screen s : {Screen::Loop, Screen::Mixer, Screen::KnobFx, Screen::Looper}) {
+        CHECK(resolve({s, Track::Kit}, use_of(Control::Step, Gesture::Press, held::none, 4)) == Job::Nothing);
+        CHECK(resolve({s, Track::Kit}, use_of(Control::Step, Gesture::Release, held::none, 4)) == Job::Nothing);
+    }
+    CHECK(resolve({Screen::Browser, Track::Kit}, use_of(Control::Step, Gesture::Press, held::none, 4)) == Job::ToggleStep);
     CHECK(resolve(kit, use_of(Control::Knob, Gesture::Turn, held::pad | held::step, 0, 3)) == Job::StepMotion);
     // Another pad: its own job (the next note, Chop's next slice), Session's chain where it has one.
     CHECK(resolve(kit, use_of(Control::Pad, Gesture::Press, held::pad, 5)) == Job::PlayPad);
@@ -379,8 +386,8 @@ void test_gestures() {
         Gestures g;
         const Where loop {Screen::Loop, Track::Kit};
         g.feed(step_input(2, true), t0);
-        auto first = g.feed(step_input(2, false), t0 + 60ms);
-        CHECK(first.size() == 1 && resolve(loop, first[0]) == Job::SelectBar);
+        auto first = g.feed(step_input(2, false), t0 + 60ms); // a Tap, then its Release, which Loop Mode keeps from Play
+        CHECK(first.size() == 2 && resolve(loop, first[0]) == Job::SelectBar && resolve(loop, first[1]) == Job::Nothing);
         auto second = g.feed(step_input(2, true), t0 + 200ms);
         CHECK(has(second, Gesture::Double));
         for (const auto& use : second)
@@ -399,8 +406,9 @@ void test_gestures() {
         auto due = g.tick(t0 + 1500ms);
         CHECK(due.size() == 1 && resolve(kit, due[0]) == Job::TransposeStepOctave);
         CHECK(g.feed(button(Button::Up, false), t0 + 1600ms).empty());
-        // The step was a modifier: no step tap when it is let go.
-        CHECK(g.feed(step_input(1, false), t0 + 1700ms).empty());
+        // The step was a modifier: no step tap when it is let go, its Release no tap.
+        auto let_go = g.feed(step_input(1, false), t0 + 1700ms);
+        CHECK(let_go.size() == 1 && let_go[0].gesture == Gesture::Release && !let_go[0].tap);
     }
     {   // Shift: a double press locks it; held for all but Play and Back; a press unlocks.
         Gestures g;
@@ -463,9 +471,14 @@ void test_gestures() {
         CHECK(play.size() == 1 && resolve(synth, play[0]) == Job::PlayStop);
         g.feed(button(Button::Play, false), t0 + 200ms);
         auto step_down = g.feed(step_input(2, true), t0 + 250ms);
-        CHECK(step_down.size() == 1 && resolve(synth, step_down[0]) == Job::Nothing); // a step acts on its tap
+        CHECK(step_down.size() == 1 && resolve(synth, step_down[0]) == Job::ToggleStep); // a step acts on its press
         auto step_up = g.feed(step_input(2, false), t0 + 300ms);
-        CHECK(step_up.size() == 1 && step_up[0].gesture == Gesture::Tap && resolve(synth, step_up[0]) == Job::ToggleStep);
+        CHECK(step_up.size() == 2 && step_up[0].gesture == Gesture::Tap && resolve(synth, step_up[0]) == Job::Nothing);
+        CHECK(step_up[1].gesture == Gesture::Release && step_up[1].tap && resolve(synth, step_up[1]) == Job::ClearStep);
+        // Held past hold_time, or used, its let-go is no tap: the step keeps its notes.
+        g.feed(step_input(2, true), t0 + 1000ms);
+        auto held_up = g.feed(step_input(2, false), t0 + 1500ms);
+        CHECK(held_up.size() == 1 && held_up[0].gesture == Gesture::Release && !held_up[0].tap);
         pad.pressed = false;
         pad.value = 0;
         auto up = g.feed(pad, t0 + 400ms);

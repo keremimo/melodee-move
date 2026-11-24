@@ -35,10 +35,16 @@ std::vector<size_t> notes_in(const melodee::Pattern& p, Span span, int key = -1)
 bool any_in(const melodee::Pattern& p, Span span, int key = -1);
 
 // Step (Play): a step with notes (on the lane) is cleared; an empty one gets
-// `keys`, each at `velocity`, a step long. True when notes went on.
-bool toggle_step(melodee::Pattern& p, unsigned step, int lane, const std::vector<uint8_t>& keys, uint8_t velocity);
+// `keys`, each at `velocity`, a step long, a kit pad's at `pitch` semitones
+// (16 Pitches). True when notes went on.
+bool toggle_step(melodee::Pattern& p, unsigned step, int lane, const std::vector<uint8_t>& keys, uint8_t velocity, int pitch = 0);
+// A step's notes on the lane taken off (Step let go, a tap). True when there were some.
+bool clear_step(melodee::Pattern& p, unsigned step, int lane);
 // Step held + Pad: that key added on the step, or taken off it when it is there.
-bool toggle_key(melodee::Pattern& p, unsigned step, uint8_t key, uint8_t velocity);
+// With a `pitch` (16 Pitches' right 16), only the key at that pitch counts,
+// and a new one is written at it; any_pitch: the key at any pitch.
+constexpr int any_pitch = 1000;
+bool toggle_key(melodee::Pattern& p, unsigned step, uint8_t key, uint8_t velocity, int pitch = any_pitch);
 // Step held + Pad (Loop): the key on every step of the span, or off them all when every step has it.
 bool toggle_key_every_step(melodee::Pattern& p, Span span, uint8_t key, uint8_t velocity);
 

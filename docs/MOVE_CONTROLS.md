@@ -116,6 +116,7 @@ after Schwung) differ for some buttons:
 | Move drum kits | **No new place: CORE LIBRARY opens `/data/CoreLibrary` itself** (Kerem, 2026-11-23), so the Move's own kits are under Track Presets > Drums > Acoustic, Electronic and Hybrid (and Sliced Loops and Templates, where Ableton keeps theirs), beside its Samples; the User Library's own (Track Presets) under ALL USER DATA, and a kit in any folder the browser opens lists too (`KIT`). **No sheet: the push puts the kit's 16 pads straight into the bank of the pad it loads onto**, that bank's other pads emptied, the other banks kept, as a bank file loads (Kerem, 2026-11-23). The Core Library stays read only. |
 | Browser: preview, star, delete | **Each file plays as the wheel lands on it**, as the Move's browser auditions (PREVIEW on or off on Sampling's settings page); **Shift + push stars or unstars** it (Melodee's Shift + B3); **Delete asks, then deletes** the file or folder: in Melodee's folder and the Move's User Library (My Samples, Recordings, as Move Manager may), never the Core Library or what the project plays. |
 | Sampling and Chop's free controls | As docs/ui/sampling.png draws them: **Shift + turn in Sampling, its SAMPLING settings** (Melodee's Settings rows); **Shift + push in Chop, slice options** (Extract, Split, Merge, Remove all cuts); **Shift + turn in Chop, the cut from hit to hit**; **Plus and Minus in Chop, slices 33-128, 32 a press**. |
+| Tester feedback (Kerem, 2026-11-24) | **A step is put on its press and cleared by its tap**, as on the Move and Push: an empty step pressed gets its note at once, so held, a knob locks it (a tester: "steps deactivate after holding, I'd like to steplock"); a step with notes is cleared only when let go within 0.4 s with nothing else used. A screen whose steps tap a job of their own (Loop Mode's bars, the Mixer's tracks, Knob FX, the Looper) keeps Play's step press and let-go from them. **16 Pitches is sequenced at its pitches**: a step writes the last pitch played, a step held + a pitch pad puts that pitch beside the others; **Shift + Plus / Minus move the left 16 a bank** with 16 Pitches on (four pads without). **SAVE KIT** joins the browser's options: the kit alone as a project, `Kits/<name>.mldp`; the browser lists any project as KIT, its push loading the project's kit whole, as the Set Overview's LOAD KIT. **On an audio track the wheel's push opens the samples browser**: a sound file pushed becomes the playing pattern's take, the pattern its whole bars at the tempo found in it, WARP on; Sampling still opens INPUT. |
 | Instruments | **The instruments mockups are built as drawn** (`docs/ui/instruments.png`). **AUTO SAMPLE is a row of the Module page, last of a module track's pages** (Kerem, 2026-11-21; it was the end of Melodee's own module menu), not Shift + Step 11, which stays the Move's Repeat and Arp; the Arp styles there turn Melodee's arpeggiator on. **Keys & Scale (Shift + Step 9) lists the Move's scales** in Ableton's order (Live 12's and Push 3's 35, kept in Melodee's scale table after its own 13 so the MPC opens them: melodee-sample branch `move-scales`). **ARP and CHORD are MIDI effects before the module in the Device View** (Kerem, 2026-11-21: Schwung's chain shape), the push shows the page whole and Mute + push turns it on or off. **A module track's knobs are the module's own; no MACRO page** (Kerem, 2026-11-20: Melodee's FILTER, ECHO and SPACE were the MPC Sample's; Schwung's controls take the knobs). |
 
 Followed from the rule without a choice: Left and Right become the
@@ -176,7 +177,7 @@ Session (a row a track of the bank, a column a pattern) and the Overview.
 | Pad (Pad FX) | (No Pad FX on the Move) | A punch while held, pressure its depth; up to four at once, a fifth takes the oldest's place | done |
 | Delete held + Pad (Pad FX) | (As above) | Takes that punch's kept punches out of the pattern | done |
 | Pad (Flex Beat) | (No Flex Beat on the Move) | Pads 1-16: pad 1 Empty, 2-16 the fifteen time effects over the master | done |
-| Step held + Pad | Adds or removes that note on the step | The same on the pattern | done |
+| Step held + Pad | Adds or removes that note on the step | The same on the pattern; 16 Pitches' right 16: the pad at that pitch, beside the others | done |
 | Step held + Pad (Loop) | The note on every step of the bar | The same | done |
 | Shift + Step 16 held + Pad | Quantizes that drum pad's notes | Time Correct on that pad | done |
 
@@ -184,7 +185,8 @@ Session (a row a track of the bank, a column a pattern) and the Overview.
 
 | Control | On the Move | In Melodee | Status |
 | --- | --- | --- | --- |
-| Step (Play) | Puts the last pad's note (or the held pads') on the step; a step with notes is cleared | Step Edit, the same | done |
+| Step (Play) | Puts the last pad's note (or the held pads') on the step as it is pressed, so held, a knob locks it | The same; 16 Pitches: the last pitch played, the pad at that pitch | done |
+| Step let go (Play) | A step with notes tapped is cleared; held, or used with another control, it keeps them | The same: let go within 0.4 s with nothing else used | done |
 | Step held + Volume knob | The notes' velocity | The same | done |
 | Step held + Wheel turn | The notes' length, a tenth of a step a detent | The same | done |
 | Step held + Step | The note's length up to that step | The same | done |
@@ -285,7 +287,7 @@ while Shift is held.
 | Control | On the Move | In Melodee | Status |
 | --- | --- | --- | --- |
 | Wheel turn (Play) | Device View: walks the Track Preset, its instrument, sample and effects | Walks the track, its sound (a kit's last pad, a module; on a synth track ARP and CHORD before the module) and its effects | done |
-| Wheel push (Play) | Opens the browser for the item in focus | Opens its browser: a synth's track its Schwung modules, a kit's track (KIT) and pad Load (kits, banks, samples; the track types' sheet not yet); on a Schwung module or effect, into its pages (as Schwung's click on a chain box); on ARP or CHORD, the page whole; Melodee's effects, the effect browser | done |
+| Wheel push (Play) | Opens the browser for the item in focus | Opens its browser: a synth's track its Schwung modules, a kit's track (KIT) and pad Load (kits, banks, samples; the track types' sheet not yet); an audio track the samples browser, a file the playing pattern's take; on a Schwung module or effect, into its pages (as Schwung's click on a chain box); on ARP or CHORD, the page whole; Melodee's effects, the effect browser | done |
 | Shift + Wheel push (Play, kit) | Sample Options for the sample in focus: Slice, Reverse | Sample Options: Chop, Reverse, Trim, Normalize, Save | done |
 | Shift + Wheel push (Play, synth) | No job (in the browser, Shift opens Options: Save Preset) | On the module: swaps it (the modules, a REPLACE question first), as Schwung's Shift + click on a box | done |
 | Shift + Wheel turn (Play) | The parameter banks of the instrument or sample in focus | The pad pages; on a Schwung effect, moves it along the chain (Schwung's Shift + jog on a box); a module's pages are entered with the push | done |
@@ -304,8 +306,8 @@ while Shift is held.
 | Wheel push (Pad FX) | (As above) | KEEP: the take laid into the pattern playing | done |
 | Shift + Wheel push (Pad FX) | (As above) | Its options: latch, master or track, quantize, snap, tail | done |
 | Wheel turn (Browser) | Moves through the list, loading each preset (Autoload) | Moves through the list; a module's presets load as it turns | done |
-| Wheel push (Browser) | Opens a folder; loads (Autoload off); leaves with the preset chosen | Opens a folder, loads onto the pad or the track; a Move drum kit (Track Presets > Drums) into the bank of the pad it loads onto | done |
-| Shift held (Browser) | Options: Save Preset (Shift held) | Options: Save Sample, Save Bank (the two banks in view, as `.mldb`); a module's preset waits for the instruments | done |
+| Wheel push (Browser) | Opens a folder; loads (Autoload off); leaves with the preset chosen | Opens a folder, loads onto the pad or the track; a Move drum kit (Track Presets > Drums) into the bank of the pad it loads onto; a project (KIT, a saved kit among them) its kit whole; on an audio track, a file the playing pattern's take | done |
+| Shift held (Browser) | Options: Save Preset (Shift held) | Options: Save Sample, Save Bank (the two banks in view, as `.mldb`), Save Kit (the whole kit, `Kits/<name>.mldp`); a module's preset waits for the instruments | done |
 | Shift + Wheel push (Browser) | No job | Stars or unstars the file under the cursor (Melodee's Shift + B3); STARRED and RECENT lead the places | done |
 | Wheel turn (list) | Moves through a menu; turns a value | The same | done |
 | Shift + Wheel turn (list) | Fine (tempo, groove) | Fine | done |
@@ -402,7 +404,7 @@ while Shift is held.
 | Plus or Minus (Play, kit) | No job without 16 Pitches (Control Live's Drum mode: the next or previous 16 pads) | The next or previous 16 pads of the kit's 8 banks | done |
 | Plus or Minus (16 Pitches) | The pitches' octave | The same | done |
 | Shift + Plus or Minus (Play, synth) | No job (Control Live: a scale degree) | The pads a note of the key up or down (a semitone on Chromatic); a note track's, not kept | done |
-| Shift + Plus or Minus (Play, kit) | No job (Control Live: four pads) | The kit's pads in view four pads up or down (with 16 Pitches, the left bank's); the bank they start in kept with the kit | done |
+| Shift + Plus or Minus (Play, kit) | No job (Control Live: four pads) | The kit's pads in view four pads up or down; with 16 Pitches, the left 16 a whole bank (A-H); the bank they start in kept with the kit | done |
 | Plus or Minus (Session) | No job (Control Live: the session ring a scene) | The bank of four tracks | done |
 | Plus or Minus (Chop) | No job | Slices 33-128, 32 a press | done |
 | Left or Right (Play) | The clip's previous or next bar (or page of steps) | The pattern's bar (today the page, which moves to Shift + turn) | done |

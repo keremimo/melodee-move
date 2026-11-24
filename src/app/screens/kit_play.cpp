@@ -84,10 +84,12 @@ public:
             studio.set_pad_bank(int(studio.pad_bank()) + (use.control == bindings::Control::Plus ? 1 : -1));
             studio.say("PADS " + banks_in_view(studio));
             return true;
-        case Job::ScaleStep: // Shift + Plus / Minus on a kit: four pads (the Move's Control Live)
-            studio.set_pad_first(int(studio.pad_first()) + (use.control == bindings::Control::Plus ? 4 : -4));
+        case Job::ScaleStep: { // Shift + Plus / Minus on a kit: four pads (the Move's Control Live); with 16 Pitches a bank of 16
+            int by = studio.pitches() ? 16 : 4;
+            studio.set_pad_first(int(studio.pad_first()) + (use.control == bindings::Control::Plus ? by : -by));
             studio.say("PADS " + banks_in_view(studio));
             return true;
+        }
         case Job::PitchesOctave: {
             int octave = studio.current().octave + (use.control == bindings::Control::Plus ? 1 : -1);
             studio.set_pitches_octave(octave);

@@ -10,8 +10,10 @@
 // them as their own layers; more, an instrument, stay silent for now.
 //
 // Browser options: Shift held in the samples browser (the Move's Options),
-// Save Sample (the pad's region, named) and Save Bank for the two banks in
-// view (Samples/Banks/<name>.mldb), which the browser lists tagged BANK.
+// Save Sample (the pad's region, named), Save Bank for the two banks in
+// view (Samples/Banks/<name>.mldb), which the browser lists tagged BANK, and
+// Save Kit, the whole kit (Kits/<name>.mldp), listed tagged KIT (a tester,
+// 2026-11-24: "could not figure out how to load or save a whole kit").
 #include "app/screens/kit_common.h"
 #include "app/new_project.h"
 #include "melodee/shell/mpc_program.h"
@@ -128,7 +130,7 @@ public:
     bool job(bindings::Job job, const bindings::Use& use) override {
         using bindings::Job;
         switch (job) {
-        case Job::ListTurn: case Job::ListTurnFine: cursor = std::clamp(cursor + use.delta, 0, 2); return true;
+        case Job::ListTurn: case Job::ListTurnFine: cursor = std::clamp(cursor + use.delta, 0, 3); return true;
         case Job::ListPush: push(); return true;
         case Job::Back: case Job::BrowserOptions: studio.close(); return true;
         case Job::TurnKnob: case Job::TurnKnobFine: return true;
@@ -146,7 +148,8 @@ public:
         ui::rail(g, "OPT", pad_label(studio.pad()), "LOAD");
         unsigned bank = studio.pad_bank();
         ui::list(g, ui::content(0, ui::height),
-                 {"SAVE SAMPLE", "SAVE BANK " + std::string(1, char('A' + bank)), "SAVE BANK " + std::string(1, char('A' + bank + 1))}, cursor, 1);
+                 {"SAVE SAMPLE", "SAVE BANK " + std::string(1, char('A' + bank)), "SAVE BANK " + std::string(1, char('A' + bank + 1)), "SAVE KIT"},
+                 cursor, 1);
     }
 
 private:
@@ -161,6 +164,13 @@ private:
             studio.ask_text("SAVE SAMPLE", upper(sample->name.substr(0, sample->name.rfind('.'))), [this, track, pad, folder](const std::string& typed) {
                 studio.file_jobs.push_back({false, track, pad, 0, (fs::path(folder) / (safe(typed) + ".wav")).string()});
                 studio.say("SAVING");
+            });
+            return;
+        }
+        if (cursor == 3) { // the whole kit, its eight banks
+            studio.close();
+            studio.ask_text("SAVE KIT", upper(std::string(studio.current().name)), [this](const std::string& typed) {
+                if (auto failed = studio.save_kit_file(safe(typed)); !failed.empty()) studio.say(upper(failed).substr(0, 16));
             });
             return;
         }

@@ -8,7 +8,9 @@
 // starts it when stopped). The Play screen shows the take of the pattern
 // playing; knobs 1-6 its CLIP (level, start, end, fade in, fade out,
 // reverse), Shift + the wheel its WARP (warp, BPM, semitones, cents). The
-// takes themselves are src/app/audio_takes.cpp's.
+// takes themselves are src/app/audio_takes.cpp's. The wheel's push opens
+// the samples browser: a sound file pushed there becomes the playing
+// pattern's take (Sampling::import_take(); a tester, 2026-11-24).
 #include "app/sampling.h"
 #include "app/screens/common.h"
 #include "melodee/model/audio_track.h"
@@ -218,7 +220,7 @@ public:
         case Job::Page: page = page ? 0 : 1; return true;
         case Job::TurnKnob: turn(unsigned(use.index), use.delta, false); return true;
         case Job::TurnKnobFine: turn(unsigned(use.index), use.delta, true); return true;
-        case Job::OpenBrowser: studio.open("audio-input"); return true; // the wheel's push: its INPUT
+        case Job::OpenBrowser: studio.open("load-samples"); return true; // the wheel's push: a file onto the pattern (Sampling: its INPUT)
         case Job::Focus: return true;
         default: return false;
         }

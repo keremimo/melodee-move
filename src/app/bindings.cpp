@@ -62,7 +62,8 @@ std::vector<Binding> make_table() {
         {"Shift + Step 16 held + Pad", S::Play, T::Any, H::shift | H::step, C::Pad, G::Press, J::QuantizePad, St::Done, "", 0, 15},
 
         // Steps
-        {"Step (Play)", S::Play, T::Any, H::none, C::Step, G::Tap, J::ToggleStep, St::Done},
+        {"Step (Play)", S::Play, T::Any, H::none, C::Step, G::Press, J::ToggleStep, St::Done}, // an empty step's note at once: held, its knobs lock it
+        {"Step let go (Play)", S::Play, T::Any, H::none, C::Step, G::Release, J::ClearStep, St::Done}, // a tap on a step with notes clears them
         {"Step held + Volume knob", S::Play, T::Any, H::step, C::Volume, G::Turn, J::StepVelocity, St::Done},
         {"Step held + Wheel turn", S::Play, T::Any, H::step, C::WheelTurn, G::Turn, J::StepLength, St::Done},
         {"Step held + Step", S::Play, T::Any, H::step, C::Step, G::Press, J::StepLengthTo, St::Done},
@@ -392,10 +393,21 @@ Screen under(Screen screen) {
 
 namespace {
 
+// Whether `screen` answers the Tap of the control `use` presses or lets go:
+// then it keeps that Press and Release from the screens under it (one place,
+// one control: Loop Mode's step picks a bar, Play's would put a note).
+bool taps_on(Screen screen, const Where& where, const Use& use) {
+    if (use.gesture != Gesture::Press && use.gesture != Gesture::Release) return false;
+    Use tap = use;
+    tap.gesture = Gesture::Tap;
+    return find_in(screen, where, tap) != nullptr;
+}
+
 // The row for `use` with exactly what it has held.
 const Binding* find_held(const Where& where, const Use& use) {
     for (Screen screen = where.screen;; screen = under(screen)) {
         if (const Binding* row = find_in(screen, where, use)) return row;
+        if (taps_on(screen, where, use)) return nullptr;
         if (under(screen) == screen) break;
     }
     if (where.screen != Screen::Typing)
@@ -577,11 +589,23 @@ std::vector<Use> Gestures::feed(const move::Input& input, Clock::time_point now)
     Down down = *at;
     downs.erase(at);
     if (mapped.control == Control::Shift) shift_down = false;
-    if (input.kind == Kind::Pad) { uses.push_back(use_of(Gesture::Release)); return uses; } // a pad has no tap; let go, a Release
+    bool tapped = !down.used && !down.held_long && now - down.since < hold_time;
+    auto let_go = [&] {
+        Use use = use_of(Gesture::Release);
+        use.tap = tapped;
+        return use;
+    };
+    if (input.kind == Kind::Pad) { uses.push_back(let_go()); return uses; } // a pad has no tap; let go, a Release
     if (input.kind == Kind::Touch) return uses; // a touch has no tap
-    if (!down.used && !down.held_long && now - down.since < hold_time) {
+    if (tapped) {
         Use use = use_of(Gesture::Tap);
         use.held = down.held; // as it was when it went down
+        use.held_step = down.held_step;
+        uses.push_back(use);
+    }
+    if (input.kind == Kind::Step) { // and a Release: Play's step clears its notes on a tap (ClearStep)
+        Use use = let_go();
+        use.held = down.held;
         use.held_step = down.held_step;
         uses.push_back(use);
     }

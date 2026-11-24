@@ -202,10 +202,12 @@ std::array<int, 128> lit_notes(app::MelodeeApp& melodee) {
 void test_steps(app::MelodeeApp& melodee) {
     Hands h {melodee};
     auto& p = current(melodee);
-    // Step (Play): A01's note on the step; a tap again clears it.
-    h.step(3);
+    // Step (Play): A01's note on the step as it is pressed, kept as it is let go; a tap again clears it.
+    h.step_down(3);
     CHECK(p.events.size() == 1 && p.events[0].tick == 72 && p.events[0].key == melodee::sampler_first_note);
     CHECK(has(h.status(), "job=ToggleStep"));
+    h.step_up(3);
+    CHECK(p.events.size() == 1);
     {   // Steps (9.5): white with a note, the track's colour dim where empty.
         auto notes = lit_notes(melodee);
         CHECK(notes[step_note(3)] == colour::white && notes[step_note(2)] == ui::track_colour(0).dim);
@@ -275,6 +277,59 @@ void test_steps(app::MelodeeApp& melodee) {
     // Delete + Pad: its notes go; again, with none, the pad is emptied.
     h.with(Button::Delete, [&] { h.pad(1); });
     CHECK(p.events.empty() && has(h.status(), "job=ClearPad"));
+}
+
+// Step locks (a tester, 2026-11-24): an empty step held gets its note as it is pressed, so a knob turned locks it,
+// and its let-go keeps both; held past a tap, a step keeps its notes. 16 Pitches: a step writes the last pitch
+// played, a step held + a pitch pad puts that pitch beside it (again, off); Shift + Plus moves the kit's 16 a bank.
+void test_locks_and_pitches(app::MelodeeApp& melodee) {
+    Hands h {melodee};
+    auto& p = current(melodee);
+    auto& studio = melodee.studio();
+    CHECK(p.events.empty());
+    h.step_down(2);
+    CHECK(p.events.size() == 1);
+    h.knob(7, -10);
+    h.step_up(2);
+    CHECK_SAID(p.events.size() == 1 && seq::locks_in(p, seq::step_span(p, 2)) == 1, p.events.size() << " " << h.status());
+    h.step_down(2);
+    h.knob(7, -5);
+    h.step_up(2);
+    CHECK(p.events.size() == 1);
+    h.step(2);
+    CHECK(p.events.empty() && has(h.status(), "job=ClearStep"));
+    p.motion.clear();
+    // 16 Pitches (Shift + Step 8): pad 5 (Rows: the right 4x4's second) a pitch of the last pad.
+    h.with(Button::Shift, [&] { h.step(7); });
+    CHECK(studio.pitches());
+    h.pad(5);
+    int key = studio.stamp(5).key.load();
+    int up = int(int8_t(key >> 8));
+    CHECK_SAID(key >= 0 && up != 0, key);
+    h.step(4);
+    CHECK_SAID(p.events.size() == 1 && p.events[0].key == (key & 0xff) && p.events[0].pitch == up, p.events.size() << " " << h.status());
+    h.step_down(4);
+    h.pad(6);
+    int higher = int(int8_t(studio.stamp(6).key.load() >> 8));
+    CHECK(higher != up && p.events.size() == 2 && std::any_of(p.events.begin(), p.events.end(), [&](const melodee::Event& e) { return e.pitch == higher; }));
+    h.pad(6);
+    CHECK(p.events.size() == 1 && p.events[0].pitch == up);
+    h.step_up(4);
+    CHECK(p.events.size() == 1);
+    // A kit pad (the left 16) and a step: the pad itself, no pitch.
+    h.pad(0);
+    h.step(6);
+    CHECK(p.events.size() == 2 && p.events[1].pitch == 0);
+    unsigned first = studio.pad_first();
+    h.with(Button::Shift, [&] { h.button(Button::Up); });
+    CHECK_SAID(studio.pad_first() == first + 16, studio.pad_first());
+    h.with(Button::Shift, [&] { h.button(Button::Down); });
+    CHECK(studio.pad_first() == first);
+    h.with(Button::Shift, [&] { h.step(7); });
+    CHECK(!studio.pitches());
+    h.with(Button::Delete, [&] { h.pad(0); h.pad(1); }); // A01's and A02's notes
+    CHECK(p.events.empty());
+    h.with(Button::Shift, [&] { h.pad(1); }); // A02 the last pad again
 }
 
 void test_bars_and_patterns(app::MelodeeApp& melodee) {
@@ -834,6 +889,7 @@ void test_app() {
     CHECK(melodee.restore_now().empty());
     CHECK(has(melodee.status(), "track=1 kind=kit"));
     test_steps(melodee);
+    test_locks_and_pitches(melodee);
     test_bars_and_patterns(melodee);
     test_record(melodee);
     test_capture(melodee);

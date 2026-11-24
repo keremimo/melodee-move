@@ -393,7 +393,10 @@ the screens were built; the screens are `src/app/screens/kit_play.cpp`,
   the rack's effects, sends and macros are left out, and a sample from a
   pack the Move does not hold leaves its pad empty (`MISSING`). Ellic-core
   reads them (`shell/drum_rack.h`). **Shift held** in the browser opens its
-  options: Save Sample, Save Bank for the two banks in view.
+  options: Save Sample, Save Bank for the two banks in view, Save Kit for
+  the whole kit (`Kits/<name>.mldp`, a project of that kit alone). A
+  project in the browser is tagged `KIT`; its push loads its first kit
+  whole onto the track, as the Set Overview's LOAD KIT.
 - **Long samples** (over ten seconds, up to six hours, or shorter ones memory
   has no room for) play from storage as Melodee's do (`engine/stream_pager.h`):
   half a second where each pad starts held in memory, the pager reading
@@ -412,7 +415,7 @@ the screens were built; the screens are `src/app/screens/kit_play.cpp`,
 | Copy onto a used pad | `COPY` / from / to | `REPLACE`, the pad | `PUSH YES`, `BACK NO` |
 | Sample Options | `OPT` / pad / `SMP` or `LYR2`-`LYR4` | the list | |
 | Load Kit | `KIT` / track / `LOAD` | WHOLE KIT, INTO A-H, LOAD BANKS | |
-| Browser options | `OPT` / pad / `LOAD` | Save Sample, Save Bank | |
+| Browser options | `OPT` / pad / `LOAD` | Save Sample, Save Bank, Save Kit | |
 | Memory full | `KIT` / track / pad | `MEMORY FULL` | |
 
 **Kit lights** (Kerem's rule, 2026-11-20): a pad with a sample dim in its
@@ -1047,7 +1050,9 @@ each file as the wheel lands, stars on Shift + push, deletes on Delete
 Chop's manual take (the red pad cuts next), a cut close up while knob 1 or
 2 turns, slices 33-128 on Plus and Minus, slice options on Shift + push, To
 Pads KIT; an audio track's INPUT on Sampling, Rec arming it, its take's CLIP
-and WARP pages.
+and WARP pages, and the wheel's push opening the samples browser, a file
+pushed there the playing pattern's take (its whole bars at the tempo found
+in it, WARP on).
 
 | Screen | Rail | Subject | Detail |
 | --- | --- | --- | --- |

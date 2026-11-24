@@ -24,6 +24,7 @@
 #include "melodee/shell/drum_rack.h"
 #include "app/pad_layout.h"
 #include "app/project_store.h"
+#include "app/sampling.h"
 #include "app/sequencer.h"
 #include "app/screen_reader.h"
 #include "move/schwung_tts.h"
@@ -3402,6 +3403,33 @@ void test_audio_track() {
         blocks(melodee, 20, false);
         press_button(melodee, Button::Play);
         CHECK(blocks(melodee, 800, false) > to_s32(0.08f));
+        press_button(melodee, Button::Play);
+        // A sound file onto the audio track (the wheel's push opens the browser; a tester, 2026-11-24): the next
+        // take, the pattern playing its whole bars at the tempo found in it (the test loop: 2 bars at 120), warped.
+        press_button(melodee, Button::MainPush);
+        CHECK(has(melodee.status(), "page=load-samples"));
+        std::string loop = folder + "/loop.wav";
+        CHECK(move::write_test_loop(loop));
+        {
+            std::lock_guard<std::mutex> guard(melodee.studio().lock);
+            melodee.studio().sampling().import_take(loop, 2);
+        }
+        for (int n = 0; n < 3; ++n) melodee.service();
+        CHECK(std::filesystem::exists(home + "/Projects/Move Audio/Take 002.wav"));
+        press_button(melodee, Button::Back);
+        if (!has(melodee.status(), "seq_bars=2 ")) std::cerr << melodee.status() << "\n";
+        CHECK(has(melodee.status(), "take=2 ") && has(melodee.status(), "take_warp=1") && has(melodee.status(), "seq_bars=2 "));
+        press_button(melodee, Button::Play);
+        CHECK(blocks(melodee, 800, false) > to_s32(0.1f));
+        press_button(melodee, Button::Play);
+        press_button(melodee, Button::Undo); // the take before it back
+        CHECK(has(melodee.status(), "take=1 ") && has(melodee.status(), "seq_bars=1 "));
+        melodee.surface(make_event(0xb0, button_cc(Button::Shift), 127));
+        press_button(melodee, Button::Undo); // redo
+        melodee.surface(make_event(0xb0, button_cc(Button::Shift), 0));
+        CHECK(has(melodee.status(), "take=2 "));
+        press_button(melodee, Button::Play);
+        CHECK(blocks(melodee, 800, false) > to_s32(0.1f));
     }
 }
 
@@ -3647,7 +3675,24 @@ void test_kit_depth() {
         CHECK(studio.current().pads[48].used() && studio.current().pads[48 + 6].used());
     }
     melodee.service(); // its files: the same slots, nothing read again
-    // Shift held in the samples browser: its options (Save Sample, Save Bank).
+    // The whole kit saved (Save Kit, Kits/<name>.mldp: the kit alone) and loaded back whole, as LOAD KIT (a tester, 2026-11-24).
+    {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        CHECK(studio.save_kit_file("TEST KIT").empty());
+    }
+    {
+        auto kit = app::new_project();
+        auto patterns = std::make_unique<melodee::PatternBank>();
+        app::PluginStates states;
+        CHECK(app::read_project_file(home + "/Kits/TEST KIT.mldp", *kit, *patterns, states).empty());
+        const auto& saved = kit->tracks[0];
+        CHECK(saved.engine == melodee::EngineKind::Sampler && saved.pads[0].used() && saved.pads[48].used());
+        CHECK(kit->samples[saved.pads[48].sample].path[0] && !kit->tracks[1].used());
+    }
+    CHECK(studio.load_kit(home + "/Kits/TEST KIT.mldp").empty());
+    CHECK(studio.current().pads[0].used() && studio.current().pads[48].used());
+    melodee.service();
+    // Shift held in the samples browser: its options (Save Sample, Save Bank, Save Kit).
     press_button(melodee, Button::MainPush); // the wheel's push on the pad: the samples browser
     CHECK(has(status(), "page=load-samples"));
     melodee.surface(make_event(0xb0, button_cc(Button::Shift), 127));

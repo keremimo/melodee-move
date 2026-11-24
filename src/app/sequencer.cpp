@@ -3,6 +3,7 @@
 #include "app/song_desk.h"
 #include "app/screen.h"
 #include "app/studio.h"
+#include "app/pad_layout.h"
 #include "move/display.h"
 #include "move/font.h"
 #include "ui/seq_widgets.h"
@@ -281,6 +282,12 @@ std::vector<uint8_t> Sequencer::step_keys() const {
     return {studio.current().last_note};
 }
 
+int Sequencer::step_pitch() const { return kit() && studio.pitches() ? last_pitch : 0; }
+
+bool Sequencer::pitch_pad(unsigned physical) const {
+    return kit() && studio.pitches() && logical_pad(physical, PadLayout::Banks) >= 16; // 16 Pitches: two MPC banks in either layout
+}
+
 int Sequencer::held_step() const { return steps_down.empty() ? -1 : int(step_of(steps_down.front())); }
 
 bool Sequencer::on_tempo() const { return studio.top() && studio.top()->id() == "tempo"; }
@@ -309,17 +316,28 @@ bool Sequencer::job(Job job, const bindings::Use& use) {
     auto held_span = [&] { return seq::step_span(p, unsigned(held_step())); };
     auto bar_span = [&] { return seq::bar_span(unsigned(held_step()), bar_ticks()); };
     switch (job) {
-    // Steps (11): a tap sets or clears; a held step's notes take the turns.
+    // Steps (11): an empty step pressed gets its note at once, so held, its
+    // knobs lock it (the Move's and Push's); a step with notes is cleared by a
+    // tap (ClearStep, as it is let go), held it keeps them for its turns.
     case Job::ToggleStep: {
+        clear_on_tap = -1;
         if (on_tempo()) { tap(Clock::now()); return true; }
         unsigned step = step_of(unsigned(use.index));
+        if (seq::any_in(p, seq::step_span(p, step), lane)) { clear_on_tap = int(step); return true; }
         if (seq::step_tick(p, step) >= p.length) { // past the end: a spare step lengthens it to its bar (Melodee's)
             uint32_t bar = bar_ticks();
             seq::set_length(p, (seq::step_tick(p, step) / bar + 1) * bar, studio.project().max_length());
         }
-        bool added = seq::toggle_step(p, step, lane, step_keys(), 100);
+        bool added = seq::toggle_step(p, step, lane, step_keys(), 100, step_pitch());
         if (added && p.is_free()) p.free = false;
         sync(t, n);
+        return true;
+    }
+    case Job::ClearStep: {
+        unsigned step = step_of(unsigned(use.index));
+        bool clear = use.tap && clear_on_tap == int(step);
+        clear_on_tap = -1;
+        if (clear && seq::clear_step(p, step, lane)) sync(t, n);
         return true;
     }
     case Job::StepVelocity: seq::add_velocity(p, held_span(), lane, use.delta); sync(t, n); return true;
@@ -349,7 +367,8 @@ bool Sequencer::job(Job job, const bindings::Use& use) {
     case Job::NoteOnStep: {
         int key = studio.stamp(unsigned(use.index)).key.load(std::memory_order_acquire);
         if (key < 0 || held_step() < 0) return true;
-        seq::toggle_key(p, unsigned(held_step()), uint8_t(key), 100); // the steps stay on their lane
+        // the steps stay on their lane; 16 Pitches' right 16 put the pad at their pitch, or take that one off
+        seq::toggle_key(p, unsigned(held_step()), uint8_t(key & 0xff), 100, pitch_pad(unsigned(use.index)) ? int(int8_t(key >> 8)) : seq::any_pitch);
         sync(t, n);
         return true;
     }
@@ -1096,6 +1115,7 @@ void Sequencer::input(const move::SurfaceEvent& event) {
         if (chord.empty() && key >= 0) chord.push_back(key);
         pad_keys[in.index] = key;
         pad_tracks[in.index] = t;
+        if (t == int(studio.track()) && kit() && studio.pitches()) last_pitch = pitch_pad(in.index) ? int(int8_t(key >> 8)) : 0;
         if (t == int(studio.track()) && !kit()) {
             for (int k : chord)
                 if (std::find(keys_down.begin(), keys_down.end(), uint8_t(k)) == keys_down.end()) keys_down.push_back(uint8_t(k));

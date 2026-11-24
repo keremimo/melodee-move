@@ -8,9 +8,13 @@
 // the pattern does. A take's CLIP and WARP are the pattern's AudioRegion.
 #include "app/sampling.h"
 #include "app/sampling_jobs.h"
+#include "app/seq_edit.h"
+#include "app/sequencer.h"
 #include "melodee/engine/audio_player.h"
 #include "melodee/engine/engine_host.h"
+#include "melodee/engine/onsets.h"
 #include "melodee/model/audio_track.h"
+#include "melodee/shell/follow_tempo.h"
 #include "melodee/shell/sample_decode.h"
 #include <algorithm>
 #include <cmath>
@@ -66,6 +70,87 @@ int Sampling::audio_recording() const {
     return take.running() ? studio.host().audio_take_track() : -1;
 }
 
+// The next take's number, after every take of the project (a file left by a take undone counts too), the ones in
+// memory and the one armed. Under the lock.
+unsigned Sampling::next_take(const std::string& folder) const {
+    unsigned number = 1;
+    std::error_code error;
+    for (const auto& item : fs::directory_iterator(folder, error)) {
+        auto name = item.path().filename().string();
+        unsigned n = 0;
+        if (std::sscanf(name.c_str(), "Take %u", &n) == 1) number = std::max(number, n + 1);
+    }
+    for (const auto& [n, data] : takes) number = std::max(number, n + 1);
+    if (audio_job) number = std::max(number, audio_job->take + 1);
+    return number;
+}
+
+void Sampling::import_take(const std::string& path, unsigned t) {
+    t %= melodee::track_count;
+    if (studio.kind(t) != TrackKind::Audio) return;
+    if (studio.project_path().empty()) { studio.say("SAVE PROJECT 1ST"); return; }
+    imports.push_back({path, t, studio.project().tracks[t].pattern % melodee::pattern_count});
+    studio.say("LOADING");
+}
+
+void Sampling::land_import(const Import& job) {
+    melodee::SampleData data;
+    bool read = melodee::read_audio(job.path, data, longest_take_seconds, nullptr).empty() && data.frames && !data.left.empty();
+    if (read && data.right.empty()) data.right = data.left;
+    std::string folder, file;
+    unsigned number = 0;
+    uint16_t project_tempo = 1200;
+    {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        if (!read) { studio.say("CANNOT READ IT"); return; }
+        folder = melodee::audio_folder(studio.project_path());
+        if (folder.empty()) { studio.say("SAVE PROJECT 1ST"); return; }
+        number = next_take(folder);
+        takes[number] = std::make_unique<TakeData>(); // its number kept from a take armed meanwhile
+        project_tempo = studio.project().tempo;
+    }
+    file = (fs::path(folder) / melodee::audio_take_name(number)).string();
+    std::error_code error;
+    fs::create_directories(folder, error);
+    bool written = melodee::write_wav(file, data).empty();
+    if (written) hand_back(file, studio.home_folder());
+    // Its tempo, as Follow finds a pad's (studio.cpp): the beats' tempo, its octave nearest the project's, exact at whole bars.
+    const uint32_t frames = uint32_t(uint64_t(data.frames) * 44100 / std::max(1u, data.rate));
+    std::array<melodee::Hit, melodee::max_hits> hits;
+    melodee::BeatGrid beats;
+    melodee::find_hits(data, hits, beats);
+    uint16_t found = melodee::follow_tempo(frames, beats.found() ? beats.tempo : 0, project_tempo);
+    auto kept = std::make_unique<TakeData>();
+    kept->left = std::move(data.left);
+    kept->right = std::move(data.right);
+    kept->rate = data.rate;
+    add_peaks(kept->peaks, kept->left.data(), kept->right.data(), 0, kept->left.size(), kept->rate);
+    std::lock_guard<std::mutex> guard(studio.lock);
+    if (!written) { takes.erase(number); studio.say("CANNOT WRITE TAKE"); return; }
+    takes[number] = std::move(kept);
+    if (studio.kind(job.track) != TrackKind::Audio) return; // the track changed meanwhile: the take stays on the card
+    studio.close_step(); // what came before is a step of its own
+    melodee::AudioRegion region;
+    region.take = uint16_t(number);
+    region.frames = region.take_frames = frames;
+    region.warp = found != 0;
+    region.tempo = found ? found : project_tempo;
+    auto& pattern = studio.patterns().at[job.track][job.pattern];
+    pattern.audio = region;
+    const uint32_t bar = studio.project().bar_ticks();
+    const double bars = double(melodee::frames_to_ticks(frames, region.tempo)) / double(std::max(1u, bar));
+    const uint32_t whole = std::max(1u, unsigned(region.warp ? std::lround(bars) : std::ceil(bars - 0.01)));
+    seq::set_length(pattern, whole * bar, studio.project().max_length());
+    studio.sequencer().sync(job.track, job.pattern);
+    send_pack(job.track);
+    studio.name_step("LOAD AUDIO", int(job.track));
+    studio.close_step();
+    studio.changed();
+    char text[24];
+    std::snprintf(text, sizeof text, "%u BAR%s %s", whole, whole == 1 ? "" : "S", region.warp ? "WARPED" : "AS IS");
+    studio.say(text);
+}
+
 void Sampling::arm_audio(unsigned t) {
     t %= melodee::track_count;
     if (audio_recording() == int(t)) { // recording: it ends here, kept
@@ -83,16 +168,8 @@ void Sampling::arm_audio(unsigned t) {
     }
     if (audio_job || studio.host().audio_take().state() != BounceState::Idle) { studio.say("SAVING TAKE"); return; }
     if (studio.kind(t) != TrackKind::Audio) return;
-    // The take's number, after every take of the project (a file left by a take undone counts too).
-    std::string folder = melodee::audio_folder(studio.project_path());
-    unsigned number = 1;
-    std::error_code error;
-    for (const auto& item : fs::directory_iterator(folder, error)) {
-        auto name = item.path().filename().string();
-        unsigned n = 0;
-        if (std::sscanf(name.c_str(), "Take %u", &n) == 1) number = std::max(number, n + 1);
-    }
-    for (const auto& [n, data] : takes) number = std::max(number, n + 1);
+        std::string folder = melodee::audio_folder(studio.project_path());
+    unsigned number = next_take(folder);
     audio_job = std::make_unique<AudioJob>();
     audio_job->track = t;
     audio_job->take = number;
@@ -190,6 +267,13 @@ void Sampling::service_audio() {
         to_read.swap(takes_wanted);
         folder = melodee::audio_folder(studio.project_path());
     }
+    // Files made takes (import_take()), one at a time.
+    std::vector<Import> to_import;
+    {
+        std::lock_guard<std::mutex> guard(studio.lock);
+        to_import.swap(imports);
+    }
+    for (const auto& job : to_import) land_import(job);
     // Takes the packs wait for: read from their files, kept for the run.
     for (unsigned number : to_read) {
         melodee::SampleData data;

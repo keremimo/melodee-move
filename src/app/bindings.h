@@ -73,8 +73,12 @@ enum class Control : uint8_t {
 // hold_time with nothing else used meanwhile is also a Tap; held past
 // hold_time unused, a Hold; pressed again within double_time, a Double.
 // A row reacts to one of them, so a control does either its Press job or
-// its Tap job in one place, never both (checked by the tests). A pad let go
-// is a Release (Sampling: a pad held records until it is let go).
+// its Tap job in one place, never both (checked by the tests). A pad or a
+// step let go is a Release (Sampling: a pad held records until it is let go;
+// Play: a step pressed puts its note, its tap clears it), its `tap` set as a
+// Tap would be; a step let go is a Tap too where it is one. A screen that
+// answers a control's Tap keeps that control's Press and Release from the
+// screens under it (Loop Mode's steps are bars, not Play's steps).
 enum class Gesture : uint8_t { Press, Tap, Hold, Double, Turn, Release, Count };
 
 // What is held down while the control is used.
@@ -90,7 +94,7 @@ constexpr uint16_t none = 0, shift = 1 << 0, track = 1 << 1, step = 1 << 2, pad 
     X(LaunchPattern) X(PasteBounced) X(SelectProject) X(ProjectOptions) X(PadLevel) X(ProjectVolume) \
     X(CopyPad) X(CopyPattern) X(CopyProject) X(ClearPad) X(DeletePattern) X(DeleteProject) X(RemoveCut) X(MutePad) \
     X(NoteOnStep) X(NoteOnBar) X(QuantizePad) \
-    X(ToggleStep) X(StepVelocity) X(StepLength) X(StepLengthTo) X(TransposeStep) X(TransposeStepOctave) \
+    X(ToggleStep) X(ClearStep) X(StepVelocity) X(StepLength) X(StepLengthTo) X(TransposeStep) X(TransposeStepOctave) \
     X(NudgeStep) X(NudgeStepFine) X(NudgeStepWhole) X(StepMotion) X(SelectBar) X(LoopRange) X(OneBarLoop) \
     X(BarLength) X(BarVelocity) X(TransposeBar) X(NudgeBar) X(CopyStep) X(CopyBar) X(ClearBar) X(PlayFromPart) \
     X(TypeDigit) X(PickTrack) \
@@ -157,6 +161,7 @@ struct Use {
     uint16_t held = held::none;
     int held_step = -1;     // the first step held, if any
     int delta = 0;          // a turn's detents
+    bool tap = false;       // a Release: let go within hold_time with nothing else used meanwhile
 };
 
 // The screen whose controls `screen` keeps for what it does not take;

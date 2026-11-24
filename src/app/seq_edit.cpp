@@ -49,28 +49,34 @@ bool any_in(const Pattern& p, Span span, int lane) {
     return false;
 }
 
-bool toggle_step(Pattern& p, unsigned step, int lane, const std::vector<uint8_t>& keys, uint8_t velocity) {
-    Span span = step_span(p, step);
-    if (any_in(p, span, lane)) {
-        remove_at(p, notes_in(p, span, lane));
-        return false;
-    }
+bool toggle_step(Pattern& p, unsigned step, int lane, const std::vector<uint8_t>& keys, uint8_t velocity, int pitch) {
+    if (clear_step(p, step, lane)) return false;
     bool added = false;
     for (uint8_t key : keys) {
         Event e;
         e.tick = step_tick(p, step);
         e.length = uint16_t(p.q());
         e.key = key;
+        e.pitch = int8_t(std::clamp(pitch, -128, 127));
         e.velocity = std::clamp<uint8_t>(velocity, 1, 127);
         added = p.add(e) || added;
     }
     return added;
 }
 
-bool toggle_key(Pattern& p, unsigned step, uint8_t key, uint8_t velocity) {
+bool clear_step(Pattern& p, unsigned step, int lane) {
+    auto found = notes_in(p, step_span(p, step), lane);
+    remove_at(p, found);
+    return !found.empty();
+}
+
+bool toggle_key(Pattern& p, unsigned step, uint8_t key, uint8_t velocity, int pitch) {
     Span span = step_span(p, step);
-    if (any_in(p, span, key)) {
-        remove_at(p, notes_in(p, span, key));
+    auto there = notes_in(p, span, key);
+    if (pitch != any_pitch)
+        there.erase(std::remove_if(there.begin(), there.end(), [&](size_t n) { return p.events[n].pitch != pitch; }), there.end());
+    if (!there.empty()) {
+        remove_at(p, there);
         return false;
     }
     // A chord's new note takes the step's length, as the Move adds it beside the others.
@@ -79,6 +85,7 @@ bool toggle_key(Pattern& p, unsigned step, uint8_t key, uint8_t velocity) {
     e.tick = first.empty() ? step_tick(p, step) : p.events[first.front()].tick;
     e.length = first.empty() ? uint16_t(p.q()) : p.events[first.front()].length;
     e.key = key;
+    if (pitch != any_pitch) e.pitch = int8_t(std::clamp(pitch, -128, 127));
     e.velocity = std::clamp<uint8_t>(velocity, 1, 127);
     return p.add(e);
 }

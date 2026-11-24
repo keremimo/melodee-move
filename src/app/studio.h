@@ -298,6 +298,11 @@ public:
     // sixteen pads (notes 36-51) replace that bank's, the other banks and the kit's own values stay.
     std::string load_move_kit(const std::string& path, unsigned bank);
     std::string save_bank_file(unsigned bank, const std::string& name);
+    // Save Kit (the browser's options): the selected kit alone, its eight banks, chains and the files they play, as
+    // a project of one track, Kits/<name>.mldp under Melodee's folder. The browser lists any project as KIT, and its
+    // push loads the project's first kit onto the selected track, as the Set Overview's LOAD KIT (load_kit()).
+    std::string save_kit_file(const std::string& name);
+    std::string kits_folder() const; // Melodee's Kits, under its home
     int slot_for(const melodee::SampleRef& ref); // this project's slot for a file, a new one queued to be read; -1 none free
     std::vector<unsigned> slots_wanted;
     std::string program_path; // the MPC drum program the LOAD KIT sheet loads (load_kit.cpp)
