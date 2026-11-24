@@ -617,6 +617,37 @@ void MelodeeApp::draw(juce::Graphics& g) {
     }
 }
 
+// The Move's power button (move/power.h): its question in Melodee's question
+// sheet, the battery's charge in the rail, and while it shuts down, that.
+// The runtime takes the push and Back; saving is stopping()'s, as on Shift + Back.
+bool MelodeeApp::draw_power(juce::Graphics& g) {
+    auto power = session().power.load();
+    int battery = session().battery.load();
+    std::string name;
+    bool dirty = false;
+    {
+        std::lock_guard<std::mutex> guard(own->lock);
+        name = upper(own->project_name());
+        dirty = own->dirty;
+    }
+    if (power == move::Power::Asking) {
+        ui::system::Question q;
+        q.rail_top = "PWR";
+        if (battery >= 0) { q.rail_big = std::to_string(battery); q.rail_bottom = "%"; }
+        q.asked = "SHUT DOWN?";
+        q.lines = {name.substr(0, 17), dirty ? "SAVED FIRST" : "ALL SAVED"};
+        ui::system::question(g, q);
+    } else {
+        ui::rail(g, "PWR", "OFF", "");
+        g.setColour(juce::Colours::white);
+        move::draw_text(g, ui::content_x + 1, 1, "SHUTTING DOWN");
+        g.fillRect(ui::content_x, 10, ui::content_width, 1);
+        move::draw_text(g, ui::content_x + 1, 14, name.substr(0, 17));
+        move::draw_text(g, ui::content_x + 1, 23, dirty ? "SAVING" : "SAVED");
+    }
+    return true;
+}
+
 void MelodeeApp::draw_touched(juce::Graphics& g) {
     auto* top = own->top();
     auto shown = top->knob(unsigned(touched));
@@ -712,6 +743,10 @@ ScreenReader::View MelodeeApp::on_screen(Clock::time_point now) const {
     ScreenReader::View view;
     if (studio.opening) {
         view.view = "Opening " + studio.opening_name;
+        return view;
+    }
+    if (auto power = session().power.load(); power != move::Power::On) { // Ableton's own words
+        view.view = power == move::Power::Asking ? "Press wheel to shut down" : "Shutting down";
         return view;
     }
     Screen* top = studio.top();

@@ -9,6 +9,7 @@
 #include "move/host.h"
 #include "move/latency.h"
 #include "move/lights.h"
+#include "move/power.h"
 #include "move/queues.h"
 #include "move/remote.h"
 #include "move/spi_device.h"
@@ -587,6 +588,67 @@ void test_spi_host() {
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
     lights_host->finish(std::chrono::milliseconds(200));
     CHECK(lights_device->seen().last_led_packet == (0x09u | 0x90u << 8 | 71u << 16 | uint32_t(colour::white) << 24));
+}
+
+void test_power() {
+    // The question, as the runtime keeps it (move/power.h).
+    using Answer = PowerQuestion::Answer;
+    auto at = std::chrono::steady_clock::now();
+    auto press = [](Button button, bool down) {
+        Input input;
+        input.kind = Input::Kind::Button; input.index = uint8_t(button); input.pressed = down;
+        return input;
+    };
+    PowerQuestion question;
+    Answer said = Answer::None;
+    CHECK(!question.report(0x22, 100, at) && question.state() == Power::On && question.charge() == 100); // after power-on
+    CHECK(!question.take(press(Button::MainPush, true), said, at) && !question.take(press(Button::Back, true), said, at)); // the app's
+    CHECK(question.report(0x29, 98, at) && question.state() == Power::Asking && question.charge() == 98);
+    CHECK(!question.report(0x29, 97, at) && question.charge() == 97); // the same ask, the charge moved
+    Input turn;
+    turn.kind = Input::Kind::MainKnob; turn.delta = 1;
+    Input touch;
+    touch.kind = Input::Kind::Touch; touch.index = uint8_t(touch_main); touch.pressed = true;
+    Input pad;
+    pad.kind = Input::Kind::Pad; pad.pressed = true;
+    CHECK(question.take(turn, said, at) && question.take(touch, said, at) && said == Answer::None);
+    CHECK(!question.take(pad, said, at) && !question.take(press(Button::Play, true), said, at)); // still the app's
+    CHECK(question.take(press(Button::Back, true), said, at) && said == Answer::No && question.state() == Power::On);
+    CHECK(question.take(press(Button::Back, false), said, at) && !question.take(press(Button::Back, false), said, at)); // its release, once
+    CHECK(!question.report(0x29, 97, at + std::chrono::milliseconds(100))); // the no's press, not cleared yet
+    CHECK(!question.report(0x21, 97, at) && question.report(0x29, 97, at) && question.state() == Power::Asking); // cleared, pressed again
+    CHECK(question.report(0x21, 97, at) && question.state() == Power::On); // the XMOS took it back
+    CHECK(question.report(0x29, 97, at + std::chrono::seconds(2)));
+    CHECK(question.take(press(Button::MainPush, true), said, at) && said == Answer::Yes && question.state() == Power::ShuttingDown);
+    CHECK(question.take(press(Button::MainPush, false), said, at) && question.take(press(Button::Back, true), said, at) && said == Answer::None);
+    CHECK(!question.report(0x21, 97, at) && question.state() == Power::ShuttingDown); // yes said: it stays
+
+    // The answers, in the lights' three-byte pieces, as the packets Ableton's app sends.
+    auto packets = [](const power::Answer& sysex) {
+        std::vector<uint32_t> out;
+        for (size_t n = 0; n < sysex.size(); n += 3) out.push_back(spi::usb_midi_out_packet(spi::cable_controls, sysex.data() + n, 3));
+        return out;
+    };
+    CHECK(packets(power::answer_no) == (std::vector<uint32_t> {0x2100f004u, 0x01011d04u, 0xf7023907u}));
+    CHECK(packets(power::answer_yes) == (std::vector<uint32_t> {0x2100f004u, 0x01011d04u, 0xf7063907u}));
+
+    // Through the device host: a report reaches `power`, an answer the XMOS.
+    auto owned = std::make_unique<FakeSpiDevice>(false, 0, "3:p0x29,98;4:0xb0,51,127");
+    FakeSpiDevice* device = owned.get();
+    SpikeApp app;
+    Session session;
+    app.attach(session);
+    auto host = make_spi_host(app, session, std::move(owned));
+    CHECK(host->power_button());
+    host->start();
+    for (size_t n = 0; n < power::answer_no.size(); n += 3)
+        host->leds.push({power::answer_no[n], power::answer_no[n + 1], power::answer_no[n + 2]});
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    host->finish(std::chrono::milliseconds(300));
+    std::array<uint8_t, 2> report {};
+    CHECK(host->power.pop(report) && report == (std::array<uint8_t, 2> {0x29, 98}) && !host->power.pop(report));
+    CHECK(session.midi_in.load() == 1); // Back went on as a control; the report did not
+    CHECK(device->seen().sysex == (std::vector<uint32_t> {0x2100f004u, 0x01011d04u, 0xf7023907u}));
 }
 
 int32_t peak_of(const AudioBlock& block) {
@@ -4041,6 +4103,7 @@ int main() {
     test_spi_protocol();
     test_latency_meter();
     test_spi_host();
+    test_power();
     test_melodee_app();
     test_saving();
     test_main_volume();

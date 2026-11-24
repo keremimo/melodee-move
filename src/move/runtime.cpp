@@ -4,7 +4,9 @@
 #include "move/remote.h"
 #include <cstring>
 #include "move/display.h"
+#include "move/font.h"
 #include "move/host.h"
+#include "move/power.h"
 #include "move/spi_device.h"
 #include "move/spi_protocol.h"
 #include <poll.h>
@@ -51,9 +53,28 @@ std::string status_line(Session& session, const App& app) {
          << " pads=" << session.pad_events.load() << " midi_in=" << session.midi_in.load() << " midi_dropped=" << session.midi_dropped.load()
          << " leds=" << session.leds_sent.load() << " frames=" << session.frames_sent.load() << " frames_failed=" << session.frames_failed.load()
          << " in_peak=" << session.input_peak.load() << " out_peak=" << session.output_peak.load();
+    Power power = session.power.load();
+    line << " power=" << (power == Power::Asking ? "asking" : power == Power::ShuttingDown ? "shutting" : "on") << " battery=" << session.battery.load();
     if (session.backend.load() == std::string("jack")) line << " cpu=" << session.cpu_load.load() << '%';
     if (auto extra = app.status(); !extra.empty()) line << ' ' << extra;
     return line.str();
+}
+
+// The power button's question for an app that draws none (App::draw_power()):
+// a sheet over its screen, Ableton's words.
+void draw_power_sheet(juce::Graphics& g, Power power) {
+    const juce::Rectangle<int> box {6, 13, screen_width - 12, 38};
+    g.setColour(juce::Colours::black);
+    g.fillRect(box);
+    g.setColour(juce::Colours::white);
+    g.drawRect(box);
+    if (power == Power::Asking) {
+        draw_text_centred(g, box.getX(), box.getY() + 5, box.getWidth(), "PRESS WHEEL TO");
+        draw_text_centred(g, box.getX(), box.getY() + 14, box.getWidth(), "SHUT DOWN");
+        draw_text_centred(g, box.getX(), box.getY() + 26, box.getWidth(), "BACK: CANCEL");
+    } else {
+        draw_text_centred(g, box.getX(), box.getY() + 15, box.getWidth(), "SHUTTING DOWN");
+    }
 }
 
 std::unique_ptr<Host> make_host(App& app, Session& session, const RunOptions& options) {
@@ -99,14 +120,27 @@ int run_app(App& app, const RunOptions& options) {
     std::cerr << "melodee-move: running on " << host->name() << " at " << session.rate << " Hz, memory locked " << locked << "; Shift + Back quits\n";
 
     std::atomic<bool> running {true}, quit {false};
+    // The power button (move/power.h): yes said on the MIDI thread; the
+    // XMOS's yes wanted once the app has saved, and sent.
+    std::atomic<bool> power_yes {false}, yes_wanted {false}, yes_sent {false};
 
     std::thread midi_thread([&] {
         Lights lights;
         lights.clear_all();
         lights.set_rgb(host->rgb_leds());
+        PowerQuestion question;
+        bool no_owed = false;
         auto next_lights = App::Clock::now();
         pollfd wake {host->wake_descriptor(), POLLIN, 0};
         auto send = [&](const uint8_t* bytes) { return host->leds.push({bytes[0], bytes[1], bytes[2]}); };
+        // An answer to the XMOS, whole, in the lights' queue (this thread is
+        // its one producer): Ableton's SysEx in three pieces, on the
+        // controls' cable as Ableton's app sends it.
+        auto answer = [&](const power::Answer& sysex) {
+            if (!host->power_button() || host->leds.room() < 3) return false;
+            for (size_t at = 0; at < sysex.size(); at += 3) send(sysex.data() + at);
+            return true;
+        };
         while (running) {
             auto now = App::Clock::now();
             int timeout = int(std::max<long long>(0, std::chrono::duration_cast<std::chrono::milliseconds>(next_lights - now).count()));
@@ -114,6 +148,16 @@ int run_app(App& app, const RunOptions& options) {
                 uint64_t count;
                 [[maybe_unused]] auto got = read(host->wake_descriptor(), &count, sizeof count);
             }
+            std::array<uint8_t, 2> report;
+            while (host->power.pop(report)) {
+                if (question.report(report[0], report[1], now)) {
+                    session.power = question.state();
+                    std::cerr << "melodee-move: the power button " << (question.state() == Power::Asking ? "asks to shut down" : "no longer asks") << '\n';
+                }
+                session.battery = question.charge();
+            }
+            if (no_owed) no_owed = !answer(power::answer_no); // the queue was full
+            if (yes_wanted && !yes_sent && answer(power::answer_yes)) yes_sent = true;
             MidiIn message;
             while (host->midi_in.pop(message)) {
                 if (message.external) {
@@ -127,6 +171,17 @@ int run_app(App& app, const RunOptions& options) {
                 event.bytes = message.bytes;
                 event.timestamp_ns = message.timestamp_ns;
                 const auto& input = event.input;
+                PowerQuestion::Answer said;
+                if (question.take(input, said, now)) {
+                    if (said == PowerQuestion::Answer::No) {
+                        no_owed = !answer(power::answer_no);
+                        std::cerr << "melodee-move: not shutting down (Back)\n";
+                    } else if (said == PowerQuestion::Answer::Yes) {
+                        power_yes = true;
+                    }
+                    session.power = question.state();
+                    continue;
+                }
                 if (input.kind == Input::Kind::Button && input.index == uint8_t(Button::Back) && input.pressed && session.shift) {
                     quit = true;
                     continue;
@@ -137,6 +192,7 @@ int run_app(App& app, const RunOptions& options) {
             now = App::Clock::now();
             if (now >= next_lights) {
                 app.lights(lights, now);
+                if (question.state() == Power::Asking) lights.button(Button::Back, white_bright); // its no
                 lights.update(send);
                 lights.update_fades(send, unsigned(host->leds.room()), now);
                 next_lights = now + lights_interval;
@@ -162,7 +218,11 @@ int run_app(App& app, const RunOptions& options) {
                 juce::Graphics g(image);
                 g.fillAll(juce::Colours::black);
                 g.setColour(juce::Colours::white);
-                app.draw(g);
+                Power power = session.power.load();
+                if (power == Power::On || !app.draw_power(g)) {
+                    app.draw(g);
+                    if (power != Power::On) draw_power_sheet(g, power);
+                }
             }
             Frame frame = pack(image);
             auto now = App::Clock::now();
@@ -208,6 +268,7 @@ int run_app(App& app, const RunOptions& options) {
     while (true) {
         if (stop_signal) { reason = "signal"; break; }
         if (quit) { reason = "Shift + Back"; break; }
+        if (power_yes) { reason = "the power button"; break; }
         if (!host->alive()) { reason = "the host went away"; break; }
         if (app.finished()) { reason = "the app finished"; break; }
         auto now = App::Clock::now();
@@ -218,6 +279,24 @@ int run_app(App& app, const RunOptions& options) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     app.stopping(); // the audio thread still runs: the app's last writes that need it
+    if (power_yes) {
+        // Saved: now the XMOS's yes, then the Move's shutdown, as Ableton's
+        // app does. Halt stops us (/etc/init.d/move, then sendsigs) before
+        // xmos-power-off; till then the screen says so. If the shutdown is
+        // refused, Ableton's app comes back and asks again.
+        yes_wanted = true;
+        for (int waited = 0; waited < 100 && (!yes_sent || !host->leds.empty()); ++waited)
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        std::string why;
+        if (power::shut_down(why)) {
+            std::cerr << "melodee-move: shutting the Move down\n";
+            auto asked = App::Clock::now();
+            while (!stop_signal && host->alive() && App::Clock::now() - asked < std::chrono::seconds(30))
+                std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        } else {
+            std::cerr << "melodee-move: the Move did not shut down: " << why << '\n';
+        }
+    }
     running = false;
     midi_thread.join();
     screen_thread.join();

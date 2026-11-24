@@ -37,6 +37,7 @@ public:
     unsigned midi_out(move::ExternalMidi* messages, unsigned room) override { return inner.midi_out(messages, room); } // audio thread
     void lights(move::Lights& lights, Clock::time_point now) override;      // MIDI thread
     void draw(juce::Graphics& g) override;                                  // screen thread
+    bool draw_power(juce::Graphics& g) override;                            // screen thread, mirrored like draw()
     void service() override;                                                // service thread
     void stopping() override { inner.stopping(); }                          // service thread, the run ending
     std::string command(const std::string& line) override { return inner.command(line); } // service thread, the control channel

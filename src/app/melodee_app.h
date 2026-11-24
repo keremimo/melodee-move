@@ -50,6 +50,7 @@ public:
     unsigned midi_out(move::ExternalMidi* out, unsigned room) override;             // audio thread
     void lights(move::Lights& lights, Clock::time_point now) override;              // MIDI thread
     void draw(juce::Graphics& g) override;                                          // screen thread
+    bool draw_power(juce::Graphics& g) override;                                    // screen thread: the power button's question
     void service() override;                                                        // service thread
     void stopping() override;                                                       // service thread, the run ending
     std::string status() const override;

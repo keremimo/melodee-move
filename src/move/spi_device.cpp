@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "move/spi_device.h"
+#include "move/power.h"
 #include "move/spi_protocol.h"
 #include <fcntl.h>
 #include <sys/ioctl.h>
@@ -71,7 +72,7 @@ std::unique_ptr<SpiDevice> open_move_device() { return std::make_unique<MoveDevi
 struct FakeSpiDevice::State {
     bool paced;
     unsigned loopback;
-    struct Scripted { uint64_t transfer; uint8_t status, data1, data2; bool external; };
+    struct Scripted { uint64_t transfer; uint8_t status, data1, data2; bool external, power; };
     std::vector<Scripted> script;
     size_t next_scripted = 0;
     alignas(64) uint8_t memory[spi::page_size] {};
@@ -89,6 +90,7 @@ FakeSpiDevice::FakeSpiDevice(bool paced, unsigned loopback_frames, std::string s
     state->loopback = loopback_frames;
     state->line.assign(2 * 16384, 0);
     state->seen.external.reserve(4096); // kept on the device's thread: no allocation there
+    state->seen.sysex.reserve(256);
     state->seen.external_at.reserve(4096);
     // "transfer:status,data1,data2;..." with numbers in decimal or 0x hex.
     for (size_t at = 0; at < script.size();) {
@@ -101,6 +103,14 @@ FakeSpiDevice::FakeSpiDevice(bool paced, unsigned loopback_frames, std::string s
         State::Scripted entry {};
         entry.transfer = std::strtoull(cursor, &cursor, 0); if (*cursor) ++cursor;
         if (*cursor == 'x') { entry.external = true; ++cursor; }
+        if (*cursor == 'p') { // a power report: the state's flags, the charge
+            entry.power = true; ++cursor;
+            entry.status = power::report_status;
+            entry.data1 = uint8_t(std::strtoul(cursor, &cursor, 0)); if (*cursor) ++cursor;
+            entry.data2 = uint8_t(std::strtoul(cursor, &cursor, 0));
+            state->script.push_back(entry);
+            continue;
+        }
         entry.status = uint8_t(std::strtoul(cursor, &cursor, 0)); if (*cursor) ++cursor;
         entry.data1 = uint8_t(std::strtoul(cursor, &cursor, 0)); if (*cursor) ++cursor;
         entry.data2 = uint8_t(std::strtoul(cursor, &cursor, 0));
@@ -128,6 +138,9 @@ bool FakeSpiDevice::transfer() {
             ++s.seen.external_messages;
             if (s.seen.external.size() < 4096) { s.seen.external.push_back(packet); s.seen.external_at.push_back(s.seen.transfers); }
             continue;
+        }
+        if (uint8_t code = packet & 0x0f; code >= 0x4 && code <= 0x7) { // a SysEx piece
+            if (s.seen.sysex.size() < 256) s.seen.sysex.push_back(packet);
         }
         ++s.seen.led_messages;
         s.seen.last_led_packet = packet;
@@ -164,6 +177,9 @@ bool FakeSpiDevice::transfer() {
         if (entry.external) { // as the XMOS puts external MIDI in: cable 2, its code index
             const uint8_t bytes[3] {entry.status, entry.data1, entry.data2};
             spi::DisplayServer::store32(event, spi::usb_midi_out_packet(spi::cable_external, bytes, 3));
+        } else if (entry.power) { // as the XMOS reports power: cable 14, a control change
+            event[0] = uint8_t(spi::cable_power << 4 | 0xb);
+            event[1] = entry.status; event[2] = entry.data1; event[3] = entry.data2;
         } else {
             event[0] = uint8_t(spi::cable_controls << 4 | entry.status >> 4);
             event[1] = entry.status; event[2] = entry.data1; event[3] = entry.data2;

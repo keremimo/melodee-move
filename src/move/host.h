@@ -42,6 +42,9 @@ public:
     virtual void finish(std::chrono::milliseconds limit) = 0;
     // Whether `leds` may carry the RGB LED SysEx (move/lights.h), in pieces.
     virtual bool rgb_leds() const { return false; }
+    // Whether the Move's power button reaches `power`, and `leds` carries
+    // its answer (move/power.h) to the XMOS: Ableton's firmware only.
+    virtual bool power_button() const { return false; }
 
     int wake_descriptor() const { return wake_fd; }
     SpscRing<MidiIn, 1024> midi_in;
@@ -49,6 +52,9 @@ public:
     // producer (the runtime's service thread): the audio thread takes them
     // in its cycle as it takes the device's own.
     SpscRing<std::array<uint8_t, 3>, 256> injected;
+    // The XMOS's power reports (move/power.h), for the MIDI thread: the
+    // state's flags and the battery's charge.
+    SpscRing<std::array<uint8_t, 2>, 16> power;
     SpscRing<LedMessage, 1024> leds;
     TripleBuffer<DisplayMessage> display;
 

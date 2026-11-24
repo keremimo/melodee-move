@@ -10,6 +10,7 @@
 // so a pad read in one exchange sounds in the audio sent with the next.
 #include "move/host.h"
 #include "move/memory.h"
+#include "move/power.h"
 #include "move/realtime.h"
 #include "move/spi_device.h"
 #include "move/spi_protocol.h"
@@ -43,6 +44,7 @@ public:
 
     const char* name() const override { return "spi"; }
     bool rgb_leds() const override { return true; }
+    bool power_button() const override { return true; }
 
     void start() override {
         session.rate = spi::audio_rate;
@@ -162,6 +164,8 @@ private:
                 const auto& event = events[n];
                 if (event.cable == spi::cable_controls || event.cable == spi::cable_external)
                     incoming(event.bytes.data(), event.size, event.cable == spi::cable_external, began, arrived);
+                else if (event.cable == spi::cable_power && event.bytes[0] == power::report_status && power.push({event.bytes[1], event.bytes[2]}))
+                    arrived = true;
             }
             if (received || skipped) spi::clear_midi_in(page);
             take_injected(began, arrived); // the control channel's presses, as the device's own

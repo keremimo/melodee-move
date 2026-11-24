@@ -82,6 +82,20 @@ void WebLayer::draw(juce::Graphics& g) {
     web.frames().publish(move::pack(image));
 }
 
+bool WebLayer::draw_power(juce::Graphics& g) {
+    bool drawn = false;
+    {
+        juce::Graphics own(image);
+        own.fillAll(juce::Colours::black);
+        own.setColour(juce::Colours::white);
+        drawn = inner.draw_power(own);
+    }
+    if (!drawn) return false;
+    g.drawImageAt(image, 0, 0);
+    web.frames().publish(move::pack(image));
+    return true;
+}
+
 void WebLayer::service() {
     inner.service();
     if (web.take_files_changed()) inner.command("melodee-files-changed"); // Load and the projects look again

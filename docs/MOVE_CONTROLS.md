@@ -71,6 +71,8 @@ after Schwung) differ for some buttons:
   it (sequencer, sampling, kit depth, instruments, mixer & effects, song &
   export, looper, MIDI/sync/undo/projects). *free*: no job on the Move and
   none given in Melodee yet. *none*: no Melodee counterpart, and why.
+  *runtime*: the runtime answers it itself, outside the table, for every
+  app (the power button, src/move/power.h).
 
 ## Decisions (Kerem, 2026-11-20)
 
@@ -415,7 +417,7 @@ while Shift is held.
 
 | Control | On the Move | In Melodee | Status |
 | --- | --- | --- | --- |
-| Power button | On; off after a push of the wheel; held 10 s, off at once | The Move's own: it never reaches the app | none |
+| Power button | On; off after a push of the wheel; held 10 s, off at once | As on the Move: a press asks SHUT DOWN? (the battery's charge in the rail), the wheel's push saves and shuts down, Back keeps it on; held 10 s, off at once (the XMOS's own) | runtime |
 | Control Live (Setup) | Makes the Move a control surface for Live | Melodee plays itself; Ableton's app does this | none |
 
 ### The Looper

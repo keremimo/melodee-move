@@ -3,6 +3,7 @@
 #include "move/audio.h"
 #include "move/controls.h"
 #include "move/lights.h"
+#include "move/power.h"
 #include <juce_graphics/juce_graphics.h>
 #include <array>
 #include <atomic>
@@ -57,6 +58,10 @@ struct Session {
     std::atomic<uint64_t> device_transfer_ns {0}; // the Move's device: how long the driver's last transfer took
     std::atomic<bool> realtime {false};           // the audio thread got SCHED_FIFO
     std::atomic<const char*> backend {""};        // "jack" or "spi"
+    // The Move's power button (move/power.h): "shut down?" asked, or
+    // shutting down; and the battery's charge, percent (-1: not reported).
+    std::atomic<Power> power {Power::On};
+    std::atomic<int> battery {-1};
 };
 
 class App {
@@ -78,7 +83,8 @@ public:
     // render()'s rules.
     virtual void audio_event(const SurfaceEvent&) {}
     // MIDI thread: a message from the Move's controls. Shift + Back never
-    // arrives: the runtime takes it to quit.
+    // arrives: the runtime takes it to quit. Nor do the wheel and Back
+    // while the power button's question is open (draw_power()).
     virtual void surface(const SurfaceEvent&) {}
     // MIDI thread: a message from an external MIDI port.
     virtual void midi(const ExternalMidi&) {}
@@ -93,6 +99,12 @@ public:
     // Screen thread, at most 60 times a second: draw the whole 128 x 64
     // screen, white on black. Only changed frames go to the screen.
     virtual void draw(juce::Graphics&) = 0;
+    // Screen thread, in place of draw() while the power button's question
+    // is open or the Move shuts down (session's `power`; the runtime takes
+    // the wheel's push as yes and Back as no, as Ableton's app does): draw
+    // that whole screen. False: the app has none, and the runtime draws its
+    // own over draw()'s.
+    virtual bool draw_power(juce::Graphics&) { return false; }
 
     // Service thread, every 10 ms: slow work (files, loading).
     virtual void service() {}

@@ -61,8 +61,8 @@ void test_doc_and_table(const std::string& doc) {
     for (const auto& binding : table()) ++bound[binding.doc];
     unsigned done = 0, next = 0;
     for (const auto& row : rows) {
-        if (row.status == "none") {
-            CHECK_SAID(!bound.count(row.control), "a none row bound: " << row.control);
+        if (row.status == "none" || row.status == "runtime") { // runtime: answered outside the table (the power button)
+            CHECK_SAID(!bound.count(row.control), "a " << row.status << " row bound: " << row.control);
             continue;
         }
         CHECK_SAID(bound.count(row.control), "not in the table: " << row.control);

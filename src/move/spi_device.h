@@ -31,7 +31,9 @@ std::unique_ptr<SpiDevice> open_move_device();
 // `loopback_frames` later (a cable from the outputs to the inputs), and
 // sends a script of control messages ("frame:status,data1,data2;...");
 // a message marked x ("frame:x0x90,60,100") comes from the external MIDI
-// port (cable 2) instead, and what goes out there is kept for tests.
+// port (cable 2) instead, and what goes out there is kept for tests; one
+// marked p ("frame:p0x29,98") is a power report (move/power.h, cable 14:
+// the state's flags, the charge), and SysEx out is kept.
 class FakeSpiDevice : public SpiDevice {
 public:
     FakeSpiDevice(bool paced, unsigned loopback_frames, std::string script);
@@ -51,6 +53,7 @@ private:
 struct FakeSpiDevice::Seen {
     uint64_t transfers = 0;
     uint64_t led_messages = 0, last_led_packet = 0;
+    std::vector<uint32_t> sysex;      // the first 256 SysEx packets on the controls' cable, as sent
     uint64_t external_messages = 0;   // packets out on cable 2 (MIDI out)
     std::vector<uint32_t> external;   // the first 4096 of them, as sent
     std::vector<uint64_t> external_at; // the transfer each went out with

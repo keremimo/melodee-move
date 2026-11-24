@@ -16,6 +16,10 @@ page carries it too.
   **Boot** page (http://move.local:7700/boot) does the same from a browser.
 - **Shift + Back**: back to Move, also when the Move started in Melodee.
   Save your Set before starting Melodee, as for any quit of Move.
+- **Power button**: Melodee asks **SHUT DOWN?**, with the battery's charge
+  beside it. Push the jogwheel to save and turn the Move off; **Back** keeps
+  it on. Held for ten seconds, the button turns the Move off at once,
+  unsaved.
 - **Master knob**: the volume, kept from one start to the next.
 
 ## The web page

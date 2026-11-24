@@ -40,7 +40,7 @@ constexpr size_t in_midi = 2048, in_display_index = 2296, in_audio = 2304, trans
 constexpr unsigned midi_out_slots = 20, midi_in_slots = 31;
 constexpr size_t display_chunk = 172;
 constexpr unsigned display_chunks = 6;
-constexpr uint8_t cable_controls = 0, cable_external = 2;
+constexpr uint8_t cable_controls = 0, cable_external = 2, cable_power = 14; // 14: the XMOS's power reports (move/power.h)
 
 struct MidiIn {
     uint8_t cable = 0;
