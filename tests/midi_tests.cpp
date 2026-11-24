@@ -554,7 +554,11 @@ void test_screens() {
         std::lock_guard<std::mutex> hold(studio.lock);
         CHECK(studio.current().midi.drum_note[1] == 39 && melodee::drum_key(studio.current(), 1) == 39); // what the pads play (Melodee's drum_key)
     }
-    // A pad by its number in the layout (app/pad_layout.h): the left bank's second pad on Banks.
+    // A drum pad by its number in Drums' 4x4 banks (app/keys.h), in Rows as in Banks: the second row's first pad is 5.
+    rig.melodee->surface(make_event(0x90, pad_note(8), 100));
+    rig.melodee->surface(make_event(0x80, pad_note(8), 0));
+    { std::lock_guard<std::mutex> hold(studio.lock); CHECK(studio.current().last_pad == 4); studio.current().last_pad = 1; }
+    // And on Banks: the left bank's second pad.
     app::set_pad_layout(app::PadLayout::Banks);
     rig.melodee->surface(make_event(0x90, pad_note(app::physical_pad(1, app::PadLayout::Banks)), 100));
     rig.melodee->surface(make_event(0x80, pad_note(app::physical_pad(1, app::PadLayout::Banks)), 0));

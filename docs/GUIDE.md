@@ -70,6 +70,9 @@ Threshold.
 - **Menu** lists them; push the jogwheel to load one.
 - **Pads** are notes in rows of fourths, C2 at the bottom left. **Up /
   Down** move an octave. Pressure is aftertouch.
+- For a drum module or a Move kit, set Keys & Scale's MODE to **Drums**
+  (Shift + Step 9): the left 4x4 plays the kit's 16 pads, 36 at the bottom
+  left, the right 4x4 the next 16. **Plus / Minus** move 16.
 - **Knobs 1-8** are the module's page, where the track opens; **Left /
   Right** its pages; the **jogwheel** turns its presets.
 - **Push the jogwheel** for the module's menu: turn to a row, push to edit a

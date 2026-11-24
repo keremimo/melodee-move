@@ -420,11 +420,13 @@ void test_keys() {
     CHECK(app::pad_notes(*project, track, 1).count == 0); // no chord there: silent, dark
     CHECK(app::pad_light(app::pad_notes(*project, track, 1), track, 15, 97, false, false) == move::colour::off);
     CHECK(app::keys_bank_count(track) == 2);
-    // Drums: notes from 36 as a kit's pads, 16 a bank.
+    // Drums: notes from 36 as a kit's pads, 16 a bank, two 4x4 banks even in Rows (Kerem, 2026-11-23): physical
+    // pad 3 (bottom row, fourth column) is 39, pad 4 (the right bank's bottom left) 52, pad 8 (the second row) 40.
     app::set_keys_mode(track, app::KeysMode::Drums, false);
-    CHECK(note(0) == 36 && note(31) == 67);
+    CHECK(note(0) == 36 && note(3) == 39 && note(4) == 52 && note(8) == 40 && note(27) == 51 && note(31) == 67);
+    for (uint8_t pad = 0; pad < 32; ++pad) CHECK(app::drum_pad_physical(app::drum_pad_number(pad)) == pad);
     track.bank = 1;
-    CHECK(note(0) == 52);
+    CHECK(note(0) == 52 && note(4) == 68);
     track.bank = 0;
     auto& midi = project->tracks[3];
     melodee::load_sound(midi, melodee::EngineKind::Midi, 0);
@@ -432,7 +434,7 @@ void test_keys() {
     midi.midi.drum_note[2] = 40;
     CHECK(app::pad_notes(*project, midi, 2).keys[0] == 40); // a MIDI track's drum map
     // Two MPC banks (Kerem's reading (a)): In-Key and Chromatic run up in pad order, 1-16 the left 4x4, 17-32 the
-    // right; Drums numbered the same. Physical pad 4 (bottom row, fifth column) is pad 17.
+    // right; Drums numbered the same as in Rows. Physical pad 4 (bottom row, fifth column) is pad 17.
     app::set_pad_layout(app::PadLayout::Banks);
     app::set_keys_mode(track, app::KeysMode::InKey, false);
     CHECK(note(0) == 48 && note(1) == 50 && note(8) == 55 && note(4) == 48 + 24 + 4); // pad 5 (the left bank's second row) the fifth note, G; pad 17 the 17th, E

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #pragma once
+#include "app/pad_layout.h"
 #include "melodee/model/project.h"
 #include <array>
 #include <cstdint>
@@ -18,7 +19,7 @@
 // - Prog: a chord of the track's progression a pad (model/progression.h),
 //   16 a bank, two banks on the 32 pads;
 // - Drums: notes from 36 as a kit's pads (model/scales.h drum_key()), 16 a
-//   bank.
+//   bank, always two MPC 4x4 banks (drum_pad_number() below).
 //
 // The key and scale are the project's; the mode, the rows and the transpose
 // the track's, kept in Melodee's own fields so the MPC opens them: In-Key in
@@ -52,13 +53,21 @@ struct PadNotes {
 // Chromatic lay their notes out in rows (octaves or 4ths); in two MPC Banks
 // they run up the key, or the semitones, in pad order, 1-16 on the left and
 // 17-32 on the right (Kerem's reading (a); pad_layout.h pad_steps()). Prog's
-// chords and Drums' notes go by the pad's number in either layout.
+// chords go by the pad's number in either layout; Drums' by its number in
+// the banks (drum_pad_number()).
 // `shift`: Shift + Plus / Minus, the bottom-left pad that many notes of the
 // key up (In-Key; Chromatic a semitone each); not kept in the project.
 PadNotes pad_notes(const melodee::Project& project, const melodee::Track& track, unsigned pad, int shift = 0);
 // The key's notes held as a chord would be stored: lowest first.
 // The bank of 16 a Prog's or Drums' pads start at (Plus / Minus, Shift + Plus / Minus).
 unsigned keys_bank_count(const melodee::Track& track);
+
+// Drums' pads are two MPC 4x4 banks in either pad layout (Kerem, 2026-11-23,
+// on a user's word: a Move kit is played as the drum track's 4x4, and Rows
+// spread its 16 over two rows of eight): the left 4x4 the bank of 16 in view
+// from its bottom left, the right 4x4 the next 16. 0-31, as logical_pad().
+constexpr uint8_t drum_pad_number(uint8_t physical) { return logical_pad(physical, PadLayout::Banks); }
+constexpr uint8_t drum_pad_physical(uint8_t number) { return physical_pad(number, PadLayout::Banks); } // for lights
 
 // The light a note track's pad shows, as the Move lights its notes: the
 // key's roots in the track's colour, its other notes light grey, the rest

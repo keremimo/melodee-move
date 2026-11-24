@@ -64,8 +64,8 @@ public:
     void input(const move::Input& input) override {
         if (input.kind == move::Input::Kind::Pad && input.index < pad_count) {
             held[input.index] = input.pressed; // physical: as lit
-            // The pad by its number in the chosen layout (app/pad_layout.h): the map's pad NOTE edits.
-            if (input.pressed && drums()) studio.current().last_pad = uint8_t(drum_pad(logical_pad(uint8_t(input.index), pad_layout())));
+            // The pad by its number in Drums' 4x4 banks (app/keys.h): the map's pad NOTE edits.
+            if (input.pressed && drums()) studio.current().last_pad = uint8_t(drum_pad(drum_pad_number(uint8_t(input.index))));
         }
         if (input.kind == move::Input::Kind::Touch && !input.pressed && int(input.index) == address_shown) address_shown = -1;
     }
@@ -119,7 +119,7 @@ public:
 
     void lights(move::Lights& lights) override {
         using namespace move;
-        key_pads(studio, lights, held, studio.current().last_pad); // Keys and Drums alike, as Keys & Scale lays them out
+        key_pads(studio, lights, held, last_lit()); // Keys and Drums alike, as Keys & Scale lays them out
         steps_playhead(studio, lights);
         for (auto button : {Button::Left, Button::Right, Button::Loop, Button::Menu}) lights.button(button, 0);
         if (drums()) {
@@ -170,6 +170,12 @@ private:
     bool slot_page() const { return page >= Cc1 && page <= Cc3; }
     bool drums() const { return studio.current().layout == melodee::PadLayout::Drums; }
     unsigned drum_pad(unsigned logical) const { return (16u * studio.current().bank + logical) % melodee::sampler_pads; } // the bank's, by logical pad
+    // The physical pad the last drum lies on, if it is in view (-1 if not, or not Drums).
+    int last_lit() const {
+        if (!drums()) return -1;
+        int number = int(studio.current().last_pad) - 16 * int(studio.current().bank);
+        return number >= 0 && number < int(pad_count) ? int(drum_pad_physical(uint8_t(number))) : -1;
+    }
     int slot_of(unsigned n) const { return (page - Cc1) * 8 + int(n); }
     int slot_address(unsigned n) const { return studio.current().params[size_t(mt::slot_address(slot_of(n)))]; }
     std::string sound_name() const { return studio.current().preset == 0 ? "MIDI" : "SND"; }

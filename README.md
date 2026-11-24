@@ -42,7 +42,8 @@ Three parts so far:
   side by side, 1-16 the left bank from its bottom left and 17-32 the right.
   Every pad job follows the one chosen: the kit's pads, Chop's slices, the
   notes (in the banks 1-32 up the semitones, as the MPC's pads run up a
-  scale), the typing keyboard and the lights. The choice is the Move's, kept
+  scale), the typing keyboard and the lights. A note track on Drums is the
+  two 4x4 banks in either layout, as a Move drum track's 4x4. The choice is the Move's, kept
   in `Move.settings` ([docs/UI.md](docs/UI.md), "Pads").
 - **The sequencer** (docs/UI.md, Sequencer), on the Move's own keys:
   the steps are the pattern's bar (a tap a note, a step held its velocity,

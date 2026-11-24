@@ -280,8 +280,9 @@ Notes in Banks, two readings were drawn; **Kerem chose (a)**:
 In Banks there are no rows, so Keys & Scale's 4ths or octaves is Rows' only.
 Up and Down move an octave, Shift + Plus and Minus a note of the key; the
 roots light in the track's colour wherever they fall. Chords and Prog put a
-pad's chord on its number, Drums plays 36 + the pad's number (as a kit),
-note repeat repeats the note the pad pressed. `pad_steps()` in
+pad's chord on its number, Drums plays 36 + the pad's number in the banks
+in both layouts (below, "Instruments"), note repeat repeats the note the
+pad pressed. `pad_steps()` in
 `pad_layout.h` is the maths: how many steps of the scale a pad lies above
 the bottom-left one, `typing_key()` the keyboard.
 
@@ -682,8 +683,8 @@ it. `docs/ui/midi.png` is the sheet (`src/ui/mockups_midi.cpp`).
 | Track options (move-projects') | `TRK` / track / `OPT` | colour, name, MIDI IN, MIDI OUT | on the MIDI rows, what the row means |
 
 Lights: a MIDI track's pads as a synth's on Keys (every C in the track's
-colour, a held pad white), as a kit's on Drums (32 pads, Plus and Minus the
-next 16, the last pad white); MIDI Config and the track options keep the
+colour, a held pad white), as a kit's on Drums (32 pads in two 4x4 banks,
+Plus and Minus the next 16, the last pad white); MIDI Config and the track options keep the
 pads playing the track and light Back.
 ## Looper
 
@@ -1071,7 +1072,11 @@ Arp, Plus and Minus the octave, Shift + Plus / Minus a scale degree
   the chord, saved as `Mine N` in `Melodee/Progressions`.
 - **Drums**: the pads play notes 36 up as a kit's do (pad 1 is 36), Plus and
   Minus move 16; the screen names the voice hit (a MIDI drum map's or
-  General MIDI's name).
+  General MIDI's name). **Two 4x4 banks in either pad layout** (Kerem,
+  2026-11-23, on a user's word: a Move kit is played as the drum track's
+  4x4, and Rows spread its 16 over two rows of eight): the left 4x4 the 16
+  in view, 36 at its bottom left, the right 4x4 the next 16
+  (`drum_pad_number()` in `app/keys.h`).
 - **Full Velocity** (Shift + Step 10): every pad at 127, as on the Move; its
   step lights bright while Shift is held.
 - **A module track's knobs are the module's own**: a track opens on the

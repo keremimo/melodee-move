@@ -136,7 +136,7 @@ PadNotes pad_notes(const melodee::Project& project, const Track& track, unsigned
         return out;
     }
     case KeysMode::Drums: {
-        unsigned at = 16 * std::min<unsigned>(track.bank, keys_bank_count(track) - 1) + logical_pad(uint8_t(pad), layout);
+        unsigned at = 16 * std::min<unsigned>(track.bank, keys_bank_count(track) - 1) + drum_pad_number(uint8_t(pad)); // a 4x4 in either layout
         int key = track.engine == melodee::EngineKind::Midi ? int(track.midi.drum_note[at % melodee::sampler_pads]) : int(melodee::drum_first_key + at);
         if (key > 127) return out;
         keys[0] = key;
