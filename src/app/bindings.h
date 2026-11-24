@@ -135,7 +135,7 @@ struct Binding {
     const char* doc;        // the doc's Control cell, word for word
     Screen screen;
     Track track;
-    uint16_t held;          // exactly these held (held::...)
+    uint16_t held;          // exactly these held (held::...), but for pads played meanwhile (find())
     Control control;
     Gesture gesture;
     Job job;
@@ -165,6 +165,8 @@ Screen under(Screen screen);
 // The row that answers `use` at `where`, or null: the screen's own rows,
 // then the screens under it, then Any (not in Typing), then Everywhere;
 // within each, the track's own rows before Any track's (Pitches before Kit).
+// A pad held is played, not a modifier, unless a row names it: with none
+// for what is held, the row for the same use with the pads left out.
 const Binding* find(const Where& where, const Use& use);
 Job resolve(const Where& where, const Use& use);
 // Whether a pad pressed now plays its sound (the audio thread's flag):

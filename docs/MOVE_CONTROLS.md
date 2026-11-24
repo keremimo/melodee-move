@@ -61,6 +61,11 @@ after Schwung) differ for some buttons:
   modifier that gives pads another job is held (Shift on a kit, Copy,
   Delete, Mute, a step), the MIDI thread sets one atomic the audio thread
   reads, and the pad stays quiet.
+- **Pads held are played, not held.** A pad held is a modifier only in a
+  row that names it (*Pad held + ...*); anything else used while pads
+  sound does its own job, as on the Move: the knobs, the Volume knob (but
+  a kit's pad held takes it for its gain), the transport, a step (tapped
+  with notes held, it takes them).
 - **Status.** *done*: works so in the app today. *next*: in the table,
   not yet done by the app. *core*: part of core's tracks and transport. *wave 2: area*: the area that builds
   it (sequencer, sampling, kit depth, instruments, mixer & effects, song &

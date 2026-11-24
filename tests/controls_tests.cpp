@@ -254,6 +254,37 @@ void test_pads_sound() {
     CHECK(!pad_sounds({Screen::Overview, Track::Kit}, held::none, 0));
 }
 
+// Pads held are played: every other control does its own job meanwhile, but
+// where a row names "Pad held" (the Move's pad gain, Session's chain).
+void test_pads_played() {
+    const Where kit {Screen::Play, Track::Kit}, synth {Screen::Play, Track::Synth}, pitches {Screen::Play, Track::Pitches};
+    const Where canvas {Screen::Canvas, Track::Synth}, session {Screen::Session, Track::Kit}, overview {Screen::Overview, Track::Kit};
+    for (Where at : {kit, synth, canvas}) {
+        CHECK(resolve(at, use_of(Control::Knob, Gesture::Turn, held::pad, 3)) == Job::TurnKnob);
+        CHECK(resolve(at, use_of(Control::Knob, Gesture::Turn, held::pad | held::shift, 3)) == Job::TurnKnobFine);
+        CHECK(resolve(at, use_of(Control::Play, Gesture::Press, held::pad)) == Job::PlayStop);
+        CHECK(resolve(at, use_of(Control::KnobTouch, Gesture::Press, held::pad, 2)) == Job::ShowKnob);
+    }
+    // The Volume knob: the main volume, but the pad's gain on a kit (the Move's) and the project's on Overview.
+    CHECK(resolve(synth, use_of(Control::Volume, Gesture::Turn, held::pad)) == Job::MainVolume);
+    CHECK(resolve(canvas, use_of(Control::Volume, Gesture::Turn, held::pad)) == Job::MainVolume);
+    CHECK(resolve({Screen::Typing, Track::Kit}, use_of(Control::Volume, Gesture::Turn, held::pad)) == Job::MainVolume);
+    CHECK(resolve(kit, use_of(Control::Volume, Gesture::Turn, held::pad)) == Job::PadLevel);
+    CHECK(resolve(pitches, use_of(Control::Volume, Gesture::Turn, held::pad)) == Job::PadLevel);
+    CHECK(resolve(overview, use_of(Control::Volume, Gesture::Turn, held::pad)) == Job::ProjectVolume);
+    // A step tapped with notes held puts them on it; a step held turns its knobs to motion.
+    CHECK(resolve(synth, use_of(Control::Step, Gesture::Tap, held::pad, 4)) == Job::ToggleStep);
+    CHECK(resolve(kit, use_of(Control::Knob, Gesture::Turn, held::pad | held::step, 0, 3)) == Job::StepMotion);
+    // Another pad: its own job (the next note, Chop's next slice), Session's chain where it has one.
+    CHECK(resolve(kit, use_of(Control::Pad, Gesture::Press, held::pad, 5)) == Job::PlayPad);
+    CHECK(resolve({Screen::Chop, Track::Kit}, use_of(Control::Pad, Gesture::Press, held::pad, 5)) == Job::PlaySlice);
+    CHECK(resolve(session, use_of(Control::Pad, Gesture::Press, held::pad, 5)) == Job::ChainPattern);
+    CHECK(pad_sounds(kit, held::pad, 0));
+    CHECK(!pad_sounds(kit, held::pad | held::copy, 0)); // Copy held: the pad is copied, not played
+    // A pad's pressure stays the audio thread's: no job.
+    CHECK(resolve(synth, use_of(Control::PadPressure, Gesture::Turn, held::pad, 5)) == Job::Nothing);
+}
+
 move::Input button(move::Button which, bool pressed) {
     move::Input input;
     input.kind = move::Input::Kind::Button;
@@ -414,6 +445,32 @@ void test_gestures() {
         CHECK(g.feed(touch, t0 + 100ms).empty());
         CHECK(g.feed(button(Button::Delete, false), t0 + 150ms).empty());
     }
+    {   // Playing: a pad held, the knobs, the Volume knob and Play still do their jobs.
+        const Where synth {Screen::Play, Track::Synth};
+        Gestures g;
+        move::Input pad;
+        pad.kind = move::Input::Kind::Pad;
+        pad.index = 9;
+        pad.pressed = true;
+        pad.value = 100;
+        g.feed(pad, t0);
+        auto knob = g.feed(turn(move::Input::Kind::Knob, 2, 4), t0 + 50ms);
+        CHECK(knob.size() == 1 && knob[0].held == held::pad && resolve(synth, knob[0]) == Job::TurnKnob && knob[0].index == 4);
+        auto volume = g.feed(turn(move::Input::Kind::MasterKnob, -1), t0 + 100ms);
+        CHECK(volume.size() == 1 && resolve(synth, volume[0]) == Job::MainVolume);
+        CHECK(resolve(kit, volume[0]) == Job::PadLevel); // the Move's: a kit pad held, its gain
+        auto play = g.feed(button(Button::Play, true), t0 + 150ms);
+        CHECK(play.size() == 1 && resolve(synth, play[0]) == Job::PlayStop);
+        g.feed(button(Button::Play, false), t0 + 200ms);
+        auto step_down = g.feed(step_input(2, true), t0 + 250ms);
+        CHECK(step_down.size() == 1 && resolve(synth, step_down[0]) == Job::Nothing); // a step acts on its tap
+        auto step_up = g.feed(step_input(2, false), t0 + 300ms);
+        CHECK(step_up.size() == 1 && step_up[0].gesture == Gesture::Tap && resolve(synth, step_up[0]) == Job::ToggleStep);
+        pad.pressed = false;
+        pad.value = 0;
+        auto up = g.feed(pad, t0 + 400ms);
+        CHECK(up.size() == 1 && up[0].gesture == Gesture::Release && g.held() == held::none);
+    }
     {   // The controls map from inputs: the code's names to the Move's.
         CHECK(map(button(Button::Menu, true)).control == Control::NoteSession);
         CHECK(map(button(Button::Up, true)).control == Control::Plus);
@@ -483,6 +540,7 @@ int main(int argc, char** argv) {
     test_no_clash();
     test_decisions();
     test_pads_sound();
+    test_pads_played();
     test_gestures();
     test_looper();
     std::cout << "controls-tests: " << checks - failures << '/' << checks << " checks passed\n";

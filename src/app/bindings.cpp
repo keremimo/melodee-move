@@ -390,7 +390,10 @@ Screen under(Screen screen) {
     }
 }
 
-const Binding* find(const Where& where, const Use& use) {
+namespace {
+
+// The row for `use` with exactly what it has held.
+const Binding* find_held(const Where& where, const Use& use) {
     for (Screen screen = where.screen;; screen = under(screen)) {
         if (const Binding* row = find_in(screen, where, use)) return row;
         if (under(screen) == screen) break;
@@ -398,6 +401,21 @@ const Binding* find(const Where& where, const Use& use) {
     if (where.screen != Screen::Typing)
         if (const Binding* row = find_in(Screen::Any, where, use)) return row;
     return find_in(Screen::Everywhere, where, use);
+}
+
+} // namespace
+
+const Binding* find(const Where& where, const Use& use) {
+    if (const Binding* row = find_held(where, use)) return row;
+    // A pad held is being played: a modifier only where a row names it
+    // ("Pad held + Volume knob"), as on the Move. Anything else used while
+    // pads sound does its own job: the knobs, the Volume knob, the
+    // transport, a step (with the pads' notes). A pad's pressure stays the
+    // audio thread's (studio.cpp); no row of the table plays it.
+    if (!(use.held & held::pad) || use.control == Control::PadPressure) return nullptr;
+    Use played = use;
+    played.held = uint16_t(use.held & ~held::pad);
+    return find_held(where, played);
 }
 
 Job resolve(const Where& where, const Use& use) {
