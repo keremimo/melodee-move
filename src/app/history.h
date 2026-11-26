@@ -11,7 +11,8 @@
 #include <vector>
 
 // Undo and redo for everything a project holds (Melodee's History,
-// shell/history.h, on the Move): the last 32 steps. A step is what changed
+// shell/history.h, on the Move): the last 512 steps, as long as they hold
+// under 64 MB (the oldest go first). A step is what changed
 // between two moments the app closes one: a press of a control, a knob's
 // turns (closed by another control or two seconds still), a sample or a
 // module loaded, a take. Nothing has to say what it changed. The history
@@ -68,6 +69,7 @@ struct Step {
     std::bitset<melodee::track_count> tracks;
     bool globals = false;
     bool tempo_only = true; // of the globals, only the tempo and swing
+    size_t bytes = 0;       // what it holds, as History counted it when kept (step_bytes)
     bool empty() const {
         return project.empty() && extras.empty() && samples.empty() && chops.empty() && patterns.empty() && modules.empty();
     }
@@ -87,7 +89,8 @@ struct Live {
 class History {
 public:
     using Clock = Step::Clock;
-    static constexpr size_t depth = 32;
+    static constexpr size_t depth = 512;
+    static constexpr size_t budget = size_t(64) << 20; // the steps' memory: past it the oldest go (the newest stays)
     History();
     ~History();
 
@@ -107,6 +110,7 @@ public:
     bool can_redo() const { return !undone.empty(); }
     size_t size() const { return done.size(); }
     size_t redos() const { return undone.size(); }
+    size_t bytes() const { return bytes_; } // what the steps hold, done and undone
     const Step& kept(size_t n) const { return done[n]; }       // oldest first
     const Step& undone_step(size_t n) const { return undone[n]; } // the next redo last
     // A module that finished loading as a step left it (a project opened, a
@@ -130,7 +134,10 @@ private:
     MoveExtras base_extras;
     std::array<ModuleState, melodee::track_count> base_modules {};
     std::deque<Step> done, undone;
+    size_t bytes_ = 0;
 };
+// The memory a step holds: itself, its byte ranges, slots, whole patterns and module states.
+size_t step_bytes(const Step& step);
 
 // A project's bytes the history compares: every field but the slot tables.
 struct ProjectSpan { size_t from, to; };

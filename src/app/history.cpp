@@ -100,6 +100,7 @@ void History::take(const Live& now) {
 void History::reset(const Live& now) {
     done.clear();
     undone.clear();
+    bytes_ = 0;
     take(now);
 }
 
@@ -186,10 +187,38 @@ bool History::close(const Live& now, const std::string& what, int track, Clock::
         for (unsigned t = 0; t < melodee::track_count; ++t)
             if (step.tracks.test(t)) step.track = int(t); // one track's: whose it is
     step.at = at;
+    step.bytes = step_bytes(step);
+    for (const auto& s : undone) bytes_ -= s.bytes;
     undone.clear();
+    bytes_ += step.bytes;
     done.push_back(std::move(step));
-    if (done.size() > depth) done.pop_front();
+    while (done.size() > depth || (bytes_ > budget && done.size() > 1)) { bytes_ -= done.front().bytes; done.pop_front(); }
     return true;
+}
+
+namespace {
+size_t pattern_bytes(const melodee::Pattern& p) {
+    return sizeof(p) + p.events.size() * sizeof(melodee::Event) + p.motion.size() * sizeof(melodee::MotionPoint)
+         + p.lanes.size() * sizeof(melodee::LaneLength) + p.euclids.size() * sizeof(melodee::EuclidLane)
+         + p.punches.size() * sizeof(melodee::PatternPunch) + p.feel.groove_offsets.size() * sizeof(int16_t) + p.feel.groove_levels.size();
+}
+size_t module_bytes(const ModuleState& m) {
+    size_t n = sizeof(m) + m.file.module.size() + m.file.user_preset.size();
+    for (const auto* list : {&m.file.values, &m.file.pages}) for (const auto& [k, v] : *list) n += sizeof(k) + k.size() + sizeof(v) + v.size();
+    return n;
+}
+} // namespace
+
+size_t step_bytes(const Step& step) {
+    size_t n = sizeof(Step) + step.what.size();
+    for (const auto* list : {&step.project, &step.extras}) for (const auto& r : *list) n += sizeof(r) + r.before.size() + r.after.size();
+    n += step.samples.size() * sizeof(Step::Sample) + step.chops.size() * sizeof(Step::Chop);
+    for (const auto& p : step.patterns) n += sizeof(p.track) * 2 + pattern_bytes(p.before) + pattern_bytes(p.after);
+    for (const auto& m : step.modules) {
+        n += sizeof(m) + module_bytes(m.before) + module_bytes(m.after);
+        for (const auto& k : m.keys) n += sizeof(k) + k.key.size() + k.before.size() + k.after.size();
+    }
+    return n;
 }
 
 void History::apply(Live& now, const Step& step, bool forward) {

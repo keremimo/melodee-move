@@ -114,12 +114,12 @@ void test_history() {
     CHECK(history.close(live, "SYNTH SURGE", -1, now));
     CHECK(history.kept(3).modules[0].whole && history.kept(3).modules[0].before.file.module == "obxd");
 
-    // Thirty-two steps at most.
-    for (int n = 0; n < 40; ++n) {
+    // 512 steps at most, as long as they hold under the budget.
+    for (int n = 0; n < int(app::History::depth) + 8; ++n) {
         project->tracks[5].pads[0].level = uint8_t(n);
         history.close(live, "LEVEL", -1, now);
     }
-    CHECK(history.size() == app::History::depth);
+    CHECK(app::History::depth == 512 && history.size() == app::History::depth && history.bytes() < app::History::budget);
     // Every slot a step could bring back.
     std::vector<bool> used(melodee::sample_slots);
     history.slots_in_use(used);
