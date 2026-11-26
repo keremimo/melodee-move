@@ -513,9 +513,9 @@ void test_pages(app::MelodeeApp& melodee) {
     seqr.set_signature(-1);
     CHECK(project.signature == signature - 1 && project.bar_ticks() == 3 * 960);
     seqr.set_signature(1);
-    // The track's speed: x1 to x2, its patterns sent again.
+    // The track's speed: x1 two up to x2 (x1/64 .. x4 in order, core model/pattern.h speeds), its patterns sent again.
     seqr.set_speed(2);
-    CHECK(project.tracks[0].speed == melodee::speed_count - 1);
+    CHECK(project.tracks[0].speed == melodee::speed_normal + 2 && melodee::speed_of(project.tracks[0].speed).num == 2);
     seqr.set_speed(-2);
     CHECK(project.tracks[0].speed == melodee::speed_normal);
     // BPM per pattern: this pattern number's own tempo, on when BPM per pattern is.

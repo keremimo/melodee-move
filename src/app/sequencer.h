@@ -154,7 +154,7 @@ public:
     int vary(unsigned variation, double amount); // into the next empty pattern, launched; -1 none made
     void set_division(int delta);   // the pattern's Q (Workflow's Step Grid)
     void set_signature(int delta);  // the project's time signature (Workflow's)
-    void set_speed(int delta);      // the track's speed, x1/2 .. x2
+    void set_speed(int delta);      // the track's speed, x1/64 .. x4
     void set_pattern_tempo(int delta); // this pattern number's tempo (BPM per pattern), tenths; below 30 BPM none
     void set_seq_tempo(bool on);
     void set_scene_tempo(unsigned number, int delta);

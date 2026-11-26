@@ -482,7 +482,12 @@ Knob SeqPages::knob(unsigned k) const {
         case 0: return {"LENGTH", p.is_free() ? "FREE" : std::to_string(seq::bars_of(p, seq.bar_ticks())) + "BR", seq::bars_of(p, seq.bar_ticks()) / 128.0f};
         case 1: return {"Q", melodee::division_name(p.division), fraction(int(p.division), 0, int(melodee::Division::Count) - 1)};
         case 2: { auto sig = project.time_signature(); return {"SIGNATURE", std::to_string(sig.beats) + "/" + std::to_string(sig.unit), fraction(project.signature, 0, int(melodee::time_signature_count) - 1)}; }
-        case 3: return {"SPEED", k == 3 && project.tracks[t].speed == melodee::speed_normal ? "X1" : std::string("X") + (project.tracks[t].speed == 0 ? "1/2" : project.tracks[t].speed == 1 ? "3/4" : project.tracks[t].speed == 3 ? "1.5" : "2"), fraction(project.tracks[t].speed, 0, 4)};
+        case 3: { // the track's speed, X1/64 .. X4 (core model/pattern.h speeds)
+            const auto sp = melodee::speed_of(project.tracks[t].speed);
+            const std::string shown = sp.den == 1 ? std::to_string(sp.num) : sp.num == 3 && sp.den == 2 ? std::string("1.5")
+                                                                         : std::to_string(sp.num) + "/" + std::to_string(sp.den);
+            return {"SPEED", "X" + shown, fraction(project.tracks[t].speed, 0, int(melodee::speed_count) - 1)};
+        }
         case 4: return {"BPM", project.pattern_tempo[n] ? tenths(project.pattern_tempo[n]) : "--", project.pattern_tempo[n] / 3000.0f};
         case 5: return {"FREE", p.is_free() ? "ON" : "OFF", p.is_free() ? 1.0f : 0.0f};
         default: return {};
