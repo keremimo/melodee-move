@@ -110,11 +110,11 @@ void add_velocity(Pattern& p, Span span, int lane, int delta) {
 }
 
 void add_length(Pattern& p, Span span, int lane, int ticks) {
-    each(p, span, lane, [&](Event& e) { e.length = uint16_t(std::clamp(int(e.length) + ticks, 1, 65535)); });
+    each(p, span, lane, [&](Event& e) { e.length = melodee::note_ticks(uint64_t(std::max<int64_t>(int64_t(e.length) + ticks, 1))); });
 }
 
 void length_to(Pattern& p, Span span, int lane, uint32_t end) {
-    each(p, span, lane, [&](Event& e) { e.length = uint16_t(std::clamp<int64_t>(int64_t(end) - int64_t(e.tick), 1, 65535)); });
+    each(p, span, lane, [&](Event& e) { e.length = melodee::note_ticks(uint64_t(std::max<int64_t>(int64_t(end) - int64_t(e.tick), 1))); });
 }
 
 void transpose(Pattern& p, Span span, int lane, int semitones, bool kit) {
@@ -226,7 +226,7 @@ void lock(Pattern& p, Span span, int lane, unsigned param, unsigned pad, int val
     m.param = uint8_t(param);
     m.pad = uint8_t(pad);
     m.value = int16_t(value);
-    m.hold = uint16_t(std::clamp<uint32_t>(std::max(longest, p.q()), 1, 65535));
+    m.hold = melodee::note_ticks(std::max(longest, p.q()));
     // One lock a lane a step: an earlier one on the step (the note moved since) goes.
     p.motion.erase(std::remove_if(p.motion.begin(), p.motion.end(),
                                   [&](const melodee::MotionPoint& o) { return o.lock() && o.on(param, pad) && span.holds(o.tick) && o.tick != at; }),

@@ -773,7 +773,7 @@ void write_bench_project(const std::string& home, const std::string& loop, bool 
             melodee::Event step;
             step.tick = beat * melodee::ticks_per_quarter + t % 4 * melodee::sixteenth_ticks;
             step.key = uint8_t(melodee::sampler_first_note);
-            step.length = 4;
+            step.length = 40;
             patterns->at[t][0].events.push_back(step);
         }
         if (!busy) continue;

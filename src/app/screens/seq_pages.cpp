@@ -63,7 +63,7 @@ public:
         switch (job) {
         case Job::SeqPages: case Job::Back: seq.entry = false; studio.close(); return true;
         case Job::Page: turn_page(use.delta); return true;
-        case Job::TurnKnob: case Job::TurnKnobFine: knob_turn(unsigned(use.index), use.delta); touched = use.index; return true;
+        case Job::TurnKnob: case Job::TurnKnobFine: knob_turn(unsigned(use.index), use.delta, job == Job::TurnKnobFine); touched = use.index; return true;
         case Job::Focus: wheel(use.delta); return true;
         case Job::OpenBrowser: push(); return true;
         case Job::DeleteCurrentPattern: return erase(); // Delete on a page: its own
@@ -221,7 +221,7 @@ private:
         edited();
         return true;
     }
-    void knob_turn(unsigned k, int delta) {
+    void knob_turn(unsigned k, int delta, bool fine) {
         auto& seq = studio.sequencer();
         auto& p = seq.pattern();
         auto& project = studio.project();
@@ -243,7 +243,7 @@ private:
             if (k == 1) seq.entry_velocity = uint8_t(std::clamp(int(seq.entry_velocity) + delta, 0, 127));
             if (k == 2) seq.entry_chance = uint8_t(std::clamp(int(seq.entry_chance) + delta, 0, 100));
             break;
-        case Page::Roll: roll_turn(k, delta); break;
+        case Page::Roll: roll_turn(k, delta, fine); break;
         case Page::Mod: mod_turn(k, delta); break;
         case Page::Macros: macro = k; seq.turn_macro(k, delta); break;
         case Page::Feel: {
@@ -283,7 +283,7 @@ private:
         default: break;
         }
     }
-    void roll_turn(unsigned k, int delta) {
+    void roll_turn(unsigned k, int delta, bool fine) {
         auto& seq = studio.sequencer();
         auto& p = seq.pattern();
         auto at = chosen();
@@ -293,10 +293,10 @@ private:
         auto notes = melodee::take_events(p, at);
         for (auto& e : notes) {
             switch (k) {
-            case 0: e.length = uint16_t(std::clamp(int(e.length) + delta * int(q) / 4, 1, 65535)); break;
+            case 0: e.length = melodee::note_ticks(uint64_t(std::max<int64_t>(int64_t(e.length) + delta * int64_t(q) / 4, 1))); break;
             case 1: e.velocity = uint8_t(std::clamp(int(e.velocity) + delta, 1, 127)); break;
             case 2: e.chance = uint8_t(std::clamp(int(e.chance) + delta, 0, 100)); break;
-            case 3: e.tick = uint32_t(std::max(0, int(e.tick) + delta)); break;
+            case 3: e.tick = uint32_t(std::max(0, int(e.tick) + delta * (fine ? 1 : int(melodee::ticks_per_quarter / 96)))); break; // a 96th of a quarter a detent, a tick fine
             case 4: e.ratchet = uint8_t(std::clamp(int(e.ratchet) + delta, 1, int(melodee::max_ratchet))); break;
             case 5:
                 if (kit) e.pitch = int8_t(std::clamp(int(e.pitch) + 12 * delta, -melodee::max_pitch_ramp, melodee::max_pitch_ramp));
@@ -411,7 +411,7 @@ void SeqPages::draw(juce::Graphics& g) {
         if (focus >= 0 && size_t(focus) < p.events.size()) {
             const auto& e = p.events[size_t(focus)];
             char text[32];
-            std::snprintf(text, sizeof text, "%s V%u %u/%u", key_name(e.key).c_str(), unsigned(e.velocity), unsigned(e.length), p.q());
+            std::snprintf(text, sizeof text, "%s V%u %.2f", key_name(e.key).c_str(), unsigned(e.velocity), double(e.length) / std::max(p.q(), 1u)); // its length in steps of Q
             ui::detail(g, text, "B" + std::to_string(e.tick / bar + 1));
         } else {
             ui::detail(g, "NO NOTES");
@@ -498,7 +498,7 @@ Knob SeqPages::knob(unsigned k) const {
         if (focus < 0 || size_t(focus) >= p.events.size()) return {};
         const auto& e = p.events[size_t(focus)];
         switch (k) {
-        case 0: std::snprintf(text, sizeof text, "%u", unsigned(e.length)); return {"LENGTH", text, e.length / 384.0f};
+        case 0: std::snprintf(text, sizeof text, "%.2f", double(e.length) / std::max(p.q(), 1u)); return {"LENGTH", text, std::min(1.0f, float(e.length) / float(project.bar_ticks()))};
         case 1: return {"VELOCITY", std::to_string(e.velocity), e.velocity / 127.0f};
         case 2: return {"CHANCE", std::to_string(e.chance) + "%", e.chance / 100.0f};
         case 3: return {"NUDGE", std::to_string(int(e.tick % p.q())), float(e.tick % p.q()) / float(p.q())};

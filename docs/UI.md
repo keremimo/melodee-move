@@ -550,7 +550,7 @@ it (`src/app/screens/device_fx.*`, `mixer.cpp`), the logic in
 
 Melodee's sequencer on the Move's own keys (Ableton's manual: Step
 Sequencing 11, Loop Mode 12, Workflow 13, Recording 14, Capture 14.3,
-Session 17), Melodee's patterns underneath (96 ticks a quarter, 128 a
+Session 17), Melodee's patterns underneath (960 ticks a quarter, 128 a
 track); its own pages on Shift + Loop, which the Move leaves free (Kerem,
 2026-11-20). `docs/ui/sequencer.png` is the sheet
 (`src/ui/mockups_sequencer.cpp`, drawn with `src/ui/seq_widgets.*`, which

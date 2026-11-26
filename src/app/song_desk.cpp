@@ -216,7 +216,7 @@ bool SongDesk::set_bars(int index, int bars) {
     auto& s = song();
     if (index < 0 || index >= int(s.count)) return false;
     Clip clip = s.clips[size_t(index)];
-    unsigned want = unsigned(std::clamp(bars, 1, 16));
+    unsigned want = unsigned(std::clamp(bars, 1, int(melodee::max_bars)));
     if (want == clip.bars || clip.bar + want > melodee::song_bars) return false;
     s.erase(unsigned(index)); // placed again: a longer clip cuts what it now covers
     clip.bars = uint16_t(want);
@@ -380,7 +380,7 @@ bool SongDesk::take_jam(std::string& said) {
 }
 
 // Each bar the clips being written grow by one, so the song always holds the
-// bar after the one playing; past 16 bars a new clip carries on.
+// bar after the one playing; past 128 bars (max_bars) a new clip carries on.
 void SongDesk::tick() {
     exporter->tick(); // an MPC 3 export's prints, then the export
     jam_tick();       // jam capture: the bar playing outside Song logged
@@ -403,7 +403,7 @@ void SongDesk::tick() {
         if (index < 0) { recording_tracks &= uint16_t(~(1u << t)); continue; }
         Clip clip = s.clips[size_t(index)];
         if (clip.end() != bar + 1 || bar + 1 >= melodee::song_bars) continue;
-        if (clip.bars >= 16) { // a new clip carries on
+        if (clip.bars >= melodee::max_bars) { // a new clip carries on
             s.place({clip.track, clip.pattern, uint16_t(bar + 1), 1, false});
             recording_from[t] = uint16_t(bar + 1);
             continue;

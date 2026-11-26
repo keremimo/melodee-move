@@ -2498,7 +2498,7 @@ void test_tracks() {
             melodee::Event step;
             step.tick = beat * melodee::ticks_per_quarter;
             step.key = uint8_t(melodee::sampler_first_note);
-            step.length = 4;
+            step.length = 40;
             patterns->at[0][0].events.push_back(step);
         }
         app::PluginStates none;
@@ -2535,7 +2535,7 @@ void test_tracks() {
         melodee.studio().restart();
     }
     loudest(melodee, 1);
-    CHECK(before > 10 && melodee.studio().host().ticks() < 3 && has(melodee.status(), "playing=1"));
+    CHECK(before > 10 && melodee.studio().host().ticks() < 30 && has(melodee.status(), "playing=1"));
     loudest(melodee, 40);
     {   // The same from the Move's keys: Shift + Play.
         std::lock_guard<std::mutex> guard(melodee.studio().lock);
@@ -2543,7 +2543,7 @@ void test_tracks() {
     }
     with_shift(melodee, [&] { press(melodee, Button::Play); });
     loudest(melodee, 1);
-    CHECK(before > 10 && melodee.studio().host().ticks() < 3 && has(melodee.status(), "playing=1 ") && has(melodee.status(), "job=Restart"));
+    CHECK(before > 10 && melodee.studio().host().ticks() < 30 && has(melodee.status(), "playing=1 ") && has(melodee.status(), "job=Restart"));
     press(melodee, Button::Play);
     loudest(melodee, 2);
     CHECK(has(melodee.status(), "playing=0"));

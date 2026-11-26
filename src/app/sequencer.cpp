@@ -357,7 +357,7 @@ bool Sequencer::job(Job job, const bindings::Use& use) {
     }
     case Job::NudgeStep: case Job::NudgeStepFine: case Job::NudgeStepWhole: {
         int sign = use.control == bindings::Control::Right ? 1 : -1;
-        int by = job == Job::NudgeStepWhole ? int(q) : job == Job::NudgeStepFine ? 1 : std::max(1, int(q) / 10);
+        int by = job == Job::NudgeStepWhole ? int(q) : job == Job::NudgeStepFine ? int(melodee::ticks_per_quarter / 96) : std::max(1, int(q) / 10); // fine: a 96th of a quarter, as before 960
         seq::nudge(p, held_span(), lane, sign * by);
         sync(t, n);
         return true;
@@ -718,7 +718,7 @@ void Sequencer::release_note(int key, uint32_t ticks, int slice) {
         auto& p = pattern(h.track, h.number);
         for (size_t at = p.lower(h.tick); at < p.events.size() && p.events[at].tick == h.tick; ++at)
             if (p.events[at].key == uint8_t(key & 0xff) && p.events[at].slice == uint8_t(slice + 1)) {
-                p.events[at].length = uint16_t(std::clamp<int64_t>(int64_t(ticks) - int64_t(h.since), 1, 65535));
+                p.events[at].length = melodee::note_ticks(uint64_t(std::max<int64_t>(int64_t(ticks) - int64_t(h.since), 1)));
                 sync(h.track, h.number);
                 break;
             }

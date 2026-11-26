@@ -49,7 +49,7 @@ void pattern_grid(juce::Graphics& g, juce::Rectangle<int> area, const std::array
 // Roll: notes at their ticks over the bars in view, low keys at the bottom;
 // the note in focus inverted (a box round it), marked notes underlined, the
 // playhead a line.
-struct RollNote { uint32_t tick = 0, length = 24; uint8_t key = 60; bool marked = false; };
+struct RollNote { uint32_t tick = 0, length = 240; uint8_t key = 60; bool marked = false; }; // ticks, 960 a quarter
 void roll(juce::Graphics& g, juce::Rectangle<int> area, const std::vector<RollNote>& notes, uint32_t from, uint32_t span,
           int low_key, int high_key, int focus, int playhead_tick, uint32_t bar_ticks);
 

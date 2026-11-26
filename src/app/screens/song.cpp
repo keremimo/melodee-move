@@ -129,7 +129,7 @@ public:
         const auto* c = clip >= 0 ? &desk.song().clips[size_t(clip)] : nullptr;
         switch (which) {
         case 0: { unsigned p = c ? c->pattern : desk.next_pattern; return {"PATTERN", pattern_name(p), p / 127.0f}; }
-        case 1: { unsigned b = c ? c->bars : desk.next_bars; return {"BARS", std::to_string(b), (b - 1) / 15.0f}; }
+        case 1: { unsigned b = c ? c->bars : desk.next_bars; return {"BARS", std::to_string(b), (b - 1) / float(melodee::max_bars - 1)}; }
         case 2: return {"ZOOM", std::to_string(desk.zoom()) + " BARS", desk.zoom_index / float(SongDesk::zoom_count - 1)};
         case 4: {
             unsigned tenths = desk.tempo_at(desk.cursor);
@@ -263,7 +263,7 @@ private:
             break;
         case 1:
             if (c) desk.set_bars(clip, int(c->bars) + delta);
-            else desk.next_bars = uint8_t(std::clamp(int(desk.next_bars) + delta, 1, 16));
+            else desk.next_bars = uint8_t(std::clamp(int(desk.next_bars) + delta, 1, int(melodee::max_bars)));
             break;
         case 2:
             zoom_turned += delta;

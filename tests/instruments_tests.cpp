@@ -581,7 +581,7 @@ void test_auto_sampler() {
             std::lock_guard<std::mutex> guard(studio.lock);
             studio.select(1); // a new project's synth track
             melodee::Event e;
-            e.key = 37; e.length = 4;
+            e.key = 37; e.length = 40;
             studio.patterns().at[1][0].events.push_back(e);
         }
         CHECK(melodee.load_module_now("fake").empty());

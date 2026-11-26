@@ -37,6 +37,8 @@ const char* refusal(looper::Error e) {
     case looper::Error::TooLong: return "TOO LONG";
     case looper::Error::Tempo: return "CANNOT FIT";
     case looper::Error::Busy: return "BUSY, AGAIN";
+    case looper::Error::Growing: return "MEMORY, AGAIN";
+    case looper::Error::NoRoom: return "NO MEMORY";
     default: return "";
     }
 }
@@ -120,7 +122,7 @@ bool LoopDesk::ask(Do what, unsigned loop, int value, uint32_t position) {
     case Do::Enable: lp.on = value != 0; break;
     case Do::Length:
         if (v.state != S::Empty && v.state != S::Armed) { studio.say(loop_name(loop) + ": BEFORE A TAKE"); return false; }
-        lp.loops[loop].bars = uint8_t(std::clamp(value, 0, 16));
+        lp.loops[loop].bars = uint8_t(std::clamp(value, 0, int(looper::longest_bars)));
         break;
     case Do::Feedback: lp.loops[loop].feedback = uint8_t(std::clamp(value, 0, 100)); break;
     case Do::Source:
@@ -402,7 +404,7 @@ std::string LoopDesk::remote(const std::string& arguments) {
     if (verb == "length") {
         if (!loop_of(a)) return "error: loops are 1 to 4";
         int bars = b == "free" ? 0 : std::atoi(b.c_str());
-        if (b != "free" && std::find(looper::lengths.begin(), looper::lengths.end(), bars) == looper::lengths.end()) return "error: length 1, 2, 4, 8, 16 or free";
+        if (b != "free" && std::find(looper::lengths.begin(), looper::lengths.end(), bars) == looper::lengths.end()) return "error: length 1, 2, 4, 8, 16, 32, 64, 128 or free";
         return ask(Do::Length, unsigned(loop), bars) ? "ok" : "error: before a take";
     }
     if (verb == "feedback") {
@@ -612,7 +614,7 @@ void LoopDesk::run_commit(const CommitJob& job) {
         if (pattern.length < want) pattern.length = want;
         melodee::Event e;
         e.tick = 0;
-        e.length = uint16_t(std::min<unsigned>(ticks, 65535));
+        e.length = melodee::note_ticks(ticks);
         e.key = uint8_t(melodee::sampler_first_note + job.pad);
         e.velocity = 100;
         pattern.add(e);

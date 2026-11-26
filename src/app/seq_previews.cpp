@@ -62,8 +62,9 @@ bool write_sequencer_previews(const juce::File& folder) {
     {
         std::lock_guard<std::mutex> guard(melodee.studio().lock);
         auto& p = seq.pattern();
-        seq::set_length(p, 4 * 384, 128 * 384);
-        for (unsigned bar = 1; bar < 3; ++bar) seq::copy_span(p, seq::bar_span(0, 384), seq::bar_span(bar, 384), -1);
+        const uint32_t bar = 4 * melodee::ticks_per_quarter;
+        seq::set_length(p, 4 * bar, melodee::max_bars * bar);
+        for (unsigned b = 1; b < 3; ++b) seq::copy_span(p, seq::bar_span(0, bar), seq::bar_span(b, bar), -1);
         p.events[1].chance = 75;
         p.events[1].condition = 1;
         p.events[1].ratchet = 3;

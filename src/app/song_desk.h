@@ -21,7 +21,7 @@
 //
 // Record into the song (guide/song.md): with Rec on while the song plays,
 // each pattern launched (Command::Pattern, wherever it is sent from) becomes a
-// clip on its lane from the next bar, growing a bar at a time; past 16 bars a
+// clip on its lane from the next bar, growing a bar at a time; past 128 bars a
 // new clip carries on; Rec off or Stop ends each with the bar playing.
 namespace app {
 
@@ -65,7 +65,7 @@ public:
     bool erase(int index);
     bool copy_to(int index, unsigned track, unsigned bar); // a copy of the clip there
     bool set_pattern(int index, int pattern);          // the clip's pattern (knob 1)
-    bool set_bars(int index, int bars);                // the clip's length (knob 2), 1..16
+    bool set_bars(int index, int bars);                // the clip's length (knob 2), 1..128
     bool marker(unsigned bar);                         // a marker, or on one its next name (past the last: gone)
     int marker_jump(unsigned from, int way) const;     // the next marker's bar that way (clip edges with none); -1 none
     // The tempo lane (TMPL): a point on `bar` (tenths of a BPM; under 30 BPM none there), its shape.
@@ -101,7 +101,7 @@ public:
     // The song laid end to end into the first pattern number free on every track (and used by no clip), as long as
     // the song, 128 bars at most; the number, or -1 when there is none or no notes.
     int to_pattern(std::string& said);
-    // The song as a MIDI file (format 1, 96 ticks, the tempo and time signature, the lane's changes); with no song,
+    // The song as a MIDI file (format 1, 960 ticks, the tempo and time signature, the lane's changes); with no song,
     // each track's pattern once. The bytes; empty when there are no notes.
     std::vector<uint8_t> midi_file() const;
     // A MIDI file's notes onto `track`'s pattern playing (a kit takes notes 36 on as its pads), as many bars as they

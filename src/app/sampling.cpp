@@ -32,7 +32,7 @@ std::string pad_name(unsigned pad) {
     return text;
 }
 
-// RecordArm's rec length: 0 Free, 1..16 bars, 255 Seq (as Melodee's shell sends it).
+// RecordArm's rec length: 0 Free, 1..128 bars, 255 Seq (as Melodee's shell sends it).
 uint8_t length_code(const melodee::InputConfig& in) {
     return in.length == melodee::rec_free ? 0 : in.length == melodee::rec_seq ? 255 : uint8_t(melodee::rec_bars(in.length));
 }

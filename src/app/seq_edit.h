@@ -5,7 +5,7 @@
 #include <vector>
 
 // The Move's step sequencing (its manual, 11 and 12) on Melodee's patterns
-// (melodee-sample's model/pattern.h, notes at any tick, 96 a quarter): what
+// (melodee-sample's model/pattern.h, notes at any tick, 960 a quarter): what
 // a step, a bar and a held step's turns do to a pattern's notes. Plain
 // functions over a pattern, for the sequencer (sequencer.h) and its tests;
 // no Studio, no thread.

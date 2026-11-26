@@ -74,7 +74,7 @@ void write_project(const std::string& home, const std::string& loop) {
         melodee::Event e;
         e.tick = tick;
         e.key = uint8_t(melodee::sampler_first_note);
-        e.length = 12;
+        e.length = 120;
         patterns->at[t][p].events.push_back(e);
     };
     uint32_t bar = project->bar_ticks();
@@ -424,7 +424,7 @@ void test_live_set_details() {
         melodee::Event e;
         e.tick = tick;
         e.key = uint8_t(key);
-        e.length = 12;
+        e.length = 120;
         e.pitch = int8_t(pitch);
         e.ratchet = uint8_t(ratchet);
         e.chance = 50;
@@ -489,7 +489,7 @@ void test_live_set_details() {
         std::set<double> times;
         for (auto* e : events) times.insert(e->getDoubleAttribute("Time"));
         CHECK(times.count(0) && times.count(2) && times.count(1)); // the hits' first, the lane again, pad 2 on beat 2
-        CHECK(times.count(0.05)); // the second hit, 4 ticks in, swung 60: 4.8 ticks
+        CHECK(times.count(0.05)); // the second hit, 40 ticks in, swung 60: 48 ticks
         CHECK(events[0]->getStringAttribute("Probability") == "0.5");
     }
     // The pad played at other pitches: its own Simpler, its notes 60 + their pitch.
@@ -587,10 +587,10 @@ void test_exports() {
         chop.slices.count = 2;
         chop.slices.start[1] = 20000;
         melodee::Event hit;
-        hit.tick = 48;
+        hit.tick = 480;
         hit.key = uint8_t(melodee::sampler_first_note);
         hit.slice = 2;
-        hit.length = 12;
+        hit.length = 120;
         rig.studio().patterns().at[0][0].add(hit);
         CHECK(exports.start(app::Exports::Kind::Mpc3).empty());
     }
@@ -847,7 +847,7 @@ void test_synth_freeze() {
         pattern.length = rig.studio().project().bar_ticks();
         melodee::Event e;
         e.key = 60;
-        e.length = 48;
+        e.length = 480;
         e.velocity = 110;
         pattern.events.push_back(e);
         rig.desk().sync_pattern(2, 0);
@@ -943,7 +943,7 @@ void test_pad_layouts() {
         pattern.length = rig.studio().project().bar_ticks();
         melodee::Event e;
         e.key = uint8_t(melodee::sampler_first_note);
-        e.length = 12;
+        e.length = 120;
         pattern.events.push_back(e);
         rig.desk().sync_pattern(0, 8);
     }

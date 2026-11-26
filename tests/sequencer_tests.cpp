@@ -32,7 +32,7 @@ int failures = 0, checks = 0;
 
 bool has(const std::string& text, const std::string& part) { return text.find(part) != std::string::npos; }
 
-melodee::Event note(uint32_t tick, uint8_t key, uint8_t velocity = 100, uint16_t length = 24) {
+melodee::Event note(uint32_t tick, uint8_t key, uint8_t velocity = 100, uint32_t length = 240) {
     melodee::Event e;
     e.tick = tick;
     e.key = key;
@@ -48,19 +48,19 @@ void test_edits() {
     CHECK(seq::page_steps(p) == 16);
     // A step tapped: the lane's note on it; again, off.
     CHECK(seq::toggle_step(p, 3, 36, {36}, 100));
-    CHECK(p.events.size() == 1 && p.events[0].tick == 72 && p.events[0].key == 36 && p.events[0].length == 24);
+    CHECK(p.events.size() == 1 && p.events[0].tick == 720 && p.events[0].key == 36 && p.events[0].length == 240);
     CHECK(!seq::toggle_step(p, 3, 36, {36}, 100) && p.events.empty());
     // A kit's steps are one lane: another pad's note on the step leaves it be.
-    p.add(note(72, 38));
+    p.add(note(720, 38));
     CHECK(seq::toggle_step(p, 3, 36, {36}, 90) && p.events.size() == 2);
     CHECK(!seq::toggle_step(p, 3, 36, {36}, 90) && p.events.size() == 1 && p.events[0].key == 38);
     // A note track's step holds a chord: a tap clears it all, another lays the keys held.
     CHECK(!seq::toggle_step(p, 3, -1, {60}, 100) && p.events.empty());
     CHECK(seq::toggle_step(p, 5, -1, {60, 64, 67}, 100) && p.events.size() == 3);
     // Step held + Pad: a key in or out of the chord, at the step's length.
-    seq::add_length(p, seq::step_span(p, 5), -1, 24);
+    seq::add_length(p, seq::step_span(p, 5), -1, 240);
     CHECK(!seq::toggle_key(p, 5, 64, 100) && p.events.size() == 2);
-    CHECK(seq::toggle_key(p, 5, 62, 100) && p.events.size() == 3 && p.events[1].key == 62 && p.events[1].length == 48);
+    CHECK(seq::toggle_key(p, 5, 62, 100) && p.events.size() == 3 && p.events[1].key == 62 && p.events[1].length == 480);
     p.events.clear();
     // A held step's turns (11.1-11.4).
     seq::toggle_step(p, 2, 36, {36}, 100);
@@ -69,18 +69,18 @@ void test_edits() {
     CHECK(p.events[0].velocity == 127);
     seq::add_velocity(p, span, 36, -200);
     CHECK(p.events[0].velocity == 1);
-    seq::add_length(p, span, 36, 2);
-    CHECK(p.events[0].length == 26);
-    seq::length_to(p, span, 36, seq::step_tick(p, 6) + 24);
-    CHECK(p.events[0].length == 7 * 24 - 48);
+    seq::add_length(p, span, 36, 20);
+    CHECK(p.events[0].length == 260);
+    seq::length_to(p, span, 36, seq::step_tick(p, 6) + 240);
+    CHECK(p.events[0].length == 7 * 240 - 480);
     seq::transpose(p, span, 36, 1, true);
     CHECK(p.events[0].pitch == 1 && p.events[0].key == 36); // a kit pad's pitch, not another pad
-    seq::nudge(p, span, 36, 5);
-    CHECK(p.events[0].tick == 53);
+    seq::nudge(p, span, 36, 50);
+    CHECK(p.events[0].tick == 530);
     // Nudged less than half a step, it is still the step's.
     auto held = seq::held(p, seq::step_span(p, 2), 36, seq::step_tick(p, 2));
-    CHECK(held.any && held.offset == 5 && held.count == 1);
-    seq::nudge(p, seq::step_span(p, 2), 36, 10); // 15 ticks on: the next step's now
+    CHECK(held.any && held.offset == 50 && held.count == 1);
+    seq::nudge(p, seq::step_span(p, 2), 36, 100); // 150 ticks on: the next step's now
     CHECK(!seq::any_in(p, seq::step_span(p, 2), 36) && seq::any_in(p, seq::step_span(p, 3), 36));
     // A note track transposes the key.
     melodee::Pattern line;
@@ -89,7 +89,7 @@ void test_edits() {
     CHECK(line.events[0].key == 72);
     // Melodee's TRIG on a step.
     melodee::Pattern t;
-    t.add(note(48, 36));
+    t.add(note(480, 36));
     auto two = seq::step_span(t, 2);
     seq::set_trig(t, two, 36, seq::Trig::Chance, -25);
     seq::set_trig(t, two, 36, seq::Trig::Condition, 1);
@@ -103,53 +103,53 @@ void test_edits() {
     CHECK(e.chance == 75 && e.condition == 1 && e.ratchet == 3 && e.ramp == -20 && e.pitch_ramp == 5);
     CHECK((e.flags & melodee::step_accent) && !(e.flags & melodee::step_tie));
     char text[16];
-    auto h = seq::held(t, two, 36, 48);
+    auto h = seq::held(t, two, 36, 480);
     CHECK(std::string(seq::trig_value(h, seq::Trig::Condition, text, sizeof text)) == "1:2");
     CHECK(std::string(seq::trig_value(h, seq::Trig::Chance, text, sizeof text)) == "75%");
     // Copy a step and a bar; Delete + a bar; Delete + a pad.
     melodee::Pattern c;
-    c.length = 2 * 384;
+    c.length = 2 * 3840;
     c.add(note(0, 36));
-    c.add(note(96, 36));
-    c.add(note(96, 38));
-    seq::copy_span(c, seq::bar_span(0, 384), seq::bar_span(1, 384), -1);
-    CHECK(c.events.size() == 6 && seq::notes_in(c, seq::bar_span(1, 384)).size() == 3);
-    seq::clear_span(c, seq::bar_span(1, 384), 38);
+    c.add(note(960, 36));
+    c.add(note(960, 38));
+    seq::copy_span(c, seq::bar_span(0, 3840), seq::bar_span(1, 3840), -1);
+    CHECK(c.events.size() == 6 && seq::notes_in(c, seq::bar_span(1, 3840)).size() == 3);
+    seq::clear_span(c, seq::bar_span(1, 3840), 38);
     CHECK(c.events.size() == 5);
     CHECK(seq::clear_lane(c, 36) && c.events.size() == 1 && !seq::clear_lane(c, 36));
     // Every step of a bar (Loop Mode's step held + pad), and off again.
     melodee::Pattern b;
-    CHECK(seq::toggle_key_every_step(b, seq::bar_span(0, 384), 42, 90) && b.events.size() == 16);
-    CHECK(!seq::toggle_key_every_step(b, seq::bar_span(0, 384), 42, 90) && b.events.empty());
+    CHECK(seq::toggle_key_every_step(b, seq::bar_span(0, 3840), 42, 90) && b.events.size() == 16);
+    CHECK(!seq::toggle_key_every_step(b, seq::bar_span(0, 3840), 42, 90) && b.events.empty());
     // Quantize (Shift + Step 16): Workflow's amount of the way, the lane alone or all.
     melodee::Pattern qz;
-    qz.add(note(30, 36));
-    qz.add(note(30, 38));
+    qz.add(note(300, 36));
+    qz.add(note(300, 38));
     seq::quantize(qz, 36, 100);
-    CHECK(qz.events[0].tick == 24 && qz.events[1].tick == 30);
+    CHECK(qz.events[0].tick == 240 && qz.events[1].tick == 300);
     seq::quantize(qz, -1, 50);
-    CHECK(qz.events[1].tick == 27);
+    CHECK(qz.events[1].tick == 270);
     // Locks (14.2.4): held for the step's longest note, read back, one a lane a step.
     melodee::Pattern l;
-    l.add(note(48, 36, 100, 60));
+    l.add(note(480, 36, 100, 600));
     unsigned cutoff = melodee::motion_pad_param(melodee::PadParam::FilterCutoff);
     seq::lock(l, seq::step_span(l, 2), 36, cutoff, 0, 40);
     int value = 0;
     CHECK(seq::lock_of(l, seq::step_span(l, 2), cutoff, 0, value) && value == 40);
-    CHECK(l.motion.size() == 1 && l.motion[0].hold == 60 && l.motion[0].tick == 48);
+    CHECK(l.motion.size() == 1 && l.motion[0].hold == 600 && l.motion[0].tick == 480);
     seq::lock(l, seq::step_span(l, 2), 36, cutoff, 0, 41);
     CHECK(l.motion.size() == 1 && seq::locks_in(l, seq::step_span(l, 2)) == 1);
     CHECK(!seq::lock_of(l, seq::step_span(l, 3), cutoff, 0, value));
     // Seq Record's place: wrapped, and onto Q (the last step's later half onto the top).
     melodee::Pattern r;
-    CHECK(seq::record_tick(r, 50, false) == 50 && seq::record_tick(r, 50, true) == 48);
-    CHECK(seq::record_tick(r, 380, true) == 0 && seq::record_tick(r, 384 + 10, false) == 10);
+    CHECK(seq::record_tick(r, 500, false) == 500 && seq::record_tick(r, 500, true) == 480);
+    CHECK(seq::record_tick(r, 3800, true) == 0 && seq::record_tick(r, 3840 + 100, false) == 100);
     // Lengths in bars; a triplet Q pages twelve.
     melodee::Pattern n;
-    seq::set_length(n, 3 * 384, 128 * 384);
-    CHECK(seq::bars_of(n, 384) == 3 && !n.free);
-    seq::set_length(n, 999 * 384, 128 * 384);
-    CHECK(seq::bars_of(n, 384) == 128);
+    seq::set_length(n, 3 * 3840, 128 * 3840);
+    CHECK(seq::bars_of(n, 3840) == 3 && !n.free);
+    seq::set_length(n, 999 * 3840, 128 * 3840);
+    CHECK(seq::bars_of(n, 3840) == 128);
     n.division = melodee::Division::SixteenthTriplet;
     CHECK(seq::page_steps(n) == 12);
 }
@@ -204,7 +204,7 @@ void test_steps(app::MelodeeApp& melodee) {
     auto& p = current(melodee);
     // Step (Play): A01's note on the step as it is pressed, kept as it is let go; a tap again clears it.
     h.step_down(3);
-    CHECK(p.events.size() == 1 && p.events[0].tick == 72 && p.events[0].key == melodee::sampler_first_note);
+    CHECK(p.events.size() == 1 && p.events[0].tick == 720 && p.events[0].key == melodee::sampler_first_note);
     CHECK(has(h.status(), "job=ToggleStep"));
     h.step_up(3);
     CHECK(p.events.size() == 1);
@@ -223,19 +223,19 @@ void test_steps(app::MelodeeApp& melodee) {
     h.volume(-20);
     CHECK(p.events[0].velocity == 80 && has(h.status(), "job=StepVelocity") && has(h.status(), "held_step=0"));
     h.wheel(5);
-    CHECK(p.events[0].length == 24 + 5 * 2 && has(h.status(), "job=StepLength"));
+    CHECK(p.events[0].length == 240 + 5 * 24 && has(h.status(), "job=StepLength"));
     h.button(Button::Up);
     CHECK(p.events[0].pitch == 1 && has(h.status(), "job=TransposeStep"));
     h.button(Button::Down);
     CHECK(p.events[0].pitch == 0);
-    // Left / Right nudge a tenth (2 ticks of 24); Shift: a tick.
+    // Left / Right nudge a tenth (24 ticks of 240); Shift: a 96th of a quarter (10 ticks).
     h.button(Button::Right);
-    CHECK(p.events[0].tick == 2 && has(h.status(), "job=NudgeStep"));
+    CHECK(p.events[0].tick == 24 && has(h.status(), "job=NudgeStep"));
     h.with(Button::Shift, [&] { h.button(Button::Left); });
-    CHECK(p.events[0].tick == 1 && has(h.status(), "job=NudgeStepFine"));
+    CHECK(p.events[0].tick == 14 && has(h.status(), "job=NudgeStepFine"));
     // Step held + a later step: the length up to it.
     h.step(3);
-    CHECK(p.events[0].length == 4 * 24 - 1 && has(h.status(), "job=StepLengthTo"));
+    CHECK(p.events[0].length == 4 * 240 - 14 && has(h.status(), "job=StepLengthTo"));
     // Step held + Pad: that pad's note added on the step (quiet: the pad's job is the step).
     h.pad(4);
     CHECK(p.events.size() == 2 && has(h.status(), "job=NoteOnStep"));
@@ -267,11 +267,11 @@ void test_steps(app::MelodeeApp& melodee) {
     CHECK(p.motion.empty() && has(h.status(), "job=DeleteMotion"));
     // Copy held + a step, then another: the step pasted there.
     h.with(Button::Copy, [&] { h.step(0); h.step(8); });
-    CHECK(p.events.size() == 2 && p.events[1].tick == 8 * 24 + 1 && has(h.status(), "job=CopyStep"));
+    CHECK(p.events.size() == 2 && p.events[1].tick == 8 * 240 + 14 && has(h.status(), "job=CopyStep"));
     // Shift + Step 16 held + a pad: that pad's notes quantized; Shift + Step 16 alone: all.
     h.with(Button::Shift, [&] { h.step_down(15); h.pad(1); h.step_up(15); });
-    CHECK(p.events[0].tick == 0 && p.events[1].tick == 8 * 24 && has(h.status(), "job=QuantizePad"));
-    p.events[0].tick = 5;
+    CHECK(p.events[0].tick == 0 && p.events[1].tick == 8 * 240 && has(h.status(), "job=QuantizePad"));
+    p.events[0].tick = 50;
     h.with(Button::Shift, [&] { h.step(15); });
     CHECK(p.events[0].tick == 0 && has(h.status(), "job=Quantize"));
     // Delete + Pad: its notes go; again, with none, the pad is emptied.
@@ -341,26 +341,26 @@ void test_bars_and_patterns(app::MelodeeApp& melodee) {
     h.press(Button::Loop);
     h.wheel(3);
     h.release(Button::Loop);
-    CHECK(seq::bars_of(p, 384) == 4 && has(h.status(), "job=LoopLength") && has(h.status(), "seq_bars=4"));
+    CHECK(seq::bars_of(p, 3840) == 4 && has(h.status(), "job=LoopLength") && has(h.status(), "seq_bars=4"));
     h.with(Button::Shift, [&] { h.with(Button::Loop, [&] { h.wheel(-1); }); });
-    CHECK(p.length == 4 * 384 - 24 && has(h.status(), "job=LoopLengthFine"));
+    CHECK(p.length == 4 * 3840 - 240 && has(h.status(), "job=LoopLengthFine"));
     // Left / Right: the pattern's bars, a page of sixteen steps each.
     h.button(Button::Right);
     CHECK(seqr.page() == 1 && has(h.status(), "job=Bar"));
     h.step(2);
-    CHECK(p.events.size() == 1 && p.events[0].tick == 384 + 48);
+    CHECK(p.events.size() == 1 && p.events[0].tick == 3840 + 480);
     h.with(Button::Shift, [&] { h.button(Button::Left); });
     CHECK(seqr.page() == 0 && has(h.status(), "job=Bar16"));
     // A step past the end: the pattern grows to that bar (Melodee's spare steps).
-    seq::set_length(p, 384, 128 * 384);
+    seq::set_length(p, 3840, 128 * 3840);
     h.button(Button::Right);
     h.step(0);
-    CHECK(seq::bars_of(p, 384) == 2);
+    CHECK(seq::bars_of(p, 3840) == 2);
     h.button(Button::Left);
     // Shift + Step 15: twice as long, the notes twice.
     size_t before = p.events.size();
     h.with(Button::Shift, [&] { h.step(14); });
-    CHECK(seq::bars_of(p, 384) == 4 && p.events.size() == 2 * before && has(h.status(), "job=DoubleLoop"));
+    CHECK(seq::bars_of(p, 3840) == 4 && p.events.size() == 2 * before && has(h.status(), "job=DoubleLoop"));
     // Copy: the pattern into the next empty one, which plays (12.3).
     h.button(Button::Copy);
     CHECK(seqr.number(0) == 1 && seqr.pattern(0, 1).events.size() == 2 * before && has(h.status(), "job=DuplicatePattern"));
@@ -384,24 +384,24 @@ void test_record(app::MelodeeApp& melodee) {
     h.button(Button::Rec);
     h.render(4);
     CHECK(has(h.status(), "rec=1 count_in=1") && has(h.status(), "playing=1"));
-    h.render(700); // a bar at 120 BPM: 384 ticks, 5.2 ms each, 2.9 ms a block
+    h.render(700); // a bar at 120 BPM: 3840 ticks, 0.52 ms each, 2.9 ms a block
     CHECK(has(h.status(), "count_in=0"));
     // A free pattern grows as the take goes: the bar playing and the next.
-    CHECK(p.length >= 2 * 384);
+    CHECK(p.length >= 2 * 3840);
     h.render(60);
     h.pad(2, 90);
     CHECK_SAID(p.events.size() == 1, h.status());
     if (!p.events.empty()) {
         CHECK(p.events[0].key == melodee::sampler_first_note + 2 && p.events[0].velocity == 90);
-        CHECK(p.events[0].tick % 24 == 0); // Rec Quantize: on the pattern's Q
+        CHECK(p.events[0].tick % 240 == 0); // Rec Quantize: on the pattern's Q
     }
     h.render(800);
     h.lights();
-    CHECK(p.length >= 3 * 384);
+    CHECK(p.length >= 3 * 3840);
     // Rec again: the take ends at the end of the bar playing; playback goes on.
     h.button(Button::Rec);
     h.render(2);
-    CHECK(has(h.status(), "rec=0") && has(h.status(), "playing=1") && !p.free && p.length % 384 == 0);
+    CHECK(has(h.status(), "rec=0") && has(h.status(), "playing=1") && !p.free && p.length % 3840 == 0);
     h.button(Button::Play);
     h.render(2);
     // Rec while playing records at once, no count-in, and overdubs.
@@ -494,24 +494,24 @@ void test_pages(app::MelodeeApp& melodee) {
     seqr.launch(0, 10);
     auto& p = seqr.pattern(0, 10);
     p = melodee::Pattern {};
-    seq::set_length(p, 2 * 384, 128 * 384);
+    seq::set_length(p, 2 * 3840, 128 * 3840);
     p.add(note(0, 36));
-    p.add(note(384 + 96, 36));
+    p.add(note(3840 + 960, 36));
     // Half Seq: the first half; Half and Double Speed: the notes further apart, or closer.
     seqr.half_seq();
-    CHECK(p.length == 384 && seq::bars_of(p, 384) == 1);
-    p.add(note(48, 37));
+    CHECK(p.length == 3840 && seq::bars_of(p, 3840) == 1);
+    p.add(note(480, 37));
     seqr.half_speed(true);
-    CHECK(p.events[1].tick == 96);
+    CHECK(p.events[1].tick == 960);
     seqr.half_speed(false);
-    CHECK(p.events[1].tick == 48);
+    CHECK(p.events[1].tick == 480);
     // Q and the time signature.
     seqr.set_division(1);
     CHECK(p.division == melodee::Division::SixteenthTriplet && seqr.page_steps() == 12);
     seqr.set_division(-1);
     unsigned signature = project.signature;
     seqr.set_signature(-1);
-    CHECK(project.signature == signature - 1 && project.bar_ticks() == 3 * 96);
+    CHECK(project.signature == signature - 1 && project.bar_ticks() == 3 * 960);
     seqr.set_signature(1);
     // The track's speed: x1 to x2, its patterns sent again.
     seqr.set_speed(2);
@@ -547,9 +547,9 @@ void test_pages(app::MelodeeApp& melodee) {
     // Euclid on the last pad's lane, its own length.
     melodee.studio().select_pad(2);
     seqr.lay_euclid(3, 8, 0);
-    CHECK(seq::notes_in(p, {0, p.length}, 38).size() == 3 && p.lane_length(38) == 8 * 24); // looping on its own
+    CHECK(seq::notes_in(p, {0, p.length}, 38).size() == 3 && p.lane_length(38) == 8 * 240); // looping on its own
     seqr.set_lane_steps(-2);
-    CHECK(p.lane_length(38) == 6 * 24);
+    CHECK(p.lane_length(38) == 6 * 240);
     seqr.set_lane_steps(100);
     CHECK(!p.own_lane(38));
     // Macros: one knob over lanes; MOD: a modulator to the engine.
@@ -578,10 +578,10 @@ void test_pages(app::MelodeeApp& melodee) {
     seqr.entry = false;
     // The playhead by Q, stopped: Play continues from it.
     seqr.move_playhead(4);
-    CHECK(seqr.play_from_shown() == 96);
+    CHECK(seqr.play_from_shown() == 960);
     h.button(Button::Play);
     h.render(2);
-    CHECK(melodee.studio().host().position_of(0) >= 96);
+    CHECK(melodee.studio().host().position_of(0) >= 960);
     h.button(Button::Play);
     h.render(2);
     CHECK(seqr.play_from_shown() == 0);
@@ -595,8 +595,8 @@ void test_screens(app::MelodeeApp& melodee) {
     seqr.launch(0, 20);
     auto& p = seqr.pattern(0, 20);
     p = melodee::Pattern {};
-    seq::set_length(p, 4 * 384, 128 * 384);
-    for (unsigned bar = 0; bar < 4; ++bar) p.add(note(bar * 384, 36));
+    seq::set_length(p, 4 * 3840, 128 * 3840);
+    for (unsigned bar = 0; bar < 4; ++bar) p.add(note(bar * 3840, 36));
     // A held step: long Plus an octave, long Right a whole step.
     h.step_down(0);
     h.press(Button::Up);
@@ -608,7 +608,7 @@ void test_screens(app::MelodeeApp& melodee) {
     std::this_thread::sleep_for(std::chrono::milliseconds(450));
     h.lights();
     h.release(Button::Right);
-    CHECK(p.events[0].tick == 24 && has(h.status(), "job=NudgeStepWhole"));
+    CHECK(p.events[0].tick == 240 && has(h.status(), "job=NudgeStepWhole"));
     h.step_up(0);
     p.events[0].tick = 0;
     p.events[0].pitch = 0;
@@ -626,13 +626,13 @@ void test_screens(app::MelodeeApp& melodee) {
     h.volume(-10);
     CHECK(p.events[1].velocity == 90 && has(h.status(), "job=BarVelocity"));
     h.wheel(1);
-    CHECK(p.events[1].length == 26 && has(h.status(), "job=BarLength"));
+    CHECK(p.events[1].length == 264 && has(h.status(), "job=BarLength"));
     h.button(Button::Up);
     CHECK(p.events[1].pitch == 1 && has(h.status(), "job=TransposeBar"));
     h.button(Button::Right);
-    CHECK(p.events[1].tick == 384 + 2 && has(h.status(), "job=NudgeBar"));
+    CHECK(p.events[1].tick == 3840 + 24 && has(h.status(), "job=NudgeBar"));
     h.pad(5);
-    CHECK(seq::notes_in(p, seq::bar_span(1, 384), 41).size() == 16 && has(h.status(), "job=NoteOnBar"));
+    CHECK(seq::notes_in(p, seq::bar_span(1, 3840), 41).size() == 16 && has(h.status(), "job=NoteOnBar"));
     // A bar held + another: the loop from one to the other (from bar 2: an editor's loop).
     h.step(2);
     h.step_up(1);
@@ -640,18 +640,18 @@ void test_screens(app::MelodeeApp& melodee) {
     // A double press: a one-bar loop, the first bar's: the pattern one bar long.
     h.step(0);
     h.step(0); // its release taps too: bar 1 selected
-    CHECK(seqr.loop_from(0, 20) == 0 && p.length == 384);
-    seq::set_length(p, 4 * 384, 128 * 384);
+    CHECK(seqr.loop_from(0, 20) == 0 && p.length == 3840);
+    seq::set_length(p, 4 * 3840, 128 * 3840);
     // Copy + a bar, then another: copied; Delete + a bar: cleared.
     h.with(Button::Copy, [&] { h.step(1); h.step(3); });
-    CHECK(seq::notes_in(p, seq::bar_span(3, 384), 41).size() == 16 && has(h.status(), "job=CopyBar"));
+    CHECK(seq::notes_in(p, seq::bar_span(3, 3840), 41).size() == 16 && has(h.status(), "job=CopyBar"));
     h.with(Button::Delete, [&] { h.step(3); });
-    CHECK(seq::notes_in(p, seq::bar_span(3, 384)).empty() && has(h.status(), "job=ClearBar"));
+    CHECK(seq::notes_in(p, seq::bar_span(3, 3840)).empty() && has(h.status(), "job=ClearBar"));
     // Loop held + the wheel: the length here too (shorter as on the Play screen), and Loop Mode stays.
     h.with(Button::Loop, [&] { h.wheel(-1); });
-    CHECK(p.length == 3 * 384 && has(h.status(), "job=LoopLength") && has(h.status(), "page=loop"));
+    CHECK(p.length == 3 * 3840 && has(h.status(), "job=LoopLength") && has(h.status(), "page=loop"));
     h.with(Button::Loop, [&] { h.wheel(1); });
-    CHECK(p.length == 4 * 384 && has(h.status(), "page=loop"));
+    CHECK(p.length == 4 * 3840 && has(h.status(), "page=loop"));
     // Left / Right the bar; Loop again, out.
     h.button(Button::Right);
     CHECK(has(h.status(), "loop_bar=2") && has(h.status(), "job=Bar"));
@@ -684,7 +684,7 @@ void test_screens(app::MelodeeApp& melodee) {
     CHECK(track.chain_count == 3 && track.chain[0] == 8 && track.chain[1] == 11 && track.chain[2] == 12 && has(h.status(), "job=ChainPattern"));
     // The wheel: the playhead by Q; its push, the column as a sequence.
     h.wheel(2);
-    CHECK(seqr.play_from_shown() == 48 && has(h.status(), "job=Playhead"));
+    CHECK(seqr.play_from_shown() == 480 && has(h.status(), "job=Playhead"));
     seqr.take_play_from();
     h.button(Button::MainPush);
     CHECK(has(h.status(), "page=scene") && has(h.status(), "job=LaunchScene"));
@@ -730,11 +730,11 @@ void test_screens(app::MelodeeApp& melodee) {
     h.with(Button::Shift, [&] { h.button(Button::Loop); });
     CHECK(has(h.status(), "page=seq-pages") && has(h.status(), "job=SeqPages") && has(h.status(), "seq_page_name=SEQ"));
     h.knob(0, -2); // the length: two bars
-    CHECK(seq::bars_of(seqr.pattern(), 384) == 2);
+    CHECK(seq::bars_of(seqr.pattern(), 3840) == 2);
     h.button(Button::MainPush);
     CHECK(has(h.status(), "page=seq-jobs"));
     h.button(Button::MainPush); // Half Seq
-    CHECK(seq::bars_of(seqr.pattern(), 384) == 1 && has(h.status(), "page=seq-pages"));
+    CHECK(seq::bars_of(seqr.pattern(), 3840) == 1 && has(h.status(), "page=seq-pages"));
     h.with(Button::Shift, [&] { h.wheel(1); h.wheel(1); });
     CHECK(has(h.status(), "seq_page_name=ROLL") && has(h.status(), "job=Page"));
     h.wheel(1);
@@ -754,7 +754,7 @@ void test_more(app::MelodeeApp& melodee) {
     seqr.launch(0, 30);
     auto& p = seqr.pattern(0, 30);
     p = melodee::Pattern {};
-    seq::set_length(p, 2 * 384, 128 * 384);
+    seq::set_length(p, 2 * 3840, 128 * 3840);
     // Tap tempo on Tempo (Shift + Step 5): the steps tapped half a second apart, 120 BPM; Left halves, Right doubles.
     h.with(Button::Shift, [&] { h.step(4); });
     CHECK(has(h.status(), "page=tempo"));
@@ -805,8 +805,8 @@ void test_more(app::MelodeeApp& melodee) {
     // Roll's jobs: a key's notes marked, a step inserted, the velocities ramped.
     p = melodee::Pattern {};
     p.add(note(0, 36, 100));
-    p.add(note(48, 36, 100));
-    p.add(note(96, 38, 100));
+    p.add(note(480, 36, 100));
+    p.add(note(960, 38, 100));
     seqr.sync(0, 30);
     h.with(Button::Shift, [&] { h.button(Button::Loop); });
     h.with(Button::Shift, [&] { for (int n = 0; n < 9; ++n) h.wheel(-1); h.wheel(1); h.wheel(1); }); // the pages open where they were left: back to ROLL
@@ -822,7 +822,7 @@ void test_more(app::MelodeeApp& melodee) {
     roll_job(14); // RAMP DOWN over them
     CHECK(p.events[0].velocity == 100 && p.events[1].velocity == 50);
     roll_job(15); // INSERT STEP at the focus's: everything a step later
-    CHECK(p.events[0].tick == 24 && p.events[2].tick == 120);
+    CHECK(p.events[0].tick == 240 && p.events[2].tick == 1200);
     h.button(Button::Delete); // the note in focus erased
     CHECK(p.events.size() == 2);
     h.button(Button::Back);
@@ -841,7 +841,7 @@ void test_more(app::MelodeeApp& melodee) {
         for (unsigned k = 0; k < 3; ++k) stamp.keys[k].store(chord[k]);
         stamp.count.store(3);
         stamp.velocity.store(90);
-        stamp.position.store(48);
+        stamp.position.store(480);
         stamp.ticks.store(melodee.studio().host().ticks());
         stamp.sounded.store(true);
         melodee.surface(make_event(0x90, pad_note(7), 90)); // the MIDI thread's side alone: the stamp stands as set
@@ -859,7 +859,7 @@ void test_more(app::MelodeeApp& melodee) {
         for (unsigned k = 0; k < 3; ++k) {
             melodee::Event e;
             e.tick = k * made.length / 4;
-            e.length = 12;
+            e.length = 120;
             e.key = uint8_t(40 + k);
             made.add(e);
         }
@@ -927,7 +927,7 @@ void test_links() {
             p.free = false;
             melodee::Event e;
             e.key = uint8_t(t ? 60 : melodee::sampler_first_note);
-            e.length = 24;
+            e.length = 240;
             p.events.push_back(e);
             seqr.sync(t, n);
         }
