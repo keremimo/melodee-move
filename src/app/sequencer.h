@@ -122,6 +122,7 @@ public:
     bool recording() const { return rec; }
     bool counting_in() const;
     void record(bool on);
+    void press_record() { record(!rec && !rec_waiting); } // Rec's press: record, or stop (a count-in too)
     // Note Repeat (11.6): the selected track's, its style (0 Repeat, 1-5
     // the arp Up, Down, Up-down, Random, Order) and rate (engine/arp.h).
     void set_repeat(unsigned track, bool on, unsigned style, unsigned rate); // style 0 Repeat, 1-5 the arp's modes

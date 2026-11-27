@@ -76,7 +76,9 @@ reader (`shell/midi_route.cpp`, `shell/mtc_in.cpp`) are compiled unchanged.
   Scale on white keys, `src/app/scale_keys.h`). A MIDI track echoes what plays it on its own channel, unless that is
   the channel it came on (a keyboard and its own synth: Local Off), and a CC
   that one of its slots sends turns that slot. Remote CCs (102, 103, 104 on
-  the Remote channel) select a track, launch a pattern or a sequence;
+  the Remote channel) select a track, launch a pattern or a sequence; the
+  Remote play CC and record CC (off until set; a press is 64 or more) play,
+  or stop while playing, and press Rec;
   program change launches sequence n (what it keeps; one that keeps nothing
   is its column); a pattern launched by Remote CC 103 is kept in the
   sequence in hand, as one launched by hand; Thru sends on what no

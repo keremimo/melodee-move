@@ -11,9 +11,10 @@
 namespace app::screens {
 namespace {
 
-enum Row { InChannel, OutChannel, PadIn, ScaleKeys, PadOut, SyncIn, SyncOut, Thru, ProgramChange, RemoteChannel, TrackCc, PatternCc, SequenceCc, Panic, RowCount };
+enum Row { InChannel, OutChannel, PadIn, ScaleKeys, PadOut, SyncIn, SyncOut, Thru, ProgramChange, RemoteChannel, TrackCc, PatternCc, SequenceCc,
+           PlayCc, RecordCc, Panic, RowCount };
 const char* const labels[] {"IN CHANNEL", "OUT CHANNEL", "PAD IN", "SCALE KEYS", "PAD OUT", "SYNC IN", "SYNC OUT", "THRU", "PROG CHANGE", "REMOTE CH",
-                            "TRACK CC", "PATTERN CC", "SEQUENCE CC", "PANIC"};
+                            "TRACK CC", "PATTERN CC", "SEQUENCE CC", "PLAY CC", "REC CC", "PANIC"};
 const char* const syncs[] {"OFF", "CLOCK", "MTC"};
 const char* const pad_outs[] {"NEVER", "ALWAYS", "EMPTY"};
 
@@ -94,11 +95,13 @@ private:
         case SyncIn: return syncs[unsigned(c.sync_in) % 3];
         case SyncOut: return syncs[unsigned(c.sync_out) % 3];
         case Thru: return c.thru ? "ON" : "OFF";
-        case ProgramChange: return c.program_change ? "ON" : "OFF";
+        case ProgramChange: return c.program_change == melodee::program_sequence ? "ON" : "OFF"; // the Move has no plug-in presets to pick
         case RemoteChannel: return channel_or(c.remote_channel, "OFF");
         case TrackCc: return channel_or(c.track_cc, "OFF");
         case PatternCc: return channel_or(c.pattern_cc, "OFF");
         case SequenceCc: return channel_or(c.scene_cc, "OFF");
+        case PlayCc: return channel_or(c.play_cc, "OFF");
+        case RecordCc: return channel_or(c.record_cc, "OFF");
         default: return {};
         }
     }
@@ -113,7 +116,7 @@ private:
         case PadOut: return "PADS AND PATTERNS";
         case SyncOut: return midi.config.sync_out == melodee::MidiSync::Mtc ? "MTC 25 FPS OUT" : "";
         case ProgramChange: return "LAUNCHES PATTERN";
-        case TrackCc: case PatternCc: case SequenceCc: return "ON REMOTE CH";
+        case TrackCc: case PatternCc: case SequenceCc: case PlayCc: case RecordCc: return "ON REMOTE CH";
         case Panic: return "PUSH: ALL OFF";
         default: return {};
         }
@@ -132,11 +135,13 @@ private:
         case SyncIn: c.sync_in = melodee::MidiSync(cycle(unsigned(c.sync_in), 3)); break;
         case SyncOut: c.sync_out = melodee::MidiSync(cycle(unsigned(c.sync_out), 3)); break;
         case Thru: c.thru = way > 0; break;
-        case ProgramChange: c.program_change = way > 0; break;
+        case ProgramChange: c.program_change = way > 0 ? melodee::program_sequence : melodee::program_off; break;
         case RemoteChannel: c.remote_channel = uint8_t(std::clamp(int(c.remote_channel) + delta, 0, 16)); break;
         case TrackCc: c.track_cc = uint8_t(std::clamp(int(c.track_cc) + delta, 0, 127)); break;
         case PatternCc: c.pattern_cc = uint8_t(std::clamp(int(c.pattern_cc) + delta, 0, 127)); break;
         case SequenceCc: c.scene_cc = uint8_t(std::clamp(int(c.scene_cc) + delta, 0, 127)); break;
+        case PlayCc: c.play_cc = uint8_t(std::clamp(int(c.play_cc) + delta, 0, 127)); break;
+        case RecordCc: c.record_cc = uint8_t(std::clamp(int(c.record_cc) + delta, 0, 127)); break;
         default: return;
         }
         studio.changed(); // Move.settings goes with the next save

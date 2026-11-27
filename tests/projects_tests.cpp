@@ -7,7 +7,9 @@
 #include "app/melodee_app.h"
 #include "move/controls.h"
 #include "move/tools.h"
+#include "ui/track_style.h"
 #include <juce_core/juce_core.h>
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
@@ -394,10 +396,10 @@ void test_setup_and_tracks() {
     press(melodee, Button::MainPush); // COLOUR: editing
     turn_wheel(melodee, 3);
     press(melodee, Button::MainPush);
-    CHECK(studio.extras().track_colour[1] != 0 && studio.colour_of(1).bright == studio.extras().track_colour[1]);
+    CHECK(studio.project().tracks[1].colour == 3 && studio.colour_of(1).bright == ui::track_colours[2].bright);
     press(melodee, Button::Back);
     press(melodee, Button::Undo);
-    CHECK(studio.extras().track_colour[1] == 0);
+    CHECK(studio.project().tracks[1].colour == 0 && studio.colour_of(1).bright == ui::track_colour(1).bright);
     // Its name, typed.
     with(melodee, Button::Shift, [&] { press(melodee, Button::Row2); });
     turn_wheel(melodee, 1);
@@ -541,6 +543,35 @@ void test_mpc_projects() {
     CHECK(studio.project_path() != projects + "/Song.mldp" && std::filesystem::exists(projects + "/Song.mldp"));
 }
 
+// A track's colour (melodee-sample's issue 69): Melodee's own (Track::colour, TCOL), through the file; the MVPJ
+// `track_colour T N` lines of older Move builds (N a palette index) read into it, TCOL first.
+void test_track_colours() {
+    auto project = app::new_project();
+    auto bank = std::make_unique<melodee::PatternBank>();
+    app::PluginStates states;
+    app::MoveExtras extras;
+    extras.colour = ui::track_colours[4].bright;
+    project->tracks[5].colour = 7;
+    auto bytes = app::project_file_bytes(*project, *bank, states, &extras);
+    // An older build's: violet (the third track colour) on track 3, an index no track colour has on track 4, and azure
+    // on track 6, which TCOL already holds.
+    const std::string old = "melodee-move project 1\ntrack_colour 2 18\ntrack_colour 3 99\ntrack_colour 5 15\n";
+    const char tag[4] {'M', 'V', 'P', 'J'};
+    bytes.insert(bytes.end(), tag, tag + 4);
+    for (int k = 0; k < 4; ++k) bytes.push_back(uint8_t(old.size() >> (8 * k)));
+    bytes.insert(bytes.end(), old.begin(), old.end());
+    auto read = std::make_unique<melodee::Project>();
+    auto read_bank = std::make_unique<melodee::PatternBank>();
+    app::MoveExtras read_extras;
+    CHECK(app::read_project_bytes(bytes, *read, *read_bank, states, &read_extras).empty());
+    CHECK(read->tracks[5].colour == 7 && read->tracks[2].colour == 3 && read->tracks[3].colour == 0 && read->tracks[0].colour == 0);
+    CHECK(read_extras.colour == extras.colour);
+    // Written again: TCOL alone holds them.
+    auto again = app::project_file_bytes(*read, *read_bank, states, &read_extras);
+    const std::string line = "track_colour";
+    CHECK(std::search(again.begin(), again.end(), line.begin(), line.end()) == again.end());
+}
+
 // Setup's AUTOSAVE off (melodee-sample's issue 18): only SAVE writes the project;
 // REVERT on the open project's options, pushed twice, reads its file again; a
 // new project leaves the changes behind.
@@ -597,6 +628,7 @@ int main() {
     test_projects();
     test_setup_and_tracks();
     test_mpc_projects();
+    test_track_colours();
     test_autosave_off();
     std::cout << "projects-tests: " << checks - failures << "/" << checks << " checks passed\n";
     return failures ? 1 : 0;

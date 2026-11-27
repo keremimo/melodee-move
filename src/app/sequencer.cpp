@@ -473,7 +473,7 @@ bool Sequencer::job(Job job, const bindings::Use& use) {
         return true;
     }
     // Recording (14.1) and Capture (14.3).
-    case Job::Record: record(!rec && !rec_waiting); return true;
+    case Job::Record: press_record(); return true;
     case Job::Recall:
         if (!capture()) studio.say("NOTHING TO CAPTURE");
         return true;

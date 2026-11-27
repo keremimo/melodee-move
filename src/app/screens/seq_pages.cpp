@@ -132,6 +132,7 @@ public:
         for (const auto& lane : studio.sequencer().lanes_of(studio.track()))
             if (lane.param == param && (lane.pad == pad || melodee::pad_param_of(param) < 0)) return lane.name;
         if (int which = melodee::pad_param_of(param); which >= 0) return "PAD " + pad_label(pad) + " " + std::to_string(which);
+        if (param == melodee::motion_cc) return "CC " + std::to_string(pad); // a controller MIDI in moved (an MPC take's)
         return "LANE " + std::to_string(param);
     }
 

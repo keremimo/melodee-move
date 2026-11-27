@@ -613,7 +613,9 @@ void Studio::drop_module_track(unsigned t) {
 bool Studio::new_track(unsigned t, TrackKind made) {
     t %= melodee::track_count;
     if (song->tracks[t].used() || made == TrackKind::Empty || made == TrackKind::Plugin) return false;
+    const uint8_t colour = song->tracks[t].colour; // one picked while it was empty stays
     song->tracks[t] = fresh_track(made, t);
+    song->tracks[t].colour = colour;
     if (made == TrackKind::Synth) make_module_track(t);
     apply_track(t);
     changed();
@@ -624,9 +626,11 @@ void Studio::delete_track(unsigned t) {
     t %= melodee::track_count;
     drop_module_track(t);
     release_chain_fx(song->tracks[t].fx);
-    auto mix = song->tracks[t].mix; // its mix strip stays, as Melodee's Delete leaves it
+    auto mix = song->tracks[t].mix; // its mix strip stays, and its colour, as Melodee's Delete leaves them
+    const uint8_t colour = song->tracks[t].colour;
     song->tracks[t] = melodee::Track {};
     song->tracks[t].mix = mix;
+    song->tracks[t].colour = colour;
     for (auto& pattern : bank->at[t]) pattern = melodee::Pattern {};
     apply_track(t);
     if (t == selected) select(t);
@@ -1255,21 +1259,16 @@ void Studio::ask(Question question) {
 
 ui::TrackColour Studio::colour_of(unsigned t) const {
     t %= melodee::track_count;
-    uint8_t own = move_extras.track_colour[t];
-    if (!own) return ui::track_colour(t);
-    for (const auto& colour : ui::track_colours)
-        if (colour.bright == own) return colour; // one of the sixteen: its dim one too
-    return {own, own};
+    return ui::track_colours[melodee::track_colour_slot(song->tracks[t], t)]; // picked (Track::colour) or its place's
 }
 
 bool Studio::move_track(unsigned from, unsigned to) {
     from %= melodee::track_count;
     to %= melodee::track_count;
     if (from == to || !song->tracks[from].used()) return false;
-    std::swap(song->tracks[from], song->tracks[to]);   // whole: mix strip too
+    std::swap(song->tracks[from], song->tracks[to]);   // whole: mix strip and colour too
     std::swap(bank->at[from], bank->at[to]);
     std::swap(modules[from], modules[to]);             // each module keeps its entry: the track names it
-    std::swap(move_extras.track_colour[from], move_extras.track_colour[to]);
     apply_track(from);
     apply_track(to);
     if (selected == from || selected == to) select(selected == from ? to : from);
@@ -2592,6 +2591,7 @@ std::string Studio::load_kit(const std::string& file) {
                 }
         }
         copy.mix = song->tracks[t].mix;       // the track keeps its strip
+        copy.colour = song->tracks[t].colour; // and its colour
         copy_text(copy.name, std::string(kit->name));
         song->tracks[t] = copy;
         apply_track(t);

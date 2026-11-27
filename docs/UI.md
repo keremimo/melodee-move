@@ -326,8 +326,11 @@ the screens were built; the screens are `src/app/screens/kit_play.cpp`,
   turn** from Play walks nine pages of the last pad, past either end back to
   Play; Back too. Each page is eight knobs: TRIM (start, end, loop point,
   Loop Lock, gain; a picture of the region with its flags), LAYERS (the
-  layer in hand, its velocities, tune, fine, level, pan, how a hit picks; a
-  row a layer; the wheel's push loads a sample onto the layer in hand),
+  layer in hand, its velocities, tune, fine, level, pan, how a hit picks:
+  VELOCITY, CYCLE, RANDOM, their holds, or CC 1-127, where a MIDI
+  controller's value picks as the velocity would and LOW CC / HIGH CC are
+  its range, the first CC splitting the layers' ranges evenly; a row a
+  layer; the wheel's push loads a sample onto the layer in hand),
   TUNE (tune, fine, Warp, # Beats, and the kit's Follow, its mode Beats,
   Tones or Tape (Tape is Warp's Pitch mode), Pitch), AMP ENV (attack, decay,
   sustain, release, velocity sense, decay from), PLAY (One Shot or Note On,
@@ -698,7 +701,8 @@ it. `docs/ui/midi.png` is the sheet (`src/ui/mockups_midi.cpp`).
 - **MIDI Config** (Setup, Shift + Step 2: its MIDI and MIDI SYNC rows push it; Back goes back to Setup): in
   and out channels, pad MIDI in, SCALE KEYS (on an In-Key track a
   keyboard's white keys play the scale, its black keys nothing), pad MIDI
-  out, sync in and out (MIDI clock or MTC), Thru, program change, the Remote channel and CCs, PANIC. The wheel
+  out, sync in and out (MIDI clock or MTC), Thru, program change, the Remote channel and CCs (PLAY CC and REC CC: a
+  pedal's press plays or stops, or presses Rec), PANIC. The wheel
   picks a row, push edits it (`[MTC]`), the wheel sets it, push again done;
   push on PANIC sends it. The rail's bottom says `IN` and `OUT` as MIDI
   passes; the detail line `EXT CLOCK` and the tempo heard, or `EXT MTC`,
@@ -891,7 +895,8 @@ sheet (`src/ui/mockups_projects.cpp`); the screens draw with the same code
   (`[MED]`: the wheel turns it, a push keeps it, Back leaves it as it was);
   a value of two flips at once. Step 2 flashes while it is open.
 - **A track's options** (Shift + a track button): its COLOUR (the wheel
-  turns it, the track button and the pads showing it as it turns) and its
+  turns it, the track button and the pads showing it as it turns; kept with
+  the track in the project, as Melodee on the MPC keeps it) and its
   NAME; move-midi adds its MIDI channels. Both are undo steps.
 
 | Screen | Rail | Subject | Detail |

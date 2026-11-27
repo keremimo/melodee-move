@@ -26,11 +26,12 @@ namespace app {
 using PluginStates = std::array<std::vector<uint8_t>, melodee::max_plugins>;
 
 // The Move's own part of a project, beside Melodee's: kept in the file's
-// Move section ("MVPJ", text: `colour N`, `track_colour T N`), which
-// Melodee's reader skips, and covered by undo (history.h).
+// Move section ("MVPJ", text: `colour N`), which Melodee's reader skips, and
+// covered by undo (history.h). A track's colour is the project's own
+// (Track::colour, TCOL); the `track_colour T N` lines older Move builds wrote
+// here (N a palette index, ui/track_style.h) are read into it.
 struct MoveExtras {
-    std::array<uint8_t, melodee::track_count> track_colour {}; // a palette index; 0: the track's own (ui/track_style.h)
-    uint8_t colour = 0;                                         // the project's, on its Set Overview pad; 0: none picked
+    uint8_t colour = 0; // the project's, on its Set Overview pad; 0: none picked
     uint8_t spare[15] {};
 };
 

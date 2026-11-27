@@ -79,6 +79,23 @@ int colour_choice(uint32_t colour) {
 int warp_place(int warp) { return warp == melodee::warp_off ? 0 : warp == melodee::warp_seq ? 1 : 2 + (std::clamp(warp, 50, 200) - 50) / 5; }
 int warp_value(int place) { return place <= 0 ? melodee::warp_off : place == 1 ? melodee::warp_seq : 50 + (place - 2) * 5; }
 
+// LAYERS' play (issue 66): a hit's velocity, a cycle, chance, or a MIDI controller's value picks the layers.
+bool cc_layers(const PadSound& sound) { return sound.layer_play == melodee::LayerPlay::Cc; }
+std::string layer_play_text(const Edit&, int choice) {
+    if (choice >= int(melodee::LayerPlay::Cc)) return "CC " + std::to_string(choice - int(melodee::LayerPlay::Cc) + 1);
+    return melodee::layer_play_name(melodee::LayerPlay(choice));
+}
+// The title's short name: VEL, CYC, RND (each hold as its way), or the controller.
+std::string layer_play_tag(const PadSound& sound) {
+    using L = melodee::LayerPlay;
+    switch (sound.layer_play) {
+    case L::Velocity: return "VEL";
+    case L::Cycle: case L::CycleHold: return "CYC";
+    case L::Cc: return "CC " + std::to_string(sound.layer_cc);
+    default: return "RND";
+    }
+}
+
 // A layer's values: layer 1 is the pad's own (its tune, level and pan are the pad's).
 melodee::PadLayer* layer_of(Edit& e) { return e.layer ? &e.sound.layers[(e.layer - 1) % 3] : nullptr; }
 
@@ -100,9 +117,10 @@ const std::array<std::array<Value, 8>, PageCount>& pages() {
         }},
         {{  // LAYERS: knob 1 the layer in hand (the screen's own)
             {"LAYER", "LYR", 1, 4, nullptr, nullptr, number},
-            {"LOW VELOCITY", "LOW", 1, 127,
+            {"LOW VELOCITY", "LOW", 1, 127, // under CC (issue 66) the controller's values, 1 taking in 0: LOW CC
              [](const Edit& e) { return int(e.layer ? e.sound.layers[(e.layer - 1) % 3].low : e.sound.low_velocity); },
-             [](Edit& e, int v) { if (auto* l = layer_of(e)) { l->low = uint8_t(v); l->high = std::max(l->high, l->low); } else { e.sound.low_velocity = uint8_t(v); e.sound.high_velocity = std::max(e.sound.high_velocity, e.sound.low_velocity); } }, number},
+             [](Edit& e, int v) { if (auto* l = layer_of(e)) { l->low = uint8_t(v); l->high = std::max(l->high, l->low); } else { e.sound.low_velocity = uint8_t(v); e.sound.high_velocity = std::max(e.sound.high_velocity, e.sound.low_velocity); } },
+             [](const Edit& e, int v) { return std::to_string(cc_layers(e.sound) && v == 1 ? 0 : v); }},
             {"HIGH VELOCITY", "HIG", 1, 127,
              [](const Edit& e) { return int(e.layer ? e.sound.layers[(e.layer - 1) % 3].high : e.sound.high_velocity); },
              [](Edit& e, int v) { if (auto* l = layer_of(e)) { l->high = uint8_t(v); l->low = std::min(l->low, l->high); } else { e.sound.high_velocity = uint8_t(v); e.sound.low_velocity = std::min(e.sound.low_velocity, e.sound.high_velocity); } }, number},
@@ -114,9 +132,9 @@ const std::array<std::array<Value, 8>, PageCount>& pages() {
              [](Edit& e, int v) { if (auto* l = layer_of(e)) l->gain = int16_t(v); else e.sound.gain = int16_t(v); }, hundredths_db, -1, false, 50},
             {"LAYER PAN", "PAN", -50, 50, [](const Edit& e) { return int(e.layer ? e.sound.layers[(e.layer - 1) % 3].pan : e.sound.pan); },
              [](Edit& e, int v) { if (auto* l = layer_of(e)) l->pan = int8_t(v); else e.sound.pan = int8_t(v); }, pan_text},
-            {"HOW A HIT PICKS", "HOW", 0, int(melodee::LayerPlay::Count) - 1, [](const Edit& e) { return int(e.sound.layer_play); },
-             [](Edit& e, int v) { e.sound.layer_play = melodee::LayerPlay(v); },
-             [](const Edit&, int v) { return std::string(melodee::layer_play_name(melodee::LayerPlay(v))); }},
+            // The five ways, then CC 1 to CC 127 (issue 66): the first CC splits the used layers' ranges evenly.
+            {"HOW A HIT PICKS", "HOW", 0, melodee::layer_play_choices - 1, [](const Edit& e) { return melodee::layer_play_choice(e.sound); },
+             [](Edit& e, int v) { melodee::set_layer_play_choice(e.sound, v); }, layer_play_text},
         }},
         {{  // TUNE: the pad's tune and Warp, the kit's Follow and warp mode
             {"TUNE", "TUN", -36, 36, [](const Edit& e) { return int(e.sound.pitch); }, [](Edit& e, int v) { e.sound.pitch = int8_t(v); }, semitones},
@@ -294,7 +312,9 @@ public:
         int v = value.get(edit);
         int low = value.low, high = value.frames ? int(edit.frames) : value.high;
         float fraction = high > low ? float(v - low) / float(high - low) : 0.0f;
-        return {value.name, value.text(edit, v), fraction};
+        const char* name = value.name;
+        if (page == Layers && (which == 1 || which == 2) && cc_layers(sound)) name = which == 1 ? "LOW CC" : "HIGH CC"; // issue 66
+        return {name, value.text(edit, v), fraction};
     }
     std::string knob_owner() const override { return pad_label(studio.pad()); }
     // TRIM's START, END and LOOP POINT touched: the place close up under its value.
@@ -404,7 +424,7 @@ private:
     }
 
     void draw_layers(juce::Graphics& g, const PadSound& sound) {
-        title(g, "LAYERS", sound.layer_play == melodee::LayerPlay::Velocity ? "VEL" : sound.layer_play == melodee::LayerPlay::Cycle ? "CYC" : "RND");
+        title(g, "LAYERS", layer_play_tag(sound));
         for (unsigned n = 0; n < melodee::pad_layers; ++n) {
             int y = 11 + int(n) * 10;
             const auto one = sound.layer(n);
@@ -412,7 +432,7 @@ private:
             std::string name = sample ? upper(sample->name.substr(0, sample->name.rfind('.'))) : "--";
             move::draw_text(g, ui::content_x + 2, y + 1, std::to_string(n + 1));
             move::draw_text(g, ui::content_x + 10, y + 1, name.substr(0, 10));
-            if (one.used()) { // its velocities across 1-127
+            if (one.used()) { // its velocities across 1-127 (under CC the controller's values)
                 int x0 = 98 + one.low * 28 / 127, x1 = 98 + one.high * 28 / 127;
                 g.fillRect(98, y + 7, 28, 1);
                 g.fillRect(x0, y + 4, std::max(1, x1 - x0), 3);
@@ -421,7 +441,8 @@ private:
         }
         const auto one = sound.layer(unsigned(layer));
         char text[24], gain[16];
-        std::snprintf(text, sizeof text, "VEL %d-%d", one.low, one.high);
+        if (cc_layers(sound)) std::snprintf(text, sizeof text, "CC %d-%d", one.low == 1 ? 0 : one.low, one.high);
+        else std::snprintf(text, sizeof text, "VEL %d-%d", one.low, one.high);
         std::snprintf(gain, sizeof gain, "%+.1f DB", one.gain / 100.0);
         ui::detail(g, layer > 0 && !one.used() ? "PUSH: LOAD" : text, layer > 0 && one.used() ? gain : "");
     }

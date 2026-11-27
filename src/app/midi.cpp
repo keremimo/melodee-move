@@ -3,6 +3,7 @@
 // after melodee-sample's shell/midi_io.cpp, which does the same for the
 // MPC's jacks and USB.
 #include "app/midi.h"
+#include "app/sampling.h"
 #include "app/scale_keys.h"
 #include "app/sequencer.h"
 #include "app/studio.h"
@@ -189,6 +190,11 @@ void Midi::receive(Studio& studio, const move::ExternalMidi& m) {
             else if (job.kind == K::Scene) {
                 studio.sequencer().launch_scene(job.index); // what it keeps (sequence links)
                 studio.say("SEQUENCE " + std::to_string(job.index + 1));
+            } else if (job.kind == K::Play) { // a foot pedal (issue 7): as Play, Stop while playing
+                if (studio.playing()) { studio.stop(); studio.sampling().stop(); }
+                else studio.play();
+            } else if (job.kind == K::Record) {
+                studio.sequencer().press_record(); // as Rec on a Play screen: record, or stop recording
             }
             return;
         }
@@ -255,7 +261,7 @@ void Midi::receive(Studio& studio, const move::ExternalMidi& m) {
     if (!channel_message) return;
 
     if (type == 0xc0) { // program change: sequence n, as the column sheet's push (sequence links)
-        if (!config.program_change || (config.in_channel && config.in_channel != channel)) return;
+        if (config.program_change != melodee::program_sequence || (config.in_channel && config.in_channel != channel)) return;
         if (a >= melodee::pattern_count) return;
         studio.sequencer().launch_scene(a);
         studio.say("PROGRAM CHANGE SEQ " + std::to_string(a + 1));

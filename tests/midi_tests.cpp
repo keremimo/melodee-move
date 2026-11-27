@@ -275,10 +275,36 @@ void test_in() {
     { std::lock_guard<std::mutex> hold(rig.studio().lock); CHECK(rig.studio().track() == 0); }
     rig.in_message({0xbf, 103, 5}); // pattern 6 on the selected track
     { std::lock_guard<std::mutex> hold(rig.studio().lock); CHECK(rig.studio().project().tracks[0].pattern == 5); }
+    // The play and record CCs (melodee-sample's issue 7, a foot pedal): a press plays, or stops while playing; the
+    // record CC is Rec's press; a pedal let go does nothing.
+    {
+        std::lock_guard<std::mutex> hold(rig.studio().lock);
+        rig.studio().midi.config.play_cc = 85;
+        rig.studio().midi.config.record_cc = 86;
+    }
+    auto playing = [&] {
+        rig.blocks(8);
+        rig.pump();
+        std::lock_guard<std::mutex> hold(rig.studio().lock);
+        return rig.studio().playing();
+    };
+    auto recording = [&] { std::lock_guard<std::mutex> hold(rig.studio().lock); return rig.studio().sequencer().recording(); };
+    rig.in_message({0xbf, 85, 127});
+    CHECK(playing());
+    rig.in_message({0xbf, 85, 0});
+    CHECK(playing());
+    rig.in_message({0xbf, 86, 127});
+    CHECK(recording());
+    rig.in_message({0xbf, 86, 0});
+    CHECK(recording());
+    rig.in_message({0xbf, 86, 127});
+    CHECK(!recording());
+    rig.in_message({0xbf, 85, 127});
+    CHECK(!playing());
     // Program change launches that sequence (once turned on): one that keeps nothing is its column (the selected
     // track and those with notes there); one that keeps patterns puts each track on its own.
     rig.in_message({0xc0, 3});
-    { std::lock_guard<std::mutex> hold(rig.studio().lock); CHECK(rig.studio().project().tracks[2].pattern == 0); rig.studio().midi.config.program_change = true; }
+    { std::lock_guard<std::mutex> hold(rig.studio().lock); CHECK(rig.studio().project().tracks[2].pattern == 0); rig.studio().midi.config.program_change = melodee::program_sequence; }
     rig.in_message({0xc0, 3});
     { std::lock_guard<std::mutex> hold(rig.studio().lock); CHECK(rig.studio().project().tracks[2].pattern == 0 && rig.studio().project().tracks[0].pattern == 3); }
     {

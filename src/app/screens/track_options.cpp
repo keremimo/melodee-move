@@ -33,8 +33,7 @@ public:
             if (editing && rows()[size_t(cursor)] != "COLOUR") {
                 set_channel(t, rows()[size_t(cursor)], channel(t, rows()[size_t(cursor)]) + use.delta);
             } else if (editing) {
-                int at = std::clamp(colour_index(t) + use.delta, 0, 16);
-                studio.extras().track_colour[t] = at ? ui::track_colours[size_t(at - 1)].bright : 0;
+                studio.project().tracks[t].colour = uint8_t(std::clamp(colour_index(t) + use.delta, 0, 16)); // Track::colour (TCOL)
             } else {
                 cursor = std::clamp(cursor + use.delta, 0, int(rows().size()) - 1);
             }
@@ -43,7 +42,7 @@ public:
             auto row = rows()[size_t(cursor)];
             if (row == "COLOUR") {
                 if (editing) { editing = false; studio.name_step("COLOUR T" + std::to_string(t + 1), int(t)); studio.changed(); }
-                else { editing = true; was = studio.extras().track_colour[t]; }
+                else { editing = true; was = studio.project().tracks[t].colour; }
                 return true;
             }
             if (row == "MIDI IN" || row == "MIDI OUT") {
@@ -67,7 +66,7 @@ public:
         }
         case Job::Back:
             if (editing && rows()[size_t(cursor)] != "COLOUR") { set_channel(t, rows()[size_t(cursor)], was_channel); editing = false; return true; }
-            if (editing) { studio.extras().track_colour[t] = was; editing = false; return true; }
+            if (editing) { studio.project().tracks[t].colour = was; editing = false; return true; }
             studio.close();
             return true;
         default: return false;
@@ -140,12 +139,8 @@ private:
             studio.midi.track_out[t] = uint8_t(std::clamp(value, 0, 16)); // the project's MVMO section
         }
     }
-    int colour_index(unsigned t) const {
-        uint8_t own = studio.extras().track_colour[t];
-        for (unsigned n = 0; n < 16; ++n)
-            if (ui::track_colours[n].bright == own) return int(n) + 1;
-        return 0;
-    }
+    // 0 OWN (its place's), 1-16 the track colour picked (ui::track_colours).
+    int colour_index(unsigned t) const { return std::min<int>(studio.project().tracks[t].colour, 16); }
 };
 
 RegisterScreen registered("track-options", make<TrackOptions>);

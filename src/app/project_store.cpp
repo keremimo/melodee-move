@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #include "app/project_store.h"
 #include "melodee/model/project_file.h"
+#include "ui/track_style.h"
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -116,6 +117,14 @@ KitFile chops_of(const melodee::Project& project) {
     return kit;
 }
 
+// A track's colour as an older Move build kept it (MVPJ's `track_colour T N`, N a palette index): the track colour
+// of that index (1-16, Track::colour), unless the file's TCOL already gave the track one. Any other index: its own.
+void old_track_colour(melodee::Track& track, unsigned palette) {
+    if (track.colour) return;
+    for (unsigned n = 0; n < ui::track_colours.size(); ++n)
+        if (ui::track_colours[n].bright == palette) track.colour = uint8_t(n + 1);
+}
+
 } // namespace
 
 std::vector<uint8_t> project_file_bytes(const melodee::Project& project, const melodee::PatternBank& patterns, const PluginStates& states,
@@ -132,9 +141,7 @@ std::vector<uint8_t> project_file_bytes(const melodee::Project& project, const m
         std::ostringstream out;
         out << move_header << '\n';
         if (extras->colour) out << "colour " << unsigned(extras->colour) << '\n';
-        for (unsigned t = 0; t < melodee::track_count; ++t)
-            if (extras->track_colour[t]) out << "track_colour " << t << ' ' << unsigned(extras->track_colour[t]) << '\n';
-        section(move_tag, out.str());
+        section(move_tag, out.str()); // the tracks' colours: Melodee's TCOL (Track::colour)
     }
     return bytes;
 }
@@ -165,7 +172,7 @@ std::string read_project_bytes(const std::vector<uint8_t>& bytes, melodee::Proje
             for (const auto& sample : kit.samples)
                 if (sample.chop.used()) project.chops.edit(sample.slot) = sample.chop;
         }
-        if (extras && !std::memcmp(bytes.data() + at, move_tag, 4)) {
+        if (!std::memcmp(bytes.data() + at, move_tag, 4)) {
             std::istringstream text(std::string(bytes.begin() + long(at + 8), bytes.begin() + long(at + 8 + size)));
             std::string line;
             if (std::getline(text, line) && line == move_header)
@@ -174,8 +181,8 @@ std::string read_project_bytes(const std::vector<uint8_t>& bytes, melodee::Proje
                     std::string word;
                     unsigned a = 0, b = 0;
                     fields >> word >> a;
-                    if (word == "colour") extras->colour = uint8_t(std::min(a, 127u));
-                    else if (word == "track_colour" && (fields >> b) && a < melodee::track_count) extras->track_colour[a] = uint8_t(std::min(b, 127u));
+                    if (word == "colour") { if (extras) extras->colour = uint8_t(std::min(a, 127u)); }
+                    else if (word == "track_colour" && (fields >> b) && a < melodee::track_count) old_track_colour(project.tracks[a], b);
                 }
         }
         at += 8 + size;

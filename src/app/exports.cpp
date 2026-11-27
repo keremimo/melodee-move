@@ -394,8 +394,11 @@ void Exports::project_job() {
     char said[64] = {};
     if (kind == Kind::Live) {
         melodee::LiveExport report;
+        melodee::LiveColours colours {}; // each track in the colour it shows: picked (Track::colour) or its place's
+        for (unsigned t = 0; t < melodee::track_count; ++t)
+            colours[t] = ui::live_track_colours[melodee::track_colour_slot(copy_project->tracks[t], t)];
         error = melodee::export_live_set(*copy_project, *copy_bank, path, name, report, copy_prints.get(), copy_prints_dir,
-                                         copy_audio_dir, &ui::live_track_colours);
+                                         copy_audio_dir, &colours);
         // Run as root over SSH, everything it wrote goes to the Move's user.
         if (error.empty()) {
             const fs::path made = fs::path(path) / (name + " Project");
