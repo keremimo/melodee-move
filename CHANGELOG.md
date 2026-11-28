@@ -4,6 +4,26 @@ Melodee for Ableton Move as Schwung's module catalog installs it
 (`melodee-move-module.tar.gz`). A version is `module/module.json`'s;
 `tools/release.sh` builds it and takes its release notes from here.
 
+## 0.6.0 (2026-11-28)
+
+- Melodee's engine from ellic-core ec5f4c4, as Melodee on the MPC Sample
+  has it.
+- The sequencer runs at 960 ticks a quarter, as the MPC. Roll's nudge
+  moves a 96th of a quarter a detent, a tick with Shift held; note lengths
+  show in steps.
+- Looper lengths, the rec length and song clips go up to 128 bars.
+- Undo keeps the last 512 steps, as long as they fit in 64 MB; the oldest
+  go first.
+- The SPEED knob runs x1/64 to x4. A project's track directions and step
+  sounds play as on the MPC.
+- LAYERS picks a kit pad's layer by a MIDI CC: HOW past RANDOM HOLD runs
+  CC 1 to CC 127, and LOW CC and HIGH CC set each layer's range.
+- A track's colour is kept in the project, as on the MPC. Colours set by
+  older Move builds are read.
+- MIDI Config: PLAY CC and REC CC on the Remote channel play, stop and
+  record as the Play and Rec buttons do.
+- A recorded CC lane from an MPC project shows as CC n on the Motion page.
+
 ## 0.5.0 (2026-11-24)
 
 - Melodee's engine from ellic-core 21dcb83, as Melodee on the MPC Sample
